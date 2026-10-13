@@ -20,21 +20,51 @@ Every setting has a **macOS** choice, meaning the toolkit leaves that behaviour 
 | Wheel speed | macOS / custom multiplier | scroll event tap |
 | Wheel acceleration | macOS / off / custom | `HIDMouseScrollAcceleration` on the device's HID service |
 | Wheel smoothing | macOS / smooth | scroll event tap |
+| Back and forward buttons | macOS / navigate | event tap; sends a navigation swipe to Apple apps |
 
 Profiles are keyed by vendor ID, product ID and transport, and stored in
 `~/Library/Application Support/MacOS Toolkit/mouse.json`.
 
-Cursor settings need no permission. The wheel settings that go through the event tap need
-**Accessibility**. Trackpad scrolling is never modified.
+Cursor settings need no permission. The wheel and button settings that go through the event tap
+need **Accessibility**. Trackpad scrolling is never modified.
 
-## Building
+## Installing on a Mac
 
-Only the Xcode Command Line Tools are needed.
+Needs macOS 15 or later. Nothing is downloaded prebuilt: the app is compiled on the Mac it runs on.
 
-```bash
-./scripts/make-cert.sh        # once: local signing identity, so macOS keeps permissions across rebuilds
-./scripts/build.sh --install  # builds, copies to /Applications and launches
-```
+1. Install the Xcode Command Line Tools (skip if `swift --version` already works):
+
+   ```bash
+   xcode-select --install
+   ```
+
+2. Clone the repo (it is private, so sign in first with `gh auth login`):
+
+   ```bash
+   gh repo clone joafalves/macos-toolkit && cd macos-toolkit
+   ```
+
+3. Create the local signing identity. This is per Mac and only needed once; it lets macOS keep
+   the app's permissions across rebuilds. macOS may ask for the login keychain password.
+
+   ```bash
+   ./scripts/make-cert.sh
+   ```
+
+4. Build, install to `/Applications` and launch:
+
+   ```bash
+   ./scripts/build.sh --install
+   ```
+
+5. In the app: **General → Grant Access…** and enable *MacOS Toolkit* under
+   System Settings → Privacy & Security → Accessibility. Turn on **Launch at login** if wanted.
+
+6. To carry settings over, use **General → Export…** on the old Mac and **Import…** on the new
+   one. Mouse profiles are per mouse model and connection, so they apply as soon as the same
+   mouse is connected.
+
+To update later: `git pull && ./scripts/build.sh --install`.
 
 `swift scripts/make-icon.swift` regenerates the app icon.
 
