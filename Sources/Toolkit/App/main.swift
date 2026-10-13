@@ -11,6 +11,14 @@ if CommandLine.arguments.contains("--register-login-item") {
     exit(0)
 }
 
+// Development aid: `--snapshot <png> [section] [light]` renders the main window
+// to an image without showing it, so layout can be checked from the terminal.
+if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.arguments.count > flag + 1 {
+    let rest = Array(CommandLine.arguments[(flag + 1)...])
+    Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"))
+    exit(0)
+}
+
 // Two instances would fight over the same device properties.
 let bundleID = Bundle.main.bundleIdentifier ?? "dev.jalves.macos-toolkit"
 let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)

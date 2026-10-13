@@ -26,34 +26,45 @@ private struct GeneralView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var mouse: MouseController
 
+    private var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    }
+
     var body: some View {
-        Form {
-            Section {
-                Toggle("Launch at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-            }
-            Section {
-                LabeledContent {
-                    Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse) }
-                    Button("Import…") { SettingsTransfer.importSettings(mouse: mouse) }
-                } label: {
-                    Text("Settings")
-                    Text("Save every setting to a file, or load them from one.")
+        Page {
+            HStack(spacing: 14) {
+                IconTile(symbol: "wrench.and.screwdriver.fill")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("MacOS Toolkit").font(.title2.weight(.semibold))
+                    Text("Version \(version)").font(.subheadline).foregroundStyle(.secondary)
                 }
             }
-            Section("Permissions") {
-                LabeledContent("Accessibility") {
+
+            Card(title: "Startup") {
+                ToggleRow(title: "Launch at login",
+                          caption: "Start in the menu bar when you log in.",
+                          isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+            }
+
+            Card(title: "Backup") {
+                SettingRow(title: "Settings file", caption: "Save every setting to a file, or load them from one.") {
+                    HStack(spacing: 8) {
+                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse) }
+                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse) }
+                    }
+                }
+            }
+
+            Card(title: "Permissions") {
+                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing.") {
                     if mouse.accessibilityGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
                         Button("Grant Access…") { mouse.requestAccessibility() }
                     }
                 }
-                Text("Used by Mouse Settings for wheel direction, speed and smoothing.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
         .navigationTitle("General")
     }
 }
