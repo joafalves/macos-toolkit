@@ -31,6 +31,15 @@ private struct GeneralView: View {
             Section {
                 Toggle("Launch at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
             }
+            Section {
+                LabeledContent {
+                    Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse) }
+                    Button("Import…") { SettingsTransfer.importSettings(mouse: mouse) }
+                } label: {
+                    Text("Settings")
+                    Text("Save every setting to a file, or load them from one.")
+                }
+            }
             Section("Permissions") {
                 LabeledContent("Accessibility") {
                     if mouse.accessibilityGranted {
