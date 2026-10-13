@@ -24,6 +24,9 @@ final class AppState: ObservableObject {
     /// Sidebar selection of the settings window: a device id, or "general".
     @Published var selection: String?
     @Published private(set) var accessibilityGranted = false
+    /// Accessibility is granted but macOS still refused the event tap; this
+    /// happens when the grant predates the running process.
+    @Published private(set) var wheelTapFailed = false
     @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     private let monitor = ActivityMonitor()
@@ -77,8 +80,15 @@ final class AppState: ObservableObject {
         }
 
         let trusted = AXIsProcessTrusted()
-        if trusted != accessibilityGranted { accessibilityGranted = trusted }
-        if trusted, !wheel.isRunning { wheel.start() }
+        if trusted != accessibilityGranted {
+            accessibilityGranted = trusted
+            NSLog("Tiller: accessibility granted = \(trusted)")
+        }
+        if trusted, !wheel.isRunning {
+            let started = wheel.start()
+            NSLog("Tiller: scroll event tap started = \(started)")
+            if wheelTapFailed == started { wheelTapFailed = !started }
+        }
     }
 
     func profile(for device: MouseDevice) -> Profile {
@@ -178,6 +188,14 @@ final class AppState: ObservableObject {
 
     func requestInputMonitoring() {
         IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+    }
+
+    func relaunch() {
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {

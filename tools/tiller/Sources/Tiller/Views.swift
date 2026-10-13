@@ -72,6 +72,19 @@ private struct ProfileView: View {
     var body: some View {
         let p = profile
         Form {
+            if p.wrappedValue.rewritesWheelEvents {
+                if !state.accessibilityGranted {
+                    PermissionNote(text: "Wheel direction, speed and smoothing are not active yet: Tiller needs the Accessibility permission.",
+                                   button: "Grant Access…") { state.requestAccessibility() }
+                } else if state.wheelTapFailed {
+                    PermissionNote(text: "Accessibility is granted, but Tiller has to restart before wheel settings take effect.",
+                                   button: "Restart Tiller") { state.relaunch() }
+                } else if state.needsInputMonitoring {
+                    PermissionNote(text: "With several mice connected, Input Monitoring lets Tiller tell which one is scrolling.",
+                                   button: "Allow…") { state.requestInputMonitoring() }
+                }
+            }
+
             Section("Cursor") {
                 OptionRow(title: "Speed", caption: "How far the cursor travels for a given hand movement.",
                           selection: p.cursorSpeedMode, options: [(.macOS, "macOS"), (.custom, "Custom")]) {
@@ -108,14 +121,6 @@ private struct ProfileView: View {
                           selection: p.smoothScrolling, options: [(false, "macOS"), (true, "Smooth")]) { EmptyView() }
             } header: {
                 Text("Wheel")
-            } footer: {
-                if p.wrappedValue.rewritesWheelEvents, !state.accessibilityGranted {
-                    PermissionNote(text: "Direction, speed and smoothing need the Accessibility permission to take effect.",
-                                   button: "Grant Access…") { state.requestAccessibility() }
-                } else if p.wrappedValue.rewritesWheelEvents, state.needsInputMonitoring {
-                    PermissionNote(text: "With several mice connected, Input Monitoring lets Tiller tell which one is scrolling.",
-                                   button: "Allow…") { state.requestInputMonitoring() }
-                }
             }
 
             Section {
@@ -193,7 +198,6 @@ private struct PermissionNote: View {
             Spacer()
             Button(button, action: action)
         }
-        .padding(.top, 4)
     }
 }
 
