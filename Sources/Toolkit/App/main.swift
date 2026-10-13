@@ -1,7 +1,18 @@
 import AppKit
+import ServiceManagement
+
+// Maintenance flags, used by the build script when the app is replaced.
+if CommandLine.arguments.contains("--unregister-login-item") {
+    try? SMAppService.mainApp.unregister()
+    exit(0)
+}
+if CommandLine.arguments.contains("--register-login-item") {
+    try? SMAppService.mainApp.register()
+    exit(0)
+}
 
 // Two instances would fight over the same device properties.
-let bundleID = Bundle.main.bundleIdentifier ?? "dev.jalves.tiller"
+let bundleID = Bundle.main.bundleIdentifier ?? "dev.jalves.macos-toolkit"
 let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
     .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
 if !others.isEmpty {

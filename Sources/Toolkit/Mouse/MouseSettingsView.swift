@@ -1,68 +1,23 @@
 import SwiftUI
 
-private let generalTag = "general"
-
-struct SettingsView: View {
-    @ObservedObject var state: AppState
+/// The "Mouse Settings" section: pick a mouse, then edit its profile.
+struct MouseSettingsView: View {
+    @ObservedObject var mouse: MouseController
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $state.selection) {
-                Section("Mice") {
-                    if state.devices.isEmpty {
-                        Text("No mouse connected").foregroundStyle(.secondary)
-                    }
-                    ForEach(state.devices) { device in
-                        DeviceRow(device: device).tag(device.id)
-                    }
-                }
-                Section {
-                    Label("General", systemImage: "gearshape").tag(generalTag)
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
-        } detail: {
-            if state.selection == generalTag {
-                GeneralView(state: state)
-            } else if let device = state.devices.first(where: { $0.id == state.selection }) {
-                ProfileView(state: state, device: device)
+        Group {
+            if let device = mouse.devices.first(where: { $0.id == mouse.selectedID }) {
+                ProfileView(state: mouse, device: device)
             } else {
-                Text("Select a mouse").foregroundStyle(.secondary)
+                Text("No mouse connected").foregroundStyle(.secondary)
             }
         }
-        .onAppear { selectDefault() }
-        .onChange(of: state.devices) { selectDefault() }
-        .frame(minWidth: 720, minHeight: 560)
-    }
-
-    private func selectDefault() {
-        if state.selection == generalTag || state.devices.contains(where: { $0.id == state.selection }) { return }
-        state.selection = state.devices.first?.id ?? generalTag
+        .navigationTitle("Mouse Settings")
     }
 }
-
-private struct DeviceRow: View {
-    let device: MouseDevice
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "computermouse")
-                .foregroundStyle(device.connected ? .primary : .secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(device.name)
-                Text(device.connected ? device.transport : "Not connected")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .opacity(device.connected ? 1 : 0.6)
-    }
-}
-
-// MARK: - Per-mouse settings
 
 private struct ProfileView: View {
-    @ObservedObject var state: AppState
+    @ObservedObject var state: MouseController
     let device: MouseDevice
 
     private var profile: Binding<Profile> {
@@ -72,15 +27,30 @@ private struct ProfileView: View {
     var body: some View {
         let p = profile
         Form {
+            Section {
+                Picker("Mouse", selection: $state.selectedID) {
+                    ForEach(state.devices) { device in
+                        Text(device.connected ? "\(device.name) — \(device.transport)" : "\(device.name) (not connected)")
+                            .tag(Optional(device.id))
+                    }
+                }
+                if let level = state.battery(for: device) {
+                    LabeledContent("Battery") {
+                        Label("\(level)%", systemImage: Self.batterySymbol(level))
+                            .foregroundStyle(level <= 20 ? .red : .secondary)
+                    }
+                }
+            }
+
             if p.wrappedValue.rewritesWheelEvents {
                 if !state.accessibilityGranted {
-                    PermissionNote(text: "Wheel direction, speed and smoothing are not active yet: Tiller needs the Accessibility permission.",
+                    PermissionNote(text: "Wheel direction, speed and smoothing are not active yet: the toolkit needs the Accessibility permission.",
                                    button: "Grant Access…") { state.requestAccessibility() }
                 } else if state.wheelTapFailed {
-                    PermissionNote(text: "Accessibility is granted, but Tiller has to restart before wheel settings take effect.",
-                                   button: "Restart Tiller") { state.relaunch() }
+                    PermissionNote(text: "Accessibility is granted, but the app has to restart before wheel settings take effect.",
+                                   button: "Restart") { state.relaunch() }
                 } else if state.needsInputMonitoring {
-                    PermissionNote(text: "With several mice connected, Input Monitoring lets Tiller tell which one is scrolling.",
+                    PermissionNote(text: "With several mice connected, Input Monitoring lets the toolkit tell which one is scrolling.",
                                    button: "Allow…") { state.requestInputMonitoring() }
                 }
             }
@@ -135,7 +105,16 @@ private struct ProfileView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(device.name)
+    }
+
+    private static func batterySymbol(_ level: Int) -> String {
+        switch level {
+        case ..<13: return "battery.0percent"
+        case ..<38: return "battery.25percent"
+        case ..<63: return "battery.50percent"
+        case ..<88: return "battery.75percent"
+        default: return "battery.100percent"
+        }
     }
 }
 
@@ -198,41 +177,5 @@ private struct PermissionNote: View {
             Spacer()
             Button(button, action: action)
         }
-    }
-}
-
-// MARK: - General
-
-private struct GeneralView: View {
-    @ObservedObject var state: AppState
-
-    var body: some View {
-        Form {
-            Section {
-                Toggle("Launch at login", isOn: Binding(get: { state.launchAtLogin }, set: { state.setLaunchAtLogin($0) }))
-                Toggle(isOn: $state.config.restoreOnQuit) {
-                    Text("Restore macOS behaviour on quit")
-                    Text("When off, cursor settings stay applied after Tiller quits until the mouse reconnects.")
-                }
-                Toggle(isOn: $state.config.showAllPointingDevices) {
-                    Text("Show all pointing devices")
-                    Text("Includes trackpads and keyboards that report a pointer.")
-                }
-            }
-            Section("Permissions") {
-                LabeledContent("Accessibility") {
-                    if state.accessibilityGranted {
-                        Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    } else {
-                        Button("Grant Access…") { state.requestAccessibility() }
-                    }
-                }
-                Text("Needed for wheel direction, speed and smoothing. Cursor settings work without it.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-        .navigationTitle("General")
     }
 }

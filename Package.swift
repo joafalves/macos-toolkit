@@ -2,9 +2,9 @@
 import PackageDescription
 
 let package = Package(
-    name: "Tiller",
+    name: "Toolkit",
     platforms: [.macOS("15.0")],
     targets: [
-        .executableTarget(name: "Tiller", path: "Sources/Tiller"),
+        .executableTarget(name: "Toolkit", path: "Sources/Toolkit"),
     ]
 )

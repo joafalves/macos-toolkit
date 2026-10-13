@@ -59,7 +59,7 @@ final class WheelEngine {
         }
         if type == .scrollWheel, loggedEvents < 5 {
             loggedEvents += 1
-            NSLog("Tiller: scroll event continuous=\(event.getIntegerValueField(.scrollWheelEventIsContinuous)) lines=\(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)) points=\(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)) hasProfile=\(profileProvider() != nil)")
+            NSLog("Toolkit: scroll event continuous=\(event.getIntegerValueField(.scrollWheelEventIsContinuous)) lines=\(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)) points=\(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)) hasProfile=\(profileProvider() != nil)")
         }
         guard type == .scrollWheel,
               event.getIntegerValueField(.eventSourceUserData) != Self.marker,

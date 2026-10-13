@@ -1,6 +1,6 @@
 import Foundation
 
-/// A setting that either defers to macOS or uses Tiller's own value.
+/// A setting that either defers to macOS or uses our own value.
 enum ValueMode: String, Codable, CaseIterable {
     case macOS, custom
 }
@@ -10,7 +10,7 @@ enum AccelMode: String, Codable, CaseIterable {
     case macOS, off, custom
 }
 
-/// Per-mouse settings. Every field defaults to "macOS", meaning Tiller leaves
+/// Per-mouse settings. Every field defaults to "macOS", meaning the toolkit leaves
 /// that behaviour to System Settings.
 struct Profile: Codable, Equatable {
     var name: String
@@ -70,7 +70,7 @@ struct Profile: Codable, Equatable {
     }
 }
 
-struct Config: Codable, Equatable {
+struct MouseConfig: Codable, Equatable {
     /// Keyed by `MouseIdentity.key` (vendor:product:transport).
     var profiles: [String: Profile] = [:]
     var restoreOnQuit = true
@@ -87,21 +87,21 @@ struct Config: Codable, Equatable {
 
     static var fileURL: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Tiller", isDirectory: true)
-        return dir.appendingPathComponent("config.json")
+            .appendingPathComponent("MacOS Toolkit", isDirectory: true)
+        return dir.appendingPathComponent("mouse.json")
     }
 
-    static func load() -> Config {
+    static func load() -> MouseConfig {
         guard let data = try? Data(contentsOf: fileURL) else {
-            let config = Config.firstRun
+            let config = MouseConfig.firstRun
             config.save()
             return config
         }
-        return (try? JSONDecoder().decode(Config.self, from: data)) ?? Config()
+        return (try? JSONDecoder().decode(MouseConfig.self, from: data)) ?? MouseConfig()
     }
 
     func save() {
-        let url = Config.fileURL
+        let url = MouseConfig.fileURL
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -112,8 +112,8 @@ struct Config: Codable, Equatable {
 
     /// Seeds the MX Anywhere 2S (Bluetooth) with the cursor values carried over
     /// from the previous SteerMouse setup: tracking speed 0.685 at native CPI.
-    private static var firstRun: Config {
-        var config = Config()
+    private static var firstRun: MouseConfig {
+        var config = MouseConfig()
         var profile = Profile(name: "MX Anywhere 2S")
         profile.accelMode = .custom
         profile.accel = 0.685

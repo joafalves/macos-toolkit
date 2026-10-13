@@ -1,6 +1,6 @@
 import AppKit
 import ApplicationServices
-import ServiceManagement
+import IOKit.ps
 
 /// A row in the device list: a connected mouse, or a saved profile whose
 /// mouse is currently away.
@@ -11,8 +11,8 @@ struct MouseDevice: Identifiable, Equatable {
     var connected: Bool
 }
 
-final class AppState: ObservableObject {
-    @Published var config: Config {
+final class MouseController: ObservableObject {
+    @Published var config: MouseConfig {
         didSet {
             guard config != oldValue else { return }
             config.save()
@@ -21,23 +21,24 @@ final class AppState: ObservableObject {
     }
 
     @Published private(set) var devices: [MouseDevice] = []
-    /// Sidebar selection of the settings window: a device id, or "general".
-    @Published var selection: String?
+    /// The mouse being edited in the settings window.
+    @Published var selectedID: String?
+    /// Battery charge (0...100) by "vendor:product", for mice that report one.
+    @Published private(set) var batteries: [String: Int] = [:]
     @Published private(set) var accessibilityGranted = false
     /// Accessibility is granted but macOS still refused the event tap; this
     /// happens when the grant predates the running process.
     @Published private(set) var wheelTapFailed = false
-    @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     private let monitor = ActivityMonitor()
     private let wheel = WheelEngine()
     private var services: [PointerService] = []
-    /// Values Tiller has written this session, by "registryID/key".
+    /// Values we have written this session, by "registryID/key".
     private var written: [String: Int32] = [:]
     private var timer: Timer?
 
     init() {
-        config = Config.load()
+        config = MouseConfig.load()
         wheel.profileProvider = { [weak self] in self?.wheelProfile() }
         monitor.onDevicesChanged = { [weak self] in
             // The event service appears slightly after the device itself.
@@ -72,6 +73,12 @@ final class AppState: ObservableObject {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         list += away
         if list != devices { devices = list }
+        if selectedID == nil || !list.contains(where: { $0.id == selectedID }) {
+            let first = list.first?.id
+            if selectedID != first { selectedID = first }
+        }
+        let levels = Self.batteryLevels()
+        if levels != batteries { batteries = levels }
 
         for service in services {
             if let profile = config.profiles[service.identity.key] {
@@ -82,11 +89,11 @@ final class AppState: ObservableObject {
         let trusted = AXIsProcessTrusted()
         if trusted != accessibilityGranted {
             accessibilityGranted = trusted
-            NSLog("Tiller: accessibility granted = \(trusted)")
+            NSLog("Toolkit: accessibility granted = \(trusted)")
         }
         if trusted, !wheel.isRunning {
             let started = wheel.start()
-            NSLog("Tiller: scroll event tap started = \(started)")
+            NSLog("Toolkit: scroll event tap started = \(started)")
             if wheelTapFailed == started { wheelTapFailed = !started }
         }
     }
@@ -104,6 +111,30 @@ final class AppState: ObservableObject {
             config.profiles[device.id]?.resetToMacOS()
             config.profiles[device.id] = nil
         }
+    }
+
+    func battery(for device: MouseDevice) -> Int? {
+        guard device.connected else { return nil }
+        return batteries[device.id.split(separator: ":").prefix(2).joined(separator: ":")]
+    }
+
+    /// Reads the charge of wireless accessories from the power-source registry,
+    /// the same place the Bluetooth menu gets it from.
+    private static func batteryLevels() -> [String: Int] {
+        // 4 is kIOPSSourceForAccessories.
+        guard let blob = IOPSCopyPowerSourcesByType(4)?.takeRetainedValue(),
+              let sources = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef]
+        else { return [:] }
+        var levels: [String: Int] = [:]
+        for source in sources {
+            guard let info = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue() as? [String: Any],
+                  let vendor = info["Vendor ID"] as? Int, let product = info["Product ID"] as? Int,
+                  let current = info[kIOPSCurrentCapacityKey] as? Int
+            else { continue }
+            let max = info[kIOPSMaxCapacityKey] as? Int ?? 100
+            levels["\(vendor):\(product)"] = max > 0 ? current * 100 / max : current
+        }
+        return levels
     }
 
     var connectedCount: Int { devices.filter(\.connected).count }
@@ -197,17 +228,8 @@ final class AppState: ObservableObject {
             DispatchQueue.main.async { NSApp.terminate(nil) }
         }
     }
-
-    func setLaunchAtLogin(_ enabled: Bool) {
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-        } catch {
-            NSLog("Tiller: launch at login failed: \(error.localizedDescription)")
-        }
-        launchAtLogin = SMAppService.mainApp.status == .enabled
-    }
 }
+
+/// Not in the public IOKit headers, but it is what `pmset -g accps` uses.
+@_silgen_name("IOPSCopyPowerSourcesByType")
+private func IOPSCopyPowerSourcesByType(_ type: Int32) -> Unmanaged<CFTypeRef>?
