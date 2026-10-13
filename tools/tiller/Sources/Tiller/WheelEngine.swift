@@ -1,0 +1,151 @@
+import AppKit
+import CoreGraphics
+
+/// Rewrites wheel events from mice: direction, distance and smoothing.
+/// Trackpad and Magic Mouse scrolling (continuous events) is never touched.
+final class WheelEngine {
+    /// Stamped on events we post ourselves so the tap lets them through.
+    private static let marker: Int64 = 0x54494C4C
+
+    /// Returns the profile of the mouse that is scrolling, if it has one.
+    var profileProvider: () -> Profile? = { nil }
+
+    private var tap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
+
+    // Smooth scrolling: distance still to be delivered, in pixels.
+    private var remainingX = 0.0
+    private var remainingY = 0.0
+    private var carryX = 0.0
+    private var carryY = 0.0
+    private var flags: CGEventFlags = []
+    private var timer: Timer?
+    private var lastTick = 0.0
+
+    var isRunning: Bool { tap != nil }
+
+    /// Installs the event tap. Fails (returns false) until Accessibility is granted.
+    @discardableResult
+    func start() -> Bool {
+        if tap != nil { return true }
+        let mask = CGEventMask(1 << CGEventType.scrollWheel.rawValue)
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: mask,
+            callback: { _, type, event, refcon in
+                let engine = Unmanaged<WheelEngine>.fromOpaque(refcon!).takeUnretainedValue()
+                return engine.handle(type: type, event: event)
+            },
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ) else { return false }
+
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        self.tap = tap
+        runLoopSource = source
+        return true
+    }
+
+    private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        let pass = Unmanaged.passUnretained(event)
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            return pass
+        }
+        guard type == .scrollWheel,
+              event.getIntegerValueField(.eventSourceUserData) != Self.marker,
+              event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0,
+              let profile = profileProvider(), profile.rewritesWheelEvents
+        else { return pass }
+
+        let signY = profile.verticalInverted ? -1.0 : 1.0
+        let signX = profile.horizontalInverted ? -1.0 : 1.0
+        let speed = profile.scrollSpeedMode == .custom ? profile.scrollSpeed : 1.0
+
+        let linesY = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)) * signY
+        let linesX = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis2)) * signX
+        let fixedY = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1) * signY * speed
+        let fixedX = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2) * signX * speed
+        let pointY = Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)) * signY * speed
+        let pointX = Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)) * signX * speed
+
+        if profile.smoothScrolling {
+            // A reversal should take effect immediately rather than fight the tail.
+            if remainingY * pointY < 0 { remainingY = 0; carryY = 0 }
+            if remainingX * pointX < 0 { remainingX = 0; carryX = 0 }
+            remainingY += pointY
+            remainingX += pointX
+            flags = event.flags
+            startAnimating()
+            return nil
+        }
+
+        // The whole-line delta must be written first: setting it resets the others.
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Self.scaledLines(linesY, speed))
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Self.scaledLines(linesX, speed))
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: fixedY)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: fixedX)
+        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(pointY.rounded()))
+        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(pointX.rounded()))
+        return pass
+    }
+
+    /// Scales a line count, never rounding a real notch down to nothing.
+    private static func scaledLines(_ lines: Double, _ speed: Double) -> Int64 {
+        guard lines != 0 else { return 0 }
+        let scaled = (lines * speed).rounded()
+        return scaled == 0 ? (lines > 0 ? 1 : -1) : Int64(scaled)
+    }
+
+    // MARK: - Smooth scrolling
+
+    private func startAnimating() {
+        guard timer == nil else { return }
+        lastTick = CACurrentMediaTime()
+        let timer = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] _ in self?.tick() }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    private func tick() {
+        let now = CACurrentMediaTime()
+        let dt = min(now - lastTick, 0.05)
+        lastTick = now
+
+        // Exponential ease-out: each frame delivers a fixed share of what is left.
+        let share = 1 - exp(-dt / 0.07)
+        let stepY = Self.take(&remainingY, &carryY, share)
+        let stepX = Self.take(&remainingX, &carryX, share)
+
+        if stepX != 0 || stepY != 0,
+           let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: stepY, wheel2: stepX, wheel3: 0) {
+            event.setIntegerValueField(.eventSourceUserData, value: Self.marker)
+            event.flags = flags
+            event.post(tap: .cgSessionEventTap)
+        }
+        if remainingX == 0, remainingY == 0 {
+            timer?.invalidate()
+            timer = nil
+        }
+    }
+
+    /// Removes this frame's whole-pixel step from `remaining`, keeping the
+    /// fractional part in `carry` so no distance is lost to rounding.
+    private static func take(_ remaining: inout Double, _ carry: inout Double, _ share: Double) -> Int32 {
+        guard remaining != 0 else { return 0 }
+        var move = remaining * share
+        if abs(remaining) < 0.5 { move = remaining }
+        remaining -= move
+        carry += move
+        let whole = carry.rounded(.towardZero)
+        carry -= whole
+        if abs(remaining) < 0.01 {
+            remaining = 0
+            carry = 0
+        }
+        return Int32(whole)
+    }
+}
