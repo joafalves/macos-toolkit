@@ -11,11 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     func applicationDidFinishLaunching(_ notification: Notification) {
         mouse = MouseController()
 
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        let icon = NSImage(systemSymbolName: "wrench.and.screwdriver.fill", accessibilityDescription: "MacOS Toolkit")?
-            .withSymbolConfiguration(.init(pointSize: 15, weight: .medium))
-        icon?.isTemplate = true
-        statusItem.button?.image = icon
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem.button?.image = Self.makeStatusIcon()
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
@@ -50,6 +47,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         guard let event = NSAppleEventManager.shared().currentAppleEvent else { return false }
         return event.eventID == kAEOpenApplication
             && event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+    }
+
+    /// The menu bar glyph, fitted into the standard 18pt box. Used as-is the
+    /// symbol is taller than the menu bar allows and gets clipped.
+    static func makeStatusIcon() -> NSImage {
+        let box = NSSize(width: 18, height: 18)
+        let image = NSImage(size: box, flipped: false) { rect in
+            guard let glyph = NSImage(systemSymbolName: "wrench.and.screwdriver.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: 14, weight: .regular))
+            else { return false }
+            let area = rect.insetBy(dx: 1, dy: 1)
+            let fit = min(area.width / glyph.size.width, area.height / glyph.size.height, 1)
+            let size = NSSize(width: glyph.size.width * fit, height: glyph.size.height * fit)
+            glyph.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "MacOS Toolkit"
+        return image
     }
 
     // MARK: - Menus
