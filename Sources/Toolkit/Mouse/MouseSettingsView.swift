@@ -5,18 +5,33 @@ struct MouseSettingsView: View {
     @ObservedObject var mouse: MouseController
 
     var body: some View {
-        Group {
+        Form {
+            Section("All Mice") {
+                Toggle(isOn: $mouse.config.restoreOnQuit) {
+                    Text("Restore macOS behaviour on quit")
+                    Text("When off, cursor settings stay applied after the app quits until the mouse reconnects.")
+                }
+                Toggle(isOn: $mouse.config.showAllPointingDevices) {
+                    Text("Show all pointing devices")
+                    Text("Includes trackpads and keyboards that report a pointer.")
+                }
+            }
+
             if let device = mouse.devices.first(where: { $0.id == mouse.selectedID }) {
-                ProfileView(state: mouse, device: device)
+                ProfileSections(state: mouse, device: device)
             } else {
-                Text("No mouse connected").foregroundStyle(.secondary)
+                Section {
+                    Text("No mouse connected").foregroundStyle(.secondary)
+                }
             }
         }
+        .formStyle(.grouped)
         .navigationTitle("Mouse Settings")
     }
 }
 
-private struct ProfileView: View {
+/// The form sections for one mouse: picker, battery, cursor and wheel.
+private struct ProfileSections: View {
     @ObservedObject var state: MouseController
     let device: MouseDevice
 
@@ -26,12 +41,11 @@ private struct ProfileView: View {
 
     var body: some View {
         let p = profile
-        Form {
+        Group {
             Section {
                 Picker("Mouse", selection: $state.selectedID) {
                     ForEach(state.devices) { device in
-                        Text(device.connected ? "\(device.name) — \(device.transport)" : "\(device.name) (not connected)")
-                            .tag(Optional(device.id))
+                        Text(state.label(for: device)).tag(Optional(device.id))
                     }
                 }
                 if let level = state.battery(for: device) {
@@ -104,7 +118,6 @@ private struct ProfileView: View {
                 }
             }
         }
-        .formStyle(.grouped)
     }
 
     private static func batterySymbol(_ level: Int) -> String {

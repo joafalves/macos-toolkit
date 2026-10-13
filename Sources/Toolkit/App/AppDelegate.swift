@@ -11,8 +11,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     func applicationDidFinishLaunching(_ notification: Notification) {
         mouse = MouseController()
 
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "wrench.and.screwdriver", accessibilityDescription: "MacOS Toolkit")
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let icon = NSImage(systemSymbolName: "wrench.and.screwdriver.fill", accessibilityDescription: "MacOS Toolkit")?
+            .withSymbolConfiguration(.init(pointSize: 15, weight: .medium))
+        icon?.isTemplate = true
+        statusItem.button?.image = icon
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu

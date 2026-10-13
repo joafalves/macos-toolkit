@@ -113,6 +113,17 @@ final class MouseController: ObservableObject {
         }
     }
 
+    /// Name for the picker; the connection is only spelled out when two
+    /// entries would otherwise read the same.
+    func label(for device: MouseDevice) -> String {
+        var label = device.name
+        if devices.filter({ $0.name == device.name }).count > 1 {
+            let transport = device.transport.hasPrefix("Bluetooth") ? "Bluetooth" : device.transport
+            label += " (\(transport))"
+        }
+        return device.connected ? label : label + " — not connected"
+    }
+
     func battery(for device: MouseDevice) -> Int? {
         guard device.connected else { return nil }
         return batteries[device.id.split(separator: ":").prefix(2).joined(separator: ":")]
