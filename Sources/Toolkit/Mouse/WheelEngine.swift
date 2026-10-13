@@ -1,8 +1,9 @@
 import AppKit
 import CoreGraphics
 
-/// Rewrites wheel events from mice: direction, distance and smoothing.
-/// Trackpad and Magic Mouse scrolling (continuous events) is never touched.
+/// Rewrites events from mice: wheel direction, distance and smoothing, and
+/// the side buttons. Trackpad and Magic Mouse scrolling (continuous events)
+/// is never touched.
 final class WheelEngine {
     /// Stamped on events we post ourselves so the tap lets them through.
     private static let marker: Int64 = 0x54494C4C
@@ -31,6 +32,8 @@ final class WheelEngine {
     func start() -> Bool {
         if tap != nil { return true }
         let mask = CGEventMask(1 << CGEventType.scrollWheel.rawValue)
+            | CGEventMask(1 << CGEventType.otherMouseDown.rawValue)
+            | CGEventMask(1 << CGEventType.otherMouseUp.rawValue)
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
@@ -56,6 +59,9 @@ final class WheelEngine {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return pass
+        }
+        if type == .otherMouseDown || type == .otherMouseUp {
+            return handleButton(type: type, event: event) ? nil : pass
         }
         if type == .scrollWheel, loggedEvents < 5 {
             loggedEvents += 1
@@ -104,6 +110,47 @@ final class WheelEngine {
         guard lines != 0 else { return 0 }
         let scaled = (lines * speed).rounded()
         return scaled == 0 ? (lines > 0 ? 1 : -1) : Int64(scaled)
+    }
+
+    // MARK: - Side buttons
+
+    /// Side buttons whose press we swallowed, so the release goes the same way.
+    private var swallowedButtons: Set<Int64> = []
+
+    /// Turns the back (3) and forward (4) buttons into navigation swipes for
+    /// Apple's apps, which ignore the buttons themselves. Other apps mostly
+    /// handle the buttons natively, so they get them unchanged.
+    /// Returns true when the event was consumed.
+    private func handleButton(type: CGEventType, event: CGEvent) -> Bool {
+        let button = event.getIntegerValueField(.mouseEventButtonNumber)
+        guard button == 3 || button == 4 else { return false }
+        if type == .otherMouseUp {
+            return swallowedButtons.remove(button) != nil
+        }
+        guard profileProvider()?.navigationButtons == true,
+              NSWorkspace.shared.frontmostApplication?.bundleIdentifier?.hasPrefix("com.apple.") == true
+        else { return false }
+
+        swallowedButtons.insert(button)
+        Self.postNavigationSwipe(back: button == 3)
+        return true
+    }
+
+    /// Posts the same event a three-finger trackpad swipe produces. Apps read
+    /// it as "go back / forward", whatever the keyboard layout.
+    private static func postNavigationSwipe(back: Bool) {
+        // Undocumented gesture fields: HID event type, swipe direction, phase.
+        guard let event = CGEvent(source: nil),
+              let gestureType = CGEventType(rawValue: 29),
+              let hidType = CGEventField(rawValue: 110),
+              let swipeValue = CGEventField(rawValue: 115),
+              let phase = CGEventField(rawValue: 132)
+        else { return }
+        event.type = gestureType
+        event.setIntegerValueField(hidType, value: 16)             // navigation swipe
+        event.setIntegerValueField(swipeValue, value: back ? 4 : 8) // left : right
+        event.setIntegerValueField(phase, value: 1)                // began
+        event.post(tap: .cgSessionEventTap)
     }
 
     // MARK: - Smooth scrolling

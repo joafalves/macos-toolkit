@@ -132,15 +132,15 @@ private struct ProfileEditor: View {
     var body: some View {
         let p = profile
 
-        if p.wrappedValue.rewritesWheelEvents {
+        if p.wrappedValue.needsEventTap {
             if !mouse.accessibilityGranted {
-                Banner(text: "Wheel direction, speed and smoothing are not active yet. They need the Accessibility permission.",
+                Banner(text: "Wheel and button settings are not active yet. They need the Accessibility permission.",
                        button: "Grant Access…") { mouse.requestAccessibility() }
             } else if mouse.wheelTapFailed {
-                Banner(text: "Accessibility is granted, but the app has to restart before wheel settings take effect.",
+                Banner(text: "Accessibility is granted, but the app has to restart before wheel and button settings take effect.",
                        button: "Restart") { mouse.relaunch() }
             } else if mouse.needsInputMonitoring {
-                Banner(text: "With several mice connected, Input Monitoring lets the toolkit tell which one is scrolling.",
+                Banner(text: "With several mice connected, Input Monitoring lets the toolkit tell which one is being used.",
                        button: "Allow…") { mouse.requestInputMonitoring() }
             }
         }
@@ -183,6 +183,11 @@ private struct ProfileEditor: View {
             RowDivider()
             OptionRow(title: "Smoothing", caption: "Glide each notch instead of jumping.",
                       selection: p.smoothScrolling, options: [(false, "macOS"), (true, "Smooth")])
+        }
+
+        Card(title: "Buttons", footnote: "Other apps receive the buttons unchanged; most browsers and editors already handle them.") {
+            OptionRow(title: "Back and forward buttons", caption: "Go back and forward in Finder, Safari and other Apple apps.",
+                      selection: p.navigationButtons, options: [(false, "macOS"), (true, "Navigate")])
         }
 
         HStack(spacing: 10) {

@@ -217,7 +217,7 @@ final class MouseController: ObservableObject {
             return config.profiles[key]
         }
         // Can't tell the mice apart: only act when just one of them wants changes.
-        let candidates = connected.compactMap { config.profiles[$0.id] }.filter(\.rewritesWheelEvents)
+        let candidates = connected.compactMap { config.profiles[$0.id] }.filter(\.needsEventTap)
         return candidates.count == 1 ? candidates[0] : nil
     }
 

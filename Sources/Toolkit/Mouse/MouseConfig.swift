@@ -34,6 +34,10 @@ struct Profile: Codable, Equatable {
     var scrollAccel: Double = 0.3125
     var smoothScrolling = false
 
+    // Buttons
+    /// Turns the side buttons into back/forward navigation in Apple's apps.
+    var navigationButtons = false
+
     init(name: String) {
         self.name = name
     }
@@ -52,9 +56,14 @@ struct Profile: Codable, Equatable {
         scrollAccelMode = try c.decodeIfPresent(AccelMode.self, forKey: .scrollAccelMode) ?? .macOS
         scrollAccel = try c.decodeIfPresent(Double.self, forKey: .scrollAccel) ?? 0.3125
         smoothScrolling = try c.decodeIfPresent(Bool.self, forKey: .smoothScrolling) ?? false
+        navigationButtons = try c.decodeIfPresent(Bool.self, forKey: .navigationButtons) ?? false
     }
 
-    /// True when any setting needs the scroll event tap (and so Accessibility).
+    /// True when any setting needs the event tap (and so Accessibility).
+    var needsEventTap: Bool {
+        rewritesWheelEvents || navigationButtons
+    }
+
     var rewritesWheelEvents: Bool {
         verticalInverted || horizontalInverted || smoothScrolling
             || (scrollSpeedMode == .custom && scrollSpeed != 1.0)
@@ -62,7 +71,7 @@ struct Profile: Codable, Equatable {
 
     var isAllMacOS: Bool {
         cursorSpeedMode == .macOS && accelMode == .macOS && scrollSpeedMode == .macOS
-            && scrollAccelMode == .macOS && !verticalInverted && !horizontalInverted && !smoothScrolling
+            && scrollAccelMode == .macOS && !verticalInverted && !horizontalInverted && !smoothScrolling && !navigationButtons
     }
 
     mutating func resetToMacOS() {
