@@ -5,18 +5,26 @@ struct MainView: View {
     @ObservedObject var mouse: MouseController
 
     var body: some View {
-        NavigationSplitView {
+        // A plain split rather than NavigationSplitView: that one runs the
+        // sidebar up into the title bar, leaving the bar two-toned.
+        HStack(spacing: 0) {
             List(selection: $model.section) {
                 ForEach(AppSection.allCases) { section in
                     Label(section.title, systemImage: section.symbol).tag(section)
                 }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
-        } detail: {
-            switch model.section ?? .mouse {
-            case .mouse: MouseSettingsView(mouse: mouse)
-            case .general: GeneralView(model: model, mouse: mouse)
+            .listStyle(.sidebar)
+            .frame(width: 200)
+
+            Divider()
+
+            Group {
+                switch model.section ?? .mouse {
+                case .mouse: MouseSettingsView(mouse: mouse)
+                case .general: GeneralView(model: model, mouse: mouse)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 720, minHeight: 560)
     }
@@ -65,6 +73,5 @@ private struct GeneralView: View {
                 }
             }
         }
-        .navigationTitle("General")
     }
 }

@@ -7,7 +7,8 @@ enum Snapshot {
         let model = AppModel()
         model.section = section
         let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController())))
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.title = "MacOS Toolkit"
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         window.setContentSize(NSSize(width: 780, height: 760))
         window.layoutIfNeeded()

@@ -117,7 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if window == nil {
             let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse)))
             window.title = "MacOS Toolkit"
-            window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: 780, height: 640))
             window.isReleasedWhenClosed = false
             window.delegate = self

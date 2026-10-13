@@ -25,7 +25,6 @@ struct MouseSettingsView: View {
             }
             .padding(.top, 6)
         }
-        .navigationTitle("Mouse Settings")
     }
 }
 
