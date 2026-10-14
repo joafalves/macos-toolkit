@@ -3,6 +3,7 @@ import SwiftUI
 struct MainView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var mouse: MouseController
+    @ObservedObject var switcher: SwitcherController
 
     var body: some View {
         // A plain split rather than NavigationSplitView: that one runs the
@@ -21,7 +22,8 @@ struct MainView: View {
             Group {
                 switch model.section ?? .mouse {
                 case .mouse: MouseSettingsView(mouse: mouse)
-                case .general: GeneralView(model: model, mouse: mouse)
+                case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
+                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -33,6 +35,7 @@ struct MainView: View {
 private struct GeneralView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var mouse: MouseController
+    let switcher: SwitcherController
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
@@ -57,14 +60,14 @@ private struct GeneralView: View {
             Card(title: "Backup") {
                 SettingRow(title: "Settings file", caption: "Save every setting to a file, or load them from one.") {
                     HStack(spacing: 8) {
-                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse) }
-                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse) }
+                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher) }
+                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher) }
                     }
                 }
             }
 
             Card(title: "Permissions") {
-                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing.") {
+                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing, and by the Window Switcher.") {
                     if mouse.accessibilityGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {

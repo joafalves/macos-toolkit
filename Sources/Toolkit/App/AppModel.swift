@@ -3,13 +3,14 @@ import ServiceManagement
 
 /// The tools shown in the sidebar of the main window.
 enum AppSection: String, CaseIterable, Identifiable {
-    case mouse, general
+    case mouse, switcher, general
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .mouse: return "Mouse Settings"
+        case .switcher: return "Window Switcher"
         case .general: return "General"
         }
     }
@@ -17,6 +18,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .mouse: return "computermouse"
+        case .switcher: return "macwindow.on.rectangle"
         case .general: return "gearshape"
         }
     }

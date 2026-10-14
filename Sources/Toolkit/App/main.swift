@@ -13,9 +13,20 @@ if CommandLine.arguments.contains("--register-login-item") {
 
 // Development aid: `--snapshot <png> [section] [light]` renders the main window
 // to an image without showing it, so layout can be checked from the terminal.
+// `switcher-list` in place of a section renders the window switcher's list.
 if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.arguments.count > flag + 1 {
     let rest = Array(CommandLine.arguments[(flag + 1)...])
+    if rest.contains("switcher-list") {
+        Snapshot.writeSwitcher(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
     Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"))
+    exit(0)
+}
+
+// Development aid: `--list-windows` prints the rows the window switcher would show.
+if CommandLine.arguments.contains("--list-windows") {
+    SwitcherController.dumpWindows()
     exit(0)
 }
 

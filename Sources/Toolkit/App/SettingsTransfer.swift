@@ -5,10 +5,12 @@ import UniformTypeIdentifiers
 struct SettingsFile: Codable {
     var version = 1
     var mouse: MouseConfig
+    /// Missing in files exported before the switcher existed.
+    var switcher: SwitcherConfig?
 }
 
 enum SettingsTransfer {
-    static func exportSettings(mouse: MouseController) {
+    static func exportSettings(mouse: MouseController, switcher: SwitcherController) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "MacOS Toolkit Settings.json"
@@ -17,13 +19,13 @@ enum SettingsTransfer {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         do {
-            try encoder.encode(SettingsFile(mouse: mouse.config)).write(to: url, options: .atomic)
+            try encoder.encode(SettingsFile(mouse: mouse.config, switcher: switcher.config)).write(to: url, options: .atomic)
         } catch {
             show(error: "The settings could not be exported.", detail: error.localizedDescription)
         }
     }
 
-    static func importSettings(mouse: MouseController) {
+    static func importSettings(mouse: MouseController, switcher: SwitcherController) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
@@ -45,6 +47,7 @@ enum SettingsTransfer {
         guard confirm.runModal() == .alertFirstButtonReturn else { return }
 
         mouse.config = file.mouse
+        if let config = file.switcher { switcher.config = config }
     }
 
     private static func show(error: String, detail: String) {

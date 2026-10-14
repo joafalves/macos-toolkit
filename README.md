@@ -7,6 +7,7 @@ Personal macOS tooling, packaged as one menu bar app. Each tool is a section in 
 | Tool | What it does |
 | --- | --- |
 | Mouse Settings | Per-mouse cursor and wheel settings (SteerMouse-style), plus battery level. |
+| Window Switcher | Replaces ⌘Tab with a list of windows instead of apps (AltTab-style). |
 
 ## Mouse Settings
 
@@ -27,6 +28,29 @@ Profiles are keyed by vendor ID, product ID and transport, and stored in
 
 Cursor settings need no permission. The wheel and button settings that go through the event tap
 need **Accessibility**. Trackpad scrolling is never modified.
+
+## Window Switcher
+
+⌘Tab opens a list with one row per window, never grouped by app, across all Spaces and displays.
+Rows are in most recently used order, so row 1 is the window you are in and a quick ⌘Tab goes
+back to the previous one without showing the list at all. Minimized windows, hidden apps and
+apps without a window come last, dimmed.
+
+| Key (while ⌘ is held) | Action |
+| --- | --- |
+| ⇥ / ⇧⇥, ↓ / ↑ | Next / previous row |
+| 1 – 9 | Go straight to that row |
+| release ⌘, or click | Go to the selected row |
+| esc | Cancel |
+| W, M | Close / minimize the window |
+| H, Q | Hide / quit the app |
+
+The list opens on the main display, the display with the pointer, or the one with the active
+window, as chosen in the settings.
+
+It needs **Accessibility**, and relies on private macOS APIs to find windows on other Spaces,
+to focus a single window, and to switch the system's own ⌘Tab off (it is switched back on when
+the toolkit quits or the tool is turned off). ⌘` is left alone.
 
 ## Installing on a Mac
 
@@ -72,3 +96,4 @@ To update later: `git pull && ./scripts/build.sh --install`.
 
 - `Sources/Toolkit/App` — app shell: menu bar item, main window, general settings
 - `Sources/Toolkit/Mouse` — the Mouse Settings tool
+- `Sources/Toolkit/Switcher` — the Window Switcher tool
