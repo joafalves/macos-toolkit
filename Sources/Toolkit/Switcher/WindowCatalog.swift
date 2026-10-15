@@ -450,6 +450,16 @@ final class WindowCatalog {
         app(item.pid)?.terminate()
     }
 
+    /// Quits every app that only has dimmed rows: hidden, without windows, or
+    /// with every window minimized. Finder and the toolkit are spared.
+    func quitIdle(_ items: [SwitcherItem]) {
+        let inUse = Set(items.filter { !$0.dimmed }.map(\.pid))
+        for pid in Set(items.map(\.pid)).subtracting(inUse) where pid != ownPID {
+            guard let app = app(pid), app.bundleIdentifier != "com.apple.finder" else { continue }
+            app.terminate()
+        }
+    }
+
     /// Hides the app, or shows it again if it already is.
     func toggleHidden(_ item: SwitcherItem) {
         guard let app = app(item.pid) else { return }

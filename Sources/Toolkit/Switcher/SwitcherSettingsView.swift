@@ -15,6 +15,7 @@ struct SwitcherSettingsView: View {
         ("Minimize the window", "M"),
         ("Hide the app", "H"),
         ("Quit the app", "Q"),
+        ("Quit every dimmed app", "X"),
     ]
 
     var body: some View {

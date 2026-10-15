@@ -19,7 +19,7 @@ final class SwitcherController: ObservableObject {
     private enum Key {
         static let tab: Int64 = 48, escape: Int64 = 53, enter: Int64 = 36
         static let left: Int64 = 123, right: Int64 = 124, down: Int64 = 125, up: Int64 = 126
-        static let w: Int64 = 13, q: Int64 = 12, m: Int64 = 46, h: Int64 = 4
+        static let w: Int64 = 13, q: Int64 = 12, m: Int64 = 46, h: Int64 = 4, x: Int64 = 7
         /// Key codes of 1 to 9, in that order.
         static let digits: [Int64] = [18, 19, 20, 21, 23, 22, 26, 28, 25]
     }
@@ -171,6 +171,7 @@ final class SwitcherController: ObservableObject {
                 case Key.q: catalog.quit(item)
                 case Key.m: catalog.toggleMinimized(item)
                 case Key.h: catalog.toggleHidden(item)
+                case Key.x: catalog.quitIdle(items)
                 default: break
                 }
             }

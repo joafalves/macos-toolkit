@@ -44,6 +44,7 @@ apps without a window come last, dimmed.
 | esc | Cancel |
 | W, M | Close / minimize the window |
 | H, Q | Hide / quit the app |
+| X | Quit every app that only has dimmed rows (hidden, no windows, or all minimized), except Finder |
 
 The list opens on the main display, the display with the pointer, or the one with the active
 window, as chosen in the settings.
