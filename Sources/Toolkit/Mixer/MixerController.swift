@@ -97,6 +97,7 @@ final class MixerController: ObservableObject {
     private var masterTap: AppTap?
     private var hardwareVolume = false
     private var loggedMasterSkip = false
+    private var lastMasterSound: Date?
     private lazy var volumeKeys = VolumeKeys(mixer: self)
     /// Taps macOS refused, so they're not retried on every slider move.
     private var failed: Set<String> = []
@@ -446,10 +447,32 @@ final class MixerController: ObservableObject {
     }
 
     private func updateLevels() {
-        guard running, !taps.isEmpty else { return }
+        guard running, !taps.isEmpty || masterTap != nil else { return }
         let now = Date()
         for (pid, tap) in taps where tap.takePeak() > 0.001 { lastSound[pid] = now }
+        if let masterTap, masterTap.takePeak() > 0.001 { lastMasterSound = now }
         if currentlyAudible() != audible { updateList() }
+        // A tap kept on only to avoid a click can go once its sound has stopped.
+        if lingering(now) { applyTaps() }
+    }
+
+    /// How long a tap that is no longer needed stays up after its last sound.
+    /// Taking it down mid-playback reroutes the audio and clicks; in silence
+    /// nobody hears it.
+    private static let quietBeforeRelease: TimeInterval = 3
+
+    private func isQuiet(since last: Date?, _ now: Date = Date()) -> Bool {
+        now.timeIntervalSince(last ?? .distantPast) >= Self.quietBeforeRelease
+    }
+
+    /// Whether a tap kept on only to avoid a click has gone quiet, so it can go.
+    private func lingering(_ now: Date) -> Bool {
+        for (pid, tap) in taps where tap.controlsVolume {
+            let bundleID = groups[pid]?.app.bundleIdentifier ?? ""
+            if (config.apps[bundleID]?.isDefault ?? true), isQuiet(since: lastSound[pid], now) { return true }
+        }
+        if masterTap != nil, !softwareActive, !config.equalizer.isActive, isQuiet(since: lastMasterSound, now) { return true }
+        return false
     }
 
     private func updateList() {
@@ -525,7 +548,10 @@ final class MixerController: ObservableObject {
             // output is running get one that only listens, to see if they're
             // really making sound.
             let setting = config.apps[bundleID] ?? AppVolume(name: "")
-            let controlsVolume = !setting.isDefault
+            // An app put back to 100% keeps its tap, passing the sound through,
+            // until it goes quiet: removing it mid-playback would click.
+            let lingers = setting.isDefault && taps[pid]?.controlsVolume == true && !isQuiet(since: lastSound[pid])
+            let controlsVolume = !setting.isDefault || lingers
             guard controlsVolume || (panelOpen && group.isPlaying) else { continue }
             wanted.insert(pid)
             let objects = group.objects.sorted()
@@ -564,7 +590,10 @@ final class MixerController: ObservableObject {
     /// The equalizer needs it too, on any output: everything has to pass
     /// through the toolkit to be equalized.
     private func applyMasterTap(device: OutputDevice, controlled: [AudioObjectID], gain: Float) {
-        guard softwareActive || config.equalizer.isActive else {
+        // Like the app taps, it stays up after the equalizer goes off until the
+        // sound stops, so turning it off doesn't click.
+        let lingers = masterTap != nil && !isQuiet(since: lastMasterSound)
+        guard softwareActive || config.equalizer.isActive || lingers else {
             masterTap = nil
             return
         }

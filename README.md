@@ -88,7 +88,9 @@ macOS has no setting for one app's volume, so the mixer uses Core Audio *process
 an app's sound (which silences the original) and plays it again at the volume you chose. That needs
 the **System Audio Recording** permission, which macOS asks for the first time you turn an app down.
 
-- Apps at 100% and not muted are never rerouted. They play exactly as before.
+- Apps at 100% and not muted are never rerouted. They play exactly as before. An app put back to
+  100% keeps its tap until its sound stops, and so does the equalizer when it's turned off, because
+  removing a tap mid-playback reroutes the audio and clicks.
 - To tell real sound from an app that keeps its output open in silence (a paused Safari tab, Discord,
   games), the panel listens to each running app, but only while it is open.
 - macOS shows its purple recording indicator whenever a tap runs. Outside the panel that means only
