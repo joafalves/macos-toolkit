@@ -4,6 +4,7 @@ struct MainView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var mouse: MouseController
     @ObservedObject var switcher: SwitcherController
+    @ObservedObject var mixer: MixerController
 
     var body: some View {
         // A plain split rather than NavigationSplitView: that one runs the
@@ -23,7 +24,8 @@ struct MainView: View {
                 switch model.section ?? .mouse {
                 case .mouse: MouseSettingsView(mouse: mouse)
                 case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
-                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher)
+                case .mixer: MixerSettingsView(mixer: mixer)
+                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, mixer: mixer)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -36,6 +38,7 @@ private struct GeneralView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var mouse: MouseController
     let switcher: SwitcherController
+    @ObservedObject var mixer: MixerController
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
@@ -60,8 +63,8 @@ private struct GeneralView: View {
             Card(title: "Backup") {
                 SettingRow(title: "Settings file", caption: "Save every setting to a file, or load them from one.") {
                     HStack(spacing: 8) {
-                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher) }
-                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher) }
+                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher, mixer: mixer) }
+                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher, mixer: mixer) }
                     }
                 }
             }
@@ -72,6 +75,14 @@ private struct GeneralView: View {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
                         Button("Grant Access…") { mouse.requestAccessibility() }
+                    }
+                }
+                RowDivider()
+                SettingRow(title: "System Audio Recording", caption: "Used by the Audio Mixer to change the volume of each app.") {
+                    if mixer.permission == .granted {
+                        Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else {
+                        Button(mixer.permission == .denied ? "Open System Settings…" : "Grant Access…") { mixer.requestPermission() }
                     }
                 }
             }

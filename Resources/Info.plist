@@ -22,6 +22,8 @@
 	<string>15.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>The Audio Mixer plays each app's sound at the volume you set for it.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>

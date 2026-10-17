@@ -6,7 +6,7 @@ enum Snapshot {
         _ = NSApplication.shared
         let model = AppModel()
         model.section = section
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController(), switcher: SwitcherController())))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController(), switcher: SwitcherController(), mixer: MixerController.preview())))
         window.title = "MacOS Toolkit"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
@@ -44,6 +44,19 @@ enum Snapshot {
         window.styleMask = [.borderless]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         window.setContentSize(size)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        if let view = window.contentView { save(view, to: path) }
+    }
+
+    /// The menu bar mixer, filled with made-up rows.
+    static func writeMixer(to path: String, light: Bool, outputs: Bool) {
+        _ = NSApplication.shared
+        let host = NSHostingController(rootView: MixerPopoverView(mixer: .preview(), showOutputs: outputs).background(Color(nsColor: .windowBackgroundColor)))
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.borderless]
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.setContentSize(host.view.fittingSize)
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         if let view = window.contentView { save(view, to: path) }

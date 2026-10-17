@@ -197,3 +197,10 @@ struct IconTile: View {
             .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
     }
 }
+
+/// Local view state for `@StateObject`. `@State` is a macro in the macOS 27
+/// SDK, and the Command Line Tools ship without the plugin that expands it.
+final class ViewState<Value>: ObservableObject {
+    @Published var value: Value
+    init(_ value: Value) { self.value = value }
+}
