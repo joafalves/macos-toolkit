@@ -24,6 +24,8 @@ tool; keep it in step with the code.
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
 - `Resources`: `Info.plist` (the only place the version lives), app icon.
 - `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `make-icon.swift`.
+- `docs/images`: the README's screenshots, all rendered with `--snapshot`. The mixer and switcher
+  use made-up rows; the mouse one is cropped below the header so the real device name stays out.
 
 ## Conventions
 
@@ -75,7 +77,9 @@ bumps the patch (`0.1.2`).
    `CFBundleShortVersionString`, so it follows the plist; don't hard-code a version anywhere else.
    Search for the old version with `grep -rIn "<old>" . --exclude-dir=.git --exclude-dir=.build --exclude-dir=build`
    and update any other hit (README, docs).
-3. `README.md`: the tool table, the tool's section, and the Layout list if anything was added.
+3. `README.md`: the tool table, the tool's section, and the project layout tree if a folder was added.
+   If a page changed visibly, render new screenshots into `docs/images` (a `-light` and a `-dark`
+   image each, from `--snapshot`) so the README doesn't show an old UI.
 4. Commit as `chore: release X.Y.Z` and tag `vX.Y.Z` on that commit.
 
 To publish (only when asked; it pushes to GitHub):
