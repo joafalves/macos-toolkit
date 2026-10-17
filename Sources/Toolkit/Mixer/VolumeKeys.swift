@@ -128,6 +128,16 @@ final class VolumeHUD {
     private var hideWork: DispatchWorkItem?
     private var generation = 0
 
+    /// For `--show-hud`: puts the bar up for a few seconds.
+    static func demo() {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        let hud = VolumeHUD()
+        hud.show(volume: 0.65, muted: false)
+        RunLoop.main.run(until: Date().addingTimeInterval(6))
+        _ = hud
+    }
+
     func show(volume: Float, muted: Bool) {
         model.volume = volume
         model.muted = muted
@@ -142,6 +152,8 @@ final class VolumeHUD {
         if !panel.isVisible {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
+            // The shadow is cached from whatever the window looked like when it appeared.
+            DispatchQueue.main.async { panel.invalidateShadow() }
         }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.1
@@ -181,9 +193,10 @@ final class VolumeHUD {
         effect.material = .hudWindow
         effect.blendingMode = .behindWindow
         effect.state = .active
-        effect.wantsLayer = true
-        effect.layer?.cornerRadius = Self.size.height / 2
-        effect.layer?.masksToBounds = true
+        // The blur is drawn by the window server, which ignores a rounded layer;
+        // only a mask image shapes it, and the window's shadow follows that too.
+        // Rounding the layer instead leaves the blur as a faint square.
+        effect.maskImage = Self.capsuleMask(size: Self.size)
 
         let content = NSHostingView(rootView: VolumeHUDView(model: model))
         content.frame = effect.bounds
@@ -191,6 +204,18 @@ final class VolumeHUD {
         effect.addSubview(content)
         panel.contentView = effect
         return panel
+    }
+
+    private static func capsuleMask(size: NSSize) -> NSImage {
+        let radius = size.height / 2
+        let image = NSImage(size: size, flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
     }
 }
 

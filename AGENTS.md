@@ -57,6 +57,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software]
 .build/debug/Toolkit --list-windows          # what the Window Switcher would list
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
+.build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
 ```
 
 There is no test suite. Check UI changes by rendering `--snapshot` images in both light and dark and

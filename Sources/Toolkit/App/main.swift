@@ -41,6 +41,12 @@ if CommandLine.arguments.contains("--list-audio") {
     exit(0)
 }
 
+// Development aid: `--show-hud` shows the volume bar for a few seconds.
+if CommandLine.arguments.contains("--show-hud") {
+    VolumeHUD.demo()
+    exit(0)
+}
+
 // Two instances would fight over the same device properties.
 let bundleID = Bundle.main.bundleIdentifier ?? "dev.jalves.macos-toolkit"
 let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
