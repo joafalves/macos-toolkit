@@ -44,6 +44,8 @@ struct MixerConfig: Codable, Equatable {
     var softwareVolume = true
     /// Keyed by the output device's UID.
     var software: [String: SoftwareVolume] = [:]
+    /// When on and not flat, all sound goes through the toolkit to be equalized.
+    var equalizer = EqualizerConfig()
     /// Keyed by bundle ID.
     var apps: [String: AppVolume] = [:]
     /// Apps the mixer never lists or taps: bundle ID to name.
@@ -62,6 +64,7 @@ struct MixerConfig: Codable, Equatable {
         standaloneIcon = try c.decodeIfPresent(Bool.self, forKey: .standaloneIcon) ?? false
         softwareVolume = try c.decodeIfPresent(Bool.self, forKey: .softwareVolume) ?? true
         software = (try? c.decodeIfPresent([String: SoftwareVolume].self, forKey: .software)) ?? [:]
+        equalizer = (try? c.decodeIfPresent(EqualizerConfig.self, forKey: .equalizer)) ?? EqualizerConfig()
         apps = (try? c.decodeIfPresent([String: AppVolume].self, forKey: .apps)) ?? [:]
         ignored = (try? c.decodeIfPresent([String: String].self, forKey: .ignored)) ?? [:]
         played = (try? c.decodeIfPresent(Set<String>.self, forKey: .played)) ?? []

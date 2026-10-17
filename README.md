@@ -56,6 +56,11 @@ every app that has sound gets its own slider.
   **Never Touch** it.
 - Optionally gets **its own icon** in the menu bar, one click away, in the mixer's settings.
 - **Software volume** for outputs that have no volume control of their own (see below).
+- An **equalizer** under the main volume: five bands (60 Hz to 12 kHz, ±12 dB) with presets such as
+  Bass Boost, Vocal, Loudness and Late Night. Drag a band, or double-click it for 0 dB. While it's on
+  and not flat, all sound goes through the toolkit, the same way as the software volume, so macOS
+  shows its recording indicator. Strong boosts are kept from clipping with a little headroom and a
+  soft limiter.
 
 ### Outputs with no volume control
 

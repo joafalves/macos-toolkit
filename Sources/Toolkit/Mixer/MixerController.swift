@@ -45,6 +45,7 @@ final class MixerController: ObservableObject {
             if config.enabled != oldValue.enabled {
                 config.enabled ? start() : stop()
             } else {
+                equalizerState.set(config.equalizer)
                 // The software volume may have changed, which the taps depend on.
                 refreshMainVolume()
                 if config.ignored != oldValue.ignored || config.played != oldValue.played || config.hidden != oldValue.hidden {
@@ -108,8 +109,12 @@ final class MixerController: ObservableObject {
     private var pendingRefresh = false
     private var saveWork: DispatchWorkItem?
 
+    /// What every tap that plays sound reads its equalizer from.
+    private let equalizerState = EqualizerState()
+
     init() {
         config = MixerConfig.load()
+        equalizerState.set(config.equalizer)
     }
 
     // MARK: - Lifecycle
@@ -308,7 +313,27 @@ final class MixerController: ObservableObject {
 
     /// Whether anything is waiting on the audio permission.
     var needsAudioPermission: Bool {
-        hasCustomVolumes || (softwareActive && !(config.software[currentOutput?.uid ?? ""]?.isDefault ?? true))
+        hasCustomVolumes || config.equalizer.isActive || (softwareActive && !(config.software[currentOutput?.uid ?? ""]?.isDefault ?? true))
+    }
+
+    // MARK: - Equalizer
+
+    func setEqualizerEnabled(_ enabled: Bool) {
+        config.equalizer.enabled = enabled
+        if config.equalizer.isActive, permission == .unknown { requestPermission() }
+    }
+
+    func setBand(_ band: Int, gain: Double) {
+        let range = EqualizerConfig.range
+        config.equalizer.gains[band] = min(range, max(-range, (gain * 2).rounded() / 2))
+        config.equalizer.enabled = true
+        if config.equalizer.isActive, permission == .unknown { requestPermission() }
+    }
+
+    func applyPreset(_ preset: EqualizerPreset) {
+        config.equalizer.gains = preset.gains
+        config.equalizer.enabled = true
+        if config.equalizer.isActive, permission == .unknown { requestPermission() }
     }
 
     func keysInstalledChanged(_ installed: Bool) {
@@ -517,7 +542,8 @@ final class MixerController: ObservableObject {
                 continue
             }
             // Made before the old one is let go, so the app is never left unmuted.
-            if let tap = AppTap(objects: objects, deviceUID: device.uid, gain: gain, controlsVolume: controlsVolume) {
+            if let tap = AppTap(objects: objects, deviceUID: device.uid, gain: gain, controlsVolume: controlsVolume,
+                                equalizer: controlsVolume ? equalizerState : nil) {
                 taps[pid] = tap
                 if controlsVolume { controlled += objects }
             } else {
@@ -535,8 +561,10 @@ final class MixerController: ObservableObject {
     /// the software volume. It stays up at 100% too, where it passes the sound
     /// through untouched: taking it down there would reroute the audio in the
     /// middle of playback, which clicks every time the volume crosses 100%.
+    /// The equalizer needs it too, on any output: everything has to pass
+    /// through the toolkit to be equalized.
     private func applyMasterTap(device: OutputDevice, controlled: [AudioObjectID], gain: Float) {
-        guard softwareActive else {
+        guard softwareActive || config.equalizer.isActive else {
             masterTap = nil
             return
         }
@@ -560,7 +588,8 @@ final class MixerController: ObservableObject {
         let signature = "master \(device.uid) \(excluded)"
         guard !failed.contains(signature) else { return }
         // The new tap is up before the old one goes, so nothing plays unmuted in between.
-        if let tap = AppTap(objects: excluded, deviceUID: device.uid, gain: gain, isGlobal: true, excludedBundleIDs: bundleIDs) {
+        if let tap = AppTap(objects: excluded, deviceUID: device.uid, gain: gain, isGlobal: true,
+                            excludedBundleIDs: bundleIDs, equalizer: equalizerState) {
             masterTap = tap
         } else {
             masterTap = nil
@@ -589,7 +618,7 @@ extension MixerController {
     }
 
     /// Made-up rows for `--snapshot`, without touching Core Audio or the saved settings.
-    static func preview(software: Bool = false) -> MixerController {
+    static func preview(software: Bool = false, equalizer: Bool = false) -> MixerController {
         let mixer = MixerController()
         mixer.persists = false
         func icon(_ bundleID: String) -> NSImage? {
@@ -606,6 +635,10 @@ extension MixerController {
             "com.apple.Safari": AppVolume(name: "Safari", volume: 0.45),
             "com.apple.podcasts": AppVolume(name: "Podcasts", volume: 0.8, muted: true),
         ]
+        if equalizer {
+            mixer.config.equalizer.enabled = true
+            mixer.config.equalizer.gains = EqualizerPreset.all.first { $0.name == "Loudness" }?.gains ?? []
+        }
         mixer.outputs = [
             OutputDevice(id: 1, uid: "a", name: "MacBook Pro Speakers"),
             OutputDevice(id: 2, uid: "b", name: "AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth),

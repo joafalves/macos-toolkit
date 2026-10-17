@@ -50,9 +50,9 @@ enum Snapshot {
     }
 
     /// The menu bar mixer, filled with made-up rows.
-    static func writeMixer(to path: String, light: Bool, outputs: Bool, software: Bool) {
+    static func writeMixer(to path: String, light: Bool, outputs: Bool, software: Bool, equalizer: Bool) {
         _ = NSApplication.shared
-        let host = NSHostingController(rootView: MixerPopoverView(mixer: .preview(software: software), showOutputs: outputs).background(Color(nsColor: .windowBackgroundColor)))
+        let host = NSHostingController(rootView: MixerPopoverView(mixer: .preview(software: software, equalizer: equalizer), showOutputs: outputs, showEqualizer: equalizer).background(Color(nsColor: .windowBackgroundColor)))
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.borderless]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)

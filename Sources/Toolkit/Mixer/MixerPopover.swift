@@ -11,16 +11,19 @@ struct MixerPopoverView: View {
     private static let visibleRows = 9
 
     @StateObject private var showOutputs: ViewState<Bool>
+    @StateObject private var showEqualizer: ViewState<Bool>
 
-    init(mixer: MixerController, showOutputs: Bool = false, openSettings: @escaping () -> Void = {}) {
+    init(mixer: MixerController, showOutputs: Bool = false, showEqualizer: Bool = false, openSettings: @escaping () -> Void = {}) {
         self.mixer = mixer
         self.openSettings = openSettings
         _showOutputs = StateObject(wrappedValue: ViewState(showOutputs))
+        _showEqualizer = StateObject(wrappedValue: ViewState(showEqualizer))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             outputModule
+            EqualizerModule(mixer: mixer, expanded: showEqualizer)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
@@ -71,7 +74,9 @@ struct MixerPopoverView: View {
     private var outputModule: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
-                withAnimation(.snappy(duration: 0.22)) { showOutputs.value.toggle() }
+                // No SwiftUI animation: the popover resizes to fit on every frame of one,
+                // which redraws the whole panel. NSPopover animates the size change itself.
+                showOutputs.value.toggle()
             } label: {
                 HStack(spacing: 8) {
                     SectionTitle("Sound")
@@ -121,11 +126,160 @@ struct MixerPopoverView: View {
                         }
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(10)
         .background(ModuleBackground())
+    }
+}
+
+// MARK: - Equalizer
+
+private struct EqualizerModule: View {
+    @ObservedObject var mixer: MixerController
+    @ObservedObject var expanded: ViewState<Bool>
+
+    private var eq: EqualizerConfig { mixer.config.equalizer }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Button {
+                    expanded.value.toggle()
+                } label: {
+                    HStack(spacing: 8) {
+                        SectionTitle("Equalizer")
+                        Spacer(minLength: 8)
+                        Text(eq.enabled ? eq.presetName : "Off")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.tertiary)
+                            .rotationEffect(.degrees(expanded.value ? 90 : 0))
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Show the bands and presets")
+
+                Toggle("Equalizer", isOn: Binding(get: { eq.enabled }, set: { mixer.setEqualizerEnabled($0) }))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .labelsHidden()
+                    .help("While it's on and not flat, all sound goes through the toolkit to be equalized.")
+            }
+
+            if expanded.value {
+                VStack(spacing: 8) {
+                    HStack(alignment: .bottom, spacing: 0) {
+                        ForEach(0..<EqualizerConfig.frequencies.count, id: \.self) { band in
+                            BandColumn(gain: eq.gains[band], label: EqualizerConfig.labels[band], dimmed: !eq.enabled) {
+                                mixer.setBand(band, gain: $0)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    HStack(spacing: 6) {
+                        Menu {
+                            ForEach(EqualizerPreset.all) { preset in
+                                Button {
+                                    mixer.applyPreset(preset)
+                                } label: {
+                                    if eq.enabled, preset.gains == eq.gains {
+                                        Label(preset.name, systemImage: "checkmark")
+                                    } else {
+                                        Text(preset.name)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label("Presets", systemImage: "slider.vertical.3")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        Spacer()
+                        PillButton(title: "Flat", symbol: "arrow.counterclockwise") {
+                            if let flat = EqualizerPreset.all.first { mixer.applyPreset(flat) }
+                        }
+                        .disabled(eq.isFlat)
+                        .help("Put every band back to 0 dB")
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(ModuleBackground())
+    }
+}
+
+/// One band: its gain on top, a vertical slider from -12 to +12 dB, the frequency below.
+private struct BandColumn: View {
+    let gain: Double
+    let label: String
+    let dimmed: Bool
+    let change: (Double) -> Void
+
+    private static let height: CGFloat = 76
+    private static let width: CGFloat = 16
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(gain == 0 ? "0" : String(format: "%+.1f", gain).replacingOccurrences(of: ".0", with: ""))
+                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .foregroundStyle(gain == 0 ? .tertiary : .secondary)
+            GeometryReader { geo in
+                let range = EqualizerConfig.range
+                let mid = geo.size.height / 2
+                let y = mid - CGFloat(gain / range) * mid
+                ZStack(alignment: .top) {
+                    // The fill runs from 0 dB in the middle to the gain, inside the track.
+                    ZStack(alignment: .top) {
+                        Capsule().fill(Color.primary.opacity(0.1))
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.25))
+                            .frame(height: 1)
+                            .offset(y: mid)
+                        Rectangle()
+                            .fill(dimmed ? AnyShapeStyle(Color.secondary.opacity(0.5)) : AnyShapeStyle(Color.accentColor.gradient))
+                            .frame(height: abs(y - mid))
+                            .offset(y: min(y, mid))
+                    }
+                    .clipShape(Capsule())
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
+                        .frame(width: Self.width - 2, height: Self.width - 2)
+                        .offset(y: min(max(0, y - (Self.width - 2) / 2), geo.size.height - (Self.width - 2)))
+                }
+                .frame(width: Self.width)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0).onChanged { drag in
+                    let value = (mid - drag.location.y) / mid * range
+                    change(min(range, max(-range, value)))
+                })
+                .simultaneousGesture(TapGesture(count: 2).onEnded { change(0) })
+            }
+            .frame(height: Self.height)
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .opacity(dimmed ? 0.6 : 1)
+        .help("\(label) Hz. Drag to boost or cut; double-click for 0 dB.")
+        .accessibilityElement()
+        .accessibilityLabel("\(label) hertz")
+        .accessibilityValue("\(gain) decibels")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: change(gain + 1)
+            case .decrement: change(gain - 1)
+            @unknown default: break
+            }
+        }
     }
 }
 

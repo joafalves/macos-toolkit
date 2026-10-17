@@ -24,6 +24,8 @@ final class AppTap {
     let isGlobal: Bool
     /// For a global tap: apps left out by bundle ID, which works before they have played anything.
     private let excludedBundleIDs: [String]
+    /// Applied to what this tap plays, when it is on.
+    private let equalizer: EqualizerState?
 
     private var tapID = AudioObjectID.unknown
     private var aggregateID = AudioObjectID.unknown
@@ -49,8 +51,9 @@ final class AppTap {
 
     /// Nil when macOS refuses any step, for example without the permission.
     init?(objects: [AudioObjectID], deviceUID: String, gain: Float, controlsVolume: Bool = true,
-          isGlobal: Bool = false, excludedBundleIDs: [String] = []) {
+          isGlobal: Bool = false, excludedBundleIDs: [String] = [], equalizer: EqualizerState? = nil) {
         self.objects = objects
+        self.equalizer = equalizer
         self.deviceUID = deviceUID
         self.controlsVolume = controlsVolume
         self.isGlobal = isGlobal
@@ -190,6 +193,8 @@ final class AppTap {
         let tapBuffers = interleaved ? 1 : channels
         let shared = self.shared
         let controlsVolume = self.controlsVolume
+        let equalizer = self.equalizer
+        let filters = EqualizerFilters(sampleRate: format.mSampleRate)
         var current = gain
 
         return { _, inputList, _, outputList, _ in
@@ -203,7 +208,7 @@ final class AppTap {
                 for output in outputs { if let out = output.mData { memset(out, 0, Int(output.mDataByteSize)) } }
                 return
             }
-            let frames = Int(inputs[first].mDataByteSize) / MemoryLayout<Float>.size / (interleaved ? channels : 1)
+            var frames = Int(inputs[first].mDataByteSize) / MemoryLayout<Float>.size / (interleaved ? channels : 1)
 
             // Measured before the gain, so a turned down app still counts as playing.
             var peak: Float = 0
@@ -214,10 +219,8 @@ final class AppTap {
             if peak > Float(bitPattern: shared.peakBits.load(ordering: .relaxed)) {
                 shared.peakBits.store(peak.bitPattern, ordering: .relaxed)
             }
-            guard controlsVolume else {
-                for output in outputs { if let out = output.mData { memset(out, 0, Int(output.mDataByteSize)) } }
-                return
-            }
+            for output in outputs { if let out = output.mData { memset(out, 0, Int(output.mDataByteSize)) } }
+            guard controlsVolume else { return }
 
             @inline(__always) func sample(_ frame: Int, _ channel: Int) -> Float {
                 if interleaved { return data.assumingMemoryBound(to: Float.self)[frame * channels + channel] }
@@ -226,34 +229,39 @@ final class AppTap {
             }
 
             var totalOutputs = 0
-            for output in outputs { totalOutputs += Int(output.mNumberChannels) }
+            for output in outputs where output.mNumberChannels > 0 {
+                totalOutputs += Int(output.mNumberChannels)
+                frames = min(frames, Int(output.mDataByteSize) / MemoryLayout<Float>.size / Int(output.mNumberChannels))
+            }
+            if let equalizer { filters.update(equalizer.load()) }
+            let eq = equalizer != nil && filters.isOn
+            let preamp = filters.preamp
             let step = frames > 0 ? (target - current) / Float(frames) : 0
 
-            var base = 0
-            for output in outputs {
-                let outChannels = Int(output.mNumberChannels)
-                guard let out = output.mData?.assumingMemoryBound(to: Float.self), outChannels > 0 else { continue }
-                let outFrames = min(frames, Int(output.mDataByteSize) / MemoryLayout<Float>.size / outChannels)
-                for frame in 0..<outFrames {
-                    let g = current + step * Float(frame)
+            for frame in 0..<frames {
+                let g = current + step * Float(frame)
+                // The tap is a stereo mix: left and right.
+                var left = sample(frame, 0)
+                var right = channels > 1 ? sample(frame, 1) : left
+                if eq {
+                    left = EqualizerFilters.limit(filters.process(left * preamp, channel: 0) * g)
+                    right = EqualizerFilters.limit(filters.process(right * preamp, channel: 1) * g)
+                } else {
+                    left *= g
+                    right *= g
+                }
+                // Left and right go to the first two outputs, other speakers stay silent.
+                var base = 0
+                for output in outputs {
+                    let outChannels = Int(output.mNumberChannels)
+                    guard let out = output.mData?.assumingMemoryBound(to: Float.self), outChannels > 0 else { continue }
                     for c in 0..<outChannels {
                         let channel = base + c
-                        let value: Float
-                        if totalOutputs == 1 {
-                            var sum: Float = 0
-                            for ch in 0..<channels { sum += sample(frame, ch) }
-                            value = sum / Float(channels)
-                        } else {
-                            // Left and right go to the first two outputs, other speakers stay silent.
-                            value = channel < channels ? sample(frame, channel) : 0
-                        }
-                        out[frame * outChannels + c] = value * g
+                        let value: Float = totalOutputs == 1 ? (left + right) / 2 : channel == 0 ? left : channel == 1 ? right : 0
+                        out[frame * outChannels + c] = value
                     }
+                    base += outChannels
                 }
-                let written = outFrames * outChannels
-                let capacity = Int(output.mDataByteSize) / MemoryLayout<Float>.size
-                if written < capacity { (out + written).update(repeating: 0, count: capacity - written) }
-                base += outChannels
             }
             current = target
         }

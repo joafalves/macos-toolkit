@@ -54,7 +54,7 @@ swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch
 .build/debug/Toolkit --snapshot out.png [mouse|switcher|mixer|general] [light]
-.build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software]
+.build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
 .build/debug/Toolkit --list-windows          # what the Window Switcher would list
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
