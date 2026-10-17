@@ -44,10 +44,14 @@ final class MixerController: ObservableObject {
             scheduleSave()
             if config.enabled != oldValue.enabled {
                 config.enabled ? start() : stop()
-            } else if config.ignored != oldValue.ignored || config.played != oldValue.played || config.hidden != oldValue.hidden {
-                refreshApps()
             } else {
-                applyTaps()
+                // The software volume may have changed, which the taps depend on.
+                refreshMainVolume()
+                if config.ignored != oldValue.ignored || config.played != oldValue.played || config.hidden != oldValue.hidden {
+                    refreshApps()
+                } else {
+                    applyTaps()
+                }
             }
         }
     }
@@ -59,6 +63,11 @@ final class MixerController: ObservableObject {
     @Published private(set) var mainMuted = false
     /// HDMI and some USB devices have no volume of their own.
     @Published private(set) var hasMainVolume = false
+    /// The output has no volume of its own, so the main volume is applied in
+    /// software by a tap on everything that plays to it.
+    @Published private(set) var softwareActive = false
+    /// The volume keys are being caught, which needs Accessibility.
+    @Published private(set) var keysInstalled = false
     @Published private(set) var permission = AudioPermission.status
 
     /// While the panel is on screen, apps whose output is running get a tap
@@ -83,6 +92,11 @@ final class MixerController: ObservableObject {
     private var audible: Set<pid_t> = []
     private var levelTimer: Timer?
     private var taps: [pid_t: AppTap] = [:]
+    /// Plays everything else at the software volume, on outputs without a volume of their own.
+    private var masterTap: AppTap?
+    private var hardwareVolume = false
+    private var loggedMasterSkip = false
+    private lazy var volumeKeys = VolumeKeys(mixer: self)
     /// Taps macOS refused, so they're not retried on every slider move.
     private var failed: Set<String> = []
 
@@ -131,6 +145,9 @@ final class MixerController: ObservableObject {
         guard running else { return }
         running = false
         taps.removeAll()
+        masterTap = nil
+        softwareActive = false
+        volumeKeys.setWanted(false)
         systemListeners.removeAll()
         deviceListeners.removeAll()
         processListeners.removeAll()
@@ -230,6 +247,7 @@ final class MixerController: ObservableObject {
     }
 
     func refreshPermission() {
+        volumeKeys.retryIfNeeded()
         let status = AudioPermission.status
         guard status != permission else { return }
         permission = status
@@ -240,6 +258,12 @@ final class MixerController: ObservableObject {
     // MARK: - Main volume and output
 
     func setMainVolume(_ volume: Float) {
+        if softwareActive {
+            return updateSoftware { setting in
+                setting.volume = volume >= 0.995 ? 1 : volume < 0.005 ? 0 : Double(volume)
+                setting.muted = false
+            }
+        }
         output.write(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: kAudioObjectPropertyScopeOutput, Float32(volume))
         // Like the volume keys: changing the volume unmutes.
         if mainMuted { output.write(kAudioDevicePropertyMute, scope: kAudioObjectPropertyScopeOutput, UInt32(0)) }
@@ -247,8 +271,53 @@ final class MixerController: ObservableObject {
     }
 
     func toggleMainMute() {
+        if softwareActive { return updateSoftware { $0.muted.toggle() } }
         output.write(kAudioDevicePropertyMute, scope: kAudioObjectPropertyScopeOutput, UInt32(mainMuted ? 0 : 1))
         refreshMainVolume()
+    }
+
+    /// A volume key, when the output has no volume of its own to change.
+    func volumeKey(_ key: VolumeKey, fine: Bool) {
+        guard softwareActive else { return }
+        // Whole percents that land on round numbers: 5% a press, 1% with Shift
+        // and Option. A volume set with the slider moves to the next round one.
+        let step = fine ? 1 : 5
+        updateSoftware { setting in
+            let percent = Int((setting.volume * 100).rounded())
+            switch key {
+            case .mute:
+                setting.muted.toggle()
+            case .up:
+                // From a muted output, up unmutes before it raises anything.
+                if setting.muted { setting.muted = false } else {
+                    setting.volume = Double(min(100, percent / step * step + step)) / 100
+                }
+            case .down:
+                if !setting.muted { setting.volume = Double(max(0, (percent + step - 1) / step * step - step)) / 100 }
+            }
+        }
+    }
+
+    private func updateSoftware(_ change: (inout SoftwareVolume) -> Void) {
+        guard let uid = currentOutput?.uid else { return }
+        var setting = config.software[uid] ?? SoftwareVolume()
+        change(&setting)
+        config.software[uid] = setting.isDefault ? nil : setting
+        if !setting.isDefault, permission == .unknown { requestPermission() }
+    }
+
+    /// Whether anything is waiting on the audio permission.
+    var needsAudioPermission: Bool {
+        hasCustomVolumes || (softwareActive && !(config.software[currentOutput?.uid ?? ""]?.isDefault ?? true))
+    }
+
+    func keysInstalledChanged(_ installed: Bool) {
+        keysInstalled = installed
+    }
+
+    func requestAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        AXIsProcessTrustedWithOptions(options)
     }
 
     func setOutput(_ device: OutputDevice) {
@@ -285,6 +354,8 @@ final class MixerController: ObservableObject {
                 // Taps are built for one sample rate.
                 AudioListener(current, kAudioDevicePropertyNominalSampleRate) { [weak self] in self?.rebuildTaps() },
             ]
+            // The taps depend on whether the new output needs a software volume.
+            refreshMainVolume()
             rebuildTaps()
         }
         refreshMainVolume()
@@ -292,9 +363,22 @@ final class MixerController: ObservableObject {
 
     private func refreshMainVolume() {
         let scope = kAudioObjectPropertyScopeOutput
-        hasMainVolume = output.isSettable(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope)
-        mainVolume = output.read(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, as: Float32.self) ?? 0
-        mainMuted = (output.read(kAudioDevicePropertyMute, scope: scope, as: UInt32.self) ?? 0) != 0
+        hardwareVolume = output.isSettable(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope)
+        let software = running && config.softwareVolume && !hardwareVolume && currentOutput != nil
+        if software != softwareActive {
+            softwareActive = software
+            NSLog("Toolkit: mixer software volume \(software ? "on" : "off") for \(currentOutput?.name ?? "no output") (permission \(permission))")
+        }
+        hasMainVolume = hardwareVolume || software
+        if software {
+            let setting = config.software[currentOutput?.uid ?? ""] ?? SoftwareVolume()
+            mainVolume = Float(setting.volume)
+            mainMuted = setting.muted
+        } else {
+            mainVolume = output.read(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, as: Float32.self) ?? 0
+            mainMuted = (output.read(kAudioDevicePropertyMute, scope: scope, as: UInt32.self) ?? 0) != 0
+        }
+        volumeKeys.setWanted(software)
     }
 
     // MARK: - Apps and taps
@@ -389,16 +473,27 @@ final class MixerController: ObservableObject {
 
     private func rebuildTaps() {
         taps.removeAll()
+        masterTap = nil
         failed.removeAll()
         applyTaps()
     }
 
+    /// The software volume as a gain, 1 when there is none.
+    private var masterGain: Float {
+        guard softwareActive, let uid = currentOutput?.uid else { return 1 }
+        return (config.software[uid] ?? SoftwareVolume()).gain
+    }
+
     private func applyTaps() {
-        guard running, permission == .granted, let device = outputs.first(where: { $0.id == output }) else {
+        guard running, permission == .granted, let device = currentOutput else {
             taps.removeAll()
+            masterTap = nil
             return
         }
+        let master = masterGain
         var wanted: Set<pid_t> = []
+        /// What the app taps play themselves, so the master tap has to leave it alone.
+        var controlled: [AudioObjectID] = []
         for (pid, group) in groups {
             guard let bundleID = group.app.bundleIdentifier, config.ignored[bundleID] == nil else { continue }
             // Apps with their own volume get a tap that plays them; apps whose
@@ -409,20 +504,68 @@ final class MixerController: ObservableObject {
             guard controlsVolume || (panelOpen && group.isPlaying) else { continue }
             wanted.insert(pid)
             let objects = group.objects.sorted()
+            // These bypass the master tap, so the software volume is applied here.
+            let gain = setting.gain * master
             if let tap = taps[pid], tap.deviceUID == device.uid, tap.objects == objects, tap.controlsVolume == controlsVolume {
-                tap.gain = setting.gain
+                tap.gain = gain
+                if controlsVolume { controlled += objects }
                 continue
             }
             let signature = "\(device.uid) \(objects) \(controlsVolume)"
-            taps[pid] = nil
-            guard !failed.contains(signature) else { continue }
-            if let tap = AppTap(objects: objects, deviceUID: device.uid, gain: setting.gain, controlsVolume: controlsVolume) {
+            guard !failed.contains(signature) else {
+                taps[pid] = nil
+                continue
+            }
+            // Made before the old one is let go, so the app is never left unmuted.
+            if let tap = AppTap(objects: objects, deviceUID: device.uid, gain: gain, controlsVolume: controlsVolume) {
                 taps[pid] = tap
+                if controlsVolume { controlled += objects }
             } else {
+                taps[pid] = nil
                 failed.insert(signature)
             }
         }
+        // Before the taps that are no longer wanted go: an app they hand back
+        // would otherwise play at full volume until the master tap picks it up.
+        applyMasterTap(device: device, controlled: controlled, gain: master)
         for pid in taps.keys where !wanted.contains(pid) { taps[pid] = nil }
+    }
+
+    /// Everything not played by an app tap goes through one tap that applies
+    /// the software volume. It stays up at 100% too, where it passes the sound
+    /// through untouched: taking it down there would reroute the audio in the
+    /// middle of playback, which clicks every time the volume crosses 100%.
+    private func applyMasterTap(device: OutputDevice, controlled: [AudioObjectID], gain: Float) {
+        guard softwareActive else {
+            masterTap = nil
+            return
+        }
+        // Ours too, or the tap would hear its own output. Our process only has
+        // a Core Audio object once it has used audio, so on macOS 26 and later
+        // it is also left out by bundle ID, which needs no such object.
+        let own = AudioProcesses.processObject(of: ProcessInfo.processInfo.processIdentifier)
+        var bundleIDs: [String] = []
+        if #available(macOS 26.0, *), let id = Bundle.main.bundleIdentifier { bundleIDs = [id] }
+        guard own != nil || !bundleIDs.isEmpty else {
+            if !loggedMasterSkip { NSLog("Toolkit: mixer software volume needs macOS 26 or later to leave its own audio out of the tap") }
+            loggedMasterSkip = true
+            masterTap = nil
+            return
+        }
+        let excluded = (Array(own.map { [$0] } ?? []) + controlled).sorted()
+        if let tap = masterTap, tap.isGlobal, tap.deviceUID == device.uid, tap.objects == excluded {
+            tap.gain = gain
+            return
+        }
+        let signature = "master \(device.uid) \(excluded)"
+        guard !failed.contains(signature) else { return }
+        // The new tap is up before the old one goes, so nothing plays unmuted in between.
+        if let tap = AppTap(objects: excluded, deviceUID: device.uid, gain: gain, isGlobal: true, excludedBundleIDs: bundleIDs) {
+            masterTap = tap
+        } else {
+            masterTap = nil
+            failed.insert(signature)
+        }
     }
 
     private func scheduleSave() {
@@ -446,7 +589,7 @@ extension MixerController {
     }
 
     /// Made-up rows for `--snapshot`, without touching Core Audio or the saved settings.
-    static func preview() -> MixerController {
+    static func preview(software: Bool = false) -> MixerController {
         let mixer = MixerController()
         mixer.persists = false
         func icon(_ bundleID: String) -> NSImage? {
@@ -471,6 +614,7 @@ extension MixerController {
         mixer.output = 1
         mixer.mainVolume = 0.62
         mixer.hasMainVolume = true
+        mixer.softwareActive = software
         mixer.permission = .granted
         return mixer
     }

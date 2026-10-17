@@ -17,9 +17,14 @@ struct MixerSettingsView: View {
 
             if mixer.config.enabled, mixer.permission != .granted {
                 Banner(text: mixer.permission == .denied
-                       ? "System Audio Recording is turned off for MacOS Toolkit, so app volumes have no effect."
-                       : "App volumes need the System Audio Recording permission. macOS asks for it the first time you turn an app down.",
+                       ? "System Audio Recording is turned off for MacOS Toolkit, so volume changes made here have no effect."
+                       : "Volume changes need the System Audio Recording permission. macOS asks for it the first time you turn an app down.",
                        button: mixer.permission == .denied ? "Open System Settings…" : "Allow…") { mixer.requestPermission() }
+            }
+
+            if mixer.softwareActive, !mixer.keysInstalled {
+                Banner(text: "The current output has no volume control, so the volume keys are macOS's \"not allowed\" until the toolkit has the Accessibility permission.",
+                       button: "Grant Access…") { mixer.requestAccessibility() }
             }
 
             Card(title: "Mixer",
@@ -31,6 +36,16 @@ struct MixerSettingsView: View {
                 ToggleRow(title: "Own menu bar icon",
                           caption: "Show the mixer as an icon of its own in the menu bar, one click away.",
                           isOn: $mixer.config.standaloneIcon)
+                    .disabled(!mixer.config.enabled)
+            }
+
+            Card(title: "Outputs Without a Volume Control",
+                 footnote: mixer.softwareActive
+                    ? "The current output, \(mixer.currentOutput?.name ?? "this one"), has no volume control, so this is on for it: the slider and the volume keys lower its sound in software."
+                    : "The current output has its own volume control, so macOS handles the volume and the keys.") {
+                ToggleRow(title: "Software volume",
+                          caption: "Many monitors over HDMI or DisplayPort have no volume control, so macOS can't change it. With this on, the main slider and the volume keys work there by lowering the sound in software. It sits between the apps and the output, so it adds a little delay and makes macOS show its recording indicator for as long as it is on, even at 100%.",
+                          isOn: $mixer.config.softwareVolume)
                     .disabled(!mixer.config.enabled)
             }
 

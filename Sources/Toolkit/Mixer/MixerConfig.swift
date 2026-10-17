@@ -20,12 +20,30 @@ struct AppVolume: Codable, Equatable {
     var gain: Float { muted ? 0 : Float(volume * volume) }
 }
 
+/// The main volume of an output that has none of its own, applied by the
+/// mixer in software.
+struct SoftwareVolume: Codable, Equatable {
+    var volume = 1.0
+    var muted = false
+
+    var isDefault: Bool { volume >= 1 && !muted }
+
+    /// Squared like the app volumes, so the middle of the scale sounds about half as loud.
+    var gain: Float { muted ? 0 : Float(volume * volume) }
+}
+
 struct MixerConfig: Codable, Equatable {
     /// When off, every app plays at the main volume and the menu has no mixer.
     var enabled = true
     /// Gives the mixer an icon of its own in the menu bar, besides the
     /// entry in the toolkit menu.
     var standaloneIcon = false
+    /// For outputs with no volume control of their own (most monitors over
+    /// HDMI or DisplayPort): the main slider and the volume keys lower the
+    /// sound in software instead.
+    var softwareVolume = true
+    /// Keyed by the output device's UID.
+    var software: [String: SoftwareVolume] = [:]
     /// Keyed by bundle ID.
     var apps: [String: AppVolume] = [:]
     /// Apps the mixer never lists or taps: bundle ID to name.
@@ -42,6 +60,8 @@ struct MixerConfig: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
         standaloneIcon = try c.decodeIfPresent(Bool.self, forKey: .standaloneIcon) ?? false
+        softwareVolume = try c.decodeIfPresent(Bool.self, forKey: .softwareVolume) ?? true
+        software = (try? c.decodeIfPresent([String: SoftwareVolume].self, forKey: .software)) ?? [:]
         apps = (try? c.decodeIfPresent([String: AppVolume].self, forKey: .apps)) ?? [:]
         ignored = (try? c.decodeIfPresent([String: String].self, forKey: .ignored)) ?? [:]
         played = (try? c.decodeIfPresent(Set<String>.self, forKey: .played)) ?? []

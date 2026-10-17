@@ -9,6 +9,9 @@ import Synchronization
 /// Without `controlsVolume` the tap only listens: the app plays as usual and
 /// the tap measures how loud it is, to tell real sound from an app that keeps
 /// its output running in silence (paused Safari, Discord, games).
+///
+/// A global tap takes everything except `objects` instead of only `objects`.
+/// It gives outputs with no volume control of their own a software volume.
 final class AppTap {
     /// Our aggregate devices carry this in their UID, so leftovers from a
     /// crash can be found and removed.
@@ -18,6 +21,9 @@ final class AppTap {
     let objects: [AudioObjectID]
     let deviceUID: String
     let controlsVolume: Bool
+    let isGlobal: Bool
+    /// For a global tap: apps left out by bundle ID, which works before they have played anything.
+    private let excludedBundleIDs: [String]
 
     private var tapID = AudioObjectID.unknown
     private var aggregateID = AudioObjectID.unknown
@@ -42,10 +48,13 @@ final class AppTap {
     }
 
     /// Nil when macOS refuses any step, for example without the permission.
-    init?(objects: [AudioObjectID], deviceUID: String, gain: Float, controlsVolume: Bool = true) {
+    init?(objects: [AudioObjectID], deviceUID: String, gain: Float, controlsVolume: Bool = true,
+          isGlobal: Bool = false, excludedBundleIDs: [String] = []) {
         self.objects = objects
         self.deviceUID = deviceUID
         self.controlsVolume = controlsVolume
+        self.isGlobal = isGlobal
+        self.excludedBundleIDs = excludedBundleIDs
         self.gain = gain
         guard start() else {
             stop()
@@ -56,14 +65,20 @@ final class AppTap {
     deinit { stop() }
 
     private func start() -> Bool {
-        let description = CATapDescription(stereoMixdownOfProcesses: objects)
+        let description = isGlobal
+            ? CATapDescription(stereoGlobalTapButExcludeProcesses: objects)
+            : CATapDescription(stereoMixdownOfProcesses: objects)
         description.name = Self.tapName
+        if isGlobal, !excludedBundleIDs.isEmpty, #available(macOS 26.0, *) {
+            description.bundleIDs = excludedBundleIDs
+        }
         description.uuid = UUID()
         description.isPrivate = true
         // Muted only while we read it, so the app is never left silent if we stop.
         description.muteBehavior = controlsVolume ? .mutedWhenTapped : .unmuted
         var status = AudioHardwareCreateProcessTap(description, &tapID)
         guard status == noErr else { return log("create tap", status) }
+        if isGlobal { logExclusions() }
 
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: Self.tapName,
@@ -127,6 +142,15 @@ final class AppTap {
         guard rate > 0 else { return }
         let ms = { (frames: UInt32) in String(format: "%.1f", Double(frames) / rate * 1000) }
         NSLog("Toolkit: mixer tap started on \(deviceUID): buffer \(buffer) frames (\(ms(buffer)) ms), input held \(ms(held)) ms at \(Int(rate)) Hz")
+    }
+
+    /// What the global tap really leaves out, as macOS has it.
+    private func logExclusions() {
+        guard let description = tapID.read(kAudioTapPropertyDescription, as: Unmanaged<CATapDescription>?.self) ?? nil else { return }
+        let tap = description.takeUnretainedValue()
+        var bundles = ""
+        if #available(macOS 26.0, *) { bundles = "\(tap.bundleIDs)" }
+        NSLog("Toolkit: mixer global tap excludes processes \(tap.processes) bundles \(bundles), exclusive \(tap.isExclusive)")
     }
 
     private func log(_ step: String, _ status: OSStatus) -> Bool {

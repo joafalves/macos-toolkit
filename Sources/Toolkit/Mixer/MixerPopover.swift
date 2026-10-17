@@ -32,7 +32,7 @@ struct MixerPopoverView: View {
                 }
                 .padding(.horizontal, 4)
 
-                if mixer.permission != .granted, mixer.hasCustomVolumes {
+                if mixer.permission != .granted, mixer.needsAudioPermission {
                     PermissionNotice(denied: mixer.permission == .denied) { mixer.requestPermission() }
                 }
 
@@ -75,6 +75,15 @@ struct MixerPopoverView: View {
             } label: {
                 HStack(spacing: 8) {
                     SectionTitle("Sound")
+                    if mixer.softwareActive {
+                        Image(systemName: "cpu")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.primary.opacity(0.1)))
+                            .help("Software volume: this output has no volume control, so the toolkit lowers the sound itself. The volume keys work too.")
+                    }
                     Spacer(minLength: 8)
                     if let device = mixer.currentOutput {
                         Image(systemName: device.symbol)
@@ -417,8 +426,8 @@ private struct PermissionNotice: View {
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 6) {
                 Text(denied
-                     ? "System Audio Recording is off for MacOS Toolkit, so app volumes have no effect."
-                     : "App volumes need the System Audio Recording permission.")
+                     ? "System Audio Recording is off for MacOS Toolkit, so volume changes have no effect."
+                     : "Volume changes need the System Audio Recording permission.")
                     .font(.system(size: 12))
                     .fixedSize(horizontal: false, vertical: true)
                 Button(denied ? "Open System Settings…" : "Allow…", action: action)

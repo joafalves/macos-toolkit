@@ -85,6 +85,18 @@ enum AudioProcesses {
         return nil
     }
 
+    /// The Core Audio object of a process, which exists once it has used audio.
+    static func processObject(of pid: pid_t) -> AudioObjectID? {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var pid = pid
+        var object = AudioObjectID.unknown
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        let status = AudioObjectGetPropertyData(.system, &address, UInt32(MemoryLayout<pid_t>.size), &pid, &size, &object)
+        return status == noErr && object != .unknown ? object : nil
+    }
+
     private typealias ResponsibleFunc = @convention(c) (pid_t) -> pid_t
     private static let responsibleFunc: ResponsibleFunc? = {
         guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "responsibility_get_pid_responsible_for_pid") else { return nil }

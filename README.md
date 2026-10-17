@@ -55,6 +55,24 @@ every app that has sound gets its own slider.
 - Volumes are remembered per app. Right-click an app to hide it until it plays again, or to
   **Never Touch** it.
 - Optionally gets **its own icon** in the menu bar, one click away, in the mixer's settings.
+- **Software volume** for outputs that have no volume control of their own (see below).
+
+### Outputs with no volume control
+
+Many monitors over HDMI or DisplayPort show up in macOS with no volume at all: the slider is greyed
+out and the volume keys show a "not allowed" icon. For those outputs the mixer takes over:
+
+- The **main slider** works, marked with a small chip icon, and the **volume keys** (up, down, mute,
+  5% a press, 1% with ⇧⌥) are caught and show a small on-screen bar. Outputs that have a volume of
+  their own are left to macOS, keys and all.
+- It lowers the sound in software: one tap on everything that plays to that output, scaled down and
+  played again. Per-app volumes keep working on top. Each output remembers its own volume.
+- The tap stays up at 100%, passing the sound through untouched, because taking it down there would
+  reroute the audio mid-playback and click. So for as long as it is on, macOS shows its purple
+  recording indicator and the sound is delayed by about one audio buffer.
+- It needs the **System Audio Recording** permission and, for the keys, **Accessibility**. It is
+  built for macOS 26 and later; on macOS 15 it may not start.
+- Turn it off in the mixer's settings under **Software volume**.
 
 <details>
 <summary><b>How it works, and what it costs</b></summary>
