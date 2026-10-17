@@ -62,7 +62,8 @@ listed before you press play. Menu bar apps are listed only once they've played,
 audio open without ever making a sound.
 Apps playing right now come first, marked with moving bars, then the most recently heard. "Playing"
 means actually making sound: many apps (paused Safari, Discord, games) keep their audio output running
-in silence, so while an app's output runs the toolkit listens to it to tell sound from silence. Browser and Electron helper
+in silence, so while the panel is open the toolkit listens to each app whose output runs, to tell sound
+from silence. Browser and Electron helper
 processes are grouped under their app, and system sounds (Finder, Control Center, alerts) are left
 out. Click the speaker at the start of a slider to mute.
 
@@ -71,6 +72,9 @@ out. Click the speaker at the start of a slider to mute.
 - **Reset** puts every app back to 100%, so they all follow the main volume again.
 - Volumes are remembered per app (by bundle ID) and stored in
   `~/Library/Application Support/MacOS Toolkit/mixer.json`.
+- Click an app's icon or row (anywhere but the slider) to mute or unmute it. 0% counts as muted:
+  unmuting brings the app back to where it was before it was turned all the way down, and
+  dragging a muted app's slider unmutes it.
 - Right-click an app to hide it until it plays again, or for **Never Touch**, which hides it for
   good and leaves its sound alone.
 - The panel closes on a click anywhere else or with Esc.
@@ -81,7 +85,9 @@ out. Click the speaker at the start of a slider to mute.
 macOS has no setting for one app's volume, so the mixer captures the app's sound with a Core Audio
 process tap, which silences the original, and plays it again at the chosen volume. This needs
 **System Audio Recording**, which macOS asks for the first time an app is turned down. Apps at 100%
-and not muted play exactly as before: their sound is never rerouted, only listened to. A tapped app's sound is delayed by
+and not muted play exactly as before: their sound is never rerouted, only listened to while the panel
+is open. macOS shows its purple recording indicator while a tap is running, so outside the panel it
+only appears while an app you turned down or muted is making sound. A tapped app's sound is delayed by
 about one audio buffer; the actual figure is written to the log when a tap starts
 (`log stream --predicate 'process == "Toolkit"'`). Taps are removed when the toolkit quits, and any
 left behind by a crash are removed at the next launch.
@@ -133,3 +139,4 @@ To update later: `git pull && ./scripts/build.sh --install`.
 - `Sources/Toolkit/Mouse` — the Mouse Settings tool
 - `Sources/Toolkit/Switcher` — the Window Switcher tool
 - `Sources/Toolkit/Mixer` — the Audio Mixer tool
+- `AGENTS.md` — project conventions, and how versions and releases are done (for people and coding agents)
