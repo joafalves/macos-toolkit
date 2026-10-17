@@ -8,8 +8,12 @@ struct AppVolume: Codable, Equatable {
     /// 0 to 1, where the slider is.
     var volume = 1.0
     var muted = false
+    /// Where the slider was before it was dragged to 0, for unmuting.
+    var restoreVolume: Double?
 
     var isDefault: Bool { volume >= 1 && !muted }
+    /// Muted, or at 0%, which sounds the same and is shown the same.
+    var isSilent: Bool { muted || volume == 0 }
 
     /// The slider position as an amplitude. Squared so that the middle of the
     /// slider sounds about half as loud, rather than barely quieter.

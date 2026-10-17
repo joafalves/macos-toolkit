@@ -35,7 +35,7 @@ struct MixerSettingsView: View {
             }
 
             Card(title: "Remembered Volumes",
-                 footnote: "Apps at 100% and not muted play exactly as before. Their sound is never rerouted, only listened to, to tell when they're playing.") {
+                 footnote: "Apps at 100% and not muted play exactly as before. Their sound is never rerouted, only listened to while the mixer is open, to tell when they're playing.") {
                 let apps = mixer.config.apps.sorted { $0.value.name.localizedStandardCompare($1.value.name) == .orderedAscending }
                 if apps.isEmpty {
                     SettingRow(title: "No app has its own volume yet.") { EmptyView() }
@@ -43,7 +43,7 @@ struct MixerSettingsView: View {
                     ForEach(Array(apps.enumerated()), id: \.element.key) { index, entry in
                         if index > 0 { RowDivider() }
                         SettingRow(title: entry.value.name,
-                                   caption: entry.value.muted ? "Muted" : "\(Int((entry.value.volume * 100).rounded()))%") {
+                                   caption: entry.value.isSilent ? "Muted" : "\(Int((entry.value.volume * 100).rounded()))%") {
                             Button("Forget") { mixer.forget(entry.key) }
                         }
                     }

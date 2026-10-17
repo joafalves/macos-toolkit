@@ -140,16 +140,16 @@ private struct AppRow: View {
                 }
             }
             .frame(width: 20, height: 20)
-            .saturation(setting.muted ? 0 : 1)
-            .opacity(setting.muted ? 0.6 : 1)
+            .saturation(setting.isSilent ? 0 : 1)
+            .opacity(setting.isSilent ? 0.6 : 1)
 
             HStack(spacing: 5) {
                 Text(app.name)
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .foregroundStyle(setting.muted ? .secondary : .primary)
-                if app.isPlaying, !setting.muted {
+                    .foregroundStyle(setting.isSilent ? .secondary : .primary)
+                if app.isPlaying, !setting.isSilent {
                     PlayingBars().help("Playing")
                 }
             }
@@ -157,15 +157,20 @@ private struct AppRow: View {
             .help(app.name)
 
             VolumeSlider(value: Binding(get: { setting.volume }, set: { mixer.setVolume($0, of: app) }),
-                         muted: setting.muted, height: 16) { mixer.toggleMute(app) }
-            PercentLabel(value: setting.volume, muted: setting.muted)
+                         muted: setting.muted, height: 16, onBegin: { mixer.beginAdjusting(app) }) { mixer.toggleMute(app) }
+            PercentLabel(value: setting.volume, muted: setting.isSilent)
         }
         .padding(.horizontal, 6)
         .frame(height: Self.height)
         .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.primary.opacity(hovering.value ? 0.06 : 0)))
         .onHover { hovering.value = $0 }
+        // A click anywhere on the row but the slider mutes or unmutes; the
+        // slider's own drag gesture wins over this one.
+        .contentShape(Rectangle())
+        .onTapGesture { mixer.toggleMute(app) }
+        .help(setting.isSilent ? "Click to unmute \(app.name)" : "Click to mute \(app.name)")
         .contextMenu {
-            Button(setting.muted ? "Unmute" : "Mute") { mixer.toggleMute(app) }
+            Button(setting.isSilent ? "Unmute" : "Mute") { mixer.toggleMute(app) }
             Button("Reset to 100%") { mixer.forget(app.bundleID) }
                 .disabled(setting.isDefault)
             Divider()
@@ -220,6 +225,7 @@ private struct VolumeSlider: View {
     let muted: Bool
     let height: CGFloat
     var prominent = false
+    var onBegin: () -> Void = {}
     let toggleMute: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -265,6 +271,7 @@ private struct VolumeSlider: View {
                     .onChanged { drag in
                         // A press on the speaker is a mute toggle, not a drag.
                         if !dragging.value, drag.startLocation.x < height, abs(drag.translation.width) < 3 { return }
+                        if !dragging.value { onBegin() }
                         dragging.value = true
                         value = min(1, max(0, (drag.location.x - height / 2) / span))
                     }

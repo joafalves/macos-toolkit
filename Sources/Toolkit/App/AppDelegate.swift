@@ -158,6 +158,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             watchForDismissal()
+            // After showing, so creating the listening taps doesn't hold up the panel.
+            DispatchQueue.main.async { self.mixer.panelOpen = true }
         }
     }
 
@@ -190,6 +192,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func popoverDidClose(_ notification: Notification) {
+        mixer.panelOpen = false
+        // Dropped rather than kept for next time: a closed popover keeps its
+        // SwiftUI view alive, and the playing bars went on animating unseen.
+        mixerPopover = nil
         popoverMonitors.forEach(NSEvent.removeMonitor)
         popoverMonitors.removeAll()
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }

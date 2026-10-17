@@ -61,6 +61,17 @@ final class MixerController: ObservableObject {
     @Published private(set) var hasMainVolume = false
     @Published private(set) var permission = AudioPermission.status
 
+    /// While the panel is on screen, apps whose output is running get a tap
+    /// that only listens, so the playing bars show real sound. Taps make macOS
+    /// show its purple recording indicator, so they don't run otherwise.
+    var panelOpen = false {
+        didSet {
+            guard panelOpen != oldValue else { return }
+            applyTaps()
+            updateList()
+        }
+    }
+
     private var running = false
     private var persists = true
     private var groups: [pid_t: AudioAppGroup] = [:]
@@ -149,12 +160,30 @@ final class MixerController: ObservableObject {
         config.apps[app.bundleID] ?? AppVolume(name: app.name)
     }
 
-    func setVolume(_ volume: Double, of app: MixerApp) {
-        update(app) { $0.volume = volume >= 0.995 ? 1 : max(0, volume) }
+    /// The volume an app had when a drag on its slider began.
+    private var dragStart: [String: Double] = [:]
+
+    func beginAdjusting(_ app: MixerApp) {
+        dragStart[app.bundleID] = volume(of: app).volume
     }
 
+    func setVolume(_ volume: Double, of app: MixerApp) {
+        update(app) { setting in
+            setting.volume = volume >= 0.995 ? 1 : volume < 0.005 ? 0 : volume
+            // Like the volume keys: turning an app up unmutes it.
+            if setting.volume > 0 { setting.muted = false }
+            if setting.volume == 0, let start = dragStart[app.bundleID], start > 0 { setting.restoreVolume = start }
+        }
+    }
+
+    /// At 0% an app counts as muted, so this unmutes it back to where it was
+    /// before it was turned all the way down.
     func toggleMute(_ app: MixerApp) {
-        update(app) { $0.muted.toggle() }
+        update(app) { setting in
+            guard setting.isSilent else { return setting.muted = true }
+            setting.muted = false
+            if setting.volume == 0 { setting.volume = setting.restoreVolume ?? 1 }
+        }
     }
 
     /// Every app back to 100% and unmuted, so all of them follow the main volume.
@@ -322,7 +351,9 @@ final class MixerController: ObservableObject {
         var hidden = config.hidden
         for (pid, group) in groups where audible.contains(pid) {
             lastPlayed[pid] = now
-            guard let bundleID = group.app.bundleIdentifier else { continue }
+            // Only on measured sound: with the panel closed, an app that keeps
+            // its output running in silence would otherwise count as playing.
+            guard taps[pid] != nil, let bundleID = group.app.bundleIdentifier else { continue }
             if group.app.activationPolicy != .regular { played.insert(bundleID) }
             hidden.remove(bundleID)
         }
@@ -375,7 +406,7 @@ final class MixerController: ObservableObject {
             // really making sound.
             let setting = config.apps[bundleID] ?? AppVolume(name: "")
             let controlsVolume = !setting.isDefault
-            guard controlsVolume || group.isPlaying else { continue }
+            guard controlsVolume || (panelOpen && group.isPlaying) else { continue }
             wanted.insert(pid)
             let objects = group.objects.sorted()
             if let tap = taps[pid], tap.deviceUID == device.uid, tap.objects == objects, tap.controlsVolume == controlsVolume {
