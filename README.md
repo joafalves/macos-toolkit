@@ -15,17 +15,48 @@
   <img alt="Swift, no dependencies" src="https://img.shields.io/badge/Swift-no%20dependencies-f05138">
 </p>
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mixer-dark.png">
-    <img src="docs/images/mixer-light.png" width="300" alt="The audio mixer panel: main volume, output device, and a slider for each app">
-  </picture>
-  &nbsp;&nbsp;
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mixer-equalizer-dark.png">
-    <img src="docs/images/mixer-equalizer-light.png" width="300" alt="The same panel with the five-band equalizer open">
-  </picture>
-</p>
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="#audio-mixer">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/images/mixer-dark.png">
+          <img src="docs/images/mixer-light.png" width="380" alt="The audio mixer: main volume, output device and a slider for each app">
+        </picture><br>
+        <b>Audio Mixer</b>
+      </a>
+    </td>
+    <td align="center" width="50%">
+      <a href="#window-switcher">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/images/switcher-dark.png">
+          <img src="docs/images/switcher-light.png" width="380" alt="The window switcher: one row per window">
+        </picture><br>
+        <b>Window Switcher</b>
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <a href="#mouse-settings">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/images/mouse-dark.png">
+          <img src="docs/images/mouse-light.png" width="380" alt="Mouse settings: cursor speed and acceleration, wheel direction, speed and smoothing">
+        </picture><br>
+        <b>Mouse Settings</b>
+      </a>
+    </td>
+    <td align="center" width="50%">
+      <a href="#finder">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/images/finder-dark.png">
+          <img src="docs/images/finder-light.png" width="380" alt="Finder settings: cut and paste files, and the items added to the right-click menu">
+        </picture><br>
+        <b>Finder</b>
+      </a>
+    </td>
+  </tr>
+</table>
 
 I missed a few things from Windows and from third-party apps, and I didn't want three more apps
 running to get them. So this is one small app, written in Swift with no dependencies, where each
@@ -43,6 +74,18 @@ itself is put back when it quits. No accounts, no telemetry, no network code. Se
 `~/Library/Application Support/MacOS Toolkit`, and **General → Export…** saves them all to one file.
 
 ## Audio Mixer
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mixer-dark.png">
+    <img src="docs/images/mixer-light.png" width="300" alt="The audio mixer panel: main volume, output device, and a slider for each app">
+  </picture>
+  &nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mixer-equalizer-dark.png">
+    <img src="docs/images/mixer-equalizer-light.png" width="300" alt="The same panel with the five-band equalizer open">
+  </picture>
+</p>
 
 macOS has one volume for everything. The mixer adds the missing part: open it from the menu bar and
 every app that has sound gets its own slider.
