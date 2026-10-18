@@ -6,6 +6,7 @@
 <p align="center">
   <b>The little things macOS never shipped, in one menu bar app.</b><br>
   A volume slider for every app. A ⌘Tab that lists windows. Mouse settings that stick, per mouse.
+  ⌘X and a better right-click menu in Finder.
 </p>
 
 <p align="center">
@@ -21,8 +22,8 @@
   </picture>
   &nbsp;&nbsp;
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mixer-outputs-dark.png">
-    <img src="docs/images/mixer-outputs-light.png" width="300" alt="The same panel with the output device list open">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mixer-equalizer-dark.png">
+    <img src="docs/images/mixer-equalizer-light.png" width="300" alt="The same panel with the five-band equalizer open">
   </picture>
 </p>
 
@@ -32,12 +33,14 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 
 | Tool | What it does |
 | --- | --- |
-| 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, like the Windows volume mixer. |
-| 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps (AltTab-style). |
+| 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, like the Windows volume mixer, plus an equalizer and volume control for outputs that have none. |
+| 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps (AltTab-style), across all Spaces. |
 | 🖱️ **[Mouse Settings](#mouse-settings)** | Cursor and wheel settings per mouse (SteerMouse-style), plus battery level. |
+| 📁 **[Finder](#finder)** | ⌘X to cut files, and New Text File and Open in Terminal in the right-click menu. |
 
-No accounts, no telemetry, no network code. Settings are plain JSON in
-`~/Library/Application Support/MacOS Toolkit`.
+Each tool can be turned off or left on its macOS defaults, and anything the app changes outside
+itself is put back when it quits. No accounts, no telemetry, no network code. Settings are plain JSON in
+`~/Library/Application Support/MacOS Toolkit`, and **General → Export…** saves them all to one file.
 
 ## Audio Mixer
 
@@ -63,6 +66,13 @@ every app that has sound gets its own slider.
   soft limiter.
 
 ### Outputs with no volume control
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mixer-outputs-dark.png">
+    <img src="docs/images/mixer-outputs-light.png" width="300" alt="The mixer with the output device list open">
+  </picture>
+</p>
 
 Many monitors over HDMI or DisplayPort show up in macOS with no volume at all: the slider is greyed
 out and the volume keys show a "not allowed" icon. For those outputs the mixer takes over:
@@ -161,6 +171,41 @@ soon as the same mouse is connected.
 Cursor settings need no permission. The wheel and button settings that go through the event tap need
 **Accessibility**. Trackpad scrolling is never modified.
 
+## Finder
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/finder-dark.png">
+    <img src="docs/images/finder-light.png" width="520" alt="Finder settings: cut and paste files, and the items added to the right-click menu">
+  </picture>
+</p>
+
+Finder has no Cut. The usual way to move files with the keyboard is ⌘C, then ⌥⌘V ("Move Item Here")
+in the destination. This does it with ⌘X and ⌘V:
+
+1. Select files in Finder and press **⌘X** (or choose **Cut** from the right-click menu). They are
+   copied, and marked as a cut.
+2. Open the destination and press **⌘V**. Finder moves them there instead of copying.
+
+Only keys pressed while Finder is in front are touched, and not while a name or the search field is
+being edited, where ⌘X and ⌘V keep their text meaning. Copying anything else in between cancels the
+cut, and a ⌘V somewhere other than Finder just pastes a copy. Finder can't dim the cut files the way
+Windows does, so a short sound says the cut worked instead. Cut needs **Accessibility**.
+
+The right-click menu gets these items, each of which can be turned off in the Finder settings:
+
+| Item | What it does |
+| --- | --- |
+| Cut | The same as ⌘X, on the files you right-clicked. |
+| New Text File | Makes an empty `untitled.txt` in the folder and starts renaming it (the rename needs **Accessibility**). |
+| Open in Terminal | Opens a terminal in the folder you clicked, or the one you're in. The item is named after the terminal: Ghostty, iTerm or Terminal, the first one installed, or the one picked in the settings. |
+
+The menu comes from a **Finder extension** inside the app. macOS keeps new Finder extensions off, so
+turn it on once with **Turn On** in the Finder settings (or under System Settings → General → Login
+Items & Extensions). The extension runs in its own sandboxed process and only builds the menu and
+hands each choice to the app, which does the work. Creating a file in a protected folder such as
+Documents may make macOS ask for access the first time.
+
 ## Install
 
 Needs **macOS 15 or later**. The released app is built for Apple silicon.
@@ -193,8 +238,9 @@ To update later: `git pull && ./scripts/build.sh --install`.
 ### First run
 
 - **General → Grant Access…** and enable *MacOS Toolkit* under System Settings → Privacy & Security →
-  Accessibility. This is for the window switcher and the mouse wheel and button settings.
+  Accessibility. This is for the window switcher, the Finder cut, and the mouse wheel and button settings.
 - System Audio Recording is asked for later, the first time you turn an app down in the mixer.
+- For the Finder right-click menu, press **Turn On** in the Finder settings.
 - Turn on **Launch at login** if you want it always there.
 - To carry your settings to another Mac, use **General → Export…** and **Import…**.
 
@@ -218,7 +264,9 @@ Sources/Toolkit
 ├── Mouse      the Mouse Settings tool
 ├── Switcher   the Window Switcher tool
 ├── Mixer      the Audio Mixer tool
+├── Finder     the Finder tool
 └── UI         shared settings-page components
+Sources/FinderExtension   the Finder extension behind the right-click menu
 scripts        build.sh, make-cert.sh, make-icon.swift
 docs/images    the screenshots above
 ```
