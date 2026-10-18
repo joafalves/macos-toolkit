@@ -16,6 +16,17 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>0.4.1</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>MacOS Toolkit Finder actions</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>macos-toolkit</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>6</string>
 	<key>LSMinimumSystemVersion</key>

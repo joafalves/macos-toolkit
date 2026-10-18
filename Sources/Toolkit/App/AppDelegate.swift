@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var mouse: MouseController!
     private var switcher: SwitcherController!
     private var mixer: MixerController!
+    private var finder: FinderController!
     private var mixerPopover: NSPopover?
     private var popoverMonitors: [Any] = []
     private var resignObserver: NSObjectProtocol?
@@ -23,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         switcher.start()
         mixer = MixerController()
         mixer.start()
+        finder = FinderController()
+        finder.start()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = Self.makeStatusIcon()
@@ -48,6 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         if !Self.launchedAsLoginItem { show(.mouse) }
     }
 
+    /// Actions from the Finder extension's right-click menu.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "macos-toolkit" { finder.handle(url) }
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         show(model.section ?? .mouse)
         return true
@@ -58,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         switcher.stop()
         mixer.stop()
         mixer.flush()
+        finder.stop()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -244,7 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private func show(_ section: AppSection) {
         model.section = section
         if window == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, mixer: mixer)))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, mixer: mixer, finder: finder)))
             window.title = "MacOS Toolkit"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: 780, height: 640))

@@ -6,7 +6,7 @@ enum Snapshot {
         _ = NSApplication.shared
         let model = AppModel()
         model.section = section
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController(), switcher: SwitcherController(), mixer: MixerController.preview())))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController(), switcher: SwitcherController(), mixer: MixerController.preview(), finder: FinderController.preview())))
         window.title = "MacOS Toolkit"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)

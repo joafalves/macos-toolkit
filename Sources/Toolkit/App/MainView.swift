@@ -5,6 +5,7 @@ struct MainView: View {
     @ObservedObject var mouse: MouseController
     @ObservedObject var switcher: SwitcherController
     @ObservedObject var mixer: MixerController
+    @ObservedObject var finder: FinderController
 
     var body: some View {
         // A plain split rather than NavigationSplitView: that one runs the
@@ -25,7 +26,8 @@ struct MainView: View {
                 case .mouse: MouseSettingsView(mouse: mouse)
                 case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
                 case .mixer: MixerSettingsView(mixer: mixer)
-                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, mixer: mixer)
+                case .finder: FinderSettingsView(finder: finder, mouse: mouse)
+                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, mixer: mixer, finder: finder)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -39,6 +41,7 @@ private struct GeneralView: View {
     @ObservedObject var mouse: MouseController
     let switcher: SwitcherController
     @ObservedObject var mixer: MixerController
+    let finder: FinderController
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
@@ -63,14 +66,14 @@ private struct GeneralView: View {
             Card(title: "Backup") {
                 SettingRow(title: "Settings file", caption: "Save every setting to a file, or load them from one.") {
                     HStack(spacing: 8) {
-                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher, mixer: mixer) }
-                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher, mixer: mixer) }
+                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher, mixer: mixer, finder: finder) }
+                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher, mixer: mixer, finder: finder) }
                     }
                 }
             }
 
             Card(title: "Permissions") {
-                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing, and by the Window Switcher.") {
+                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing, by the Window Switcher, and by Finder for Cut.") {
                     if mouse.accessibilityGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {

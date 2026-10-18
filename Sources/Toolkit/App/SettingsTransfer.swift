@@ -9,10 +9,12 @@ struct SettingsFile: Codable {
     var switcher: SwitcherConfig?
     /// Missing in files exported before the mixer existed.
     var mixer: MixerConfig?
+    /// Missing in files exported before the Finder tool existed.
+    var finder: FinderConfig?
 }
 
 enum SettingsTransfer {
-    static func exportSettings(mouse: MouseController, switcher: SwitcherController, mixer: MixerController) {
+    static func exportSettings(mouse: MouseController, switcher: SwitcherController, mixer: MixerController, finder: FinderController) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "MacOS Toolkit Settings.json"
@@ -21,13 +23,13 @@ enum SettingsTransfer {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         do {
-            try encoder.encode(SettingsFile(mouse: mouse.config, switcher: switcher.config, mixer: mixer.config)).write(to: url, options: .atomic)
+            try encoder.encode(SettingsFile(mouse: mouse.config, switcher: switcher.config, mixer: mixer.config, finder: finder.config)).write(to: url, options: .atomic)
         } catch {
             show(error: "The settings could not be exported.", detail: error.localizedDescription)
         }
     }
 
-    static func importSettings(mouse: MouseController, switcher: SwitcherController, mixer: MixerController) {
+    static func importSettings(mouse: MouseController, switcher: SwitcherController, mixer: MixerController, finder: FinderController) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
@@ -51,6 +53,7 @@ enum SettingsTransfer {
         mouse.config = file.mouse
         if let config = file.switcher { switcher.config = config }
         if let config = file.mixer { mixer.config = config }
+        if let config = file.finder { finder.config = config }
     }
 
     private static func show(error: String, detail: String) {

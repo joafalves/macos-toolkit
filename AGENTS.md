@@ -6,10 +6,12 @@ tool; keep it in step with the code.
 
 ## Stack
 
-- Swift 5 language mode, SwiftUI plus AppKit, Swift Package Manager (`Package.swift`, one executable
-  target, `Sources/Toolkit`). macOS 15+, Apple silicon. No dependencies, no Xcode project.
+- Swift 5 language mode, SwiftUI plus AppKit, Swift Package Manager (`Package.swift`). macOS 15+,
+  Apple silicon. No dependencies, no Xcode project. Two executable targets: `Toolkit` (the app) and
+  `FinderExtension` (a Finder Sync extension, linked with `NSExtensionMain` as its entry point).
 - Built with the Command Line Tools only (`swift build`), then wrapped into an app bundle by
-  `scripts/build.sh`. The app runs as an accessory (menu bar) app and only shows a Dock icon while its
+  `scripts/build.sh`, which also puts the extension in `Contents/PlugIns` with the app's version and
+  signs it (sandboxed, with its entitlements) before the app. The app runs as an accessory (menu bar) app and only shows a Dock icon while its
   main window is open.
 - Uses private APIs on purpose: SkyLight and others for the Window Switcher, TCC for the audio
   permission check, `responsibility_get_pid_responsible_for_pid` for grouping helper processes.
@@ -19,7 +21,10 @@ tool; keep it in step with the code.
 - `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (menu bar
   items, the mixer popover, the main window), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `SettingsTransfer` (export and import of all settings), `Snapshot`.
-- `Sources/Toolkit/Mouse`, `Switcher`, `Mixer`: one folder per tool.
+- `Sources/Toolkit/Mouse`, `Switcher`, `Mixer`, `Finder`: one folder per tool.
+- `Sources/FinderExtension`: the Finder extension. It is sandboxed, so it only builds the right-click
+  menu (reading `finder.json`, which its entitlements allow) and opens a `macos-toolkit://` URL that
+  `FinderController.handle` acts on. Its `Info.plist` and entitlements are in `Resources/FinderExtension`.
 - `Sources/Toolkit/UI/Components.swift`: shared settings-page building blocks (`Page`, `Card`,
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
 - `Resources`: `Info.plist` (the only place the version lives), app icon.
@@ -43,7 +48,9 @@ tool; keep it in step with the code.
   Core Audio taps) is restored on quit, on `kill`, and at the next launch if the app crashed.
 - Comments say why, not what; match the surrounding density. Prose in the UI and README is plain and
   short, no marketing words.
-- Permissions: Accessibility (mouse wheel and buttons, switcher) and System Audio Recording (mixer).
+- Permissions: Accessibility (mouse wheel and buttons, switcher, Finder cut) and System Audio
+  Recording (mixer). The Finder extension is a separate switch macOS keeps off until it is turned on
+  (`pluginkit -e use -i dev.jalves.macos-toolkit.finder`, which the Finder page's button runs).
   The app is signed with a local self-signed identity (`MacOS Toolkit Dev`) so macOS keeps the grants
   across rebuilds; ad-hoc signing makes macOS forget them.
 
@@ -52,7 +59,7 @@ tool; keep it in step with the code.
 ```bash
 swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
-./scripts/build.sh --install                 # also copy to /Applications and relaunch
+./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
 .build/debug/Toolkit --snapshot out.png [mouse|switcher|mixer|general] [light]
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
 .build/debug/Toolkit --list-windows          # what the Window Switcher would list
