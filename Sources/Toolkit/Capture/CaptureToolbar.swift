@@ -26,7 +26,7 @@ final class CaptureToolbar {
             panel.onKey = { [weak self] event in
                 switch event.keyCode {
                 case 53: self?.capture.closeToolbar(); return true
-                case 36, 76: self?.capture.captureFromToolbar(); return true
+                case 36, 76: self?.capture.captureFromToolbar(event); return true
                 default: return false
                 }
             }
@@ -68,7 +68,7 @@ struct CaptureToolbarView: View {
                 .foregroundStyle(.white)
                 .background(Color.accentColor.opacity(captureEnabled ? 1 : 0.45), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 // Not a Button: those take ⌃-click as a right click and do nothing.
-                .overlay(ClickArea { if captureEnabled { capture.captureFromToolbar() } })
+                .overlay(ClickArea { event in if captureEnabled { capture.captureFromToolbar(event) } })
                 .help(capture.config.mode == .window ? "Click the window to capture it" : "Hold ⌃ to copy instead of saving")
                 .padding(.leading, 4)
         }
@@ -163,15 +163,15 @@ private struct OptionsMenu: View {
 
 /// Takes plain clicks and ⌃-clicks alike.
 private struct ClickArea: NSViewRepresentable {
-    let action: () -> Void
+    let action: (NSEvent) -> Void
 
     func makeNSView(context: Context) -> ClickView { ClickView(action: action) }
     func updateNSView(_ view: ClickView, context: Context) { view.action = action }
 
     final class ClickView: NSView {
-        var action: () -> Void
+        var action: (NSEvent) -> Void
 
-        init(action: @escaping () -> Void) {
+        init(action: @escaping (NSEvent) -> Void) {
             self.action = action
             super.init(frame: .zero)
         }
@@ -186,7 +186,7 @@ private struct ClickArea: NSViewRepresentable {
         override func rightMouseUp(with event: NSEvent) { release(event) }
 
         private func release(_ event: NSEvent) {
-            if bounds.contains(convert(event.locationInWindow, from: nil)) { action() }
+            if bounds.contains(convert(event.locationInWindow, from: nil)) { action(event) }
         }
     }
 }

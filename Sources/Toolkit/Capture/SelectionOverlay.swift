@@ -58,7 +58,7 @@ final class SelectionOverlay {
     var onModeChange: ((Mode) -> Void)?
     var onAreaChange: ((NSRect) -> Void)?
     /// Enter, from the toolbar's kind of overlay.
-    var onConfirm: (() -> Void)?
+    var onConfirm: ((NSEvent) -> Void)?
 
     private var windows: [CapturePanel] = []
     private var candidates: [(id: CGWindowID, frame: NSRect)] = []
@@ -164,6 +164,7 @@ final class SelectionOverlay {
     // MARK: - Input
 
     private func key(_ event: NSEvent) -> Bool {
+        lastEvent = event
         switch event.keyCode {
         case 53:  // Esc
             onCancel?()
@@ -173,14 +174,20 @@ final class SelectionOverlay {
             onModeChange?(mode)
             return true
         case 36, 76:  // Return, Enter
-            onConfirm?()
+            onConfirm?(event)
             return true
         default:
             return false
         }
     }
 
-    fileprivate static var copyHeld: Bool { NSEvent.modifierFlags.contains(.control) }
+    /// Whether ⌃ is down: from the event itself, or from the window server's
+    /// keyboard state. `NSEvent.modifierFlags` isn't kept up to date for an
+    /// app in the background, which is what the toolkit is while capturing.
+    static func controlDown(_ event: NSEvent? = nil) -> Bool {
+        event?.modifierFlags.contains(.control) == true
+            || CGEventSource.flagsState(.combinedSessionState).contains(.maskControl)
+    }
 
     fileprivate func mouseDown(at point: NSPoint, on screen: NSScreen) {
         mouse = point
@@ -219,8 +226,12 @@ final class SelectionOverlay {
         }
     }
 
+    /// The event being handled, for its modifier keys.
+    fileprivate var lastEvent: NSEvent?
+
     fileprivate func mouseUp(at point: NSPoint) {
         mouse = point
+        let copy = Self.controlDown(lastEvent)
         switch mode {
         case .area:
             guard drag != nil else { return }
@@ -230,14 +241,14 @@ final class SelectionOverlay {
                 return
             }
             if quick {
-                onPick?(.area(Coordinates.toCG(selection)), Self.copyHeld)
+                onPick?(.area(Coordinates.toCG(selection)), copy)
             } else {
                 onAreaChange?(selection)
             }
         case .window:
-            if let hovered { onPick?(.window(hovered.id), Self.copyHeld) }
+            if let hovered { onPick?(.window(hovered.id), copy) }
         case .screen:
-            if let hoveredScreen { onPick?(.display(hoveredScreen.displayID), Self.copyHeld) }
+            if let hoveredScreen { onPick?(.display(hoveredScreen.displayID), copy) }
         }
     }
 
@@ -316,11 +327,17 @@ private final class OverlayView: NSView {
 
     override func mouseDown(with event: NSEvent) { overlay.mouseDown(at: global(event), on: screen) }
     override func mouseDragged(with event: NSEvent) { overlay.mouseDragged(to: global(event)) }
-    override func mouseUp(with event: NSEvent) { overlay.mouseUp(at: global(event)) }
+    override func mouseUp(with event: NSEvent) {
+        overlay.lastEvent = event
+        overlay.mouseUp(at: global(event))
+    }
     // ⌃-click can arrive as a right click; here it's a click with ⌃ held.
     override func rightMouseDown(with event: NSEvent) { overlay.mouseDown(at: global(event), on: screen) }
     override func rightMouseDragged(with event: NSEvent) { overlay.mouseDragged(to: global(event)) }
-    override func rightMouseUp(with event: NSEvent) { overlay.mouseUp(at: global(event)) }
+    override func rightMouseUp(with event: NSEvent) {
+        overlay.lastEvent = event
+        overlay.mouseUp(at: global(event))
+    }
     override func menu(for event: NSEvent) -> NSMenu? { nil }
     override func mouseMoved(with event: NSEvent) {
         overlay.mouseMoved(to: global(event))

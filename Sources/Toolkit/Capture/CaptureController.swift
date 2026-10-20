@@ -59,7 +59,7 @@ final class CaptureController: ObservableObject {
             self?.config.lastArea = Coordinates.toCG(rect)
             self?.hasArea = true
         }
-        overlay.onConfirm = { [weak self] in self?.captureFromToolbar() }
+        overlay.onConfirm = { [weak self] event in self?.captureFromToolbar(event) }
     }
 
     static func preview() -> CaptureController {
@@ -199,7 +199,7 @@ final class CaptureController: ObservableObject {
     private func watchControl() {
         guard flagMonitors.isEmpty else { return }
         let update: (NSEvent) -> Void = { [weak self] event in
-            let held = event.modifierFlags.contains(.control)
+            let held = SelectionOverlay.controlDown(event)
             if self?.controlHeld != held { self?.controlHeld = held }
         }
         if let local = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged, handler: { update($0); return $0 }) {
@@ -208,7 +208,7 @@ final class CaptureController: ObservableObject {
         if let global = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: update) {
             flagMonitors.append(global)
         }
-        controlHeld = NSEvent.modifierFlags.contains(.control)
+        controlHeld = SelectionOverlay.controlDown()
     }
 
     func setMode(_ mode: CaptureMode) {
@@ -221,9 +221,9 @@ final class CaptureController: ObservableObject {
     }
 
     /// The Capture button, or Return.
-    func captureFromToolbar() {
+    func captureFromToolbar(_ event: NSEvent? = nil) {
         guard toolbar.isVisible, let target = overlay.currentTarget(toolbarScreen: toolbar.screen) else { return }
-        begin(target, copy: NSEvent.modifierFlags.contains(.control))
+        begin(target, copy: controlHeld || SelectionOverlay.controlDown(event))
     }
 
     /// From the toolbar: after the timer, a screenshot or a recording.
@@ -309,6 +309,7 @@ final class CaptureController: ObservableObject {
     }
 
     private func deliver(_ image: CGImage, scale: CGFloat, copy: Bool, screen: NSScreen?) {
+        NSLog("Toolkit: screenshot \(image.width)×\(image.height), \(copy ? "to the clipboard" : "to a file")\(copy && config.saveWhenCopying ? " and a file" : "")")
         if config.shutterSound { Self.shutter?.play() }
         var file: URL?
         if copy, let png = Screenshotter.encode(image, as: .png, scale: scale) {
