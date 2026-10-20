@@ -33,10 +33,13 @@ tool; keep it in step with the code.
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
 - `Resources`: `Info.plist` (the only place the version lives), app icon.
 - `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `make-icon.swift`.
-- `docs/images`: the README's screenshots, all rendered with `--snapshot` from the tools' `preview()`
-  controllers, which use made-up data (a "Wireless Mouse", invented mixer and switcher rows, every
-  known terminal). Never commit an image that shows anything from this Mac: real devices, apps,
-  windows, files or folders.
+- `docs/images`: the README's screenshots. **None of them is a screenshot of the desktop**: every
+  one is rendered from the app's own views with `--snapshot`, through the tools' `preview()`
+  controllers, which use made-up data (a "Wireless Mouse", invented mixer apps and outputs, invented
+  switcher rows, every known terminal rather than the installed ones, default shortcuts and
+  folders). Never commit an image that shows anything from this Mac: real devices, apps, windows,
+  window titles, files or folders. Screen captures made while testing stay in a scratch folder and
+  are deleted.
 
 ## Conventions
 
@@ -105,7 +108,8 @@ bumps the patch (`0.1.2`).
 3. `README.md`: the tool table, the tool's section, and the project layout tree if a folder was added.
    If a page changed visibly, render new screenshots into `docs/images` (a `-light` and a `-dark`
    image each, from `--snapshot`) so the README doesn't show an old UI.
-4. Commit as `chore: release X.Y.Z` and tag `vX.Y.Z` on that commit.
+4. Look at every image in `docs/images` and check it shows only preview data, nothing from this Mac.
+5. Commit as `chore: release X.Y.Z` and tag `vX.Y.Z` on that commit.
 
 To publish (only when asked; it pushes to GitHub):
 
