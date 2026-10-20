@@ -79,6 +79,9 @@ final class SelectionOverlay {
             panel.contentView = view
             panel.onKey = { [weak self] event in self?.key(event) ?? false }
             panel.acceptsMouseMovedEvents = true
+            // Clicks on see-through pixels would go to the window below: the
+            // quick kind draws nothing until a drag starts, and the area is a hole.
+            panel.ignoresMouseEvents = false
             panel.orderFrontRegardless()
             windows.append(panel)
         }
@@ -314,6 +317,11 @@ private final class OverlayView: NSView {
     override func mouseDown(with event: NSEvent) { overlay.mouseDown(at: global(event), on: screen) }
     override func mouseDragged(with event: NSEvent) { overlay.mouseDragged(to: global(event)) }
     override func mouseUp(with event: NSEvent) { overlay.mouseUp(at: global(event)) }
+    // ⌃-click can arrive as a right click; here it's a click with ⌃ held.
+    override func rightMouseDown(with event: NSEvent) { overlay.mouseDown(at: global(event), on: screen) }
+    override func rightMouseDragged(with event: NSEvent) { overlay.mouseDragged(to: global(event)) }
+    override func rightMouseUp(with event: NSEvent) { overlay.mouseUp(at: global(event)) }
+    override func menu(for event: NSEvent) -> NSMenu? { nil }
     override func mouseMoved(with event: NSEvent) {
         overlay.mouseMoved(to: global(event))
         overlay.cursorUpdate()
@@ -325,7 +333,10 @@ private final class OverlayView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let dim = NSColor.black.withAlphaComponent(0.28)
+        // Not quite clear, so the window server hands every click to us.
+        NSColor.black.withAlphaComponent(0.01).setFill()
+        bounds.fill()
+        let dim = NSColor.black.withAlphaComponent(0.42)
         switch overlay.mode {
         case .area:
             guard let selection = overlay.selection, selection.intersects(screen.frame) else {

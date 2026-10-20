@@ -17,7 +17,11 @@ final class CaptureToolbar {
         if panel == nil {
             let host = NSHostingView(rootView: CaptureToolbarView(capture: capture))
             let panel = CapturePanel(frame: NSRect(origin: .zero, size: host.fittingSize), level: NSWindow.Level(NSWindow.Level.screenSaver.rawValue + 1))
-            panel.contentView = host
+            let container = ArrowCursorView(frame: NSRect(origin: .zero, size: host.fittingSize))
+            host.frame = container.bounds
+            host.autoresizingMask = [.width, .height]
+            container.addSubview(host)
+            panel.contentView = container
             panel.isMovableByWindowBackground = true
             panel.onKey = { [weak self] event in
                 switch event.keyCode {
@@ -57,18 +61,16 @@ struct CaptureToolbarView: View {
             ToolbarIcon(symbol: "record.circle", help: "Recording", selected: capture.config.kind == .video) { capture.config.kind = .video }
             Separator()
             OptionsMenu(capture: capture)
-            Button(action: { capture.captureFromToolbar() }) {
-                Text(captureTitle)
-                    .font(.system(size: 13, weight: .semibold))
-                    .padding(.horizontal, 14)
-                    .frame(height: 30)
-                    .foregroundStyle(.white)
-                    .background(Color.accentColor.opacity(captureEnabled ? 1 : 0.45), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .disabled(!captureEnabled)
-            .help(capture.config.mode == .window ? "Click the window to capture it" : "Hold ⌃ to copy instead of saving")
-            .padding(.leading, 4)
+            Text(captureTitle)
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 14)
+                .frame(height: 30)
+                .foregroundStyle(.white)
+                .background(Color.accentColor.opacity(captureEnabled ? 1 : 0.45), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                // Not a Button: those take ⌃-click as a right click and do nothing.
+                .overlay(ClickArea { if captureEnabled { capture.captureFromToolbar() } })
+                .help(capture.config.mode == .window ? "Click the window to capture it" : "Hold ⌃ to copy instead of saving")
+                .padding(.leading, 4)
         }
         .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -77,8 +79,11 @@ struct CaptureToolbarView: View {
     }
 
     private var captureTitle: String {
-        if capture.config.mode == .window { return capture.config.kind == .photo ? "Click a Window" : "Click a Window to Record" }
-        return capture.config.kind == .photo ? "Capture" : "Record"
+        let copy = capture.controlHeld && capture.config.kind == .photo
+        if capture.config.mode == .window {
+            return capture.config.kind == .video ? "Click a Window to Record" : copy ? "Click a Window to Copy" : "Click a Window"
+        }
+        return capture.config.kind == .video ? "Record" : copy ? "Copy" : "Capture"
     }
 
     private var captureEnabled: Bool {
@@ -154,6 +159,52 @@ private struct OptionsMenu: View {
         .fixedSize()
         .padding(.horizontal, 6)
     }
+}
+
+/// Takes plain clicks and ⌃-clicks alike.
+private struct ClickArea: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> ClickView { ClickView(action: action) }
+    func updateNSView(_ view: ClickView, context: Context) { view.action = action }
+
+    final class ClickView: NSView {
+        var action: () -> Void
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override func menu(for event: NSEvent) -> NSMenu? { nil }
+        override func mouseDown(with event: NSEvent) {}
+        override func rightMouseDown(with event: NSEvent) {}
+        override func mouseUp(with event: NSEvent) { release(event) }
+        override func rightMouseUp(with event: NSEvent) { release(event) }
+
+        private func release(_ event: NSEvent) {
+            if bounds.contains(convert(event.locationInWindow, from: nil)) { action() }
+        }
+    }
+}
+
+/// The toolbar sits over the overlay's crosshair. A background app's cursor
+/// rects don't apply, so the arrow is set by hand.
+private final class ArrowCursorView: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .cursorUpdate, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func mouseEntered(with event: NSEvent) { NSCursor.arrow.set() }
+    override func mouseMoved(with event: NSEvent) { NSCursor.arrow.set() }
+    override func cursorUpdate(with event: NSEvent) { NSCursor.arrow.set() }
 }
 
 enum Microphones {

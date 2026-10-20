@@ -17,6 +17,8 @@ final class CaptureController: ObservableObject {
     @Published private(set) var micPermission = AVCaptureDevice.authorizationStatus(for: .audio)
     @Published private(set) var recording: RecordingState?
     @Published private(set) var hasArea = false
+    /// ⌃ is down while the toolbar is open, so Capture reads Copy.
+    @Published private(set) var controlHeld = false
 
     struct RecordingState {
         var paused = false
@@ -37,6 +39,7 @@ final class CaptureController: ObservableObject {
     private var frame: CapturePanel?
     private var countdown: CapturePanel?
     private var ticker: Timer?
+    private var flagMonitors: [Any] = []
     /// Wall-clock time recorded before the current stretch, and when that began.
     private var recordedBefore: TimeInterval = 0
     private var stretchStart: Date?
@@ -180,11 +183,32 @@ final class CaptureController: ObservableObject {
         overlay.show(mode: SelectionOverlay.Mode(config.mode), quick: false, area: area)
         hasArea = area != nil
         toolbar.show(on: screen)
+        watchControl()
     }
 
     func closeToolbar() {
         toolbar.hide()
         overlay.hide()
+        flagMonitors.forEach(NSEvent.removeMonitor)
+        flagMonitors.removeAll()
+        controlHeld = false
+    }
+
+    /// Our panels have the keyboard, but the app isn't active, so both kinds
+    /// of monitor are needed to see ⌃ wherever it's pressed.
+    private func watchControl() {
+        guard flagMonitors.isEmpty else { return }
+        let update: (NSEvent) -> Void = { [weak self] event in
+            let held = event.modifierFlags.contains(.control)
+            if self?.controlHeld != held { self?.controlHeld = held }
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged, handler: { update($0); return $0 }) {
+            flagMonitors.append(local)
+        }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: update) {
+            flagMonitors.append(global)
+        }
+        controlHeld = NSEvent.modifierFlags.contains(.control)
     }
 
     func setMode(_ mode: CaptureMode) {
