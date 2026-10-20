@@ -333,13 +333,15 @@ final class WindowCatalog {
 
     /// The toolkit's own window. Accessibility calls to our own process run on
     /// the calling thread, where AppKit refuses them, so it is listed and
-    /// focused without them, as a row for the whole app.
+    /// focused without them, as a row for the whole app. It carries its window
+    /// ID only so the grid can show a picture of it: having no entry here, it
+    /// is still switched to as an app.
     private func ownItem() -> SwitcherItem? {
         guard NSApp.activationPolicy() == .regular,
               let window = NSApp.windows.first(where: { $0.styleMask.contains(.titled) && ($0.isVisible || $0.isMiniaturized || NSApp.isHidden) })
         else { return nil }
         let app = NSRunningApplication.current
-        return SwitcherItem(id: "a\(ownPID)", window: nil, pid: ownPID, title: window.title,
+        return SwitcherItem(id: "a\(ownPID)", window: window.windowID, pid: ownPID, title: window.title,
                             appName: app.localizedName ?? "", icon: app.icon,
                             state: NSApp.isHidden ? .hiddenApp : window.isMiniaturized ? .minimized : .window)
     }

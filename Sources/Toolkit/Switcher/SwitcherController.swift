@@ -29,6 +29,9 @@ final class SwitcherController: ObservableObject {
 
     private let catalog = WindowCatalog()
     private let panel = SwitcherPanel()
+    private let previews = SwitcherPreviews()
+    /// Takes new pictures while the grid is open, in Live mode.
+    private var liveTimer: Timer?
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var timer: Timer?
@@ -53,6 +56,10 @@ final class SwitcherController: ObservableObject {
         config = SwitcherConfig.load()
         catalog.onChange = { [weak self] in self?.refresh() }
         panel.onHover = { [weak self] in self?.select($0) }
+        previews.onUpdate = { [weak self] id, image in
+            guard let self, self.panel.isVisible, self.panel.style == .previews else { return }
+            self.panel.model.previews[id] = image
+        }
         panel.onClick = { [weak self] index in
             self?.select(index)
             self?.confirm()
@@ -180,8 +187,13 @@ final class SwitcherController: ObservableObject {
     private func keyDown(_ code: Int64, shift: Bool, isRepeat: Bool) {
         switch code {
         case Key.tab: move(by: shift ? -1 : 1)
-        case Key.down, Key.right: move(by: 1)
-        case Key.up, Key.left: move(by: -1)
+        case Key.right: move(by: 1)
+        case Key.left: move(by: -1)
+        // In the grid, up and down go to the row above and below.
+        case Key.down where grid: select(panel.neighbour(of: selection, rows: 1))
+        case Key.up where grid: select(panel.neighbour(of: selection, rows: -1))
+        case Key.down: move(by: 1)
+        case Key.up: move(by: -1)
         case Key.escape: end()
         case Key.enter: confirm()
         default:
@@ -214,12 +226,24 @@ final class SwitcherController: ObservableObject {
         if backwards {
             selection = max(list.count - 1, 0)
         } else {
-            // Row 1 is the window already in use, so start on the one before it.
+            // Row 1 is the window already in use, so start on the one before it:
+            // a quick ⌘Tab goes back there.
             selection = currentFirst && list.count > 1 ? 1 : 0
         }
+        let initial = selection
+        let backwards = backwards
+        if config.style == .previews, SwitcherPreviews.permitted { previews.prepare() }
         let reveal = DispatchWorkItem { [weak self] in
             guard let self, self.active else { return }
+            // Once it shows, the settings may want the current window selected,
+            // unless the selection has already been moved.
+            if !self.config.startOnPrevious, !backwards, currentFirst, self.selection == initial { self.selection = 0 }
+            // Previews need Screen Recording; without it, the list.
+            let previews = self.config.style == .previews && SwitcherPreviews.permitted
+            self.panel.style = previews ? .previews : .list
+            self.panel.previewSize = self.config.previewSize
             self.panel.show(self.items, selection: self.selection, on: self.config.placement)
+            if previews { self.startPreviews() }
         }
         self.reveal = reveal
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.revealDelay, execute: reveal)
@@ -248,8 +272,42 @@ final class SwitcherController: ObservableObject {
         active = false
         reveal?.cancel()
         reveal = nil
+        stopPreviews()
         panel.hide()
         items = []
+    }
+
+    private var grid: Bool { panel.isVisible && panel.style == .previews }
+
+    // MARK: - Previews
+
+    private var previewIDs: [CGWindowID] {
+        items.filter { $0.state == .window }.compactMap(\.window)
+    }
+
+    /// Only once the grid is on screen, so a quick ⌘Tab takes no pictures.
+    private func startPreviews() {
+        let ids = previewIDs
+        // Minimized windows can't be taken again, but keep their last picture.
+        let shown = items.compactMap(\.window)
+        panel.model.previews = config.previewFreshness == .fresh ? [:] : previews.cached(shown)
+        previews.refresh(ids, width: panel.previewWidth)
+        if config.previewFreshness == .live {
+            let timer = Timer(timeInterval: 0.3, repeats: true) { [weak self] _ in
+                guard let self, self.grid, !self.previews.busy else { return }
+                self.previews.refresh(self.previewIDs, width: self.panel.previewWidth)
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            liveTimer = timer
+        }
+    }
+
+    private func stopPreviews() {
+        liveTimer?.invalidate()
+        liveTimer = nil
+        previews.cancel()
+        if !items.isEmpty { previews.keep(only: Set(items.compactMap(\.window))) }
+        panel.model.previews = [:]
     }
 
     /// Picks up changes made while the list is open (a window closed with W,

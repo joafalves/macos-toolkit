@@ -63,7 +63,9 @@ tool; keep it in step with the code.
 - Comments say why, not what; match the surrounding density. Prose in the UI and README is plain and
   short, no marketing words.
 - Permissions: Accessibility (mouse wheel and buttons, switcher, Finder cut, the capture's Content
-  Only window style), System Audio Recording (mixer), Screen Recording and Microphone (capture). The Finder extension is a separate switch macOS keeps off until it is turned on
+  Only window style), System Audio Recording (mixer), Screen Recording (capture, and the switcher's
+  previews) and Microphone (capture). The Finder extension is a separate switch macOS keeps off
+  until it is turned on
   (`pluginkit -e use -i dev.jalves.macos-toolkit.finder`, which the Finder page's button runs).
   The app is signed with a local self-signed identity (`MacOS Toolkit Dev`) so macOS keeps the grants
   across rebuilds; ad-hoc signing makes macOS forget them.
@@ -77,11 +79,13 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png [mouse|switcher|mixer|finder|capture|general] [light]
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
+.build/debug/Toolkit --snapshot out.png switcher-grid [light]   # drawn stand-ins, no real windows
 .build/debug/Toolkit --test-capture <folder> [app]   # each screenshot kind and short recordings, with a report
 .build/debug/Toolkit --test-recording        # the app's recording path: start, stop button, discard
 .build/debug/Toolkit --test-shortcuts        # config migration, and which macOS screenshot shortcuts clash
 .build/debug/Toolkit --test-toolbar          # the capture toolbar's panel against its content
 .build/debug/Toolkit --test-highlight        # the window highlight sits right above its window
+.build/debug/Toolkit --test-switcher-previews   # times the grid's pictures of real windows; keeps none
 .build/debug/Toolkit --list-windows          # what the Window Switcher would list
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds

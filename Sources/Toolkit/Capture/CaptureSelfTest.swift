@@ -239,3 +239,30 @@ extension CaptureController {
         print("defaults:             \(states())  (expect all off)")
     }
 }
+
+extension SwitcherController {
+    /// Takes previews of every normal window, as the grid would, and reports
+    /// how long they took. Nothing is kept.
+    static func previewTest() {
+        _ = NSApplication.shared
+        let own = ProcessInfo.processInfo.processIdentifier
+        let ids = (CGWindowListCopyWindowInfo([.excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
+            .filter { ($0[kCGWindowLayer as String] as? Int) == 0 && ($0[kCGWindowOwnerPID as String] as? pid_t) != own }
+            .compactMap { $0[kCGWindowNumber as String] as? CGWindowID }
+        for width in [520, 1240] {
+            let previews = SwitcherPreviews()
+            var times: [Double] = []
+            // As the switcher does: the list asked for at ⌘Tab, pictures 150 ms later.
+            previews.prepare()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+            let start = Date()
+            previews.onUpdate = { _, _ in times.append(Date().timeIntervalSince(start)) }
+            previews.refresh(ids, width: width)
+            while times.count < ids.count, Date().timeIntervalSince(start) < 5 {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+            }
+            let ms = { (t: Double) in Int(t * 1000) }
+            print("\(width) px: \(times.count) of \(ids.count) windows; first \(times.first.map(ms) ?? -1) ms, half \(times.count > 1 ? ms(times[times.count / 2]) : -1) ms, all \(times.last.map(ms) ?? -1) ms")
+        }
+    }
+}

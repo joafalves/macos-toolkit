@@ -19,8 +19,9 @@ enum Snapshot {
         save(view, to: path)
     }
 
-    /// The window switcher's list, filled with made-up rows.
-    static func writeSwitcher(to path: String, light: Bool) {
+    /// The window switcher's list, or with `grid` its previews, filled with
+    /// made-up rows and drawn stand-ins for windows: nothing from the screen.
+    static func writeSwitcher(to path: String, light: Bool, grid: Bool = false) {
         _ = NSApplication.shared
         func icon(_ app: String) -> NSImage { NSWorkspace.shared.icon(forFile: "/System/Applications/\(app).app") }
         func row(_ id: Int, _ title: String, _ app: String, _ state: SwitcherItem.State = .window) -> SwitcherItem {
@@ -40,8 +41,18 @@ enum Snapshot {
         ]
         model.selection = 1
         model.shown = model.items.count
-        let size = NSSize(width: 620, height: CGFloat(model.shown) * SwitcherListView.rowHeight + SwitcherListView.padding * 2)
-        let window = NSWindow(contentViewController: NSHostingController(rootView: SwitcherListView(model: model).background(Color(nsColor: .windowBackgroundColor))))
+        var size = NSSize(width: 620, height: CGFloat(model.shown) * SwitcherListView.rowHeight + SwitcherListView.padding * 2)
+        if grid {
+            model.style = .previews
+            model.layout = GridLayout(count: model.items.count, maxTileWidth: PreviewSize.medium.maxTileWidth, area: CGSize(width: 1180, height: 760))
+            let colors: [NSColor] = [.systemBlue, .darkGray, .systemOrange, .systemYellow, .systemRed, .systemGray]
+            for (index, item) in model.items.enumerated() where item.state == .window || item.state == .minimized {
+                guard let id = item.window, let image = fakeWindow(accent: colors[index % colors.count], dark: !light, wide: index % 3 != 2) else { continue }
+                model.previews[id] = image
+            }
+            size = model.layout.size
+        }
+        let window = NSWindow(contentViewController: NSHostingController(rootView: SwitcherView(model: model).background(Color(nsColor: .windowBackgroundColor))))
         window.styleMask = [.borderless]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         window.setContentSize(size)
@@ -49,6 +60,35 @@ enum Snapshot {
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         if let view = window.contentView { save(view, to: path) }
+    }
+
+    /// A drawn window: a title bar, a sidebar and a few lines of "text".
+    private static func fakeWindow(accent: NSColor, dark: Bool, wide: Bool) -> CGImage? {
+        let size = NSSize(width: wide ? 640 : 480, height: 400)
+        let image = NSImage(size: size, flipped: true) { rect in
+            let base = dark ? NSColor(white: 0.17, alpha: 1) : NSColor(white: 0.98, alpha: 1)
+            let line = dark ? NSColor(white: 0.32, alpha: 1) : NSColor(white: 0.85, alpha: 1)
+            base.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: 14, yRadius: 14).fill()
+            (dark ? NSColor(white: 0.22, alpha: 1) : NSColor(white: 0.93, alpha: 1)).setFill()
+            NSRect(x: 0, y: 0, width: rect.width * 0.26, height: rect.height).fill()
+            for (i, color) in [NSColor.systemRed, .systemYellow, .systemGreen].enumerated() {
+                color.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 18 + CGFloat(i) * 22, y: 16, width: 13, height: 13)).fill()
+            }
+            accent.setFill()
+            NSBezierPath(roundedRect: NSRect(x: rect.width * 0.3, y: 50, width: rect.width * 0.4, height: 26), xRadius: 6, yRadius: 6).fill()
+            line.setFill()
+            for row in 0..<8 {
+                let width = rect.width * (0.62 - CGFloat(row % 3) * 0.12)
+                NSBezierPath(roundedRect: NSRect(x: rect.width * 0.3, y: 100 + CGFloat(row) * 32, width: width, height: 12), xRadius: 6, yRadius: 6).fill()
+            }
+            for row in 0..<6 {
+                NSBezierPath(roundedRect: NSRect(x: 18, y: 60 + CGFloat(row) * 30, width: rect.width * 0.18, height: 12), xRadius: 6, yRadius: 6).fill()
+            }
+            return true
+        }
+        return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
     }
 
     /// The menu bar mixer, filled with made-up rows.

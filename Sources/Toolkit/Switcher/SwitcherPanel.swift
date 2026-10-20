@@ -9,6 +9,10 @@ final class SwitcherListModel: ObservableObject {
     /// Index of the first row on screen.
     @Published var first = 0
     @Published var shown = 0
+    @Published var style = SwitcherStyle.list
+    /// Pictures for the grid, by window.
+    @Published var previews: [CGWindowID: CGImage] = [:]
+    @Published var layout = GridLayout()
 
     var visible: ArraySlice<SwitcherItem> {
         items[min(first, items.count)..<min(first + shown, items.count)]
@@ -22,6 +26,187 @@ final class SwitcherListModel: ObservableObject {
             if selection >= first + shown { first = selection - shown + 1 }
         }
         self.first = max(0, min(first, items.count - shown))
+    }
+}
+
+/// The list or the grid, as the switcher's style says.
+struct SwitcherView: View {
+    @ObservedObject var model: SwitcherListModel
+
+    var body: some View {
+        if model.style == .previews {
+            SwitcherGridView(model: model)
+        } else {
+            SwitcherListView(model: model)
+        }
+    }
+}
+
+/// Where each tile of the grid goes. Tiles are as wide as the size setting
+/// allows, and narrower when that's what it takes for every window to fit.
+/// Rows are filled evenly and centred. Coordinates start at the top left.
+struct GridLayout: Equatable {
+    static let spacing: CGFloat = 12
+    static let padding: CGFloat = 14
+    /// Height over width of a tile.
+    static let aspect: CGFloat = 0.66
+    static let minimumWidth: CGFloat = 96
+
+    var tile = CGSize(width: 260, height: 260 * GridLayout.aspect)
+    var columns = 1
+    var count = 0
+
+    init() {}
+
+    init(count: Int, maxTileWidth: CGFloat, area: CGSize) {
+        self.count = count
+        let n = max(count, 1)
+        var width = maxTileWidth
+        var columns = 1
+        while true {
+            columns = max(1, min(n, Int((area.width - Self.padding * 2 + Self.spacing) / (width + Self.spacing))))
+            let rows = Int(ceil(Double(n) / Double(columns)))
+            let height = CGFloat(rows) * width * Self.aspect + CGFloat(rows - 1) * Self.spacing + Self.padding * 2
+            if height <= area.height || width <= Self.minimumWidth { break }
+            width -= 4
+        }
+        // As few columns as the same number of rows needs, so rows come out even.
+        let rows = Int(ceil(Double(n) / Double(columns)))
+        self.columns = Int(ceil(Double(n) / Double(rows)))
+        tile = CGSize(width: width.rounded(), height: (width * Self.aspect).rounded())
+    }
+
+    var rows: Int { max(1, Int(ceil(Double(max(count, 1)) / Double(columns)))) }
+
+    var size: CGSize {
+        CGSize(width: CGFloat(columns) * tile.width + CGFloat(columns - 1) * Self.spacing + Self.padding * 2,
+               height: CGFloat(rows) * tile.height + CGFloat(rows - 1) * Self.spacing + Self.padding * 2)
+    }
+
+    private func tiles(inRow row: Int) -> Int {
+        min(columns, count - row * columns)
+    }
+
+    func frame(of index: Int) -> CGRect {
+        let row = index / columns, column = index % columns
+        let inRow = tiles(inRow: row)
+        let rowWidth = CGFloat(inRow) * tile.width + CGFloat(inRow - 1) * Self.spacing
+        let x = (size.width - rowWidth) / 2 + CGFloat(column) * (tile.width + Self.spacing)
+        let y = Self.padding + CGFloat(row) * (tile.height + Self.spacing)
+        return CGRect(x: x, y: y, width: tile.width, height: tile.height)
+    }
+
+    func index(at point: CGPoint) -> Int? {
+        (0..<count).first { frame(of: $0).contains(point) }
+    }
+
+    /// The tile above (`rows` -1) or below (+1), the one nearest across.
+    func neighbour(of index: Int, rows step: Int) -> Int {
+        let row = index / columns + step
+        guard row >= 0, row < rows else { return index }
+        let x = frame(of: index).midX
+        let candidates = (row * columns)..<(row * columns + tiles(inRow: row))
+        return candidates.min { abs(frame(of: $0).midX - x) < abs(frame(of: $1).midX - x) } ?? index
+    }
+}
+
+struct SwitcherGridView: View {
+    @ObservedObject var model: SwitcherListModel
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(model.items.enumerated()), id: \.element.id) { index, item in
+                let frame = model.layout.frame(of: index)
+                PreviewTile(item: item, image: item.window.flatMap { model.previews[$0] },
+                            number: index < 9 ? index + 1 : nil, selected: index == model.selection)
+                    .frame(width: frame.width, height: frame.height)
+                    .offset(x: frame.minX, y: frame.minY)
+            }
+        }
+        .frame(width: model.layout.size.width, height: model.layout.size.height, alignment: .topLeading)
+    }
+}
+
+private struct PreviewTile: View {
+    let item: SwitcherItem
+    let image: CGImage?
+    let number: Int?
+    let selected: Bool
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(selected ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.07))
+            Group {
+                if let image {
+                    Image(decorative: image, scale: 1)
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
+                        .padding(8)
+                        .padding(.bottom, 22)
+                } else if let icon = item.icon {
+                    // Nothing to show of the window itself (minimized, hidden,
+                    // or not seen yet): its app instead.
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 64, height: 64)
+                        .padding(.bottom, 22)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            label
+        }
+        .overlay(alignment: .topLeading) {
+            if let number {
+                Text(String(number))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
+                    .background(Color.black.opacity(selected ? 0.55 : 0.4), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .padding(6)
+            }
+        }
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(selected ? Color.accentColor : Color.clear, lineWidth: 3))
+        .opacity(item.dimmed ? 0.55 : 1)
+    }
+
+    /// The app and the title, across the bottom of the tile.
+    private var label: some View {
+        HStack(spacing: 6) {
+            if let icon = item.icon {
+                Image(nsImage: icon).resizable().interpolation(.high).frame(width: 16, height: 16)
+            }
+            Text(item.title)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 0)
+            if let symbol = item.stateSymbol {
+                Image(systemName: symbol).font(.system(size: 10))
+            }
+        }
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+        .background(Color.black.opacity(0.55))
+        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10, style: .continuous))
+    }
+}
+
+extension SwitcherItem {
+    /// What the row or tile marks a window that isn't simply open with.
+    var stateSymbol: String? {
+        switch state {
+        case .window: return nil
+        case .minimized: return "minus.circle"
+        case .hiddenApp: return "eye.slash"
+        case .noWindows: return "macwindow.badge.plus"
+        }
     }
 }
 
@@ -48,15 +233,6 @@ private struct SwitcherRow: View {
     let number: Int?
     let selected: Bool
 
-    private var stateSymbol: String? {
-        switch item.state {
-        case .window: return nil
-        case .minimized: return "minus.circle"
-        case .hiddenApp: return "eye.slash"
-        case .noWindows: return "macwindow.badge.plus"
-        }
-    }
-
     var body: some View {
         HStack(spacing: 10) {
             Text(number.map(String.init) ?? "")
@@ -76,7 +252,7 @@ private struct SwitcherRow: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 12)
-            if let stateSymbol {
+            if let stateSymbol = item.stateSymbol {
                 Image(systemName: stateSymbol).font(.footnote)
             }
             // Rows that stand for an app already show its name as the title.
@@ -129,7 +305,7 @@ final class SwitcherPanel {
         background.layer?.cornerRadius = 14
         background.layer?.masksToBounds = true
 
-        let list = NSHostingView(rootView: SwitcherListView(model: model))
+        let list = NSHostingView(rootView: SwitcherView(model: model))
         let mouse = MouseCatcher()
         mouse.panel = self
         for view in [list, mouse] {
@@ -150,26 +326,55 @@ final class SwitcherPanel {
         case .activeWindow: chosen = NSScreen.main
         }
         screen = (chosen ?? screens.first)?.visibleFrame ?? .zero
+        scale = (chosen ?? screens.first)?.backingScaleFactor ?? 2
         isVisible = true
         update(items, selection: selection)
         panel.orderFrontRegardless()
     }
 
+    /// Set before `show`, for the session.
+    var style = SwitcherStyle.list
+    var previewSize = PreviewSize.medium
+    var scale: CGFloat = 2
+
     func update(_ items: [SwitcherItem], selection: Int) {
         guard isVisible else { return }
+        model.style = style
+        if style == .previews {
+            let area = CGSize(width: screen.width * 0.92, height: screen.height * 0.8)
+            let layout = GridLayout(count: items.count, maxTileWidth: previewSize.maxTileWidth, area: area)
+            model.items = items
+            model.selection = selection
+            if layout != model.layout { model.layout = layout }
+            place(layout.size)
+            return
+        }
         let room = Int((screen.height * 0.7 - SwitcherListView.padding * 2) / SwitcherListView.rowHeight)
         model.items = items
         model.selection = selection
         model.shown = min(items.count, max(room, 3))
         model.scroll()
 
-        let size = NSSize(width: min(620, screen.width - 80),
-                          height: CGFloat(max(model.shown, 1)) * SwitcherListView.rowHeight + SwitcherListView.padding * 2)
-        let frame = NSRect(x: screen.midX - size.width / 2, y: screen.midY - size.height / 2, width: size.width, height: size.height)
+        place(NSSize(width: min(620, screen.width - 80),
+                     height: CGFloat(max(model.shown, 1)) * SwitcherListView.rowHeight + SwitcherListView.padding * 2))
+    }
+
+    private func place(_ size: NSSize) {
+        let frame = NSRect(x: screen.midX - size.width / 2, y: screen.midY - size.height / 2, width: size.width, height: size.height).integral
         if panel.frame != frame {
             panel.setFrame(frame, display: true)
             panel.invalidateShadow()
         }
+    }
+
+    /// The tile `rows` above or below in the grid.
+    func neighbour(of index: Int, rows: Int) -> Int {
+        model.layout.neighbour(of: index, rows: rows)
+    }
+
+    /// Pixels across a tile's picture, for taking previews at the size shown.
+    var previewWidth: Int {
+        Int(model.layout.tile.width * scale)
     }
 
     func hide() {
@@ -179,6 +384,7 @@ final class SwitcherPanel {
     }
 
     fileprivate func index(at point: NSPoint) -> Int? {
+        if style == .previews { return model.layout.index(at: point) }
         let row = Int(floor((point.y - SwitcherListView.padding) / SwitcherListView.rowHeight))
         return (0..<model.shown).contains(row) ? model.first + row : nil
     }
@@ -213,6 +419,7 @@ private final class MouseCatcher: NSView {
     }
 
     override func scrollWheel(with event: NSEvent) {
+        guard panel?.style == .list else { return }
         scrolled += event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * SwitcherListView.rowHeight
         let rows = Int(scrolled / SwitcherListView.rowHeight)
         guard rows != 0 else { return }

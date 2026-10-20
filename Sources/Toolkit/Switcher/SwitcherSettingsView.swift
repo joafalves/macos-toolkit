@@ -4,6 +4,8 @@ import SwiftUI
 struct SwitcherSettingsView: View {
     @ObservedObject var switcher: SwitcherController
     @ObservedObject var mouse: MouseController
+    /// Screen Recording, checked again when the app comes back to the front.
+    @StateObject private var recording = ViewState(SwitcherPreviews.permitted)
 
     private var shortcut: Shortcut { switcher.config.shortcut }
     /// The keys held to keep the list open, like "⌘".
@@ -11,10 +13,12 @@ struct SwitcherSettingsView: View {
     private var key: String { shortcut.key }
 
     private var keys: [(String, String)] {
-        let back = shortcut.flags.contains(.shift) ? "↑" : "⇧\(key)  ↑"
+        let grid = switcher.config.style == .previews
+        let back = shortcut.flags.contains(.shift) ? (grid ? "←" : "↑") : "⇧\(key)  \(grid ? "←" : "↑")"
         return [
-            ("Next window", "\(key)  ↓"),
+            ("Next window", "\(key)  \(grid ? "→" : "↓")"),
             ("Previous window", back),
+        ] + (grid ? [("The window above or below", "↑  ↓")] : []) + [
             ("Go straight to one of the first nine", "1 – 9"),
             ("Go to the selected window", "release \(held)"),
             ("Cancel", "esc"),
@@ -24,6 +28,14 @@ struct SwitcherSettingsView: View {
             ("Quit the app", "Q"),
             ("Quit every dimmed app", "X"),
         ]
+    }
+
+    private var freshnessCaption: String {
+        switch switcher.config.previewFreshness {
+        case .cached: return "Shows the last picture of each window at once, and a new one a moment later."
+        case .fresh: return "Only new pictures: each window shows its app's icon until its picture arrives."
+        case .live: return "Pictures keep updating while the switcher is open, so video plays. Uses more power."
+        }
     }
 
     var body: some View {
@@ -40,7 +52,33 @@ struct SwitcherSettingsView: View {
                 }
             }
 
+            if switcher.config.enabled, switcher.config.style == .previews, !recording.value, !switcher.isPreview {
+                Banner(text: "Previews need the Screen Recording permission. Until then the switcher shows the list.",
+                       button: "Allow…") {
+                    if !CGRequestScreenCaptureAccess() {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
+                    }
+                    recording.value = SwitcherPreviews.permitted
+                }
+            }
+
             WhenEnabled(enabled: switcher.config.enabled) {
+                Card(title: "Appearance") {
+                    OptionRow(title: "Style", caption: "A list of rows, or a grid with a picture of each window.",
+                              selection: $switcher.config.style,
+                              options: [(.list, "List"), (.previews, "Previews")])
+                    if switcher.config.style == .previews {
+                        RowDivider()
+                        OptionRow(title: "Size", caption: "The largest a preview gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows.",
+                                  selection: $switcher.config.previewSize,
+                                  options: PreviewSize.allCases.map { ($0, $0.title) })
+                        RowDivider()
+                        OptionRow(title: "Pictures", caption: freshnessCaption,
+                                  selection: $switcher.config.previewFreshness,
+                                  options: PreviewFreshness.allCases.map { ($0, $0.title) })
+                    }
+                }
+
                 Card(title: "Shortcut",
                      footnote: shortcut == .commandTab
                         ? "macOS's app switcher is off while the switcher has ⌘Tab. ⌘` still cycles the windows of the current app."
@@ -52,6 +90,10 @@ struct SwitcherSettingsView: View {
                     OptionRow(title: "Show on", caption: "Which display the list opens on.",
                               selection: $switcher.config.placement,
                               options: [(.mainScreen, "Main Display"), (.mouse, "Mouse"), (.activeWindow, "Active Window")])
+                    RowDivider()
+                    ToggleRow(title: "Open on the previous window",
+                              caption: "When the \(switcher.config.style == .previews ? "grid" : "list") appears, the window you were in before is selected, like macOS's own ⌘Tab. When off, the window you're in is. A quick \(shortcut.display) goes back to the previous window either way.",
+                              isOn: $switcher.config.startOnPrevious)
                 }
 
                 Card(title: "While \(held) Is Held",
@@ -66,6 +108,9 @@ struct SwitcherSettingsView: View {
                     }
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            recording.value = SwitcherPreviews.permitted
         }
     }
 }

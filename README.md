@@ -183,7 +183,8 @@ the **System Audio Recording** permission, which macOS asks for the first time y
 
 ⌘Tab opens a list with **one row per window**, never grouped by app, across all Spaces and displays.
 Rows are in most recently used order, so row 1 is the window you are in, and a quick ⌘Tab goes back
-to the previous one without showing the list at all. Minimized windows, hidden apps and apps without
+to the previous one without showing the list at all. When the list does appear, the previous window
+is selected, or the one you're in with **Open on the previous window** off. Minimized windows, hidden apps and apps without
 a window come last, dimmed.
 
 | Key (while ⌘ is held) | Action |
@@ -198,6 +199,29 @@ a window come last, dimmed.
 
 The list opens on the main display, the display with the pointer, or the one with the active window,
 as you choose in the settings. ⌘\` is left alone.
+
+### Previews
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/switcher-grid-dark.png">
+    <img src="docs/images/switcher-grid-light.png" width="620" alt="The window switcher as a grid: a picture of each window with its app and title along the bottom">
+  </picture>
+</p>
+
+With **Style: Previews** in the settings, the list becomes a grid with a picture of each window, its
+app and title along the bottom. ← → step through the tiles, ↑ ↓ go to the row above and below, and
+the other keys work as in the list. Minimized windows keep their last picture, dimmed; hidden apps
+and apps without a window show their icon.
+
+- **Size**: Small, Medium or Large is the largest a tile gets, and tiles shrink when there are more
+  windows than fit, so there's never any scrolling. **Fit** makes them as large as the display allows.
+- **Pictures**: **Cached** shows the last picture of each window at once and a new one a moment later,
+  **Fresh** shows the app's icon until the new picture arrives, and **Live** keeps them updating
+  while the switcher is open (more power).
+- Pictures are only taken while the switcher is on screen, so a quick ⌘Tab takes none, and they're
+  kept in memory only. They need the **Screen Recording** permission; without it the switcher shows
+  the list.
 
 ⌘Tab is the default; the shortcut can be changed in the settings to any key with ⌘, ⌥ or ⌃. Its
 modifiers are what you hold to keep the list open, and ⇧ goes backwards. With a shortcut other than

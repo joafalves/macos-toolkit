@@ -18,8 +18,8 @@ if CommandLine.arguments.contains("--register-login-item") {
 // `capture-toolbar [video]` the Screen Capture toolbar.
 if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.arguments.count > flag + 1 {
     let rest = Array(CommandLine.arguments[(flag + 1)...])
-    if rest.contains("switcher-list") {
-        Snapshot.writeSwitcher(to: rest[0], light: rest.contains("light"))
+    if rest.contains("switcher-list") || rest.contains("switcher-grid") {
+        Snapshot.writeSwitcher(to: rest[0], light: rest.contains("light"), grid: rest.contains("switcher-grid"))
         exit(0)
     }
     if rest.contains("mixer-popover") {
@@ -55,6 +55,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-capture"), CommandLin
     exit(0)
 }
 
+if CommandLine.arguments.contains("--test-switcher-previews") {
+    SwitcherController.previewTest()
+    exit(0)
+}
 if CommandLine.arguments.contains("--test-shortcuts") {
     CaptureController.shortcutTest()
     exit(0)
