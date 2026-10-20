@@ -6,6 +6,7 @@ struct MainView: View {
     @ObservedObject var switcher: SwitcherController
     @ObservedObject var mixer: MixerController
     @ObservedObject var finder: FinderController
+    @ObservedObject var capture: CaptureController
 
     var body: some View {
         // A plain split rather than NavigationSplitView: that one runs the
@@ -27,7 +28,8 @@ struct MainView: View {
                 case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
                 case .mixer: MixerSettingsView(mixer: mixer)
                 case .finder: FinderSettingsView(finder: finder, mouse: mouse)
-                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, mixer: mixer, finder: finder)
+                case .capture: CaptureSettingsView(capture: capture)
+                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, mixer: mixer, finder: finder, capture: capture)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -42,6 +44,7 @@ private struct GeneralView: View {
     let switcher: SwitcherController
     @ObservedObject var mixer: MixerController
     let finder: FinderController
+    @ObservedObject var capture: CaptureController
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
@@ -66,14 +69,14 @@ private struct GeneralView: View {
             Card(title: "Backup") {
                 SettingRow(title: "Settings file", caption: "Save every setting to a file, or load them from one.") {
                     HStack(spacing: 8) {
-                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher, mixer: mixer, finder: finder) }
-                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher, mixer: mixer, finder: finder) }
+                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher, mixer: mixer, finder: finder, capture: capture) }
+                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher, mixer: mixer, finder: finder, capture: capture) }
                     }
                 }
             }
 
             Card(title: "Permissions") {
-                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing, by the Window Switcher, and by Finder for Cut.") {
+                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing, by the Window Switcher, by Finder for Cut, and by Screen Capture to find where a window's content starts.") {
                     if mouse.accessibilityGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
@@ -86,6 +89,14 @@ private struct GeneralView: View {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
                         Button(mixer.permission == .denied ? "Open System Settings…" : "Grant Access…") { mixer.requestPermission() }
+                    }
+                }
+                RowDivider()
+                SettingRow(title: "Screen Recording", caption: "Used by Screen Capture for screenshots and recordings.") {
+                    if capture.screenPermission {
+                        Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else {
+                        Button("Grant Access…") { capture.requestScreenPermission() }
                     }
                 }
             }

@@ -35,6 +35,8 @@
 	<true/>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>The Audio Mixer plays each app's sound at the volume you set for it.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Screen Capture records your microphone with a screen recording, when you turn that on.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>

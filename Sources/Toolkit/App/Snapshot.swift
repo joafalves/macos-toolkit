@@ -6,11 +6,12 @@ enum Snapshot {
         _ = NSApplication.shared
         let model = AppModel()
         model.section = section
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController(), switcher: SwitcherController(), mixer: MixerController.preview(), finder: FinderController.preview())))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController(), switcher: SwitcherController(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview())))
         window.title = "MacOS Toolkit"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         window.setContentSize(NSSize(width: 780, height: 760))
+        onRetina(window)
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(1.0))
 
@@ -44,6 +45,7 @@ enum Snapshot {
         window.styleMask = [.borderless]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         window.setContentSize(size)
+        onRetina(window)
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         if let view = window.contentView { save(view, to: path) }
@@ -57,9 +59,35 @@ enum Snapshot {
         window.styleMask = [.borderless]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         window.setContentSize(host.view.fittingSize)
+        onRetina(window)
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         if let view = window.contentView { save(view, to: path) }
+    }
+
+    /// The Screen Capture toolbar, as ⇧⌘5 shows it.
+    static func writeCaptureToolbar(to path: String, light: Bool, video: Bool) {
+        _ = NSApplication.shared
+        let capture = CaptureController.preview()
+        capture.config.kind = video ? .video : .photo
+        let host = NSHostingController(rootView: CaptureToolbarView(capture: capture).padding(16))
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.borderless]
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.backgroundColor = light ? NSColor(white: 0.86, alpha: 1) : NSColor(white: 0.16, alpha: 1)
+        window.setContentSize(host.view.fittingSize)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        if let view = window.contentView { save(view, to: path) }
+    }
+
+    /// Images come out at the scale of the display the window is on, so the
+    /// window goes to a Retina one when there is one.
+    private static func onRetina(_ window: NSWindow) {
+        if let screen = NSScreen.screens.first(where: { $0.backingScaleFactor >= 2 }) {
+            window.setFrameOrigin(screen.frame.origin)
+        }
     }
 
     private static func save(_ view: NSView, to path: String) {

@@ -14,7 +14,8 @@ if CommandLine.arguments.contains("--register-login-item") {
 // Development aid: `--snapshot <png> [section] [light]` renders the main window
 // to an image without showing it, so layout can be checked from the terminal.
 // `switcher-list` in place of a section renders the window switcher's list,
-// `mixer-popover [outputs] [software] [equalizer]` the menu bar mixer.
+// `mixer-popover [outputs] [software] [equalizer]` the menu bar mixer,
+// `capture-toolbar [video]` the Screen Capture toolbar.
 if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.arguments.count > flag + 1 {
     let rest = Array(CommandLine.arguments[(flag + 1)...])
     if rest.contains("switcher-list") {
@@ -23,6 +24,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     }
     if rest.contains("mixer-popover") {
         Snapshot.writeMixer(to: rest[0], light: rest.contains("light"), outputs: rest.contains("outputs"), software: rest.contains("software"), equalizer: rest.contains("equalizer"))
+        exit(0)
+    }
+    if rest.contains("capture-toolbar") {
+        Snapshot.writeCaptureToolbar(to: rest[0], light: rest.contains("light"), video: rest.contains("video"))
         exit(0)
     }
     Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"))
@@ -38,6 +43,15 @@ if CommandLine.arguments.contains("--list-windows") {
 // Development aid: `--list-audio` prints the apps the audio mixer sees.
 if CommandLine.arguments.contains("--list-audio") {
     MixerController.dumpApps()
+    exit(0)
+}
+
+// Development aid: `--test-capture <folder> [app name]` takes each kind of
+// screenshot (of the app's biggest window) and a short recording, and writes them with a report to the folder. Run it with
+// `open -n` so the Screen Recording permission is the app's own.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-capture"), CommandLine.arguments.count > flag + 1 {
+    let app = CommandLine.arguments.count > flag + 2 ? CommandLine.arguments[flag + 2] : nil
+    CaptureController.selfTest(into: URL(fileURLWithPath: CommandLine.arguments[flag + 1]), app: app)
     exit(0)
 }
 

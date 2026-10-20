@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var switcher: SwitcherController!
     private var mixer: MixerController!
     private var finder: FinderController!
+    private var capture: CaptureController!
     private var mixerPopover: NSPopover?
     private var popoverMonitors: [Any] = []
     private var resignObserver: NSObjectProtocol?
@@ -26,6 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         mixer.start()
         finder = FinderController()
         finder.start()
+        capture = CaptureController()
+        capture.onOpenSettings = { [weak self] in self?.show(.capture) }
+        capture.start()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = Self.makeStatusIcon()
@@ -61,12 +65,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         return true
     }
 
+    /// A recording in progress is finished first, or the file would be unplayable.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard capture.isRecording else { return .terminateNow }
+        capture.finishBeforeQuit { NSApp.reply(toApplicationShouldTerminate: true) }
+        return .terminateLater
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         if mouse.config.restoreOnQuit { mouse.restoreAll() }
         switcher.stop()
         mixer.stop()
         mixer.flush()
         finder.stop()
+        capture.stop()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -111,9 +123,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             menu.addItem(item)
             menu.addItem(.separator())
         }
+        if capture.isRecording {
+            let item = NSMenuItem(title: "Stop Recording", action: #selector(stopRecording), keyEquivalent: "")
+            item.image = NSImage(systemSymbolName: "stop.circle", accessibilityDescription: nil)
+            item.target = self
+            menu.addItem(item)
+            menu.addItem(.separator())
+        } else if !capture.config.standaloneIcon {
+            let item = NSMenuItem(title: "Screen Capture", action: #selector(openCaptureToolbar), keyEquivalent: "")
+            item.image = NSImage(systemSymbolName: AppSection.capture.symbol, accessibilityDescription: nil)
+            item.target = self
+            menu.addItem(item)
+            menu.addItem(.separator())
+        }
         for section in AppSection.allCases {
             // "Audio Mixer…" would read like the mixer itself.
-            let title = section == .mixer ? "Audio Mixer Settings…" : "\(section.title)…"
+            let title = section == .mixer || section == .capture ? "\(section.title) Settings…" : "\(section.title)…"
             let item = NSMenuItem(title: title, action: #selector(openSection(_:)), keyEquivalent: "")
             item.image = NSImage(systemSymbolName: section.symbol, accessibilityDescription: nil)
             item.representedObject = section.rawValue
@@ -122,6 +147,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit MacOS Toolkit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    }
+
+    /// After the menu has closed, so the toolbar gets the keyboard.
+    @objc private func openCaptureToolbar() {
+        DispatchQueue.main.async { self.capture.openToolbar() }
+    }
+
+    @objc private func stopRecording() {
+        capture.stopRecording()
     }
 
     @objc private func openSection(_ sender: NSMenuItem) {
@@ -253,7 +287,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private func show(_ section: AppSection) {
         model.section = section
         if window == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, mixer: mixer, finder: finder)))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, mixer: mixer, finder: finder, capture: capture)))
             window.title = "MacOS Toolkit"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: 780, height: 640))

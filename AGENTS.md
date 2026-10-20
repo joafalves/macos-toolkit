@@ -14,14 +14,18 @@ tool; keep it in step with the code.
   signs it (sandboxed, with its entitlements) before the app. The app runs as an accessory (menu bar) app and only shows a Dock icon while its
   main window is open.
 - Uses private APIs on purpose: SkyLight and others for the Window Switcher, TCC for the audio
-  permission check, `responsibility_get_pid_responsible_for_pid` for grouping helper processes.
+  permission check, `responsibility_get_pid_responsible_for_pid` for grouping helper processes,
+  `CGSSetSymbolicHotKeyEnabled` to take ⌘Tab and ⇧⌘3/4/5 from macOS, and `SetsCursorInBackground`
+  so the capture overlay can set the cursor without activating the app.
 
 ## Layout
 
 - `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (menu bar
   items, the mixer popover, the main window), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `SettingsTransfer` (export and import of all settings), `Snapshot`.
-- `Sources/Toolkit/Mouse`, `Switcher`, `Mixer`, `Finder`: one folder per tool.
+- `Sources/Toolkit/Mouse`, `Switcher`, `Mixer`, `Finder`, `Capture`: one folder per tool. Screen
+  Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
+  ⇧⌘3/4/5, and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
 - `Sources/FinderExtension`: the Finder extension. It is sandboxed, so it only builds the right-click
   menu (reading `finder.json`, which its entitlements allow) and opens a `macos-toolkit://` URL that
   `FinderController.handle` acts on. Its `Info.plist` and entitlements are in `Resources/FinderExtension`.
@@ -44,12 +48,13 @@ tool; keep it in step with the code.
 - **`@State` does not compile** here: in the macOS 27 SDK it is a macro and the Command Line Tools lack
   its plugin. Use `@StateObject private var x = ViewState(value)` instead (`ViewState` is in
   `Components.swift`). `@GestureState` and `@StateObject` are fine.
-- Clean up after yourself: anything the app changes outside itself (Cmd-Tab, device properties,
-  Core Audio taps) is restored on quit, on `kill`, and at the next launch if the app crashed.
+- Clean up after yourself: anything the app changes outside itself (Cmd-Tab, the screenshot keys,
+  device properties, Core Audio taps) is restored on quit, on `kill`, and at the next launch if the
+  app crashed.
 - Comments say why, not what; match the surrounding density. Prose in the UI and README is plain and
   short, no marketing words.
-- Permissions: Accessibility (mouse wheel and buttons, switcher, Finder cut) and System Audio
-  Recording (mixer). The Finder extension is a separate switch macOS keeps off until it is turned on
+- Permissions: Accessibility (mouse wheel and buttons, switcher, Finder cut, the capture's Content
+  Only window style), System Audio Recording (mixer), Screen Recording and Microphone (capture). The Finder extension is a separate switch macOS keeps off until it is turned on
   (`pluginkit -e use -i dev.jalves.macos-toolkit.finder`, which the Finder page's button runs).
   The app is signed with a local self-signed identity (`MacOS Toolkit Dev`) so macOS keeps the grants
   across rebuilds; ad-hoc signing makes macOS forget them.
@@ -60,8 +65,10 @@ tool; keep it in step with the code.
 swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
-.build/debug/Toolkit --snapshot out.png [mouse|switcher|mixer|general] [light]
+.build/debug/Toolkit --snapshot out.png [mouse|switcher|mixer|finder|capture|general] [light]
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
+.build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
+.build/debug/Toolkit --test-capture <folder> [app]   # each screenshot kind and short recordings, with a report
 .build/debug/Toolkit --list-windows          # what the Window Switcher would list
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
