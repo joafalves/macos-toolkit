@@ -6,7 +6,7 @@
 <p align="center">
   <b>The little things macOS never shipped, in one menu bar app.</b><br>
   A volume slider for every app. A ⌘Tab that lists windows. Mouse settings that stick, per mouse.
-  ⌘X and a better right-click menu in Finder.
+  ⌘X and a better right-click menu in Finder. Screenshots and small screen recordings on ⇧⌘3/4/5.
 </p>
 
 <p align="center">
@@ -56,6 +56,17 @@
       </a>
     </td>
   </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <a href="#screen-capture">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/images/capture-toolbar-dark.png">
+          <img src="docs/images/capture-toolbar-light.png" width="480" alt="The Screen Capture toolbar: display, window or area, screenshot or recording, options, and Capture">
+        </picture><br>
+        <b>Screen Capture</b>
+      </a>
+    </td>
+  </tr>
 </table>
 
 I missed a few things from Windows and from third-party apps, and I didn't want three more apps
@@ -68,6 +79,7 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 | 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps (AltTab-style), across all Spaces. |
 | 🖱️ **[Mouse Settings](#mouse-settings)** | Cursor and wheel settings per mouse (SteerMouse-style), plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, and New Text File and Open in Terminal in the right-click menu. |
+| 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings (CleanShot-style), with window backdrops and small H.264 files. |
 
 Each tool can be turned off or left on its macOS defaults, and anything the app changes outside
 itself is put back when it quits. No accounts, no telemetry, no network code. Settings are plain JSON in
@@ -101,6 +113,10 @@ every app that has sound gets its own slider.
 - Volumes are remembered per app. Right-click an app to hide it until it plays again, or to
   **Never Touch** it.
 - Optionally gets **its own icon** in the menu bar, one click away, in the mixer's settings.
+- **The volume keys** go through the mixer on every output while it's on, so they always behave the
+  same: 5% a press (1% with ⇧⌥), mute toggles, and the toolkit's own on-screen bar in place of
+  macOS's. On outputs with a volume of their own that volume is set directly; on the rest it's the
+  software volume. ⌥ with a volume key still opens Sound settings. Needs **Accessibility**.
 - **Software volume** for outputs that have no volume control of their own (see below).
 - An **equalizer** under the main volume: five bands (60 Hz to 12 kHz, ±12 dB) with presets such as
   Bass Boost, Vocal, Loudness and Late Night. Drag a band, or double-click it for 0 dB. While it's on
@@ -120,9 +136,7 @@ every app that has sound gets its own slider.
 Many monitors over HDMI or DisplayPort show up in macOS with no volume at all: the slider is greyed
 out and the volume keys show a "not allowed" icon. For those outputs the mixer takes over:
 
-- The **main slider** works, marked with a small chip icon, and the **volume keys** (up, down, mute,
-  5% a press, 1% with ⇧⌥) are caught and show a small on-screen bar. Outputs that have a volume of
-  their own are left to macOS, keys and all.
+- The **main slider** works there too, marked with a small chip icon.
 - It lowers the sound in software: one tap on everything that plays to that output, scaled down and
   played again. Per-app volumes keep working on top. Each output remembers its own volume.
 - The tap stays up at 100%, passing the sound through untouched, because taking it down there would
@@ -249,6 +263,55 @@ Items & Extensions). The extension runs in its own sandboxed process and only bu
 hands each choice to the app, which does the work. Creating a file in a protected folder such as
 Documents may make macOS ask for access the first time.
 
+## Screen Capture
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/capture-toolbar-dark.png">
+    <img src="docs/images/capture-toolbar-light.png" width="480" alt="The Screen Capture toolbar">
+  </picture>
+  <br><br>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/capture-dark.png">
+    <img src="docs/images/capture-light.png" width="520" alt="Screen Capture settings: shortcuts, screenshot folder and format">
+  </picture>
+</p>
+
+It takes over macOS's screenshot keys, with the same habits, and adds screen recordings small
+enough to paste into a chat or a GitHub issue.
+
+| Key | Action |
+| --- | --- |
+| ⇧⌘3 | Screenshot of the display under the pointer |
+| ⇧⌘4 | Drag out an area. **Space** switches to clicking a window |
+| ⇧⌘5 | The toolbar: display, window or area, screenshot or recording, timer and options. Stops a recording |
+| hold ⌃ | Copy to the clipboard instead of saving a file. It counts if it's held when the capture happens, so it can be pressed mid-drag |
+| esc | Cancel |
+
+- **Screenshots** are saved to the Desktop (or a folder you pick) as PNG, JPEG or HEIC. With ⌃ they
+  go to the clipboard instead, and optionally to the folder as well. A thumbnail shows in the corner:
+  drag it into an app, click it to open it, or let it go.
+- **Windows** come out in one of three styles, picked in the toolbar's options: **Content Only**
+  (without the title bar and toolbar, found through Accessibility; apps that draw their own title
+  bar may keep part of it), **Plain** (no shadow), or **With Backdrop**: the window with a soft
+  shadow on a blurred piece of your desktop picture or a solid color.
+- **Recordings** are H.264 MP4, which plays inline almost everywhere. They're recorded at point size
+  by default (a quarter of the pixels on a Retina display, text still sharp), at 30 fps (15 and 60
+  in the settings), and frames are only written when something changes, so a mostly still screen
+  costs little. Optional system audio and microphone (mixed into one track), cursor and click rings. A window recording follows the window when it moves, and
+  windows on top of it don't show.
+- While recording, the menu bar shows a **stop button with the time and size** so far. Right-click
+  it to pause, resume or discard. ⇧⌘5 stops too. When it stops, the file is saved to Movies (or a
+  folder you pick) and put on the clipboard as a file, ready to paste.
+- The toolbar remembers the last area. The toolkit's own toolbar, outline and thumbnails never show
+  up in a capture.
+- Optionally gets **its own icon** in the menu bar, which opens the toolbar.
+
+It needs the **Screen Recording** permission (and the microphone one, if you turn the mic on). macOS
+asks again every so often to confirm it for apps that aren't Apple's. macOS's own shortcuts are
+switched off while the keys are the toolkit's, and back on when the toolkit quits or the setting is
+turned off.
+
 ## Install
 
 Needs **macOS 15 or later**. The released app is built for Apple silicon.
@@ -282,7 +345,8 @@ To update later: `git pull && ./scripts/build.sh --install`.
 
 - **General → Grant Access…** and enable *MacOS Toolkit* under System Settings → Privacy & Security →
   Accessibility. This is for the window switcher, the Finder cut, and the mouse wheel and button settings.
-- System Audio Recording is asked for later, the first time you turn an app down in the mixer.
+- System Audio Recording is asked for later, the first time you turn an app down in the mixer, and
+  Screen Recording the first time you take a screenshot.
 - For the Finder right-click menu, press **Turn On** in the Finder settings.
 - Turn on **Launch at login** if you want it always there.
 - To carry your settings to another Mac, use **General → Export…** and **Import…**.
@@ -293,11 +357,12 @@ To remove it, quit the app, delete it from `/Applications`, and delete
 ## Good to know
 
 - It uses **private macOS APIs** (window discovery for the switcher, the permission check for the
-  mixer, grouping helper processes under their app). They can change in any macOS update, and this
+  mixer, grouping helper processes under their app, switching off the system's ⌘Tab and screenshot
+  keys). They can change in any macOS update, and this
   is a personal tool, so expect to rebuild when they do.
 - It is **not notarized**, which is why the install steps above remove the quarantine flag.
-- Anything the toolkit changes outside itself (⌘Tab, device properties, audio taps) is put back when
-  it quits, when it is killed, and at the next launch if it crashed.
+- Anything the toolkit changes outside itself (⌘Tab, the screenshot keys, device properties, audio
+  taps) is put back when it quits, when it is killed, and at the next launch if it crashed.
 
 ## Project layout
 
@@ -308,6 +373,7 @@ Sources/Toolkit
 ├── Switcher   the Window Switcher tool
 ├── Mixer      the Audio Mixer tool
 ├── Finder     the Finder tool
+├── Capture    the Screen Capture tool
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu
 scripts        build.sh, make-cert.sh, make-icon.swift
@@ -316,4 +382,4 @@ docs/images    the screenshots above
 
 A tool is a controller plus a config, stored as JSON. [`AGENTS.md`](AGENTS.md) has the conventions,
 the dev flags (`--snapshot` renders any page to an image, `--list-windows` and `--list-audio` print
-what the tools see), and how versions and releases are made.
+what the tools see, `--test-capture` runs the screenshot and recording code without the UI), and how versions and releases are made.
