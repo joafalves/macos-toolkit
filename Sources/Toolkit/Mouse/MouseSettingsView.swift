@@ -7,23 +7,27 @@ struct MouseSettingsView: View {
 
     var body: some View {
         Page {
-            if let device = mouse.devices.first(where: { $0.id == mouse.selectedID }) {
-                DeviceHeader(mouse: mouse, device: device)
-                ProfileEditor(mouse: mouse, device: device)
-            } else {
-                EmptyState()
-            }
+            ToolHeader(section: .mouse, subtitle: "Cursor and wheel settings for each mouse.", enabled: $mouse.config.enabled)
 
-            Card(title: "All Mice") {
-                ToggleRow(title: "Restore macOS behaviour on quit",
-                          caption: "When off, cursor settings stay applied after the app quits, until the mouse reconnects.",
-                          isOn: $mouse.config.restoreOnQuit)
-                RowDivider()
-                ToggleRow(title: "Show all pointing devices",
-                          caption: "Also list trackpads and keyboards that report a pointer.",
-                          isOn: $mouse.config.showAllPointingDevices)
+            WhenEnabled(enabled: mouse.config.enabled) {
+                if let device = mouse.devices.first(where: { $0.id == mouse.selectedID }) {
+                    DeviceHeader(mouse: mouse, device: device)
+                    ProfileEditor(mouse: mouse, device: device)
+                } else {
+                    EmptyState()
+                }
+
+                Card(title: "All Mice") {
+                    ToggleRow(title: "Restore macOS behaviour on quit",
+                              caption: "When off, cursor settings stay applied after the app quits, until the mouse reconnects.",
+                              isOn: $mouse.config.restoreOnQuit)
+                    RowDivider()
+                    ToggleRow(title: "Show all pointing devices",
+                              caption: "Also list trackpads and keyboards that report a pointer.",
+                              isOn: $mouse.config.showAllPointingDevices)
+                }
+                .padding(.top, 6)
             }
-            .padding(.top, 6)
         }
     }
 }
@@ -49,8 +53,6 @@ private struct DeviceHeader: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            IconTile(symbol: "computermouse.fill")
-
             VStack(alignment: .leading, spacing: 3) {
                 Menu {
                     ForEach(mouse.devices) { other in
@@ -66,7 +68,7 @@ private struct DeviceHeader: View {
                     }
                 } label: {
                     HStack(spacing: 5) {
-                        Text(device.name).font(.title2.weight(.semibold))
+                        Text(device.name).font(.title3.weight(.semibold))
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)

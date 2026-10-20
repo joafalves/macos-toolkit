@@ -6,7 +6,7 @@ import ScreenCaptureKit
 /// CPU or file size.
 final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     struct Options {
-        var nativeResolution = false
+        var quality = RecordingQuality.standard
         var frameRate = 30
         var showCursor = true
         var showClicks = false
@@ -52,14 +52,14 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         switch target {
         case .display(let id):
             guard let display = content.displays.first(where: { $0.displayID == id }) else { throw CaptureError.notFound }
-            filter = SCContentFilter(display: display, excludingWindows: CaptureContent.windows(excluding, in: content))
+            filter = SCContentFilter(display: display, excludingWindows: CaptureContent.windows(excluding, in: content, menuBar: true))
             points = display.frame.size
             scale = CaptureContent.scale(of: id)
         case .area(let rect):
             guard let display = CaptureContent.display(for: rect, in: content) else { throw CaptureError.notFound }
             let area = rect.intersection(display.frame).integral
             guard !area.isEmpty else { throw CaptureError.notFound }
-            filter = SCContentFilter(display: display, excludingWindows: CaptureContent.windows(excluding, in: content))
+            filter = SCContentFilter(display: display, excludingWindows: CaptureContent.windows(excluding, in: content, menuBar: true))
             config.sourceRect = area.offsetBy(dx: -display.frame.minX, dy: -display.frame.minY)
             points = area.size
             scale = CaptureContent.scale(of: display.displayID)
@@ -72,7 +72,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         }
 
         // H.264 wants even dimensions.
-        let factor = options.nativeResolution ? scale : 1
+        let factor = options.quality.nativeResolution ? scale : 1
         let width = Int(points.width * factor) & ~1
         let height = Int(points.height * factor) & ~1
         guard width >= 16, height >= 16 else { throw CaptureError.notFound }
@@ -105,7 +105,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
                 AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
             ],
             AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: Self.bitRate(width: width, height: height, fps: options.frameRate),
+                AVVideoAverageBitRateKey: Self.bitRate(width: width, height: height, fps: options.frameRate, quality: options.quality),
                 AVVideoExpectedSourceFrameRateKey: options.frameRate,
                 AVVideoMaxKeyFrameIntervalDurationKey: 4,
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
@@ -146,10 +146,21 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
 
     /// Sized for screen content, which is mostly flat and sharp: enough that
     /// text survives scrolling, without the 20+ Mbit/s a camera would use.
-    static func bitRate(width: Int, height: Int, fps: Int) -> Int {
-        let perFrame = Double(width * height) * 0.1
+    /// Doubling the frame rate doesn't need double the bits: consecutive
+    /// frames of a screen are mostly the same.
+    static func bitRate(width: Int, height: Int, fps: Int, quality: RecordingQuality) -> Int {
+        let perFrame = Double(width * height) * quality.bitsPerPixel
         let rate = perFrame * pow(Double(fps), 0.7)
-        return Int(min(max(rate, 800_000), 16_000_000))
+        return Int(min(max(rate, 800_000), quality.maxBitRate))
+    }
+
+    /// The most a minute of constant motion takes on a display, in bytes. A
+    /// screen that's mostly still writes far less, since frames only come
+    /// when something changes.
+    static func busyMinute(points: CGSize, scale: CGFloat, fps: Int, quality: RecordingQuality) -> Int64 {
+        let factor = quality.nativeResolution ? scale : 1
+        let rate = bitRate(width: Int(points.width * factor), height: Int(points.height * factor), fps: fps, quality: quality)
+        return Int64(rate) * 60 / 8
     }
 
     func setPaused(_ paused: Bool) {

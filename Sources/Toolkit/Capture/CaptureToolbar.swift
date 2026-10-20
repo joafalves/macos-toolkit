@@ -1,9 +1,12 @@
 import AVFoundation
+import Combine
 import SwiftUI
 
 /// The ⇧⌘5 bar: what to capture, photo or video, options, and Capture.
 final class CaptureToolbar {
     private var panel: CapturePanel?
+    private var host: NSView?
+    private var changes: AnyCancellable?
     unowned let capture: CaptureController
 
     init(capture: CaptureController) {
@@ -16,8 +19,9 @@ final class CaptureToolbar {
     func show(on screen: NSScreen) {
         if panel == nil {
             let host = NSHostingView(rootView: CaptureToolbarView(capture: capture))
-            let panel = CapturePanel(frame: NSRect(origin: .zero, size: host.fittingSize), level: NSWindow.Level(NSWindow.Level.screenSaver.rawValue + 1))
-            let container = ArrowCursorView(frame: NSRect(origin: .zero, size: host.fittingSize))
+            let size = host.fittingSize
+            let panel = CapturePanel(frame: NSRect(origin: .zero, size: size), level: NSWindow.Level(NSWindow.Level.screenSaver.rawValue + 1))
+            let container = ArrowCursorView(frame: NSRect(origin: .zero, size: size))
             host.frame = container.bounds
             host.autoresizingMask = [.width, .height]
             container.addSubview(host)
@@ -31,18 +35,34 @@ final class CaptureToolbar {
                 }
             }
             self.panel = panel
+            self.host = host
+            // The Capture button's label changes width ("Click a Window",
+            // "Copy"); the panel follows, keeping its centre.
+            changes = capture.objectWillChange.sink { [weak self] _ in
+                DispatchQueue.main.async { self?.fit() }
+            }
         }
-        guard let panel else { return }
-        let size = panel.contentView?.fittingSize ?? panel.frame.size
+        guard let panel, let host else { return }
+        let size = host.fittingSize
         let visible = screen.visibleFrame
         panel.setFrame(NSRect(x: visible.midX - size.width / 2, y: visible.minY + 80, width: size.width, height: size.height), display: true)
         panel.orderFrontRegardless()
         panel.makeKey()
     }
 
+    private func fit() {
+        guard let panel, let host else { return }
+        let size = host.fittingSize
+        guard size != panel.frame.size, size.width > 0 else { return }
+        let frame = panel.frame
+        panel.setFrame(NSRect(x: frame.midX - size.width / 2, y: frame.minY, width: size.width, height: size.height), display: true)
+    }
+
     func hide() {
+        changes = nil
         panel?.orderOut(nil)
         panel = nil
+        host = nil
     }
 }
 
@@ -139,6 +159,9 @@ private struct OptionsMenu: View {
                 Text("With Backdrop").tag(WindowStyle.nice)
             }
             Divider()
+            Picker("Recording Quality", selection: $capture.config.quality) {
+                ForEach(RecordingQuality.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
             Toggle("Show Cursor", isOn: $capture.config.showCursor)
             Toggle("Show Clicks", isOn: $capture.config.showClicks)
             Toggle("System Audio", isOn: $capture.config.systemAudio)

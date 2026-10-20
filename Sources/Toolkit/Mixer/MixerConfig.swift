@@ -32,12 +32,21 @@ struct SoftwareVolume: Codable, Equatable {
     var gain: Float { muted ? 0 : Float(volume * volume) }
 }
 
+/// What the mixer shows in the menu bar besides the toolkit's own icon.
+enum MixerMenuBarIcon: String, Codable, CaseIterable {
+    /// Nothing: the mixer opens from the toolkit menu.
+    case none
+    /// The mixer glyph.
+    case mixer
+    /// A speaker that follows the volume and shows when it's muted.
+    case volume
+}
+
 struct MixerConfig: Codable, Equatable {
-    /// When off, every app plays at the main volume and the menu has no mixer.
+    /// The whole tool: when off, every app plays at the main volume, the keys
+    /// are macOS's, and the menu has no mixer.
     var enabled = true
-    /// Gives the mixer an icon of its own in the menu bar, besides the
-    /// entry in the toolkit menu.
-    var standaloneIcon = false
+    var menuBarIcon = MixerMenuBarIcon.none
     /// For outputs with no volume control of their own (most monitors over
     /// HDMI or DisplayPort): the main slider and the volume keys lower the
     /// sound in software instead.
@@ -61,7 +70,13 @@ struct MixerConfig: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
-        standaloneIcon = try c.decodeIfPresent(Bool.self, forKey: .standaloneIcon) ?? false
+        if let icon = try? c.decodeIfPresent(MixerMenuBarIcon.self, forKey: .menuBarIcon) {
+            menuBarIcon = icon
+        } else {
+            // Before the choice of icons there was only an on/off switch.
+            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+            menuBarIcon = (try? legacy.decodeIfPresent(Bool.self, forKey: .standaloneIcon)) == true ? .mixer : .none
+        }
         softwareVolume = try c.decodeIfPresent(Bool.self, forKey: .softwareVolume) ?? true
         software = (try? c.decodeIfPresent([String: SoftwareVolume].self, forKey: .software)) ?? [:]
         equalizer = (try? c.decodeIfPresent(EqualizerConfig.self, forKey: .equalizer)) ?? EqualizerConfig()
@@ -69,6 +84,10 @@ struct MixerConfig: Codable, Equatable {
         ignored = (try? c.decodeIfPresent([String: String].self, forKey: .ignored)) ?? [:]
         played = (try? c.decodeIfPresent(Set<String>.self, forKey: .played)) ?? []
         hidden = (try? c.decodeIfPresent(Set<String>.self, forKey: .hidden)) ?? []
+    }
+
+    private enum LegacyKeys: String, CodingKey {
+        case standaloneIcon
     }
 
     static var fileURL: URL {

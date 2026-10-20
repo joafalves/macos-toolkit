@@ -5,121 +5,138 @@ import SwiftUI
 struct CaptureSettingsView: View {
     @ObservedObject var capture: CaptureController
 
-    private static let keys: [(String, String)] = [
-        ("Screenshot of the display under the pointer", "⇧⌘3"),
-        ("Screenshot of an area; Space switches to a window", "⇧⌘4"),
-        ("Toolbar, for recordings and the timer; stops a recording", "⇧⌘5"),
-        ("Copy to the clipboard instead of saving", "hold ⌃"),
-        ("Cancel", "esc"),
-    ]
+    private var others: (screen: [Shortcut], area: [Shortcut], toolbar: [Shortcut]) {
+        let c = capture.config
+        return ([c.areaShortcut, c.toolbarShortcut], [c.screenShortcut, c.toolbarShortcut], [c.screenShortcut, c.areaShortcut])
+    }
+
+    /// What the chosen quality means, and what it costs on the main display.
+    private var qualityCaption: String {
+        let quality = capture.config.quality
+        let what: String
+        switch quality {
+        case .standard: what = "Half the pixels on Retina. Fine for clicking through a UI."
+        case .high: what = "Every pixel. Small text stays sharp while it scrolls."
+        case .maximum: what = "Every pixel, with detail to spare for code and tutorials."
+        }
+        guard let screen = NSScreen.main else { return what }
+        let minute = Recorder.busyMinute(points: screen.frame.size, scale: screen.backingScaleFactor,
+                                         fps: capture.config.frameRate, quality: quality)
+        let size = ByteCountFormatter.string(fromByteCount: minute, countStyle: .file)
+        return what + " Up to about \(size) a minute while the whole screen moves."
+    }
 
     var body: some View {
         Page {
-            HStack(spacing: 14) {
-                IconTile(symbol: AppSection.capture.symbol)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Screen Capture").font(.title2.weight(.semibold))
-                    Text("Screenshots and small screen recordings.").font(.subheadline).foregroundStyle(.secondary)
-                }
-            }
+            ToolHeader(section: .capture, subtitle: "Screenshots and small screen recordings.", enabled: $capture.config.enabled)
 
-            if !capture.screenPermission {
+            if capture.config.enabled, !capture.screenPermission {
                 Banner(text: "Screen Capture needs the Screen Recording permission. macOS asks for it once; after that it's in System Settings, under Privacy & Security.",
                        button: "Allow…") { capture.requestScreenPermission() }
             }
 
-            Card(title: "Shortcuts",
-                 footnote: "⌃ counts if it's held when the capture happens: at the end of the drag, or at the click on a window.") {
-                ToggleRow(title: "Replace macOS's screenshot keys",
-                          caption: "When off, these keys open macOS's own screenshot tools, and the toolkit's are in the menu bar.",
-                          isOn: $capture.config.replaceShortcuts)
-                RowDivider()
-                ToggleRow(title: "Own menu bar icon",
-                          caption: "Opens the toolbar with one click. While recording, a stop button is in the menu bar either way.",
-                          isOn: $capture.config.standaloneIcon)
-                ForEach(Array(Self.keys.enumerated()), id: \.offset) { _, key in
+            WhenEnabled(enabled: capture.config.enabled) {
+                Card(title: "Shortcuts",
+                     footnote: "macOS's own screenshot shortcuts are off only where they clash with these. ⌃ counts if it's held when the capture happens: at the end of the drag, or at the click on a window.") {
+                    ShortcutRow(title: "Screenshot of the display", caption: "The display under the pointer.",
+                                shortcut: $capture.config.screenShortcut, defaultValue: CaptureConfig.defaultScreenShortcut, taken: others.screen)
                     RowDivider()
-                    SettingRow(title: key.0) {
-                        Text(key.1).font(.callout).foregroundStyle(.secondary)
+                    ShortcutRow(title: "Screenshot of an area", caption: "Space switches to clicking a window.",
+                                shortcut: $capture.config.areaShortcut, defaultValue: CaptureConfig.defaultAreaShortcut, taken: others.area)
+                    RowDivider()
+                    ShortcutRow(title: "Toolbar", caption: "Recordings, the timer and options. Stops a recording.",
+                                shortcut: $capture.config.toolbarShortcut, defaultValue: CaptureConfig.defaultToolbarShortcut, taken: others.toolbar)
+                    RowDivider()
+                    SettingRow(title: "Copy to the clipboard instead of saving") {
+                        Text("hold ⌃").font(.callout).foregroundStyle(.secondary)
+                    }
+                    RowDivider()
+                    SettingRow(title: "Cancel") {
+                        Text("esc").font(.callout).foregroundStyle(.secondary)
                     }
                 }
-            }
 
-            Card(title: "Screenshots") {
-                FolderRow(title: "Save to", path: $capture.config.screenshotFolder, fallback: "Desktop")
-                RowDivider()
-                OptionRow(title: "Format", caption: "PNG is lossless. JPEG and HEIC are much smaller. The clipboard always gets PNG.",
-                          selection: $capture.config.format,
-                          options: [(.png, "PNG"), (.jpeg, "JPEG"), (.heic, "HEIC")])
-                RowDivider()
-                ToggleRow(title: "When copying, also save a file",
-                          caption: "With ⌃ held, the screenshot goes to the clipboard and to the folder.",
-                          isOn: $capture.config.saveWhenCopying)
-                RowDivider()
-                ToggleRow(title: "Shutter sound", isOn: $capture.config.shutterSound)
-            }
-
-            Card(title: "Window Screenshots",
-                 footnote: "Content Only cuts at the bottom of the title bar and toolbar. Apps that draw their own title bar may keep part of it.") {
-                OptionRow(title: "Style", selection: $capture.config.windowStyle,
-                          options: [(.content, "Content Only"), (.plain, "Plain"), (.nice, "With Backdrop")])
-                if capture.config.windowStyle == .nice {
-                    RowDivider()
-                    OptionRow(title: "Backdrop", caption: "A blurred piece of your desktop picture, or a solid color.",
-                              selection: $capture.config.backdrop,
-                              options: [(.wallpaper, "Wallpaper"), (.color, "Color")]) {
-                        if capture.config.backdrop == .color {
-                            ColorPicker("Color", selection: Binding(
-                                get: { Color(nsColor: capture.config.backdropNSColor) },
-                                set: { capture.config.backdropColor = NSColor($0).hexString }
-                            ), supportsOpacity: false)
-                        }
-                    }
-                    RowDivider()
-                    SettingRow(title: "Padding") { EmptyView() } extra: {
-                        ValueSlider(value: $capture.config.padding, range: 0...120, step: 4, low: "None", high: "Wide") { "\(Int($0)) pt" }
-                    }
-                    RowDivider()
-                    SettingRow(title: "Shadow") { EmptyView() } extra: {
-                        ValueSlider(value: $capture.config.shadow, range: 0...1, step: 0.05, low: "None", high: "Deep") { "\(Int(($0 * 100).rounded()))%" }
-                    }
+                Card(title: "Menu Bar") {
+                    ToggleRow(title: "Own menu bar icon",
+                              caption: "Opens the toolbar with one click. While recording, a stop button is in the menu bar either way.",
+                              isOn: $capture.config.standaloneIcon)
                 }
-            }
 
-            Card(title: "Recordings",
-                 footnote: "H.264 MP4, which plays everywhere. Frames are only written when something on screen changes, so a still screen adds almost nothing to the file. When it stops, the file is put on the clipboard, ready to paste.") {
-                FolderRow(title: "Save to", path: $capture.config.recordingFolder, fallback: "Movies")
-                RowDivider()
-                OptionRow(title: "Resolution",
-                          caption: "Point size keeps text readable at a quarter of the pixels of a Retina display, and makes files 3 to 4 times smaller.",
-                          selection: $capture.config.nativeResolution,
-                          options: [(false, "Point Size"), (true, "Native")])
-                RowDivider()
-                OptionRow(title: "Frame rate", selection: $capture.config.frameRate,
-                          options: [(15, "15 fps"), (30, "30 fps"), (60, "60 fps")])
-                RowDivider()
-                ToggleRow(title: "Show cursor", isOn: $capture.config.showCursor)
-                RowDivider()
-                ToggleRow(title: "Show clicks", caption: "A ring where you click.", isOn: $capture.config.showClicks)
-                RowDivider()
-                ToggleRow(title: "System audio", caption: "The sound of other apps.", isOn: $capture.config.systemAudio)
-                RowDivider()
-                ToggleRow(title: "Microphone",
-                          caption: capture.micPermission == .denied
-                              ? "Microphone access is off for MacOS Toolkit in System Settings."
-                              : "With system audio on too, both are mixed into one track.",
-                          isOn: Binding(get: { capture.config.microphone }, set: { capture.setMicrophone($0) }))
-                if capture.config.microphone {
+                Card(title: "Screenshots") {
+                    FolderRow(title: "Save to", path: $capture.config.screenshotFolder, fallback: CaptureConfig.defaultScreenshotDirectory)
                     RowDivider()
-                    SettingRow(title: "Input") {
-                        Picker("Input", selection: $capture.config.microphoneID) {
-                            Text("Default").tag("")
-                            if !capture.isPreview {
-                                ForEach(Microphones.all(), id: \.uniqueID) { Text($0.localizedName).tag($0.uniqueID) }
+                    OptionRow(title: "Format", caption: "PNG is lossless. JPEG and HEIC are much smaller. The clipboard always gets PNG.",
+                              selection: $capture.config.format,
+                              options: [(.png, "PNG"), (.jpeg, "JPEG"), (.heic, "HEIC")])
+                    RowDivider()
+                    ToggleRow(title: "When copying, also save a file",
+                              caption: "With ⌃ held, the screenshot goes to the clipboard and to the folder.",
+                              isOn: $capture.config.saveWhenCopying)
+                    RowDivider()
+                    ToggleRow(title: "Shutter sound", isOn: $capture.config.shutterSound)
+                }
+
+                Card(title: "Window Screenshots",
+                     footnote: "Content Only cuts at the bottom of the title bar and toolbar. Apps that draw their own title bar may keep part of it.") {
+                    OptionRow(title: "Style", selection: $capture.config.windowStyle,
+                              options: [(.content, "Content Only"), (.plain, "Plain"), (.nice, "With Backdrop")])
+                    if capture.config.windowStyle == .nice {
+                        RowDivider()
+                        OptionRow(title: "Backdrop", caption: "A blurred piece of your desktop picture, or a solid color.",
+                                  selection: $capture.config.backdrop,
+                                  options: [(.wallpaper, "Wallpaper"), (.color, "Color")]) {
+                            if capture.config.backdrop == .color {
+                                ColorPicker("Color", selection: Binding(
+                                    get: { Color(nsColor: capture.config.backdropNSColor) },
+                                    set: { capture.config.backdropColor = NSColor($0).hexString }
+                                ), supportsOpacity: false)
                             }
                         }
-                        .labelsHidden()
-                        .fixedSize()
+                        RowDivider()
+                        SettingRow(title: "Padding") { EmptyView() } extra: {
+                            ValueSlider(value: $capture.config.padding, range: 0...120, step: 4, low: "None", high: "Wide") { "\(Int($0)) pt" }
+                        }
+                        RowDivider()
+                        SettingRow(title: "Shadow") { EmptyView() } extra: {
+                            ValueSlider(value: $capture.config.shadow, range: 0...1, step: 0.05, low: "None", high: "Deep") { "\(Int(($0 * 100).rounded()))%" }
+                        }
+                    }
+                }
+
+                Card(title: "Recordings",
+                     footnote: "H.264 MP4, which plays everywhere. Frames are only written when something on screen changes, so a still screen adds almost nothing to the file. When it stops, the file is put on the clipboard, ready to paste.") {
+                    FolderRow(title: "Save to", path: $capture.config.recordingFolder, fallback: CaptureConfig.defaultRecordingDirectory)
+                    RowDivider()
+                    OptionRow(title: "Quality", caption: qualityCaption,
+                              selection: $capture.config.quality,
+                              options: RecordingQuality.allCases.map { ($0, $0.title) })
+                    RowDivider()
+                    OptionRow(title: "Frame rate", selection: $capture.config.frameRate,
+                              options: [(15, "15 fps"), (30, "30 fps"), (60, "60 fps")])
+                    RowDivider()
+                    ToggleRow(title: "Show cursor", isOn: $capture.config.showCursor)
+                    RowDivider()
+                    ToggleRow(title: "Show clicks", caption: "A ring where you click.", isOn: $capture.config.showClicks)
+                    RowDivider()
+                    ToggleRow(title: "System audio", caption: "The sound of other apps.", isOn: $capture.config.systemAudio)
+                    RowDivider()
+                    ToggleRow(title: "Microphone",
+                              caption: capture.micPermission == .denied
+                                  ? "Microphone access is off for MacOS Toolkit in System Settings."
+                                  : "With system audio on too, both are mixed into one track.",
+                              isOn: Binding(get: { capture.config.microphone }, set: { capture.setMicrophone($0) }))
+                    if capture.config.microphone {
+                        RowDivider()
+                        SettingRow(title: "Input") {
+                            Picker("Input", selection: $capture.config.microphoneID) {
+                                Text("Default").tag("")
+                                if !capture.isPreview {
+                                    ForEach(Microphones.all(), id: \.uniqueID) { Text($0.localizedName).tag($0.uniqueID) }
+                                }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
                     }
                 }
             }
@@ -131,17 +148,16 @@ struct CaptureSettingsView: View {
     }
 }
 
-/// A folder setting: the folder's name, and a button to pick another.
+/// A folder setting: where files go, and a button to pick another. Empty
+/// means `fallback`, which is made on first use.
 private struct FolderRow: View {
     let title: String
     @Binding var path: String
-    let fallback: String
+    let fallback: URL
 
     var body: some View {
-        SettingRow(title: title, caption: path.isEmpty ? nil : (path as NSString).abbreviatingWithTildeInPath) {
+        SettingRow(title: title, caption: ((path.isEmpty ? fallback.path : path) as NSString).abbreviatingWithTildeInPath) {
             HStack(spacing: 8) {
-                Text(path.isEmpty ? fallback : URL(fileURLWithPath: path).lastPathComponent)
-                    .foregroundStyle(.secondary)
                 Button("Choose…") { choose() }
                 if !path.isEmpty {
                     Button("Reset") { path = "" }

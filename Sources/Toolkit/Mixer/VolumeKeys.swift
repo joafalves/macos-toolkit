@@ -6,9 +6,9 @@ enum VolumeKey {
     case up, down, mute
 }
 
-/// Catches the keyboard's volume keys for outputs that have no volume of their
-/// own, where macOS would only show a "not allowed" icon. Everywhere else the
-/// keys are left to macOS, with its own volume display.
+/// Catches the keyboard's volume keys while the mixer is on, on every output,
+/// so they always behave the same and always show the toolkit's bar: the
+/// device's own volume where it has one, the software volume where it doesn't.
 final class VolumeKeys {
     private unowned let mixer: MixerController
     private let hud = VolumeHUD()
@@ -82,7 +82,7 @@ final class VolumeKeys {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return pass
         }
-        guard type.rawValue == Self.systemDefined, wanted, mixer.softwareActive,
+        guard type.rawValue == Self.systemDefined, wanted, mixer.handlesVolumeKeys,
               let ns = NSEvent(cgEvent: event), ns.type == .systemDefined, ns.subtype.rawValue == 8
         else { return pass }
 

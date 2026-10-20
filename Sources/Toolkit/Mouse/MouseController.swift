@@ -14,8 +14,9 @@ struct MouseDevice: Identifiable, Equatable {
 final class MouseController: ObservableObject {
     @Published var config: MouseConfig {
         didSet {
-            guard config != oldValue else { return }
+            guard config != oldValue, !isPreview else { return }
             config.save()
+            if oldValue.enabled, !config.enabled { restoreAll() }
             refresh(force: true)
         }
     }
@@ -36,6 +37,33 @@ final class MouseController: ObservableObject {
     /// Values we have written this session, by "registryID/key".
     private var written: [String: Int32] = [:]
     private var timer: Timer?
+
+    /// For `--snapshot`: a made-up mouse, with nothing read from or written
+    /// to the real ones.
+    private(set) var isPreview = false
+
+    static func preview() -> MouseController {
+        let mouse = MouseController(preview: true)
+        let id = "1:2:Bluetooth Low Energy"
+        var profile = Profile(name: "Wireless Mouse")
+        profile.cursorSpeedMode = .custom
+        profile.cursorSpeed = 1.2
+        profile.accelMode = .custom
+        profile.accel = 0.5
+        profile.smoothScrolling = true
+        mouse.config = MouseConfig()
+        mouse.config.profiles[id] = profile
+        mouse.devices = [MouseDevice(id: id, name: "Wireless Mouse", transport: "Bluetooth Low Energy", connected: true)]
+        mouse.selectedID = id
+        mouse.batteries = ["1:2": 80]
+        mouse.accessibilityGranted = true
+        return mouse
+    }
+
+    private init(preview: Bool) {
+        isPreview = true
+        config = MouseConfig()
+    }
 
     init() {
         config = MouseConfig.load()
@@ -80,7 +108,7 @@ final class MouseController: ObservableObject {
         let levels = Self.batteryLevels()
         if levels != batteries { batteries = levels }
 
-        for service in services {
+        for service in services where config.enabled {
             if let profile = config.profiles[service.identity.key] {
                 apply(profile, to: service, force: force)
             }
@@ -211,6 +239,7 @@ final class MouseController: ObservableObject {
     // MARK: - Wheel
 
     private func wheelProfile() -> Profile? {
+        guard config.enabled else { return nil }
         let connected = devices.filter(\.connected)
         if connected.count == 1 { return config.profiles[connected[0].id] }
         if let key = monitor.lastActiveKey, connected.contains(where: { $0.id == key }) {

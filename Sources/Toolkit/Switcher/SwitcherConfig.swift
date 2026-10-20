@@ -10,8 +10,11 @@ enum SwitcherPlacement: String, Codable, CaseIterable {
 }
 
 struct SwitcherConfig: Codable, Equatable {
-    /// When off, Cmd-Tab is left to macOS.
+    /// When off, the switcher is gone and ⌘Tab is macOS's again.
     var enabled = true
+    /// Its modifiers are the ones held to keep the list open. macOS's own
+    /// ⌘Tab is only switched off while this is ⌘Tab.
+    var shortcut = Shortcut.commandTab
     var placement = SwitcherPlacement.mainScreen
 
     init() {}
@@ -19,6 +22,7 @@ struct SwitcherConfig: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        shortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .shortcut)) ?? .commandTab
         placement = (try? c.decodeIfPresent(SwitcherPlacement.self, forKey: .placement)) ?? .mainScreen
     }
 

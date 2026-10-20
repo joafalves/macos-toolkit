@@ -28,6 +28,8 @@ final class FinderSync: FIFinderSync {
         let onItems = menuKind == .contextualMenuForItems
         guard onItems || menuKind == .contextualMenuForContainer else { return nil }
         let settings = Settings.load()
+        // The Finder tool turned off as a whole in the app.
+        guard settings.bool("enabled") else { return nil }
         let menu = NSMenu(title: "")
         // Drawn now, in the colour of the current theme: Finder shows these
         // images as they are, without tinting them the way it does its own.

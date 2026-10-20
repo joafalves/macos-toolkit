@@ -1,6 +1,9 @@
 import AppKit
 
 struct FinderConfig: Codable, Equatable {
+    /// When off, there's no Cut and no right-click menu, whatever the
+    /// switches below say. The Finder extension reads this key too.
+    var enabled = true
     /// ⌘X in Finder, or Cut in its right-click menu, marks the selection to be
     /// moved by the next ⌘V.
     var cut = true
@@ -15,6 +18,7 @@ struct FinderConfig: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
         cut = try c.decodeIfPresent(Bool.self, forKey: .cut) ?? true
         newTextFile = try c.decodeIfPresent(Bool.self, forKey: .newTextFile) ?? true
         openInTerminal = try c.decodeIfPresent(Bool.self, forKey: .openInTerminal) ?? true

@@ -47,7 +47,9 @@ final class SelectionOverlay {
     var selection: NSRect? {
         didSet { redraw() }
     }
-    fileprivate var hovered: (id: CGWindowID, frame: NSRect)?
+    fileprivate var hovered: Candidate? {
+        didSet { if hovered?.id != oldValue?.id { highlight.show(hovered) } }
+    }
     fileprivate var hoveredScreen: NSScreen?
     fileprivate var mouse = NSPoint.zero
     fileprivate var drag: Drag?
@@ -61,10 +63,12 @@ final class SelectionOverlay {
     var onConfirm: ((NSEvent) -> Void)?
 
     private var windows: [CapturePanel] = []
-    private var candidates: [(id: CGWindowID, frame: NSRect)] = []
+    private var moveMonitors: [Any] = []
+    private var candidates: [Candidate] = []
+    private let highlight = WindowHighlight()
 
     var isVisible: Bool { !windows.isEmpty }
-    var windowNumbers: Set<CGWindowID> { Set(windows.map { CGWindowID($0.windowNumber) }) }
+    var windowNumbers: Set<CGWindowID> { Set(windows.compactMap(\.windowID)) }
 
     func show(mode: Mode, quick: Bool, area: NSRect? = nil) {
         hide()
@@ -91,9 +95,20 @@ final class SelectionOverlay {
         updateHover()
         redraw()
         cursorUpdate()
+        // Moves over the toolbar may go to the toolbar or to us, depending on
+        // macOS; either way the cursor is decided in one place.
+        let follow: (NSEvent) -> Void = { [weak self] _ in self?.cursorUpdate() }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: { follow($0); return $0 }) {
+            moveMonitors.append(local)
+        }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: follow) {
+            moveMonitors.append(global)
+        }
     }
 
     func hide() {
+        moveMonitors.forEach(NSEvent.removeMonitor)
+        moveMonitors.removeAll()
         windows.forEach { $0.orderOut(nil) }
         windows.removeAll()
         drag = nil
@@ -138,7 +153,7 @@ final class SelectionOverlay {
                   let rect = CGRect(dictionaryRepresentation: bounds),
                   rect.width >= 40, rect.height >= 40
             else { return nil }
-            return (id, Coordinates.toAppKit(rect))
+            return Candidate(id: id, frame: Coordinates.toAppKit(rect), layer: layer)
         }
     }
 
@@ -147,17 +162,19 @@ final class SelectionOverlay {
         guard mode == .window else { hovered = nil; return }
         // Front to back, so the first hit is the one on top.
         let hit = candidates.first { $0.frame.contains(mouse) }
-        if hit?.id != hovered?.id {
-            hovered = hit
-            redraw()
-        }
+        if hit?.id != hovered?.id { hovered = hit }
     }
 
     fileprivate func redraw() {
         windows.forEach { $0.contentView?.needsDisplay = true }
     }
 
+    /// The crosshair (or camera) over the overlay, the arrow over anything
+    /// above it, like the toolbar or a menu.
     fileprivate func cursorUpdate() {
+        guard !windows.isEmpty else { return }
+        let top = NSWindow.windowNumber(at: NSEvent.mouseLocation, belowWindowWithWindowNumber: 0)
+        guard windows.contains(where: { $0.windowNumber == top }) else { return NSCursor.arrow.set() }
         (mode == .window ? CaptureCursor.camera : NSCursor.crosshair).set()
     }
 
@@ -259,6 +276,44 @@ final class SelectionOverlay {
     }
 }
 
+struct Candidate {
+    let id: CGWindowID
+    /// In AppKit global coordinates.
+    let frame: NSRect
+    let layer: Int
+}
+
+/// The tint over the window under the mouse. The overlay sits above every
+/// window, so a tint drawn there would cover the windows in front of this one
+/// too. As a window of its own, ordered just above the one it marks, the
+/// windows in front cover it the way they cover that window.
+final class WindowHighlight {
+    private var panel: CapturePanel?
+
+    func show(_ candidate: Candidate?) {
+        guard let candidate else {
+            panel?.orderOut(nil)
+            return
+        }
+        let panel = self.panel ?? make()
+        self.panel = panel
+        panel.level = NSWindow.Level(rawValue: candidate.layer)
+        panel.setFrame(candidate.frame, display: true)
+        panel.order(.above, relativeTo: Int(candidate.id))
+    }
+
+    private func make() -> CapturePanel {
+        let panel = CapturePanel(frame: .zero, level: .normal)
+        panel.ignoresMouseEvents = true
+        let view = NSView()
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.28).cgColor
+        view.layer?.cornerRadius = 10
+        panel.contentView = view
+        return panel
+    }
+}
+
 fileprivate enum Drag {
     case create(anchor: NSPoint, screen: NSRect)
     case move(from: NSPoint, original: NSRect)
@@ -349,9 +404,11 @@ private final class OverlayView: NSView {
         overlay.cursorUpdate()
     }
 
+    /// Not quite clear, so the window server hands every click to us.
+    static let base = NSColor.black.withAlphaComponent(0.01)
+
     override func draw(_ dirtyRect: NSRect) {
-        // Not quite clear, so the window server hands every click to us.
-        NSColor.black.withAlphaComponent(0.01).setFill()
+        Self.base.setFill()
         bounds.fill()
         let dim = NSColor.black.withAlphaComponent(0.42)
         switch overlay.mode {
@@ -390,11 +447,8 @@ private final class OverlayView: NSView {
             drawLabel("\(Int(selection.width)) × \(Int(selection.height))",
                       at: NSPoint(x: hole.maxX, y: hole.minY), below: true)
         case .window:
-            if let hovered = overlay.hovered, hovered.frame.intersects(screen.frame) {
-                let rect = local(hovered.frame)
-                NSColor.controlAccentColor.withAlphaComponent(0.28).setFill()
-                NSBezierPath(roundedRect: rect, xRadius: 10, yRadius: 10).fill()
-            }
+            // The highlight is a window of its own, in among the others.
+            break
         case .screen:
             if overlay.hoveredScreen == screen {
                 NSColor.controlAccentColor.withAlphaComponent(0.18).setFill()

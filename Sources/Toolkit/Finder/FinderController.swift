@@ -10,7 +10,7 @@ final class FinderController: ObservableObject {
         didSet {
             guard config != oldValue else { return }
             if persists { config.save() }
-            if !config.cut { cutMark = nil }
+            if !config.enabled || !config.cut { cutMark = nil }
             apply()
         }
     }
@@ -110,7 +110,7 @@ final class FinderController: ObservableObject {
     }
 
     private func apply() {
-        guard config.cut else { return uninstall() }
+        guard config.enabled, config.cut else { return uninstall() }
         guard tap == nil, AXIsProcessTrusted() else { return }
         let installed = installTap()
         NSLog("Toolkit: finder event tap started = \(installed)")
@@ -216,7 +216,7 @@ final class FinderController: ObservableObject {
     func handle(_ url: URL) {
         // Only while Finder is in front, as it is right after its menu, so
         // another app or a web page can't use the scheme to make files.
-        guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Self.finder,
+        guard config.enabled, NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Self.finder,
               let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
         else { return }
         func path(_ name: String) -> URL? {

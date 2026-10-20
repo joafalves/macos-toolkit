@@ -40,6 +40,7 @@ final class CaptureController: ObservableObject {
     private var countdown: CapturePanel?
     private var ticker: Timer?
     private var flagMonitors: [Any] = []
+    private var recordingObserver: NSObjectProtocol?
     /// Wall-clock time recorded before the current stretch, and when that began.
     private var recordedBefore: TimeInterval = 0
     private var stretchStart: Date?
@@ -50,6 +51,9 @@ final class CaptureController: ObservableObject {
     init() {
         config = CaptureConfig.load()
         keys.onAction = { [weak self] action in self?.handle(action) }
+        recordingObserver = NotificationCenter.default.addObserver(forName: ShortcutRecording.changed, object: nil, queue: .main) { [weak self] _ in
+            self?.keys.suspend(ShortcutRecording.active)
+        }
         overlay.onCancel = { [weak self] in self?.cancelSelection() }
         overlay.onModeChange = { [weak self] mode in
             guard let self, self.toolbar.isVisible else { return }
@@ -98,7 +102,13 @@ final class CaptureController: ObservableObject {
     private func apply() {
         // A snapshot must not take the shortcuts from macOS.
         guard !isPreview else { return }
-        if config.replaceShortcuts { keys.start() } else { keys.stop() }
+        if config.enabled {
+            keys.start(config.bindings)
+        } else {
+            keys.stop()
+            closeToolbar()
+            overlay.hide()
+        }
         statusItem.update()
     }
 
@@ -291,7 +301,7 @@ final class CaptureController: ObservableObject {
 
     /// Our capture windows, kept out of every capture.
     private var ownWindows: Set<CGWindowID> {
-        Set(NSApp.windows.compactMap { $0 is CapturePanel && $0.isVisible ? CGWindowID($0.windowNumber) : nil })
+        Set(NSApp.windows.compactMap { $0 is CapturePanel && $0.isVisible ? $0.windowID : nil })
     }
 
     private func takeScreenshot(_ target: CaptureTarget, copy: Bool, screen: NSScreen?) {
@@ -345,7 +355,7 @@ final class CaptureController: ObservableObject {
 
     // MARK: - Recording
 
-    private func startRecording(_ target: CaptureTarget, screen: NSScreen?) {
+    func startRecording(_ target: CaptureTarget, screen: NSScreen?) {
         guard ensurePermission() else { return }
         let folder = config.recordingDirectory
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -355,7 +365,7 @@ final class CaptureController: ObservableObject {
             NSLog("Toolkit: recording stopped by the system: \(error?.localizedDescription ?? "")")
             self.stopRecording()
         }
-        let options = Recorder.Options(nativeResolution: config.nativeResolution, frameRate: config.frameRate,
+        let options = Recorder.Options(quality: config.quality, frameRate: config.frameRate,
                                        showCursor: config.showCursor, showClicks: config.showClicks,
                                        systemAudio: config.systemAudio,
                                        microphone: config.microphone && micPermission == .authorized,
@@ -367,10 +377,10 @@ final class CaptureController: ObservableObject {
         recording = RecordingState()
         statusItem.update()
         if case .area(let rect) = target { showFrame(around: Coordinates.toAppKit(rect)) }
-        // The menu bar button and the frame are ours too, and stay out of the video.
-        var excluded = ownWindows
-        if let number = statusItem.windowNumber { excluded.insert(number) }
         Task { @MainActor in
+            // The outline is ours too, and stays out of the video (the stop
+            // button is left out by the recorder, with our other menu bar items).
+            let excluded = self.ownWindows
             do {
                 try await recorder.start(target, options: options, excluding: excluded)
                 self.startTicker()
@@ -398,7 +408,8 @@ final class CaptureController: ObservableObject {
         statusItem.update()
     }
 
-    func stopRecording(then done: (() -> Void)? = nil) {
+    /// `keep` false throws the file away, without the clipboard or a thumbnail.
+    func stopRecording(keep: Bool = true, then done: (() -> Void)? = nil) {
         guard let recorder else { done?(); return }
         self.recorder = nil
         ticker?.invalidate()
@@ -409,7 +420,9 @@ final class CaptureController: ObservableObject {
         let screen = recordingScreen
         Task { @MainActor in
             let saved = await recorder.stop()
-            if saved {
+            if saved, !keep {
+                try? FileManager.default.removeItem(at: recorder.url)
+            } else if saved {
                 let board = NSPasteboard.general
                 board.clearContents()
                 board.writeObjects([recorder.url as NSURL])
@@ -421,9 +434,7 @@ final class CaptureController: ObservableObject {
 
     /// Throws the recording away.
     func discardRecording() {
-        guard let recorder else { return }
-        let url = recorder.url
-        stopRecording { try? FileManager.default.removeItem(at: url) }
+        stopRecording(keep: false)
     }
 
     private func startTicker() {

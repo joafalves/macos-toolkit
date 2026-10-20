@@ -55,6 +55,23 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-capture"), CommandLin
     exit(0)
 }
 
+if CommandLine.arguments.contains("--test-shortcuts") {
+    CaptureController.shortcutTest()
+    exit(0)
+}
+if CommandLine.arguments.contains("--test-recording") {
+    CaptureController.recordingTest()
+    exit(0)
+}
+if CommandLine.arguments.contains("--test-highlight") {
+    CaptureController.highlightTest()
+    exit(0)
+}
+if CommandLine.arguments.contains("--test-toolbar") {
+    CaptureController.toolbarTest()
+    exit(0)
+}
+
 // Development aid: `--show-hud` shows the volume bar for a few seconds.
 if CommandLine.arguments.contains("--show-hud") {
     VolumeHUD.demo()

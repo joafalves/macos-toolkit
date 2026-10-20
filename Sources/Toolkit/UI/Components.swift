@@ -184,6 +184,73 @@ struct Banner: View {
     }
 }
 
+/// The top of a tool's page: what the tool is, and the switch that turns it
+/// on and off. The same on every tool, so "on" always looks the same.
+struct ToolHeader: View {
+    let section: AppSection
+    var title: String?
+    let subtitle: String
+    @Binding var enabled: Bool
+
+    var body: some View {
+        HStack(spacing: 14) {
+            IconTile(symbol: section.symbol, size: 46)
+                .saturation(enabled ? 1 : 0)
+                .opacity(enabled ? 1 : 0.55)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title ?? section.title).font(.title2.weight(.semibold))
+                Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+            Text(enabled ? "Enabled" : "Off")
+                .font(.callout.weight(.medium))
+                .foregroundStyle(enabled ? Color.accentColor : .secondary)
+            Toggle("Enabled", isOn: $enabled)
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .controlSize(.large)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(enabled ? Color.accentColor.opacity(0.09) : Color.primary.opacity(0.045),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(enabled ? Color.accentColor.opacity(0.28) : Color.primary.opacity(0.08)))
+        .animation(.easeOut(duration: 0.15), value: enabled)
+    }
+}
+
+/// The rest of a tool's page, greyed out while the tool is off.
+struct WhenEnabled<Content: View>: View {
+    let enabled: Bool
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            content()
+        }
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.5)
+    }
+}
+
+/// A setting that's a shortcut, with a recorder on the right.
+struct ShortcutRow: View {
+    let title: String
+    var caption: String?
+    @Binding var shortcut: Shortcut
+    let defaultValue: Shortcut
+    var optional = true
+    var taken: [Shortcut] = []
+
+    var body: some View {
+        SettingRow(title: title, caption: caption) {
+            ShortcutRecorder(shortcut: $shortcut, defaultValue: defaultValue, optional: optional, taken: taken)
+        }
+    }
+}
+
 /// A rounded tile with a glyph, used at the top of a page.
 struct IconTile: View {
     let symbol: String

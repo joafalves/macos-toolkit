@@ -33,8 +33,10 @@ tool; keep it in step with the code.
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
 - `Resources`: `Info.plist` (the only place the version lives), app icon.
 - `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `make-icon.swift`.
-- `docs/images`: the README's screenshots, all rendered with `--snapshot`. The mixer and switcher
-  use made-up rows; the mouse one is cropped below the header so the real device name stays out.
+- `docs/images`: the README's screenshots, all rendered with `--snapshot` from the tools' `preview()`
+  controllers, which use made-up data (a "Wireless Mouse", invented mixer and switcher rows, every
+  known terminal). Never commit an image that shows anything from this Mac: real devices, apps,
+  windows, files or folders.
 
 ## Conventions
 
@@ -45,6 +47,10 @@ tool; keep it in step with the code.
 - **Adding a tool:** a case in `AppSection` (title, symbol), a view in `MainView`, a field in
   `SettingsFile` (optional, so old exports still import), a section in `README.md`.
 - **Settings pages** use `Page` and `Card`. Controls that change behaviour go through the config.
+  A tool's page starts with `ToolHeader` (its name and the Enabled switch, bound to the config's
+  `enabled`) and wraps the rest in `WhenEnabled`. Shortcuts are `Shortcut` values set with
+  `ShortcutRow` (`UI/Shortcut.swift`); a tool lets its own shortcuts through while
+  `ShortcutRecording.active`, so they can be recorded.
 - **`@State` does not compile** here: in the macOS 27 SDK it is a macro and the Command Line Tools lack
   its plugin. Use `@StateObject private var x = ViewState(value)` instead (`ViewState` is in
   `Components.swift`). `@GestureState` and `@StateObject` are fine.
@@ -69,6 +75,10 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
 .build/debug/Toolkit --test-capture <folder> [app]   # each screenshot kind and short recordings, with a report
+.build/debug/Toolkit --test-recording        # the app's recording path: start, stop button, discard
+.build/debug/Toolkit --test-shortcuts        # config migration, and which macOS screenshot shortcuts clash
+.build/debug/Toolkit --test-toolbar          # the capture toolbar's panel against its content
+.build/debug/Toolkit --test-highlight        # the window highlight sits right above its window
 .build/debug/Toolkit --list-windows          # what the Window Switcher would list
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds

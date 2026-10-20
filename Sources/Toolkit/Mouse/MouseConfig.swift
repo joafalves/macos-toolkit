@@ -80,6 +80,8 @@ struct Profile: Codable, Equatable {
 }
 
 struct MouseConfig: Codable, Equatable {
+    /// When off, every mouse is left to macOS, whatever its profile says.
+    var enabled = true
     /// Keyed by `MouseIdentity.key` (vendor:product:transport).
     var profiles: [String: Profile] = [:]
     var restoreOnQuit = true
@@ -89,6 +91,7 @@ struct MouseConfig: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
         profiles = try c.decodeIfPresent([String: Profile].self, forKey: .profiles) ?? [:]
         restoreOnQuit = try c.decodeIfPresent(Bool.self, forKey: .restoreOnQuit) ?? true
         showAllPointingDevices = try c.decodeIfPresent(Bool.self, forKey: .showAllPointingDevices) ?? false

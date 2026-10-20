@@ -61,12 +61,12 @@ extension CaptureController {
             } catch {
                 report += "rec-paused-audio: FAILED \(error.localizedDescription)\n"
             }
-            for (name, native) in [("rec-1x", false), ("rec-native", true)] {
+            for (name, quality) in RecordingQuality.allCases.map({ ("rec-\($0.rawValue)", $0) }) {
                 let url = folder.appendingPathComponent("\(name).mp4")
                 try? FileManager.default.removeItem(at: url)
                 let recorder = Recorder(url: url)
                 do {
-                    try await recorder.start(.display(main), options: .init(nativeResolution: native, frameRate: 30), excluding: [])
+                    try await recorder.start(.display(main), options: .init(quality: quality, frameRate: 30), excluding: [])
                     try await Task.sleep(nanoseconds: 3_000_000_000)
                     let ok = await recorder.stop()
                     let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
@@ -140,5 +140,102 @@ extension CaptureController {
         }
         try? report.write(to: folder.appendingPathComponent("report.txt"), atomically: true, encoding: .utf8)
         print(report)
+    }
+}
+
+extension CaptureController {
+    /// Shows the real toolbar panel in each mode and reports whether it still
+    /// fits its content.
+    static func toolbarTest() {
+        _ = NSApplication.shared
+        let capture = CaptureController.preview()
+        let toolbar = CaptureToolbar(capture: capture)
+        toolbar.show(on: NSScreen.main!)
+        for mode in [CaptureMode.area, .window, .screen, .area] {
+            capture.config.mode = mode
+            RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+            let panel = NSApp.windows.first { $0 is CapturePanel && $0.isVisible }
+            let host = panel?.contentView?.subviews.first
+            print("\(mode): panel \(panel.map { "\(Int($0.frame.width))×\(Int($0.frame.height))" } ?? "none"), content wants \(host.map { "\(Int($0.fittingSize.width))×\(Int($0.fittingSize.height))" } ?? "?")")
+        }
+        if let panel = NSApp.windows.first(where: { $0 is CapturePanel && $0.isVisible }) {
+            let top = NSWindow.windowNumber(at: NSPoint(x: panel.frame.midX, y: panel.frame.midY), belowWindowWithWindowNumber: 0)
+            print("window under the toolbar's centre is the toolbar: \(top == panel.windowNumber)")
+        }
+        toolbar.hide()
+    }
+}
+
+extension CaptureController {
+    /// Puts the window highlight over the second window from the front and
+    /// checks the window server has it directly above that window.
+    static func highlightTest() {
+        _ = NSApplication.shared
+        func normalWindows() -> [[String: Any]] {
+            (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
+                .filter { ($0[kCGWindowLayer as String] as? Int) == 0 }
+        }
+        let own = ProcessInfo.processInfo.processIdentifier
+        let others = normalWindows().filter { ($0[kCGWindowOwnerPID as String] as? pid_t) != own }
+        guard others.count > 1, let id = others[1][kCGWindowNumber as String] as? CGWindowID,
+              let bounds = others[1][kCGWindowBounds as String] as? NSDictionary,
+              let rect = CGRect(dictionaryRepresentation: bounds)
+        else { return print("needs two windows on screen") }
+        let highlight = WindowHighlight()
+        highlight.show(Candidate(id: id, frame: Coordinates.toAppKit(rect), layer: 0))
+        RunLoop.main.run(until: Date().addingTimeInterval(1))
+        let order = normalWindows().map { ($0[kCGWindowNumber as String] as? CGWindowID ?? 0, $0[kCGWindowOwnerPID as String] as? pid_t ?? 0) }
+        let mine = order.firstIndex { $0.1 == own }
+        let target = order.firstIndex { $0.0 == id }
+        print("highlight at \(mine.map(String.init) ?? "-"), target at \(target.map(String.init) ?? "-"), directly above: \(mine != nil && target != nil && mine! + 1 == target!)")
+        highlight.show(nil)
+    }
+}
+
+extension CaptureController {
+    /// The recording path the menu bar and toolbar use: start an area
+    /// recording, check the stop button, then discard it.
+    static func recordingTest() {
+        _ = NSApplication.shared
+        let capture = CaptureController()
+        let screen = NSScreen.main!
+        let area = CGRect(x: screen.cgFrame.minX + 40, y: screen.cgFrame.minY + 80, width: 320, height: 200)
+        capture.startRecording(.area(area), screen: screen)
+        RunLoop.main.run(until: Date().addingTimeInterval(2))
+        print("recording: \(capture.isRecording), elapsed: \(Int(capture.recording?.elapsed ?? 0)) s, size: \(capture.recording?.bytes ?? 0) bytes")
+        capture.discardRecording()
+        RunLoop.main.run(until: Date().addingTimeInterval(1.5))
+        print("after discard: recording \(capture.isRecording)")
+    }
+}
+
+@_silgen_name("CGSIsSymbolicHotKeyEnabled") private func CGSIsSymbolicHotKeyEnabled(_ id: Int32) -> Bool
+
+extension CaptureController {
+    /// Config migration, cleared shortcuts, and which of macOS's screenshot
+    /// shortcuts are switched off for a few sets of bindings. Ends on the
+    /// default bindings, which is what the running app has.
+    static func shortcutTest() {
+        _ = NSApplication.shared
+        let legacy = try! JSONDecoder().decode(CaptureConfig.self, from: Data(#"{"replaceShortcuts": false}"#.utf8))
+        print("legacy replaceShortcuts false -> enabled \(legacy.enabled), area \(legacy.areaShortcut.display)")
+        var config = CaptureConfig()
+        config.screenShortcut = .none
+        let round = try! JSONDecoder().decode(CaptureConfig.self, from: JSONEncoder().encode(config))
+        print("cleared screen shortcut after a save: \(round.screenShortcut.display), area still \(round.areaShortcut.display)")
+
+        func states() -> String {
+            ([28, 29, 30, 31, 184] as [Int32]).map { "\($0):\(CGSIsSymbolicHotKeyEnabled($0) ? "on" : "off")" }.joined(separator: " ")
+        }
+        let keys = CaptureKeys()
+        var custom = CaptureConfig().bindings
+        custom.area = Shortcut(keyCode: 1, flags: [.option, .shift], key: "S")
+        keys.start(custom)
+        print("area on ⌥⇧S, macOS:  \(states())  (expect 30 and 31 on)")
+        custom.screen = nil
+        keys.start(custom)
+        print("display cleared too:  \(states())  (expect 28-31 on)")
+        keys.start(CaptureConfig().bindings)
+        print("defaults:             \(states())  (expect all off)")
     }
 }

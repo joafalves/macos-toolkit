@@ -6,7 +6,7 @@ import ApplicationServices
 final class SwitcherController: ObservableObject {
     @Published var config: SwitcherConfig {
         didSet {
-            guard config != oldValue else { return }
+            guard config != oldValue, !isPreview else { return }
             config.save()
             apply()
         }
@@ -39,6 +39,16 @@ final class SwitcherController: ObservableObject {
     private var selection = 0
     private var reveal: DispatchWorkItem?
 
+    /// For `--snapshot`: default settings, nothing read or written.
+    private(set) var isPreview = false
+
+    static func preview() -> SwitcherController {
+        let switcher = SwitcherController()
+        switcher.isPreview = true
+        switcher.config = SwitcherConfig()
+        return switcher
+    }
+
     init() {
         config = SwitcherConfig.load()
         catalog.onChange = { [weak self] in self?.refresh() }
@@ -68,16 +78,20 @@ final class SwitcherController: ObservableObject {
 
     private func apply() {
         guard config.enabled else { return uninstall() }
-        guard tap == nil, AXIsProcessTrusted() else { return }
-        let installed = installTap()
-        NSLog("Toolkit: switcher event tap started = \(installed)")
-        if tapFailed == installed { tapFailed = !installed }
-        guard installed else { return }
-        catalog.start()
-        // macOS handles its own Cmd-Tab before event taps see the keys, so it
-        // has to be switched off for ours to get them.
-        CGSSetSymbolicHotKeyEnabled(1, false)
-        CGSSetSymbolicHotKeyEnabled(2, false)
+        if tap == nil {
+            guard AXIsProcessTrusted() else { return }
+            let installed = installTap()
+            NSLog("Toolkit: switcher event tap started = \(installed)")
+            if tapFailed == installed { tapFailed = !installed }
+            guard installed else { return }
+            catalog.start()
+        }
+        // macOS handles its own ⌘Tab before event taps see the keys, so it has
+        // to be switched off while ours is ⌘Tab, and only then.
+        let ours = config.shortcut.keyCode == Shortcut.commandTab.keyCode
+            && config.shortcut.flags.subtracting(.shift) == Shortcut.commandTab.flags
+        CGSSetSymbolicHotKeyEnabled(1, !ours)
+        CGSSetSymbolicHotKeyEnabled(2, !ours)
     }
 
     private func uninstall() {
@@ -124,26 +138,39 @@ final class SwitcherController: ObservableObject {
             end()
             return pass
         }
+        // A shortcut is being typed into the settings.
+        if ShortcutRecording.active, !active { return pass }
         let flags = event.flags
         let code = event.getIntegerValueField(.keyboardEventKeycode)
+        let shortcut = config.shortcut
+        // The shortcut's ⌘ ⌥ ⌃ are what hold the list open. ⇧ goes backwards,
+        // unless the shortcut itself has ⇧.
+        let held = shortcut.cgFlags.subtracting(.maskShift)
+        let shiftReverses = !shortcut.flags.contains(.shift)
 
         guard active else {
-            // Cmd-Tab and Cmd-Shift-Tab only; other combinations belong to other apps.
-            guard type == .keyDown, code == Key.tab, flags.contains(.maskCommand),
-                  flags.isDisjoint(with: [.maskControl, .maskAlternate])
+            // Exactly the shortcut (and its ⇧ version); other combinations
+            // belong to other apps.
+            let holding: CGEventFlags = [.maskCommand, .maskAlternate, .maskControl]
+            guard type == .keyDown, code == Int64(shortcut.keyCode), flags.intersection(holding) == held,
+                  shiftReverses || flags.contains(.maskShift)
             else { return pass }
-            begin(backwards: flags.contains(.maskShift))
+            begin(backwards: shiftReverses && flags.contains(.maskShift))
             return nil
         }
 
-        // Cmd is what holds the switcher open. Checking it on every event means
-        // a missed release can never leave the keyboard swallowed.
-        guard flags.contains(.maskCommand) else {
+        // The held keys are what keep the switcher open. Checking them on every
+        // event means a missed release can never leave the keyboard swallowed.
+        guard flags.contains(held) else {
             if type == .flagsChanged { confirm() } else { end() }
             return pass
         }
         if type == .keyDown {
-            keyDown(code, shift: flags.contains(.maskShift), isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0)
+            if code == Int64(shortcut.keyCode) {
+                move(by: shiftReverses && flags.contains(.maskShift) ? -1 : 1)
+            } else {
+                keyDown(code, shift: flags.contains(.maskShift), isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0)
+            }
         }
         // Keys pressed while the switcher is open must not reach the app behind
         // it, where they would be Cmd-Q, Cmd-W and so on.

@@ -1,64 +1,122 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// The screenshot shortcuts, taken from macOS while on. macOS handles its own
-/// before anyone else sees the keys, so its shortcuts are switched off and
-/// ours registered in their place.
+/// The capture shortcuts. macOS handles its own screenshot shortcuts before
+/// anyone else sees the keys, so the ones that clash with ours are switched
+/// off while ours are on; the rest are left as they are.
 final class CaptureKeys {
-    enum Action {
+    enum Action: Equatable {
         case screen(copy: Bool)
         case area(copy: Bool)
         case toolbar
     }
 
+    struct Bindings: Equatable {
+        var screen: Shortcut?
+        var area: Shortcut?
+        var toolbar: Shortcut?
+    }
+
     var onAction: ((Action) -> Void)?
 
-    /// macOS's IDs: ⇧⌘3, ⌃⇧⌘3, ⇧⌘4, ⌃⇧⌘4, ⇧⌘5.
-    private static let systemIDs: [Int32] = [28, 29, 30, 31, 184]
+    /// macOS's screenshot shortcuts, with the keys they have out of the box:
+    /// ⇧⌘3, ⌃⇧⌘3, ⇧⌘4, ⌃⇧⌘4, ⇧⌘5.
+    private static let system: [(id: Int32, shortcut: Shortcut)] = [
+        (28, Shortcut(keyCode: kVK_ANSI_3, flags: [.shift, .command])),
+        (29, Shortcut(keyCode: kVK_ANSI_3, flags: [.control, .shift, .command])),
+        (30, Shortcut(keyCode: kVK_ANSI_4, flags: [.shift, .command])),
+        (31, Shortcut(keyCode: kVK_ANSI_4, flags: [.control, .shift, .command])),
+        (184, Shortcut(keyCode: kVK_ANSI_5, flags: [.shift, .command])),
+    ]
 
     private var refs: [EventHotKeyRef] = []
+    private var actions: [Action] = []
     private var handler: EventHandlerRef?
-    private(set) var active = false
+    private var bindings: Bindings?
+    private var suspended = false
 
-    func start() {
-        guard !active else { return }
-        active = true
-        for id in Self.systemIDs { CGSSetSymbolicHotKeyEnabled(id, false) }
+    /// Registers the shortcuts, replacing any registered before.
+    func start(_ bindings: Bindings) {
+        guard bindings != self.bindings else { return }
+        self.bindings = bindings
         installHandler()
-        let shiftCmd = UInt32(cmdKey | shiftKey)
-        let ctrl = UInt32(controlKey)
-        register(kVK_ANSI_3, shiftCmd, id: 1)
-        register(kVK_ANSI_3, shiftCmd | ctrl, id: 2)
-        register(kVK_ANSI_4, shiftCmd, id: 3)
-        register(kVK_ANSI_4, shiftCmd | ctrl, id: 4)
-        register(kVK_ANSI_5, shiftCmd, id: 5)
+        register()
+        // Only the system shortcuts that clash with ours are switched off.
+        let ours = Self.combos(bindings).map(\.0)
+        let prefs = Self.systemPrefs()
+        for (id, fallback) in Self.system {
+            let entry = prefs[String(id)]
+            if ours.contains(Self.systemShortcut(entry) ?? fallback) {
+                CGSSetSymbolicHotKeyEnabled(id, false)
+            } else {
+                CGSSetSymbolicHotKeyEnabled(id, Self.systemEnabled(entry))
+            }
+        }
     }
 
     func stop() {
-        guard active else { return }
-        active = false
-        refs.forEach { UnregisterEventHotKey($0) }
-        refs.removeAll()
+        guard bindings != nil else { return }
+        bindings = nil
+        unregister()
         Self.restoreSystem()
+    }
+
+    /// While a shortcut is being recorded in the settings, ours step aside so
+    /// the keys reach the recorder. macOS's stay off meanwhile.
+    func suspend(_ on: Bool) {
+        guard on != suspended else { return }
+        suspended = on
+        register()
     }
 
     /// Puts macOS's shortcuts back as System Settings has them. Also run at
     /// launch, in case a crash left them off.
     static func restoreSystem() {
-        let prefs = CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, "com.apple.symbolichotkeys" as CFString) as? [String: Any]
-        for id in systemIDs {
-            let entry = prefs?[String(id)] as? [String: Any]
-            // Missing from the file means never changed, which is on.
-            let enabled = (entry?["enabled"] as? NSNumber)?.boolValue ?? true
-            CGSSetSymbolicHotKeyEnabled(id, enabled)
+        let prefs = systemPrefs()
+        for (id, _) in system { CGSSetSymbolicHotKeyEnabled(id, systemEnabled(prefs[String(id)])) }
+    }
+
+    // MARK: - Registration
+
+    /// Each shortcut with its action, plus ⌃ versions that copy.
+    private static func combos(_ b: Bindings) -> [(Shortcut, Action)] {
+        var list: [(Shortcut, Action)] = []
+        func add(_ shortcut: Shortcut?, _ action: (Bool) -> Action) {
+            guard let shortcut else { return }
+            list.append((shortcut, action(false)))
+            if !shortcut.flags.contains(.control) { list.append((shortcut.adding(.control), action(true))) }
+        }
+        add(b.screen) { .screen(copy: $0) }
+        add(b.area) { .area(copy: $0) }
+        if let toolbar = b.toolbar { list.append((toolbar, .toolbar)) }
+        // The same keys twice would register only once anyway.
+        var seen: [Shortcut] = []
+        return list.filter { combo in
+            defer { seen.append(combo.0) }
+            return !seen.contains(combo.0)
         }
     }
 
-    private func register(_ key: Int, _ modifiers: UInt32, id: UInt32) {
-        var ref: EventHotKeyRef?
-        let hotKeyID = EventHotKeyID(signature: OSType(0x544B_4350), id: id)  // "TKCP"
-        let status = RegisterEventHotKey(UInt32(key), modifiers, hotKeyID, GetApplicationEventTarget(), 0, &ref)
-        if status == noErr, let ref { refs.append(ref) } else { NSLog("Toolkit: capture shortcut \(id) not registered (\(status))") }
+    private func register() {
+        unregister()
+        guard let bindings, !suspended else { return }
+        for (index, (shortcut, action)) in Self.combos(bindings).enumerated() {
+            var ref: EventHotKeyRef?
+            let id = EventHotKeyID(signature: OSType(0x544B_4350), id: UInt32(index))  // "TKCP"
+            let status = RegisterEventHotKey(UInt32(shortcut.keyCode), shortcut.carbonModifiers, id, GetApplicationEventTarget(), 0, &ref)
+            if status == noErr, let ref {
+                refs.append(ref)
+            } else {
+                NSLog("Toolkit: capture shortcut \(shortcut.display) not registered (\(status))")
+            }
+            actions.append(action)
+        }
+    }
+
+    private func unregister() {
+        refs.forEach { UnregisterEventHotKey($0) }
+        refs.removeAll()
+        actions.removeAll()
     }
 
     private func installHandler() {
@@ -69,17 +127,30 @@ final class CaptureKeys {
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
                               nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
             let keys = Unmanaged<CaptureKeys>.fromOpaque(refcon!).takeUnretainedValue()
-            let action: Action?
-            switch hotKeyID.id {
-            case 1: action = .screen(copy: false)
-            case 2: action = .screen(copy: true)
-            case 3: action = .area(copy: false)
-            case 4: action = .area(copy: true)
-            case 5: action = .toolbar
-            default: action = nil
-            }
-            if let action { DispatchQueue.main.async { keys.onAction?(action) } }
+            let index = Int(hotKeyID.id)
+            guard hotKeyID.signature == OSType(0x544B_4350), keys.actions.indices.contains(index) else { return OSStatus(eventNotHandledErr) }
+            let action = keys.actions[index]
+            DispatchQueue.main.async { keys.onAction?(action) }
             return noErr
         }, 1, &type, Unmanaged.passUnretained(self).toOpaque(), &handler)
+    }
+
+    // MARK: - macOS's settings
+
+    private static func systemPrefs() -> [String: [String: Any]] {
+        CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, "com.apple.symbolichotkeys" as CFString) as? [String: [String: Any]] ?? [:]
+    }
+
+    /// Missing from the file means never changed, which is on.
+    private static func systemEnabled(_ entry: [String: Any]?) -> Bool {
+        (entry?["enabled"] as? NSNumber)?.boolValue ?? true
+    }
+
+    /// The keys set in System Settings, when they were changed there.
+    private static func systemShortcut(_ entry: [String: Any]?) -> Shortcut? {
+        guard let value = entry?["value"] as? [String: Any],
+              let parameters = value["parameters"] as? [NSNumber], parameters.count == 3
+        else { return nil }
+        return Shortcut(keyCode: parameters[1].intValue, flags: NSEvent.ModifierFlags(rawValue: parameters[2].uintValue))
     }
 }

@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     /// The mixer's own menu bar icon, when that setting is on.
     private var mixerItem: NSStatusItem?
     private var mixerItemSetting: AnyCancellable?
+    private var mixerVolumeIcon: AnyCancellable?
+    private var mixerItemKind = MixerMenuBarIcon.none
     private var window: NSWindow?
     private var termSource: DispatchSourceSignal?
 
@@ -31,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         capture.onOpenSettings = { [weak self] in self?.show(.capture) }
         capture.start()
 
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = Self.makeStatusIcon()
         let menu = NSMenu()
         menu.delegate = self
@@ -40,9 +42,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSApp.mainMenu = makeMainMenu()
 
         mixerItemSetting = mixer.$config
-            .map { $0.enabled && $0.standaloneIcon }
+            .map { $0.enabled ? $0.menuBarIcon : .none }
             .removeDuplicates()
-            .sink { [weak self] shown in self?.setMixerItem(shown: shown) }
+            .sink { [weak self] icon in self?.setMixerItem(icon) }
+        // The volume icon follows the main volume. Published values arrive
+        // before they're stored, so the new ones are passed along.
+        mixerVolumeIcon = mixer.$mainVolume
+            .combineLatest(mixer.$mainMuted)
+            .removeDuplicates { $0 == $1 }
+            .sink { [weak self] volume, muted in self?.updateVolumeIcon(volume: volume, muted: muted) }
 
         // Restore on `kill` too, not only on a regular quit.
         signal(SIGTERM, SIG_IGN)
@@ -91,22 +99,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             && event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
     }
 
-    /// The menu bar glyph, fitted into the standard 18pt box. Used as-is the
-    /// symbol is taller than the menu bar allows and gets clipped.
+    /// A menu bar glyph at the size macOS draws its own status symbols, in an
+    /// item as wide as the glyph. Squeezing symbols into the square 18pt box
+    /// shrank the wide ones to a fraction of the menu bar's other icons.
     static func makeStatusIcon(symbol: String = "wrench.and.screwdriver.fill", description: String = "MacOS Toolkit") -> NSImage {
-        let box = NSSize(width: 18, height: 18)
-        let image = NSImage(size: box, flipped: false) { rect in
-            guard let glyph = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
-                .withSymbolConfiguration(.init(pointSize: 14, weight: .regular))
-            else { return false }
-            let area = rect.insetBy(dx: 1, dy: 1)
-            let fit = min(area.width / glyph.size.width, area.height / glyph.size.height, 1)
-            let size = NSSize(width: glyph.size.width * fit, height: glyph.size.height * fit)
-            glyph.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
+        menuBarImage(symbol, widthOf: [symbol], description: description) ?? NSImage()
+    }
+
+    /// Every symbol is drawn at the same size, in an image as wide as the
+    /// widest of `widthOf`, so an icon that switches between them doesn't
+    /// change width. The glyph sits at the left, like macOS's Sound icon.
+    static func menuBarImage(_ symbol: String, widthOf symbols: [String], description: String? = nil) -> NSImage? {
+        let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        func symbolImage(_ name: String) -> NSImage? {
+            NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
+        }
+        guard let glyph = symbolImage(symbol) else { return nil }
+        let width = ceil(([glyph.size.width] + symbols.compactMap { symbolImage($0)?.size.width }).max() ?? glyph.size.width)
+        let height: CGFloat = 18
+        // Only symbols taller than the menu bar allows are scaled down.
+        let fit = min(1, height / glyph.size.height)
+        let size = NSSize(width: glyph.size.width * fit, height: glyph.size.height * fit)
+        let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
+            glyph.draw(in: NSRect(x: 0, y: rect.midY - size.height / 2, width: size.width, height: size.height))
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = description
+        image.accessibilityDescription = description ?? symbol
         return image
     }
 
@@ -116,7 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         mixerPopover?.performClose(nil)
         menu.removeAllItems()
         // With an icon of its own, the mixer opens from there instead.
-        if mixer.config.enabled, !mixer.config.standaloneIcon {
+        if mixer.config.enabled, mixer.config.menuBarIcon == .none {
             let item = NSMenuItem(title: "Audio Mixer", action: #selector(openMixerFromMenu), keyEquivalent: "")
             item.image = NSImage(systemSymbolName: AppSection.mixer.symbol, accessibilityDescription: nil)
             item.target = self
@@ -129,7 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             item.target = self
             menu.addItem(item)
             menu.addItem(.separator())
-        } else if !capture.config.standaloneIcon {
+        } else if capture.config.enabled, !capture.config.standaloneIcon {
             let item = NSMenuItem(title: "Screen Capture", action: #selector(openCaptureToolbar), keyEquivalent: "")
             item.image = NSImage(systemSymbolName: AppSection.capture.symbol, accessibilityDescription: nil)
             item.target = self
@@ -137,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             menu.addItem(.separator())
         }
         for section in AppSection.allCases {
+            if section == .general { menu.addItem(.separator()) }
             // "Audio Mixer…" would read like the mixer itself.
             let title = section == .mixer || section == .capture ? "\(section.title) Settings…" : "\(section.title)…"
             let item = NSMenuItem(title: title, action: #selector(openSection(_:)), keyEquivalent: "")
@@ -162,20 +182,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         show((sender.representedObject as? String).flatMap(AppSection.init) ?? .mouse)
     }
 
-    private func setMixerItem(shown: Bool) {
-        guard shown != (mixerItem != nil) else { return }
-        if shown {
-            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-            item.button?.image = Self.makeStatusIcon(symbol: AppSection.mixer.symbol, description: "Audio Mixer")
+    private func setMixerItem(_ kind: MixerMenuBarIcon) {
+        mixerItemKind = kind
+        if kind != .none {
+            let item = mixerItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
             item.button?.target = self
             item.button?.action = #selector(toggleMixer)
             item.button?.toolTip = "Audio Mixer"
             mixerItem = item
+            if kind == .mixer {
+                item.button?.image = Self.makeStatusIcon(symbol: AppSection.mixer.symbol, description: "Audio Mixer")
+            } else {
+                updateVolumeIcon(volume: mixer.mainVolume, muted: mixer.mainMuted)
+            }
         } else {
             mixerPopover?.performClose(nil)
             if let mixerItem { NSStatusBar.system.removeStatusItem(mixerItem) }
             mixerItem = nil
         }
+    }
+
+    /// The speaker macOS's own Sound item uses: more waves as the volume goes
+    /// up, crossed out when muted.
+    private func updateVolumeIcon(volume: Float, muted: Bool) {
+        guard mixerItemKind == .volume, let button = mixerItem?.button else { return }
+        let symbol: String
+        if muted || volume <= 0 {
+            symbol = "speaker.slash.fill"
+        } else {
+            symbol = volume < 0.34 ? "speaker.wave.1.fill" : volume < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill"
+        }
+        button.image = Self.makeVolumeIcon(symbol: symbol)
+        button.image?.accessibilityDescription = muted ? "Audio Mixer, muted" : "Audio Mixer, volume \(Int((volume * 100).rounded()))%"
+    }
+
+    private static let volumeSymbols = ["speaker.slash.fill", "speaker.wave.1.fill", "speaker.wave.2.fill", "speaker.wave.3.fill"]
+
+    static func makeVolumeIcon(symbol: String) -> NSImage? {
+        menuBarImage(symbol, widthOf: volumeSymbols)
     }
 
     /// The mixer's own icon opens and closes the mixer with one click.

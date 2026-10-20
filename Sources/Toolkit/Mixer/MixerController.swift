@@ -283,24 +283,43 @@ final class MixerController: ObservableObject {
     }
 
     /// A volume key, when the output has no volume of its own to change.
+    /// Whether the volume keys have something to change on the current output.
+    var handlesVolumeKeys: Bool { softwareActive || hardwareVolume }
+
+    /// A volume key, on any output: the device's own volume where it has one,
+    /// the software volume where it doesn't. The same steps either way.
     func volumeKey(_ key: VolumeKey, fine: Bool) {
-        guard softwareActive else { return }
-        // Whole percents that land on round numbers: 5% a press, 1% with Shift
-        // and Option. A volume set with the slider moves to the next round one.
-        let step = fine ? 1 : 5
-        updateSoftware { setting in
-            let percent = Int((setting.volume * 100).rounded())
-            switch key {
-            case .mute:
-                setting.muted.toggle()
-            case .up:
-                // From a muted output, up unmutes before it raises anything.
-                if setting.muted { setting.muted = false } else {
-                    setting.volume = Double(min(100, percent / step * step + step)) / 100
-                }
-            case .down:
-                if !setting.muted { setting.volume = Double(max(0, (percent + step - 1) / step * step - step)) / 100 }
+        if softwareActive {
+            updateSoftware { setting in
+                setting.volume = Self.step(setting.volume, muted: &setting.muted, key: key, fine: fine)
             }
+        } else if hardwareVolume {
+            var muted = mainMuted
+            let volume = Self.step(Double(mainVolume), muted: &muted, key: key, fine: fine)
+            if muted != mainMuted { toggleMainMute() }
+            if !muted, volume != Double(mainVolume) { setMainVolume(Float(volume)) }
+        }
+    }
+
+    /// Whole percents that land on round numbers: 5% a press, 1% with Shift and
+    /// Option. A volume set with the slider moves to the next round one. From
+    /// muted, up unmutes before it raises anything.
+    private static func step(_ volume: Double, muted: inout Bool, key: VolumeKey, fine: Bool) -> Double {
+        let step = fine ? 1 : 5
+        let percent = Int((volume * 100).rounded())
+        switch key {
+        case .mute:
+            muted.toggle()
+            return volume
+        case .up:
+            if muted {
+                muted = false
+                return volume
+            }
+            return Double(min(100, percent / step * step + step)) / 100
+        case .down:
+            if muted { return volume }
+            return Double(max(0, (percent + step - 1) / step * step - step)) / 100
         }
     }
 
@@ -404,7 +423,8 @@ final class MixerController: ObservableObject {
             mainVolume = output.read(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, as: Float32.self) ?? 0
             mainMuted = (output.read(kAudioDevicePropertyMute, scope: scope, as: UInt32.self) ?? 0) != 0
         }
-        volumeKeys.setWanted(software)
+        // Every output, so the keys always show the same bar while the mixer is on.
+        volumeKeys.setWanted(running)
     }
 
     // MARK: - Apps and taps

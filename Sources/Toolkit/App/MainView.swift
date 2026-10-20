@@ -13,9 +13,13 @@ struct MainView: View {
         // sidebar up into the title bar, leaving the bar two-toned.
         HStack(spacing: 0) {
             List(selection: $model.section) {
-                ForEach(AppSection.allCases) { section in
+                ForEach(AppSection.allCases.filter { $0 != .general }) { section in
                     Label(section.title, systemImage: section.symbol).tag(section)
                 }
+                // The tools above, the app's own settings below.
+                Divider()
+                    .padding(.vertical, 2)
+                Label(AppSection.general.title, systemImage: AppSection.general.symbol).tag(AppSection.general)
             }
             .listStyle(.sidebar)
             .frame(width: 200)

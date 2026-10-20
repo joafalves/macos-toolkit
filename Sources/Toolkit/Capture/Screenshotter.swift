@@ -39,9 +39,14 @@ enum CaptureContent {
         NSScreen.screens.first { $0.displayID == displayID }?.backingScaleFactor ?? 2
     }
 
-    /// Our own windows to leave out (the overlay, the toolbar, thumbnails).
-    static func windows(_ ids: Set<CGWindowID>, in content: SCShareableContent) -> [SCWindow] {
-        content.windows.filter { ids.contains($0.windowID) }
+    /// Our own windows to leave out (the overlay, the toolbar, thumbnails),
+    /// and with `menuBar`, our menu bar items too.
+    static func windows(_ ids: Set<CGWindowID>, in content: SCShareableContent, menuBar: Bool = false) -> [SCWindow] {
+        let own = ProcessInfo.processInfo.processIdentifier
+        let statusLevel = Int(CGWindowLevelForKey(.statusWindow))
+        return content.windows.filter {
+            ids.contains($0.windowID) || (menuBar && $0.owningApplication?.processID == own && $0.windowLayer == statusLevel)
+        }
     }
 }
 
@@ -231,6 +236,15 @@ enum WindowChrome {
 
 extension CGRect {
     var area: CGFloat { isNull ? 0 : width * height }
+}
+
+extension NSWindow {
+    /// The window server's ID, when the number is one: a window that hasn't
+    /// been on screen yet has a negative number, and menu bar items have
+    /// numbers too big to be IDs.
+    var windowID: CGWindowID? {
+        windowNumber > 0 ? CGWindowID(exactly: windowNumber) : nil
+    }
 }
 
 extension NSScreen {

@@ -112,7 +112,8 @@ every app that has sound gets its own slider.
 - **Reset** puts every app back to 100%, so they all follow the main volume again.
 - Volumes are remembered per app. Right-click an app to hide it until it plays again, or to
   **Never Touch** it.
-- Optionally gets **its own icon** in the menu bar, one click away, in the mixer's settings.
+- A **menu bar icon** of its own, one click away, set in the mixer's settings: none, the mixer glyph,
+  or **Volume**, a speaker that follows the volume and shows when it's muted.
 - **The volume keys** go through the mixer on every output while it's on, so they always behave the
   same: 5% a press (1% with ⇧⌥), mute toggles, and the toolkit's own on-screen bar in place of
   macOS's. On outputs with a volume of their own that volume is set directly; on the rest it's the
@@ -198,9 +199,13 @@ a window come last, dimmed.
 The list opens on the main display, the display with the pointer, or the one with the active window,
 as you choose in the settings. ⌘\` is left alone.
 
+⌘Tab is the default; the shortcut can be changed in the settings to any key with ⌘, ⌥ or ⌃. Its
+modifiers are what you hold to keep the list open, and ⇧ goes backwards. With a shortcut other than
+⌘Tab, macOS's own app switcher keeps working alongside.
+
 It needs **Accessibility**, and relies on private macOS APIs to find windows on other Spaces, to
-focus a single window, and to switch the system's own ⌘Tab off. That is switched back on when the
-toolkit quits or the tool is turned off.
+focus a single window, and to switch the system's own ⌘Tab off while the switcher has it. That is
+switched back on when the toolkit quits or the tool is turned off.
 
 ## Mouse Settings
 
@@ -278,7 +283,8 @@ Documents may make macOS ask for access the first time.
 </p>
 
 It takes over macOS's screenshot keys, with the same habits, and adds screen recordings small
-enough to paste into a chat or a GitHub issue.
+enough to paste into a chat or a GitHub issue. The keys below are the defaults; each one can be
+changed or cleared in the settings, and ⌃ added to the display or area shortcut always copies.
 
 | Key | Action |
 | --- | --- |
@@ -288,29 +294,32 @@ enough to paste into a chat or a GitHub issue.
 | hold ⌃ | Copy to the clipboard instead of saving a file. It counts if it's held when the capture happens, so it can be pressed mid-drag |
 | esc | Cancel |
 
-- **Screenshots** are saved to the Desktop (or a folder you pick) as PNG, JPEG or HEIC. With ⌃ they
-  go to the clipboard instead, and optionally to the folder as well. A thumbnail shows in the corner:
-  drag it into an app, click it to open it, or let it go.
+- **Screenshots** are saved to `~/Pictures/Capture` (or a folder you pick) as PNG, JPEG or HEIC.
+  With ⌃ they go to the clipboard instead, and optionally to the folder as well. A thumbnail shows
+  in the corner: drag it into an app, click it to open it, or let it go.
 - **Windows** come out in one of three styles, picked in the toolbar's options: **Content Only**
   (without the title bar and toolbar, found through Accessibility; apps that draw their own title
   bar may keep part of it), **Plain** (no shadow), or **With Backdrop**: the window with a soft
   shadow on a blurred piece of your desktop picture or a solid color.
-- **Recordings** are H.264 MP4, which plays inline almost everywhere. They're recorded at point size
-  by default (a quarter of the pixels on a Retina display, text still sharp), at 30 fps (15 and 60
-  in the settings), and frames are only written when something changes, so a mostly still screen
-  costs little. Optional system audio and microphone (mixed into one track), cursor and click rings. A window recording follows the window when it moves, and
-  windows on top of it don't show.
+- **Recordings** are H.264 MP4, which plays inline almost everywhere, at 30 fps (15 and 60 in the
+  settings). Three qualities: **Standard** records at point size (a quarter of the pixels on a
+  Retina display) for small files, **High** keeps every pixel so small text stays sharp while it
+  scrolls, and **Maximum** has detail to spare for code and tutorials. The settings show what a
+  minute of constant motion costs on your display; frames are only written when something changes,
+  so a mostly still screen costs far less. Optional system audio and microphone (mixed into one
+  track), cursor and click rings. A window recording follows the window when it moves, and windows
+  on top of it don't show.
 - While recording, the menu bar shows a **stop button with the time and size** so far. Right-click
-  it to pause, resume or discard. ⇧⌘5 stops too. When it stops, the file is saved to Movies (or a
-  folder you pick) and put on the clipboard as a file, ready to paste.
+  it to pause, resume or discard. ⇧⌘5 stops too. When it stops, the file is saved to
+  `~/Movies/Capture` (or a folder you pick) and put on the clipboard as a file, ready to paste.
 - The toolbar remembers the last area. The toolkit's own toolbar, outline and thumbnails never show
   up in a capture.
 - Optionally gets **its own icon** in the menu bar, which opens the toolbar.
 
 It needs the **Screen Recording** permission (and the microphone one, if you turn the mic on). macOS
-asks again every so often to confirm it for apps that aren't Apple's. macOS's own shortcuts are
-switched off while the keys are the toolkit's, and back on when the toolkit quits or the setting is
-turned off.
+asks again every so often to confirm it for apps that aren't Apple's. macOS's own screenshot
+shortcuts are switched off only where they clash with the toolkit's, and back on when the toolkit
+quits or the tool is turned off.
 
 ## Install
 

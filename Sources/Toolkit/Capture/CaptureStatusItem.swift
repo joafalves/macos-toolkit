@@ -11,14 +11,10 @@ final class CaptureStatusItem: NSObject {
         self.capture = capture
     }
 
-    var windowNumber: CGWindowID? {
-        item?.button?.window.map { CGWindowID($0.windowNumber) }
-    }
-
     func update() {
         guard !capture.isPreview else { return }
         let state = capture.recording
-        guard state != nil || capture.config.standaloneIcon else {
+        guard state != nil || (capture.config.enabled && capture.config.standaloneIcon) else {
             if let item { NSStatusBar.system.removeStatusItem(item) }
             item = nil
             return
@@ -36,7 +32,7 @@ final class CaptureStatusItem: NSObject {
             button.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
             button.toolTip = "Click to stop recording. Right-click to pause."
         } else {
-            item.length = NSStatusItem.squareLength
+            item.length = NSStatusItem.variableLength
             button.title = ""
             button.image = AppDelegate.makeStatusIcon(symbol: AppSection.capture.symbol, description: "Screen Capture")
             button.toolTip = "Screen Capture"
@@ -44,7 +40,7 @@ final class CaptureStatusItem: NSObject {
     }
 
     private func makeItem() -> NSStatusItem {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.target = self
         item.button?.action = #selector(clicked)
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])

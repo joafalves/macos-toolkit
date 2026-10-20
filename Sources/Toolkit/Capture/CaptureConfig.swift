@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 
 /// What a capture covers.
 enum CaptureMode: String, Codable, CaseIterable {
@@ -25,6 +26,43 @@ enum Backdrop: String, Codable {
     case color
 }
 
+/// How sharp a recording is, against how big the file gets.
+enum RecordingQuality: String, Codable, CaseIterable {
+    /// Point size, modest bitrate: fine for clicking through a UI.
+    case standard
+    /// Every pixel, and enough bits that small text survives scrolling.
+    case high
+    /// Every pixel, and bits to spare, for code and tutorials.
+    case maximum
+
+    var title: String {
+        switch self {
+        case .standard: return "Standard"
+        case .high: return "High"
+        case .maximum: return "Maximum"
+        }
+    }
+
+    var nativeResolution: Bool { self != .standard }
+
+    /// Bits per pixel per frame, before the frame-rate curve in `Recorder.bitRate`.
+    var bitsPerPixel: Double {
+        switch self {
+        case .standard: return 0.1
+        case .high: return 0.25
+        case .maximum: return 0.5
+        }
+    }
+
+    var maxBitRate: Double {
+        switch self {
+        case .standard: return 16_000_000
+        case .high: return 30_000_000
+        case .maximum: return 60_000_000
+        }
+    }
+}
+
 enum ImageFormat: String, Codable, CaseIterable {
     case png, jpeg, heic
 
@@ -32,9 +70,17 @@ enum ImageFormat: String, Codable, CaseIterable {
 }
 
 struct CaptureConfig: Codable, Equatable {
-    /// When on, ⇧⌘3, ⇧⌘4 and ⇧⌘5 (and their ⌃ versions) come here instead of
-    /// to macOS.
-    var replaceShortcuts = true
+    /// When off, the tool is gone: no shortcuts, no menu entry, and macOS's own
+    /// screenshot keys work again.
+    var enabled = true
+    /// `Shortcut.none` for no shortcut. ⌃ added to the display and area ones
+    /// copies instead of saving.
+    var screenShortcut = Self.defaultScreenShortcut
+    var areaShortcut = Self.defaultAreaShortcut
+    var toolbarShortcut = Self.defaultToolbarShortcut
+    static let defaultScreenShortcut = Shortcut(keyCode: kVK_ANSI_3, flags: [.shift, .command])
+    static let defaultAreaShortcut = Shortcut(keyCode: kVK_ANSI_4, flags: [.shift, .command])
+    static let defaultToolbarShortcut = Shortcut(keyCode: kVK_ANSI_5, flags: [.shift, .command])
     /// Gives Screen Capture an icon of its own in the menu bar.
     var standaloneIcon = false
 
@@ -60,12 +106,11 @@ struct CaptureConfig: Codable, Equatable {
     /// ⌃ puts the screenshot on the clipboard; this also saves it to a file.
     var saveWhenCopying = false
     var shutterSound = true
-    /// Empty means the Desktop.
+    /// Empty means ~/Pictures/Capture.
     var screenshotFolder = ""
 
     // Recordings
-    /// Records at the display's pixel size rather than its point size.
-    var nativeResolution = false
+    var quality = RecordingQuality.standard
     var frameRate = 30
     var showCursor = true
     var showClicks = false
@@ -73,14 +118,20 @@ struct CaptureConfig: Codable, Equatable {
     var microphone = false
     /// An AVCaptureDevice unique ID. Empty means the default input.
     var microphoneID = ""
-    /// Empty means ~/Movies.
+    /// Empty means ~/Movies/Capture.
     var recordingFolder = ""
 
     init() {}
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        replaceShortcuts = try c.decodeIfPresent(Bool.self, forKey: .replaceShortcuts) ?? true
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+        // Called replaceShortcuts before the tool had its own on/off.
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled)
+            ?? legacy.decodeIfPresent(Bool.self, forKey: .replaceShortcuts) ?? true
+        screenShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .screenShortcut)) ?? Self.defaultScreenShortcut
+        areaShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .areaShortcut)) ?? Self.defaultAreaShortcut
+        toolbarShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .toolbarShortcut)) ?? Self.defaultToolbarShortcut
         standaloneIcon = try c.decodeIfPresent(Bool.self, forKey: .standaloneIcon) ?? false
         mode = (try? c.decodeIfPresent(CaptureMode.self, forKey: .mode)) ?? .area
         kind = (try? c.decodeIfPresent(CaptureKind.self, forKey: .kind)) ?? .photo
@@ -95,7 +146,9 @@ struct CaptureConfig: Codable, Equatable {
         saveWhenCopying = try c.decodeIfPresent(Bool.self, forKey: .saveWhenCopying) ?? false
         shutterSound = try c.decodeIfPresent(Bool.self, forKey: .shutterSound) ?? true
         screenshotFolder = try c.decodeIfPresent(String.self, forKey: .screenshotFolder) ?? ""
-        nativeResolution = try c.decodeIfPresent(Bool.self, forKey: .nativeResolution) ?? false
+        // Before quality, there was only a native resolution switch.
+        let native = try legacy.decodeIfPresent(Bool.self, forKey: .nativeResolution) ?? false
+        quality = (try? c.decodeIfPresent(RecordingQuality.self, forKey: .quality)) ?? (native ? .high : .standard)
         frameRate = try c.decodeIfPresent(Int.self, forKey: .frameRate) ?? 30
         showCursor = try c.decodeIfPresent(Bool.self, forKey: .showCursor) ?? true
         showClicks = try c.decodeIfPresent(Bool.self, forKey: .showClicks) ?? false
@@ -105,16 +158,24 @@ struct CaptureConfig: Codable, Equatable {
         recordingFolder = try c.decodeIfPresent(String.self, forKey: .recordingFolder) ?? ""
     }
 
+    static let defaultScreenshotDirectory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Pictures/Capture")
+    static let defaultRecordingDirectory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies/Capture")
+
+    private enum LegacyKeys: String, CodingKey {
+        case replaceShortcuts, nativeResolution
+    }
+
+    /// The shortcuts in use, for `CaptureKeys`.
+    var bindings: CaptureKeys.Bindings {
+        CaptureKeys.Bindings(screen: screenShortcut.active, area: areaShortcut.active, toolbar: toolbarShortcut.active)
+    }
+
     var screenshotDirectory: URL {
-        screenshotFolder.isEmpty
-            ? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
-            : URL(fileURLWithPath: screenshotFolder)
+        screenshotFolder.isEmpty ? Self.defaultScreenshotDirectory : URL(fileURLWithPath: screenshotFolder)
     }
 
     var recordingDirectory: URL {
-        recordingFolder.isEmpty
-            ? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies")
-            : URL(fileURLWithPath: recordingFolder)
+        recordingFolder.isEmpty ? Self.defaultRecordingDirectory : URL(fileURLWithPath: recordingFolder)
     }
 
     var backdropNSColor: NSColor {
