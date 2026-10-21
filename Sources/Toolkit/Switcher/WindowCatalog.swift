@@ -164,7 +164,16 @@ final class WindowCatalog {
         work.async {
             // Doubles as the check that the app is answering at all.
             guard var elements: [AXUIElement] = Self.attribute(watch.element, kAXWindowsAttribute) else { return }
-            if deep { elements += Self.windowsOnOtherSpaces(of: pid) }
+            if deep {
+                // Only what the window server says is missing: most apps have
+                // nothing on other Spaces, and the search stops once it's found.
+                let here = Set(elements.compactMap { element -> CGWindowID? in
+                    var id: CGWindowID = 0
+                    return _AXUIElementGetWindow(element, &id) == .success ? id : nil
+                })
+                let missing = Self.windowIDs(of: pid).subtracting(here)
+                if !missing.isEmpty { elements += Self.windowsOnOtherSpaces(of: pid, looking: missing) }
+            }
             var seen = Set<CGWindowID>()
             let found = elements.compactMap { Self.read($0, pid: pid) }.filter { seen.insert($0.id).inserted }
             for entry in found where !known.contains(entry.id) { self.observe(entry.element, with: watch) }
@@ -262,19 +271,47 @@ final class WindowCatalog {
     /// An app only lists the windows on the current Space. Its other windows
     /// can still be addressed directly by element ID, so try the low IDs,
     /// which is where windows live.
-    private static func windowsOnOtherSpaces(of pid: pid_t) -> [AXUIElement] {
+    /// How many elements have been tried in the search for windows on other
+    /// Spaces, for `--list-windows`.
+    static let probes = Tally()
+
+    /// The app's windows on any Space, as the window server knows them. At any
+    /// level: some apps' floating panels are windows the switcher lists too.
+    private static func windowIDs(of pid: pid_t) -> Set<CGWindowID> {
+        let all = windowsOnAllSpaces()
+        guard !all.isEmpty else { return [] }
+        // An array of the IDs themselves, not of objects.
+        var values = all.map { UnsafeRawPointer(bitPattern: UInt($0)) }
+        guard let array = CFArrayCreate(nil, &values, values.count, nil),
+              let list = CGWindowListCreateDescriptionFromArray(array) as? [[String: Any]]
+        else { return [] }
+        return Set(list.compactMap { info in
+            guard info[kCGWindowOwnerPID as String] as? pid_t == pid else { return nil }
+            return info[kCGWindowNumber as String] as? CGWindowID
+        })
+    }
+
+    /// Windows of the app that only these IDs, on other Spaces, are missing.
+    /// Some of them may not be windows Accessibility knows (a helper the app
+    /// keeps off screen), in which case the search goes the whole way.
+    private static func windowsOnOtherSpaces(of pid: pid_t, looking missing: Set<CGWindowID>) -> [AXUIElement] {
+        var missing = missing
         // Token layout: pid (4 bytes), zero (4), 'coco' (4), element ID (8).
         var token = Data(count: 20)
         token.replaceSubrange(0..<4, with: withUnsafeBytes(of: pid) { Data($0) })
         token.replaceSubrange(8..<12, with: withUnsafeBytes(of: Int32(0x636f_636f)) { Data($0) })
         var found: [AXUIElement] = []
         for id in UInt64(0)..<1000 {
+            probes.add(1)
             token.replaceSubrange(12..<20, with: withUnsafeBytes(of: id) { Data($0) })
             guard let element = _AXUIElementCreateWithRemoteToken(token as CFData)?.takeRetainedValue(),
                   let subrole: String = attribute(element, kAXSubroleAttribute),
                   subrole == kAXStandardWindowSubrole || subrole == kAXDialogSubrole
             else { continue }
             found.append(element)
+            var window: CGWindowID = 0
+            if _AXUIElementGetWindow(element, &window) == .success { missing.remove(window) }
+            if missing.isEmpty { break }
         }
         return found
     }
@@ -469,5 +506,23 @@ final class WindowCatalog {
     func toggleHidden(_ item: SwitcherItem) {
         guard let app = app(item.pid) else { return }
         if app.isHidden { app.unhide() } else { app.hide() }
+    }
+}
+
+/// A count that several threads add to.
+final class Tally {
+    private let lock = NSLock()
+    private var count = 0
+
+    func add(_ n: Int) {
+        lock.lock()
+        count += n
+        lock.unlock()
+    }
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
     }
 }

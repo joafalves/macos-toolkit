@@ -92,7 +92,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-overlay [png]    # what the capture overlay costs in memory; with open -n, a picture of it
 .build/debug/Toolkit --test-highlight        # the window highlight sits right above its window
 .build/debug/Toolkit --test-switcher-previews   # times the grid's pictures of real windows; keeps none
-.build/debug/Toolkit --list-windows          # what the Window Switcher would list
+.build/debug/Toolkit --list-windows [--counts <file>]   # what the Window Switcher would list; with --counts, how many and the lookups it took
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
 ```

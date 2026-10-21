@@ -352,14 +352,26 @@ final class SwitcherController: ObservableObject {
 
     /// Prints what the switcher would list, for checking window discovery from the terminal.
     static func dumpWindows() {
+        // The list asks the app about its own window, so there has to be one.
+        _ = NSApplication.shared
         guard AXIsProcessTrusted() else {
             print("Accessibility is not granted to the process running this.")
             return
         }
         let catalog = WindowCatalog()
+        let start = Date()
         catalog.start()
         RunLoop.main.run(until: Date().addingTimeInterval(3))
-        for (index, item) in catalog.snapshot().items.enumerated() {
+        let items = catalog.snapshot().items
+        let counts = "\(items.filter { $0.window != nil }.count) windows; \(WindowCatalog.probes.value) elements tried for other Spaces, in under \(String(format: "%.1f", Date().timeIntervalSince(start))) s"
+        // `--list-windows --counts <file>`: just that line, into a file, for
+        // a run through `open -n` where nothing prints.
+        if let flag = CommandLine.arguments.firstIndex(of: "--counts"), CommandLine.arguments.count > flag + 1 {
+            try? (counts + "\n").write(toFile: CommandLine.arguments[flag + 1], atomically: true, encoding: .utf8)
+            return
+        }
+        print(counts)
+        for (index, item) in items.enumerated() {
             print("\(index + 1)\t\(item.state)\t\(item.window.map(String.init) ?? "-")\t\(item.appName)\t\(item.title)")
         }
     }
