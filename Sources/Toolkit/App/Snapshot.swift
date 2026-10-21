@@ -171,36 +171,31 @@ enum Snapshot {
             ([toolkit, recording, percent], nil),
             ([toolkit], .toolkit),
         ]
-        let text: NSColor = light ? .black : .white
+        // The real views, as the menu bar item has them, on drawn strips of menu bar.
         let strip = NSSize(width: 360, height: 30)
-        let image = NSImage(size: NSSize(width: strip.width, height: strip.height * CGFloat(rows.count) + 8 * CGFloat(rows.count - 1)), flipped: true) { _ in
-            for (index, row) in rows.enumerated() {
-                let top = CGFloat(index) * (strip.height + 8)
-                (light ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.16, alpha: 1)).setFill()
-                NSRect(x: 0, y: top, width: strip.width, height: strip.height).fill()
-                let (item, _) = MenuBarItem.render(row.0, pressed: row.1, textColor: text)
-                let drawn = item.isTemplate ? NSImage(size: item.size, flipped: false) { rect in
-                    item.draw(in: rect)
-                    text.set()
-                    rect.fill(using: .sourceAtop)
-                    return true
-                } : item
-                drawn.draw(in: NSRect(x: strip.width - item.size.width - 12, y: top + (strip.height - item.size.height) / 2,
-                                      width: item.size.width, height: item.size.height))
-            }
-            return true
+        let gap: CGFloat = 8
+        let size = NSSize(width: strip.width, height: strip.height * CGFloat(rows.count) + gap * CGFloat(rows.count - 1))
+        let container = NSView(frame: NSRect(origin: .zero, size: size))
+        container.wantsLayer = true
+        for (index, row) in rows.enumerated() {
+            let y = size.height - CGFloat(index + 1) * strip.height - CGFloat(index) * gap
+            let bar = NSView(frame: NSRect(x: 0, y: y, width: strip.width, height: strip.height))
+            bar.wantsLayer = true
+            bar.layer?.backgroundColor = (light ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.16, alpha: 1)).cgColor
+            container.addSubview(bar)
+            let view = MenuBarRow()
+            view.show(row.0)
+            view.setPressed(row.1)
+            view.setFrameOrigin(NSPoint(x: strip.width - view.frame.width - 12, y: ((strip.height - view.frame.height) / 2).rounded()))
+            bar.addSubview(view)
         }
-        // At twice the size, like a Retina screen.
-        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(image.size.width * 2), pixelsHigh: Int(image.size.height * 2),
-                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
-              let context = NSGraphicsContext(bitmapImageRep: rep)
-        else { return }
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = context
-        image.draw(in: NSRect(x: 0, y: 0, width: image.size.width * 2, height: image.size.height * 2))
-        NSGraphicsContext.restoreGraphicsState()
-        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+        let window = NSWindow(contentRect: container.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = container
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        save(container, to: path)
     }
 
     /// The menu bar mixer, filled with made-up rows.

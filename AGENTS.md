@@ -93,6 +93,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-layout [report]  # geometry, then a helper's windows placed for real (run with open -n)
 .build/debug/Toolkit --measure-idle <file>   # memory idle, with the settings window, and after (run with open -n, app quit first)
 .build/debug/Toolkit --test-wheel <report>   # one scroll notch through the installed app's wheel tap: what comes out (open -n)
+.build/debug/Toolkit --test-menu-bar         # CPU per menu bar item update, minus the idle loop
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)
 .build/debug/Toolkit --test-shortcuts        # config migration, and which macOS screenshot shortcuts clash
 .build/debug/Toolkit --test-toolbar          # the capture toolbar's panel against its content

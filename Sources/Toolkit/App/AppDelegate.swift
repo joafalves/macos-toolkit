@@ -167,12 +167,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }
     }
 
-    /// Under the segment, its left edge on the segment's, the segment shown pressed meanwhile.
+    /// As the item's own menu, so macOS keeps the item lit while it's open.
     private func popUp(_ menu: NSMenu, from kind: MenuBarSegment.Kind, at rect: NSRect) {
-        guard let button = menuBar.button else { return }
-        menuBar.setPressed(kind)
-        menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: button.isFlipped ? button.bounds.maxY + 4 : -4), in: button)
-        menuBar.setPressed(nil)
+        menuBar.open(menu, for: kind)
     }
 
     @objc private func pauseRecording() { capture.togglePause() }
@@ -238,6 +235,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private func showMixer(from kind: MenuBarSegment.Kind) {
         DispatchQueue.main.async { [self] in
             guard let button = menuBar.button, let rect = menuBar.rect(of: kind) else { return }
+            // Before the panel, which takes a moment to build.
+            menuBar.setPressed(kind)
             let popover = mixerPopover ?? makeMixerPopover()
             mixerPopover = popover
             mixer.refreshPermission()
@@ -245,7 +244,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             // the front, the settings window included. The popover works
             // without it, and closing is watched for below.
             popover.show(relativeTo: rect, of: button, preferredEdge: .minY)
-            menuBar.setPressed(kind)
             watchForDismissal()
             // After showing, so creating the listening taps doesn't hold up the panel.
             DispatchQueue.main.async { self.mixer.panelOpen = true }
@@ -287,9 +285,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                                                                 object: nil, queue: .main) { _ in close() }
     }
 
+    /// As it starts closing, not once its fade is over.
+    func popoverWillClose(_ notification: Notification) {
+        menuBar.setPressed(nil)
+    }
+
     func popoverDidClose(_ notification: Notification) {
         mixer.panelOpen = false
-        menuBar.setPressed(nil)
         // Dropped rather than kept for next time: a closed popover keeps its
         // SwiftUI view alive, and the playing bars went on animating unseen.
         mixerPopover = nil

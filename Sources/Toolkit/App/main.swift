@@ -93,6 +93,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-wheel"), CommandLine.
     WheelProbe.run(into: CommandLine.arguments[flag + 1])
     exit(0)
 }
+if CommandLine.arguments.contains("--test-menu-bar") {
+    MenuBarRow.selfTest()
+    exit(0)
+}
 // Development aid: `--test-taps [report]`, the event taps keep up while the
 // main thread is stuck. Run the app bundle with `open -n` so Accessibility is
 // the app's own; the report goes to the file.
