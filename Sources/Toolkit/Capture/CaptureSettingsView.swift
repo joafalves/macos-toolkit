@@ -57,8 +57,8 @@ struct CaptureSettingsView: View {
                 }
 
                 Card(title: "Menu Bar") {
-                    ToggleRow(title: "Own menu bar icon",
-                              caption: "Opens the toolbar with one click. While recording, a stop button is in the menu bar either way.",
+                    ToggleRow(title: "In the menu bar",
+                              caption: "A camera in the toolkit's menu bar item opens the toolbar with one click. While recording, the stop button is there either way.",
                               isOn: $capture.config.standaloneIcon)
                 }
 

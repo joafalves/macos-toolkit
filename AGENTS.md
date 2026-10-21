@@ -20,8 +20,8 @@ tool; keep it in step with the code.
 
 ## Layout
 
-- `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (menu bar
-  items, the mixer popover, the main window), `AppModel` (`AppSection`, the sidebar sections),
+- `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (the menu
+  bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `SettingsTransfer` (export and import of all settings), `Snapshot`.
 - `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
@@ -85,6 +85,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
 .build/debug/Toolkit --snapshot out.png switcher-grid [light]   # drawn stand-ins, no real windows
+.build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
 .build/debug/Toolkit --snapshot out.png layout-grid [light]     # the Window Layout grid over a drawn desktop
 .build/debug/Toolkit --snapshot out.png layout-slots [light]    # its layouts bar while dragging
 .build/debug/Toolkit --test-capture <folder> [app]   # each screenshot kind and short recordings, with a report

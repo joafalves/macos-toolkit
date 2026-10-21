@@ -2,7 +2,7 @@ import AppKit
 import Combine
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
     private let model = AppModel()
     private var mouse: MouseController!
     private var switcher: SwitcherController!
@@ -13,12 +13,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var mixerPopover: NSPopover?
     private var popoverMonitors: [Any] = []
     private var resignObserver: NSObjectProtocol?
-    private var statusItem: NSStatusItem!
-    /// The mixer's own menu bar icon, when that setting is on.
-    private var mixerItem: NSStatusItem?
-    private var mixerItemSetting: AnyCancellable?
-    private var mixerVolumeIcon: AnyCancellable?
-    private var mixerItemKind = MixerMenuBarIcon.none
+    /// The toolkit's one menu bar item, with a segment for each tool that has
+    /// a place there.
+    private var menuBar: MenuBarItem!
+    private var menuBarUpdates: [AnyCancellable] = []
     private var window: NSWindow?
     private var termSource: DispatchSourceSignal?
 
@@ -38,24 +36,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         capture.onOpenSettings = { [weak self] in self?.show(.capture) }
         capture.start()
 
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = Self.makeStatusIcon()
-        let menu = NSMenu()
-        menu.delegate = self
-        statusItem.menu = menu
+        menuBar = MenuBarItem()
+        menuBar.onClick = { [weak self] kind, rect, right in self?.menuBarClicked(kind, at: rect, right: right) }
+        // Published values arrive before they're stored, so the item is drawn
+        // again on the next pass, from the stored ones.
+        let redraw: () -> Void = { [weak self] in DispatchQueue.main.async { self?.updateMenuBar() } }
+        menuBarUpdates = [
+            mixer.$config.sink { _ in redraw() },
+            mixer.$mainVolume.sink { _ in redraw() },
+            mixer.$mainMuted.sink { _ in redraw() },
+            capture.$config.sink { _ in redraw() },
+            capture.$recording.sink { _ in redraw() },
+        ]
+        updateMenuBar()
 
         NSApp.mainMenu = makeMainMenu()
-
-        mixerItemSetting = mixer.$config
-            .map { $0.enabled ? $0.menuBarIcon : .none }
-            .removeDuplicates()
-            .sink { [weak self] icon in self?.setMixerItem(icon) }
-        // The volume icon follows the main volume. Published values arrive
-        // before they're stored, so the new ones are passed along.
-        mixerVolumeIcon = mixer.$mainVolume
-            .combineLatest(mixer.$mainMuted)
-            .removeDuplicates { $0 == $1 }
-            .sink { [weak self] volume, muted in self?.updateVolumeIcon(volume: volume, muted: muted) }
 
         // Restore on `kill` too, not only on a regular quit.
         signal(SIGTERM, SIG_IGN)
@@ -109,40 +104,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             && event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
     }
 
-    /// A menu bar glyph at the size macOS draws its own status symbols, in an
-    /// item as wide as the glyph. Squeezing symbols into the square 18pt box
-    /// shrank the wide ones to a fraction of the menu bar's other icons.
-    static func makeStatusIcon(symbol: String = "wrench.and.screwdriver.fill", description: String = "MacOS Toolkit") -> NSImage {
-        menuBarImage(symbol, widthOf: [symbol], description: description) ?? NSImage()
-    }
-
-    /// Every symbol is drawn at the same size, in an image as wide as the
-    /// widest of `widthOf`, so an icon that switches between them doesn't
-    /// change width. The glyph sits at the left, like macOS's Sound icon.
-    static func menuBarImage(_ symbol: String, widthOf symbols: [String], description: String? = nil) -> NSImage? {
-        let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        func symbolImage(_ name: String) -> NSImage? {
-            NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
-        }
-        guard let glyph = symbolImage(symbol) else { return nil }
-        let width = ceil(([glyph.size.width] + symbols.compactMap { symbolImage($0)?.size.width }).max() ?? glyph.size.width)
-        let height: CGFloat = 18
-        // Only symbols taller than the menu bar allows are scaled down.
-        let fit = min(1, height / glyph.size.height)
-        let size = NSSize(width: glyph.size.width * fit, height: glyph.size.height * fit)
-        let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
-            glyph.draw(in: NSRect(x: 0, y: rect.midY - size.height / 2, width: size.width, height: size.height))
-            return true
-        }
-        image.isTemplate = true
-        image.accessibilityDescription = description ?? symbol
-        return image
-    }
-
     // MARK: - Menus
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        mixerPopover?.performClose(nil)
+    // MARK: - The menu bar item
+
+    private func updateMenuBar() {
+        var segments = [MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.glyph("wrench.and.screwdriver.fill"), label: "MacOS Toolkit")]
+        if let state = capture.recording {
+            let time = MenuBarArt.duration(state.elapsed) + (state.bytes > 0 ? " · " + MenuBarArt.bytes(state.bytes) : "")
+            segments.append(MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: state.paused), text: time,
+                                           label: state.paused ? "Recording paused. Click to stop, right-click for more." : "Recording. Click to stop, right-click to pause."))
+        } else if capture.config.enabled, capture.config.standaloneIcon {
+            segments.append(MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture"))
+        }
+        if mixer.config.enabled, mixer.config.menuBarIcon != .none {
+            let volume = mixer.mainVolume, muted = mixer.mainMuted || mixer.mainVolume <= 0
+            let label = mixer.mainMuted ? "Audio Mixer, muted" : "Audio Mixer, volume \(Int((volume * 100).rounded()))%"
+            switch mixer.config.menuBarIcon {
+            case .mixer:
+                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.glyph(AppSection.mixer.symbol), label: "Audio Mixer"))
+            case .volume:
+                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.speaker(volume: volume, muted: muted), label: label))
+            case .volumePercent:
+                // The volume next to the speaker, like the battery's percentage.
+                // Muted keeps the number, greyed, so you can see what unmuting brings back.
+                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.speaker(volume: volume, muted: muted),
+                                               text: "\(Int((volume * 100).rounded()))%", dimText: mixer.mainMuted, label: label))
+            case .volumeBadge:
+                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: volume, muted: muted), label: label))
+            case .none:
+                break
+            }
+        }
+        menuBar.show(segments)
+    }
+
+    private func menuBarClicked(_ kind: MenuBarSegment.Kind, at rect: NSRect, right: Bool) {
+        if kind != .mixer { mixerPopover?.performClose(nil) }
+        switch kind {
+        case .toolkit:
+            let menu = NSMenu()
+            fillMenu(menu)
+            popUp(menu, from: .toolkit, at: rect)
+        case .capture:
+            // After this click is done, so the toolbar gets the keyboard.
+            DispatchQueue.main.async { self.capture.toggleToolbar() }
+        case .recording:
+            guard right else { return capture.stopRecording() }
+            let menu = NSMenu()
+            let paused = capture.recording?.paused == true
+            menu.addItem(withTitle: paused ? "Resume Recording" : "Pause Recording", action: #selector(pauseRecording), keyEquivalent: "").target = self
+            menu.addItem(withTitle: "Stop Recording", action: #selector(stopRecording), keyEquivalent: "").target = self
+            menu.addItem(.separator())
+            menu.addItem(withTitle: "Discard Recording", action: #selector(discardRecording), keyEquivalent: "").target = self
+            popUp(menu, from: .recording, at: rect)
+        case .mixer:
+            if mixerPopover?.isShown == true {
+                mixerPopover?.performClose(nil)
+            } else {
+                showMixer(from: .mixer)
+            }
+        }
+    }
+
+    /// Under the segment, its left edge on the segment's, the segment shown pressed meanwhile.
+    private func popUp(_ menu: NSMenu, from kind: MenuBarSegment.Kind, at rect: NSRect) {
+        guard let button = menuBar.button else { return }
+        menuBar.setPressed(kind)
+        menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: button.isFlipped ? button.bounds.maxY + 4 : -4), in: button)
+        menuBar.setPressed(nil)
+    }
+
+    @objc private func pauseRecording() { capture.togglePause() }
+    @objc private func discardRecording() { capture.discardRecording() }
+
+    private func fillMenu(_ menu: NSMenu) {
         menu.removeAllItems()
         // With an icon of its own, the mixer opens from there instead.
         if mixer.config.enabled, mixer.config.menuBarIcon == .none {
@@ -192,132 +228,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         show((sender.representedObject as? String).flatMap(AppSection.init) ?? .mouse)
     }
 
-    private func setMixerItem(_ kind: MixerMenuBarIcon) {
-        mixerItemKind = kind
-        if kind != .none {
-            let item = mixerItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-            item.button?.target = self
-            item.button?.action = #selector(toggleMixer)
-            item.button?.toolTip = "Audio Mixer"
-            mixerItem = item
-            if kind == .mixer {
-                item.button?.title = ""
-                item.button?.image = Self.makeStatusIcon(symbol: AppSection.mixer.symbol, description: "Audio Mixer")
-            } else {
-                updateVolumeIcon(volume: mixer.mainVolume, muted: mixer.mainMuted)
-            }
-        } else {
-            mixerPopover?.performClose(nil)
-            if let mixerItem { NSStatusBar.system.removeStatusItem(mixerItem) }
-            mixerItem = nil
-        }
-    }
-
-    /// The speaker macOS's own Sound item uses: more waves as the volume goes
-    /// up, crossed out when muted.
-    private func updateVolumeIcon(volume: Float, muted: Bool) {
-        guard [.volume, .volumePercent, .volumeBadge].contains(mixerItemKind), let button = mixerItem?.button else { return }
-        let symbol: String
-        if muted || volume <= 0 {
-            symbol = "speaker.slash.fill"
-        } else {
-            symbol = volume < 0.34 ? "speaker.wave.1.fill" : volume < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill"
-        }
-        let percent = "\(Int((volume * 100).rounded()))%"
-        if mixerItemKind == .volumeBadge {
-            button.title = ""
-            button.image = Self.makeVolumeBadge(volume: volume, muted: muted || volume <= 0)
-            button.image?.accessibilityDescription = muted ? "Audio Mixer, muted" : "Audio Mixer, volume \(percent)"
-            return
-        }
-        button.image = Self.makeVolumeIcon(symbol: symbol)
-        button.image?.accessibilityDescription = muted ? "Audio Mixer, muted" : "Audio Mixer, volume \(percent)"
-        guard mixerItemKind == .volumePercent else {
-            button.title = ""
-            return
-        }
-        // The volume next to the speaker, like the battery's percentage. Muted
-        // keeps the number, greyed, so you can see what unmuting brings back.
-        button.imagePosition = .imageLeading
-        button.attributedTitle = NSAttributedString(string: " " + percent, attributes: [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
-            .foregroundColor: muted ? NSColor.secondaryLabelColor : NSColor.labelColor,
-        ])
-    }
-
-    /// A pill filled up to the volume, with the speaker and the number cut out
-    /// of it, like the battery's icon with its percentage inside. Always as wide as "100", so
-    /// the menu bar doesn't shift as the number changes.
-    static func makeVolumeBadge(volume: Float, muted: Bool) -> NSImage {
-        let font = NSFont.systemFont(ofSize: 11.5, weight: .bold)
-        let text = NSAttributedString(string: muted ? "off" : "\(Int((volume * 100).rounded()))",
-                                      attributes: [.font: font, .foregroundColor: NSColor.black])
-        let widest = NSAttributedString(string: "100", attributes: [.font: font]).size().width
-        let cone = NSImage(systemSymbolName: muted ? "speaker.slash.fill" : "speaker.fill", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 10.5, weight: .semibold))
-        let coneWidth = cone?.size.width ?? 8
-        // As tall as the other menu bar symbols, about 16pt of the 18pt box.
-        let pill = NSRect(x: 0, y: 1, width: ceil(3 + coneWidth + 1 + widest + 3), height: 16)
-        let image = NSImage(size: NSSize(width: pill.width, height: 18), flipped: false) { _ in
-            // Filled up to the volume like the battery's charge, the rest faint.
-            let shape = NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2)
-            NSColor.black.withAlphaComponent(0.4).setFill()
-            shape.fill()
-            if !muted {
-                NSGraphicsContext.saveGraphicsState()
-                shape.addClip()
-                // Two lots of 40% would show where they overlap, so the fill replaces it.
-                NSGraphicsContext.current?.compositingOperation = .copy
-                NSColor.black.setFill()
-                NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(min(1, max(0, volume))), height: pill.height).fill()
-                NSGraphicsContext.restoreGraphicsState()
-            }
-            if let cone {
-                cone.draw(in: NSRect(x: 3, y: pill.midY - cone.size.height / 2, width: cone.size.width, height: cone.size.height),
-                          from: .zero, operation: .destinationOut, fraction: 1)
-            }
-            // The number is cut out too, centred in the space after the speaker.
-            let size = text.size()
-            let area = NSRect(x: 3 + coneWidth + 1, y: pill.minY, width: widest, height: pill.height)
-            NSGraphicsContext.current?.compositingOperation = .destinationOut
-            text.draw(at: NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
-            NSGraphicsContext.current?.compositingOperation = .sourceOver
-            return true
-        }
-        image.isTemplate = true
-        return image
-    }
-
-    private static let volumeSymbols = ["speaker.slash.fill", "speaker.wave.1.fill", "speaker.wave.2.fill", "speaker.wave.3.fill"]
-
-    static func makeVolumeIcon(symbol: String) -> NSImage? {
-        menuBarImage(symbol, widthOf: volumeSymbols)
-    }
-
-    /// The mixer's own icon opens and closes the mixer with one click.
-    @objc private func toggleMixer() {
-        if mixerPopover?.isShown == true {
-            mixerPopover?.performClose(nil)
-        } else if let button = mixerItem?.button {
-            showMixer(under: button)
-        }
-    }
-
+    /// From the toolkit's menu, when the mixer has no segment of its own.
     @objc private func openMixerFromMenu() {
-        guard let button = statusItem.button else { return }
-        showMixer(under: button)
+        showMixer(from: .toolkit)
     }
 
-    /// Opens on the next pass of the run loop, once any menu has closed.
-    private func showMixer(under button: NSStatusBarButton) {
+    /// Opens on the next pass of the run loop, once any menu has closed,
+    /// hanging from the segment it was opened from.
+    private func showMixer(from kind: MenuBarSegment.Kind) {
         DispatchQueue.main.async { [self] in
+            guard let button = menuBar.button, let rect = menuBar.rect(of: kind) else { return }
             let popover = mixerPopover ?? makeMixerPopover()
             mixerPopover = popover
             mixer.refreshPermission()
             // Not activating the app: that brings every one of its windows to
             // the front, the settings window included. The popover works
             // without it, and closing is watched for below.
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.show(relativeTo: rect, of: button, preferredEdge: .minY)
+            menuBar.setPressed(kind)
             watchForDismissal()
             // After showing, so creating the listening taps doesn't hold up the panel.
             DispatchQueue.main.async { self.mixer.panelOpen = true }
@@ -344,11 +272,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 close()
                 return nil
             }
-            // A click in one of our windows other than the popover. The mixer's
-            // own icon is left to its action, which toggles.
+            // A click in one of our windows other than the popover. The menu
+            // bar item is left to its own action, which toggles.
             if event.type == .leftMouseDown, let window = event.window,
                window != self?.mixerPopover?.contentViewController?.view.window,
-               window != self?.mixerItem?.button?.window {
+               window != self?.menuBar.button?.window {
                 close()
             }
             return event
@@ -361,6 +289,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func popoverDidClose(_ notification: Notification) {
         mixer.panelOpen = false
+        menuBar.setPressed(nil)
         // Dropped rather than kept for next time: a closed popover keeps its
         // SwiftUI view alive, and the playing bars went on animating unseen.
         mixerPopover = nil

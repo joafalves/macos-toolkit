@@ -25,7 +25,7 @@ struct MixerSettingsView: View {
             WhenEnabled(enabled: mixer.config.enabled) {
                 Card(title: "Options") {
                     // A pop-up rather than segments: four choices don't fit beside a caption.
-                    SettingRow(title: "Menu bar icon", caption: "Opens the mixer in one click.") {
+                    SettingRow(title: "In the menu bar", caption: "Shown in the toolkit's menu bar item; opens the mixer in one click.") {
                         Picker("Menu bar icon", selection: $mixer.config.menuBarIcon) {
                             Text("None").tag(MixerMenuBarIcon.none)
                             Text("Mixer").tag(MixerMenuBarIcon.mixer)

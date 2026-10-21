@@ -156,6 +156,53 @@ enum Snapshot {
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
     }
 
+    /// The toolkit's menu bar item in a few states, on a drawn strip of menu
+    /// bar: plain, with a segment pressed, recording, and with the percentage.
+    static func writeMenuBar(to path: String, light: Bool) {
+        _ = NSApplication.shared
+        let toolkit = MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.glyph("wrench.and.screwdriver.fill"), label: "MacOS Toolkit")
+        let capture = MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture")
+        let badge = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer")
+        let percent = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.speaker(volume: 0.6, muted: false), text: "60%", label: "Audio Mixer")
+        let recording = MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: false), text: "0:42 · 3.1 MB", label: "Recording")
+        let rows: [([MenuBarSegment], MenuBarSegment.Kind?)] = [
+            ([toolkit, capture, badge], nil),
+            ([toolkit, capture, badge], .mixer),
+            ([toolkit, recording, percent], nil),
+            ([toolkit], .toolkit),
+        ]
+        let text: NSColor = light ? .black : .white
+        let strip = NSSize(width: 360, height: 30)
+        let image = NSImage(size: NSSize(width: strip.width, height: strip.height * CGFloat(rows.count) + 8 * CGFloat(rows.count - 1)), flipped: true) { _ in
+            for (index, row) in rows.enumerated() {
+                let top = CGFloat(index) * (strip.height + 8)
+                (light ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.16, alpha: 1)).setFill()
+                NSRect(x: 0, y: top, width: strip.width, height: strip.height).fill()
+                let (item, _) = MenuBarItem.render(row.0, pressed: row.1, textColor: text)
+                let drawn = item.isTemplate ? NSImage(size: item.size, flipped: false) { rect in
+                    item.draw(in: rect)
+                    text.set()
+                    rect.fill(using: .sourceAtop)
+                    return true
+                } : item
+                drawn.draw(in: NSRect(x: strip.width - item.size.width - 12, y: top + (strip.height - item.size.height) / 2,
+                                      width: item.size.width, height: item.size.height))
+            }
+            return true
+        }
+        // At twice the size, like a Retina screen.
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(image.size.width * 2), pixelsHigh: Int(image.size.height * 2),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: rep)
+        else { return }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        image.draw(in: NSRect(x: 0, y: 0, width: image.size.width * 2, height: image.size.height * 2))
+        NSGraphicsContext.restoreGraphicsState()
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+
     /// The menu bar mixer, filled with made-up rows.
     static func writeMixer(to path: String, light: Bool, outputs: Bool, software: Bool, equalizer: Bool) {
         _ = NSApplication.shared

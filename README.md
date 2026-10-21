@@ -125,10 +125,10 @@ every app that has sound gets its own slider.
 - **Reset** puts every app back to 100%, so they all follow the main volume again.
 - Volumes are remembered per app. Right-click an app to hide it until it plays again, or to
   **Never Touch** it.
-- A **menu bar icon** of its own, one click away, set in the mixer's settings: none, the mixer glyph,
+- A place in the **menu bar**, one click away, set in the mixer's settings: none, the mixer glyph,
   **Volume**, a speaker that follows the volume and shows when it's muted, **Volume and
-  percentage**, or **Volume badge**, a pill that fills with the volume like the battery, with the speaker and the
-  number cut out of it.
+  percentage**, or **Volume badge**, a pill that fills with the volume like the battery, with the
+  speaker and the number cut out of it.
 - **The volume keys** go through the mixer on every output while it's on, so they always behave the
   same: 5% a press (1% with ⇧⌥), mute toggles, and the toolkit's own on-screen bar in place of
   macOS's. On outputs with a volume of their own that volume is set directly; on the rest it's the
@@ -456,7 +456,7 @@ changed or cleared in the settings, and ⌃ added to the display or area shortcu
   `~/Movies/Capture` (or a folder you pick) and put on the clipboard as a file, ready to paste.
 - The toolbar remembers the last area. The toolkit's own toolbar, outline and thumbnails never show
   up in a capture.
-- Optionally gets **its own icon** in the menu bar, which opens the toolbar.
+- Optionally gets a **camera in the menu bar**, which opens the toolbar.
 
 It needs the **Screen Recording** permission (and the microphone one, if you turn the mic on). macOS
 asks again every so often to confirm it for apps that aren't Apple's. macOS's own screenshot
@@ -504,6 +504,21 @@ To update later: `git pull && ./scripts/build.sh --install`.
 
 To remove it, quit the app, delete it from `/Applications`, and delete
 `~/Library/Application Support/MacOS Toolkit`.
+
+## The menu bar
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-dark.png">
+    <img src="docs/images/menu-bar-light.png" width="360" alt="The toolkit's menu bar item: the toolkit menu, Screen Capture and the mixer side by side, then with the mixer open, while recording, and on its own">
+  </picture>
+</p>
+
+The toolkit has one item in the menu bar. The toolkit menu is always there, and Screen Capture and
+the Audio Mixer join it when their settings put them in the menu bar, side by side with the same
+size and spacing. While recording, Screen Capture's place shows a red stop button with the time and
+size. Each part opens its own menu or panel, shown pressed while it's open. Being one item, they
+move together when you ⌘-drag it, and other apps' icons can't end up between them.
 
 ## Good to know
 

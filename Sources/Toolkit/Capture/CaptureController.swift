@@ -33,7 +33,6 @@ final class CaptureController: ObservableObject {
     private let overlay = SelectionOverlay()
     private lazy var toolbar = CaptureToolbar(capture: self)
     private let thumbnails = ThumbnailStack()
-    private lazy var statusItem = CaptureStatusItem(capture: self)
     private var recorder: Recorder?
     private var recordingScreen: NSScreen?
     private var frame: CapturePanel?
@@ -109,7 +108,6 @@ final class CaptureController: ObservableObject {
             closeToolbar()
             overlay.hide()
         }
-        statusItem.update()
     }
 
     func refreshPermissions() {
@@ -375,7 +373,6 @@ final class CaptureController: ObservableObject {
         recordedBefore = 0
         stretchStart = Date()
         recording = RecordingState()
-        statusItem.update()
         if case .area(let rect) = target { showFrame(around: Coordinates.toAppKit(rect)) }
         Task { @MainActor in
             // The outline is ours too, and stays out of the video (the stop
@@ -388,7 +385,6 @@ final class CaptureController: ObservableObject {
                 self.recorder = nil
                 self.recording = nil
                 self.hideFrame()
-                self.statusItem.update()
                 self.report(error)
             }
         }
@@ -405,7 +401,6 @@ final class CaptureController: ObservableObject {
             stretchStart = Date()
         }
         recording = state
-        statusItem.update()
     }
 
     /// `keep` false throws the file away, without the clipboard or a thumbnail.
@@ -416,7 +411,6 @@ final class CaptureController: ObservableObject {
         ticker = nil
         hideFrame()
         recording = nil
-        statusItem.update()
         let screen = recordingScreen
         Task { @MainActor in
             let saved = await recorder.stop()
@@ -448,7 +442,6 @@ final class CaptureController: ObservableObject {
         state.elapsed = recordedBefore + (stretchStart.map { Date().timeIntervalSince($0) } ?? 0)
         state.bytes = (try? FileManager.default.attributesOfItem(atPath: recorder.url.path)[.size] as? Int64) ?? 0
         recording = state
-        statusItem.update()
     }
 
     /// A thin outline around the area being recorded, outside it so it never
