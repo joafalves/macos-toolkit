@@ -74,12 +74,23 @@ final class SwitcherController: ObservableObject {
         let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in self?.apply() }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+        // macOS's own ⌘Tab is put back in step after the Mac sleeps or the
+        // user comes back to this session, in case either turned it on again.
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
+            wakeObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.systemSwitcherSetAt = nil
+                self?.apply()
+            })
+        }
     }
 
     /// Hands Cmd-Tab back to macOS.
     func stop() {
         timer?.invalidate()
         timer = nil
+        wakeObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
+        wakeObservers.removeAll()
         uninstall()
     }
 
@@ -97,9 +108,21 @@ final class SwitcherController: ObservableObject {
         // to be switched off while ours is ⌘Tab, and only then.
         let ours = config.shortcut.keyCode == Shortcut.commandTab.keyCode
             && config.shortcut.flags.subtracting(.shift) == Shortcut.commandTab.flags
+        // Only when it changes, plus once a minute in case something else
+        // turned macOS's back on: every 2 seconds was a window server call
+        // for nothing.
+        let now = ProcessInfo.processInfo.systemUptime
+        guard systemSwitcherOn != !ours || now - (systemSwitcherSetAt ?? -.infinity) > 60 else { return }
         CGSSetSymbolicHotKeyEnabled(1, !ours)
         CGSSetSymbolicHotKeyEnabled(2, !ours)
+        systemSwitcherOn = !ours
+        systemSwitcherSetAt = now
     }
+
+    /// What macOS's own ⌘Tab was last set to, and when.
+    private var systemSwitcherOn: Bool?
+    private var systemSwitcherSetAt: TimeInterval?
+    private var wakeObservers: [NSObjectProtocol] = []
 
     private func uninstall() {
         guard let tap else { return }
@@ -111,6 +134,8 @@ final class SwitcherController: ObservableObject {
         catalog.stop()
         CGSSetSymbolicHotKeyEnabled(1, true)
         CGSSetSymbolicHotKeyEnabled(2, true)
+        systemSwitcherOn = true
+        systemSwitcherSetAt = nil
     }
 
     private func installTap() -> Bool {
