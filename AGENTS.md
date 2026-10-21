@@ -103,37 +103,46 @@ indicator, so run them only when needed.
 
 ## Versions and releases
 
-Version `X.Y.Z` follows semver: a new tool or user-visible feature bumps the minor (`0.2.0`), a fix
-bumps the patch (`0.1.2`).
+Version `X.Y.Z` follows semver. A version goes through three stages: it's **worked on**, it's
+**released** (a local commit and tag), and it may be **published** (pushed to GitHub). Only the user
+starts a release or a publish.
 
-**The version being worked on** is the one after the last release: the next minor by default
-(`0.9.0` after `0.8.0`), a major only when the user says so. From the first change after a release:
+### While a version is worked on
 
-- `Resources/Info.plist` carries it: `CFBundleShortVersionString` to `X.Y.Z`, and `CFBundleVersion`
-  up by one (a plain integer build number, never reset). The **General** page header reads
-  `CFBundleShortVersionString`, so don't hard-code a version anywhere else.
-- `CHANGELOG.md` has it at the top as `## X.Y.Z (unreleased)`.
+The version being worked on is the one after the last release: the **next minor** by default
+(`0.9.0` after `0.8.0`). It's a major only when the user says so, and a patch only when the user
+asks for a fix-only release. From the first change after a release:
 
-**`CHANGELOG.md` maps every version.** Each user-visible change goes into the top entry in the same
-commit as the change, under `### Added`, `### Changed` or `### Fixed`, starting with the bold tool
-name (`- **Window Layout:** …`) and kept to a line or two, in the README's plain voice. Internal-only
-changes (refactors, dev flags, tests) stay out.
+- `Resources/Info.plist` carries it: `CFBundleShortVersionString` is `X.Y.Z`, and `CFBundleVersion`
+  is one more than at the last release (a plain integer build number, never reset). The **General**
+  page header reads `CFBundleShortVersionString`, so don't hard-code a version anywhere else.
+- `CHANGELOG.md` has it as its top entry, headed `## X.Y.Z (unreleased)`.
+- Every user-visible change goes into that entry **in the same commit as the change**, under
+  `### Added`, `### Changed` or `### Fixed` (leave out a heading with nothing under it). Each item
+  starts with the bold tool name (`- **Window Layout:** …`) and is a line or two in the README's
+  plain voice. Internal-only changes (refactors, dev flags, tests) stay out.
 
-**A release** of the version being worked on:
+### Releasing X.Y.Z
 
-1. Check `Resources/Info.plist` has `X.Y.Z`, and search for the previous version with
-   `grep -rIn "<old>" . --exclude-dir=.git --exclude-dir=.build --exclude-dir=build`; update any
-   other hit (README, docs).
-2. `CHANGELOG.md`: the heading becomes `## X.Y.Z (YYYY-MM-DD)`, and the entry lists everything
-   since the last release.
-3. `README.md`: the tool table, the tool's section, and the project layout tree if a folder was added.
-   If a page changed visibly, render new screenshots into `docs/images` (a `-light` and a `-dark`
-   image each, from `--snapshot`) so the README doesn't show an old UI.
+When the user asks for a release, in one commit:
+
+1. `CHANGELOG.md`: replace `(unreleased)` with the release date, so the heading reads
+   `## X.Y.Z (YYYY-MM-DD)`. Check the entry covers everything user-visible since the last tag
+   (`git log vPREVIOUS..HEAD`), and drop empty headings. If the user wants a different number than
+   the one worked on, rename the entry and the plist to it here.
+2. `Resources/Info.plist`: confirm it says `X.Y.Z`. Search for the previous version with
+   `grep -rIn "<previous>" . --exclude-dir=.git --exclude-dir=.build --exclude-dir=build` and update
+   any other hit (README, docs). `CHANGELOG.md` keeps its old versions, of course.
+3. `README.md`: the tool table, the tool's section, and the project layout tree if a folder was
+   added. If a page changed visibly, render new screenshots into `docs/images` (a `-light` and a
+   `-dark` image each, from `--snapshot`) so the README doesn't show an old UI.
 4. Look at every image in `docs/images` and check it shows only preview data, nothing from this Mac.
-5. Commit as `chore: release X.Y.Z` and tag `vX.Y.Z` on that commit. The next change starts the
-   next version (plist bumped, a new `(unreleased)` entry).
+5. Commit as `chore: release X.Y.Z` and tag `vX.Y.Z` on that commit. Both stay local until the user
+   asks to publish.
 
-To publish (only when asked; it pushes to GitHub):
+### Publishing
+
+Only when asked; it pushes to GitHub:
 
 ```bash
 ./scripts/build.sh
@@ -142,10 +151,16 @@ git push origin main vX.Y.Z
 gh release create vX.Y.Z "MacOS-Toolkit-X.Y.Z.zip" --title "X.Y.Z" --notes-file notes.md
 ```
 
-The release is named `X.Y.Z` with tag `vX.Y.Z`. Notes are the version's `CHANGELOG.md` entry, then
-the install block from the previous release (unzip into `/Applications`,
-`xattr -dr com.apple.quarantine`, grant Accessibility; the app is self-signed, not notarized),
-ending with the Claude Code attribution line. Delete the zip and notes file afterwards.
+The release is named `X.Y.Z` with tag `vX.Y.Z`. Its notes are the version's `CHANGELOG.md` entry
+(without the heading), then the install block from the previous release (unzip into
+`/Applications`, `xattr -dr com.apple.quarantine`, grant Accessibility; the app is self-signed, not
+notarized), ending with the Claude Code attribution line. Delete the zip and notes file afterwards.
+
+### After a release
+
+The next change starts the next version: bump `Resources/Info.plist` to the next minor (and
+`CFBundleVersion` up by one), and add a new `## X.Y.Z (unreleased)` entry at the top of
+`CHANGELOG.md`, in the same commit as that first change.
 
 ## Git
 
