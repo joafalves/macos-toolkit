@@ -405,8 +405,10 @@ The right-click menu gets these items, each of which can be turned off in the Fi
 The menu comes from a **Finder extension** inside the app. macOS keeps new Finder extensions off, so
 turn it on once with **Turn On** in the Finder settings (or under System Settings → General → Login
 Items & Extensions). The extension runs in its own sandboxed process and only builds the menu and
-hands each choice to the app, which does the work. Creating a file in a protected folder such as
-Documents may make macOS ask for access the first time.
+hands each choice to the app, which does the work. The app only takes those choices from its own
+extension, which proves itself with a secret that changes at every launch, and only ever acts on
+folders. Creating a file in a protected folder such as Documents may make macOS ask for access the
+first time.
 
 ## Screen Capture
 

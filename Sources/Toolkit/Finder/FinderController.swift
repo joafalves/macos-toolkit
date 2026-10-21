@@ -64,6 +64,7 @@ final class FinderController: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
+        writeToken()
         refreshExtension()
         apply()
         // Accessibility may be granted after launch.
@@ -211,30 +212,62 @@ final class FinderController: ObservableObject {
 
     // MARK: - Right-click menu
 
-    /// An action from the Finder extension: `macos-toolkit://<action>?target=<folder>&item=<path>`,
+    // MARK: - The URL scheme's token
+
+    /// A new secret for each launch, which the extension puts in every URL it
+    /// sends. Any app or web page can open a `macos-toolkit:` URL; only the
+    /// extension (and this user's own processes) can read the token.
+    private var token = ""
+
+    private static var tokenURL: URL {
+        FinderConfig.fileURL.deletingLastPathComponent().appendingPathComponent("finder-token")
+    }
+
+    private func writeToken() {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { return }
+        let value = bytes.map { String(format: "%02x", $0) }.joined()
+        let url = Self.tokenURL
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Readable by this user only.
+        guard FileManager.default.createFile(atPath: url.path, contents: Data(value.utf8), attributes: [.posixPermissions: 0o600]) else { return }
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        token = value
+    }
+
+    /// Compares every byte, so how long a wrong guess takes says nothing.
+    private static func same(_ a: String, _ b: String) -> Bool {
+        let a = Array(a.utf8), b = Array(b.utf8)
+        guard a.count == b.count, !a.isEmpty else { return false }
+        return zip(a, b).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
+    }
+
+    /// An action from the Finder extension: `macos-toolkit://<action>?token=…&target=<folder>&item=<path>`,
     /// where target is the folder Finder shows and item the first selected item, if any.
     func handle(_ url: URL) {
-        // Only while Finder is in front, as it is right after its menu, so
-        // another app or a web page can't use the scheme to make files.
+        // Only from the extension (it knows the token), and only while Finder
+        // is in front, as it is right after its menu.
         guard config.enabled, NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Self.finder,
-              let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+              let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              Self.same(parts.queryItems?.first(where: { $0.name == "token" })?.value ?? "", token)
         else { return }
         func path(_ name: String) -> URL? {
-            parts.queryItems?.first { $0.name == name }?.value.map { URL(fileURLWithPath: $0) }
+            parts.queryItems?.first { $0.name == name }?.value.map { URL(fileURLWithPath: $0).standardizedFileURL }
         }
         let item = path("item"), target = path("target")
+        // Only ever a real folder: a terminal asked to open a file runs it.
+        let folder = [item.flatMap { Self.isFolder($0) ? $0 : nil }, item?.deletingLastPathComponent(), target]
+            .compactMap { $0 }.first(where: Self.isFolder)
         switch parts.host {
         case "cut" where config.cut:
             cut()
         case "new-file" where config.newTextFile:
             // Next to the item that was clicked, which may be in an expanded subfolder.
-            if let folder = item?.deletingLastPathComponent() ?? target { newTextFile(in: folder) }
-        case "terminal" where config.openInTerminal:
-            if let item, Self.isFolder(item) {
-                openInTerminal(item)
-            } else if let folder = item?.deletingLastPathComponent() ?? target {
-                openInTerminal(folder)
+            if let folder = [item?.deletingLastPathComponent(), target].compactMap({ $0 }).first(where: Self.isFolder) {
+                newTextFile(in: folder)
             }
+        case "terminal" where config.openInTerminal:
+            if let folder { openInTerminal(folder) }
         default:
             break
         }
@@ -295,7 +328,7 @@ final class FinderController: ObservableObject {
         let result = AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString, &focused)
         // With no focused element (the desktop, say) there is no text to edit.
         if result == .noValue { return false }
-        guard result == .success, let focused else { return true }
+        guard result == .success, let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return true }
         var role: CFTypeRef?
         guard AXUIElementCopyAttributeValue(focused as! AXUIElement, kAXRoleAttribute as CFString, &role) == .success,
               let role = role as? String

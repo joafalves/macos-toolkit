@@ -199,7 +199,8 @@ enum WindowChrome {
         var inset: CGFloat = 0
         // The traffic lights sit in the middle of the title bar, or of the
         // toolbar when the two are one.
-        if let close = attribute(element, kAXCloseButtonAttribute).map({ $0 as! AXUIElement }), let frame = frame(of: close) {
+        if let close = attribute(element, kAXCloseButtonAttribute), CFGetTypeID(close) == AXUIElementGetTypeID(),
+           let frame = frame(of: close as! AXUIElement) {
             inset = (frame.midY - window.frame.minY) * 2
         }
         if let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] {
@@ -226,10 +227,12 @@ enum WindowChrome {
     }
 
     private static func frame(of element: AXUIElement) -> CGRect? {
-        guard let position = attribute(element, kAXPositionAttribute), let size = attribute(element, kAXSizeAttribute) else { return nil }
+        // Checked, since an app can answer with anything.
+        guard let position = attribute(element, kAXPositionAttribute), CFGetTypeID(position) == AXValueGetTypeID(),
+              let size = attribute(element, kAXSizeAttribute), CFGetTypeID(size) == AXValueGetTypeID()
+        else { return nil }
         var origin = CGPoint.zero, extent = CGSize.zero
-        AXValueGetValue(position as! AXValue, .cgPoint, &origin)
-        AXValueGetValue(size as! AXValue, .cgSize, &extent)
+        guard AXValueGetValue(position as! AXValue, .cgPoint, &origin), AXValueGetValue(size as! AXValue, .cgSize, &extent) else { return nil }
         return CGRect(origin: origin, size: extent)
     }
 }

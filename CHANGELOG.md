@@ -32,6 +32,14 @@ worked on; it gets its date when it's released.
   front. Esc closes it from any app.
 - **Settings window:** let go of when it's closed, and it opens again where it was.
 
+### Fixed
+
+- **Finder:** the right-click menu's actions are only accepted from the toolkit's own Finder
+  extension, and only ever on folders. Before, another app could ask the toolkit to open a file in
+  the terminal, which runs it.
+- **Window Layout, Window Switcher, Screen Capture, Finder:** an app answering Accessibility with
+  something unexpected can no longer upset them.
+
 ## 0.8.0 (2026-10-20)
 
 ### Added

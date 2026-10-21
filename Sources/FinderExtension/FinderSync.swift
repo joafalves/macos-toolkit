@@ -54,7 +54,9 @@ final class FinderSync: FIFinderSync {
 
     private func send(_ action: String, _ sender: NSMenuItem) {
         let controller = FIFinderSyncController.default()
-        var query: [URLQueryItem] = []
+        // The app only acts on URLs carrying the secret it wrote for this launch.
+        guard let token = Settings.token() else { return }
+        var query = [URLQueryItem(name: "token", value: token)]
         if let target = controller.targetedURL() {
             query.append(URLQueryItem(name: "target", value: target.path))
         }
@@ -127,6 +129,11 @@ private struct Settings {
             settings.json = json
         }
         return settings
+    }
+
+    static func token() -> String? {
+        (try? String(contentsOf: folder.appendingPathComponent("finder-token"), encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func bool(_ key: String) -> Bool { json[key] as? Bool ?? true }

@@ -196,7 +196,10 @@ enum LayoutWindow {
 
     static func attribute<T>(_ element: AXUIElement, _ name: String) -> T? {
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
+        guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success, let value else { return nil }
+        // Casts to these always succeed in Swift, whatever the app sent back.
+        if T.self == AXUIElement.self, CFGetTypeID(value) != AXUIElementGetTypeID() { return nil }
+        if T.self == AXValue.self, CFGetTypeID(value) != AXValueGetTypeID() { return nil }
         return value as? T
     }
 }
