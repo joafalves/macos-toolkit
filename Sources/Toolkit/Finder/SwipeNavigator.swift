@@ -175,22 +175,12 @@ final class SwipeNavigator {
         return target
     }
 
-    /// The pid of the app that owns the topmost window under the cursor, when
-    /// it's one of `apps`. Only normal windows (layer 0) count: the Dock keeps
-    /// an invisible window over the whole screen on a higher layer.
+    /// The app under the cursor, when it's one of `apps`.
     private static func windowOwner(at point: CGPoint) -> (pid_t, Method)? {
-        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        guard let app = NSRunningApplication.owningWindow(at: point),
+              let id = app.bundleIdentifier, let method = apps[id]
         else { return nil }
-        for window in windows where window[kCGWindowLayer as String] as? Int == 0 {
-            guard let bounds = window[kCGWindowBounds as String] as? NSDictionary,
-                  let rect = CGRect(dictionaryRepresentation: bounds), rect.contains(point)
-            else { continue }
-            guard let pid = window[kCGWindowOwnerPID as String] as? pid_t,
-                  let id = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier, let method = apps[id]
-            else { return nil }
-            return (pid, method)
-        }
-        return nil
+        return (app.processIdentifier, method)
     }
 
     /// Type-checked, as in `LayoutWindow`: an app can answer with anything.

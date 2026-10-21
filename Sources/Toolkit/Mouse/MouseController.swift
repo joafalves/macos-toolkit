@@ -68,6 +68,9 @@ final class MouseController: ObservableObject {
     init() {
         config = MouseConfig.load()
         wheel.profileProvider = { [weak self] in self?.wheelProfile() }
+        let choice = wheelChoice
+        wheel.autoscroller.excludedApps = { choice.value.autoscrollExcluded }
+        wheel.autoscroller.bypassKey = { choice.value.autoscrollBypass }
         monitor.onDevicesChanged = { [weak self] in
             // The event service appears slightly after the device itself.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self?.refresh(force: false) }
@@ -267,12 +270,15 @@ final class MouseController: ObservableObject {
         var enabled = false
         var connected: [String] = []
         var profiles: [String: Profile] = [:]
+        var autoscrollExcluded: Set<String> = []
+        var autoscrollBypass: CGEventFlags = .maskAlternate
     }
 
     private let wheelChoice = Locked(WheelChoice())
 
     private func updateWheelChoice() {
-        wheelChoice.value = WheelChoice(enabled: config.enabled, connected: devices.filter(\.connected).map(\.id), profiles: config.profiles)
+        wheelChoice.value = WheelChoice(enabled: config.enabled, connected: devices.filter(\.connected).map(\.id), profiles: config.profiles,
+                                        autoscrollExcluded: Set(config.autoscrollExcluded.keys), autoscrollBypass: config.autoscrollBypass.flag)
     }
 
     /// On the wheel tap's thread.

@@ -27,7 +27,8 @@ tool; keep it in step with the code.
 - `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (the menu
   bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing),
-  `SettingsTransfer` (export and import of all settings), `Snapshot`.
+  `SettingsTransfer` (export and import of all settings), `Snapshot`, and `WindowUnderPointer`
+  (which app owns the window under a point, for tools that act on it).
 - `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
   ⇧⌘3/4/5, and non-activating panels (`CapturePanel`) so the app being captured keeps focus.

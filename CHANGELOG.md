@@ -10,6 +10,10 @@ worked on; it gets its date when it's released.
 - **Finder:** swipe two fingers right on the trackpad to go back and left to go forward, as in a
   browser, in Finder and System Settings. A swipe over something that can still scroll sideways,
   like the column view, scrolls it until it reaches the edge.
+- **Mouse:** autoscroll on the wheel button, as in Windows browsers, in every app: hold it and move
+  the mouse to scroll, faster the farther you move, with a speed setting. A wheel click without
+  moving is still a middle click. Hold ⌥ while pressing to give the app its own wheel button, or
+  list apps that should always get it.
 
 ## 0.12.0 (2026-10-21)
 

@@ -1,8 +1,33 @@
+import CoreGraphics
 import Foundation
 
 /// A setting that either defers to macOS or uses our own value.
 enum ValueMode: String, Codable, CaseIterable {
     case macOS, custom
+}
+
+/// The key that, held while pressing the wheel button, gives the app its own
+/// wheel button instead of autoscroll.
+enum ModifierKey: String, Codable, CaseIterable {
+    case option, control, shift, command
+
+    var flag: CGEventFlags {
+        switch self {
+        case .option: return .maskAlternate
+        case .control: return .maskControl
+        case .shift: return .maskShift
+        case .command: return .maskCommand
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .option: return "⌥"
+        case .control: return "⌃"
+        case .shift: return "⇧"
+        case .command: return "⌘"
+        }
+    }
 }
 
 /// Like `ValueMode`, for settings that can also be switched off entirely.
@@ -37,6 +62,11 @@ struct Profile: Codable, Equatable {
     // Buttons
     /// Turns the side buttons into back/forward navigation in Apple's apps.
     var navigationButtons = false
+    /// Holding the wheel button and moving the mouse scrolls, faster the
+    /// farther it moves.
+    var autoscroll = false
+    /// Multiplier on the autoscroll speed.
+    var autoscrollSpeed = 1.0
 
     init(name: String) {
         self.name = name
@@ -57,11 +87,13 @@ struct Profile: Codable, Equatable {
         scrollAccel = try c.decodeIfPresent(Double.self, forKey: .scrollAccel) ?? 0.3125
         smoothScrolling = try c.decodeIfPresent(Bool.self, forKey: .smoothScrolling) ?? false
         navigationButtons = try c.decodeIfPresent(Bool.self, forKey: .navigationButtons) ?? false
+        autoscroll = try c.decodeIfPresent(Bool.self, forKey: .autoscroll) ?? false
+        autoscrollSpeed = try c.decodeIfPresent(Double.self, forKey: .autoscrollSpeed) ?? 1.0
     }
 
     /// True when any setting needs the event tap (and so Accessibility).
     var needsEventTap: Bool {
-        rewritesWheelEvents || navigationButtons
+        rewritesWheelEvents || navigationButtons || autoscroll
     }
 
     var rewritesWheelEvents: Bool {
@@ -72,6 +104,7 @@ struct Profile: Codable, Equatable {
     var isAllMacOS: Bool {
         cursorSpeedMode == .macOS && accelMode == .macOS && scrollSpeedMode == .macOS
             && scrollAccelMode == .macOS && !verticalInverted && !horizontalInverted && !smoothScrolling && !navigationButtons
+            && !autoscroll
     }
 
     mutating func resetToMacOS() {
@@ -86,6 +119,11 @@ struct MouseConfig: Codable, Equatable {
     var profiles: [String: Profile] = [:]
     var restoreOnQuit = true
     var showAllPointingDevices = false
+    /// Apps that get the wheel button unchanged, for every mouse, by bundle ID
+    /// with their names.
+    var autoscrollExcluded: [String: String] = [:]
+    /// Held while pressing the wheel button, the app gets the button itself.
+    var autoscrollBypass = ModifierKey.option
 
     init() {}
 
@@ -95,6 +133,8 @@ struct MouseConfig: Codable, Equatable {
         profiles = try c.decodeIfPresent([String: Profile].self, forKey: .profiles) ?? [:]
         restoreOnQuit = try c.decodeIfPresent(Bool.self, forKey: .restoreOnQuit) ?? true
         showAllPointingDevices = try c.decodeIfPresent(Bool.self, forKey: .showAllPointingDevices) ?? false
+        autoscrollExcluded = (try? c.decodeIfPresent([String: String].self, forKey: .autoscrollExcluded)) ?? [:]
+        autoscrollBypass = (try? c.decodeIfPresent(ModifierKey.self, forKey: .autoscrollBypass)) ?? .option
     }
 
     static var fileURL: URL {

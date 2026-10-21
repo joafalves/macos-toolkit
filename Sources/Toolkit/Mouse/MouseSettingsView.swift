@@ -32,6 +32,48 @@ struct MouseSettingsView: View {
     }
 }
 
+/// Ways to give an app its own wheel button: a key held for one press, or
+/// always, for the listed apps. Shared by every mouse, since it's about the app.
+private struct AutoscrollExceptions: View {
+    @ObservedObject var mouse: MouseController
+
+    var body: some View {
+        OptionRow(title: "Key for the app's own wheel button",
+                  caption: "Hold it while pressing the wheel to get what the app does with it, like its own autoscroll or panning. For every mouse.",
+                  selection: $mouse.config.autoscrollBypass,
+                  options: ModifierKey.allCases.map { ($0, $0.symbol) })
+        RowDivider()
+        SettingRow(title: "Leave the wheel button to these apps",
+                   caption: "Always, in apps that use it themselves, like panning in design apps.") {
+            Menu("Add") {
+                ForEach(candidates, id: \.0) { bundleID, name in
+                    Button(name) { mouse.config.autoscrollExcluded[bundleID] = name }
+                }
+            }
+            .fixedSize()
+        }
+        let apps = mouse.config.autoscrollExcluded.sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
+        ForEach(apps, id: \.key) { bundleID, name in
+            RowDivider()
+            SettingRow(title: name) {
+                Button("Remove") { mouse.config.autoscrollExcluded[bundleID] = nil }
+            }
+        }
+    }
+
+    /// Open apps that aren't in the list yet.
+    private var candidates: [(String, String)] {
+        var seen = Set(mouse.config.autoscrollExcluded.keys)
+        return NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .compactMap { app -> (String, String)? in
+                guard let id = app.bundleIdentifier, id != Bundle.main.bundleIdentifier, seen.insert(id).inserted else { return nil }
+                return (id, app.localizedName ?? id)
+            }
+            .sorted { $0.1.localizedStandardCompare($1.1) == .orderedAscending }
+    }
+}
+
 private struct EmptyState: View {
     var body: some View {
         VStack(spacing: 8) {
@@ -187,9 +229,20 @@ private struct ProfileEditor: View {
                       selection: p.smoothScrolling, options: [(false, "macOS"), (true, "Smooth")])
         }
 
-        Card(title: "Buttons", footnote: "Other apps receive the buttons unchanged; most browsers and editors already handle them.") {
+        Card(title: "Buttons", footnote: "Other apps receive the back and forward buttons unchanged; most browsers and editors already handle them. A wheel click without moving stays a normal middle click.") {
             OptionRow(title: "Back and forward buttons", caption: "Go back and forward in Finder, Safari and other Apple apps.",
                       selection: p.navigationButtons, options: [(false, "macOS"), (true, "Navigate")])
+            RowDivider()
+            OptionRow(title: "Wheel button", caption: "Hold it and move the mouse to scroll, faster the farther you move, in any app.",
+                      selection: p.autoscroll, options: [(false, "macOS"), (true, "Autoscroll")]) {
+                if p.wrappedValue.autoscroll {
+                    ValueSlider(value: p.autoscrollSpeed, range: 0.25...3, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", $0) }
+                }
+            }
+            if p.wrappedValue.autoscroll {
+                RowDivider()
+                AutoscrollExceptions(mouse: mouse)
+            }
         }
 
         HStack(spacing: 10) {
