@@ -1,19 +1,29 @@
 import SwiftUI
 
-/// A scrolling settings page with a centred, width-limited column.
+/// A scrolling settings page with a centred, width-limited column. Linked
+/// settings' badges scroll it to the row they name.
 struct Page<Content: View>: View {
     @ViewBuilder var content: () -> Content
+    @StateObject private var focus = SettingFocus()
+
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                content()
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    content()
+                }
+                .frame(maxWidth: 620, alignment: .leading)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 24)
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: 620, alignment: .leading)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity)
+            .onAppear { focus.scroll = { anchor in proxy.scrollTo(anchor, anchor: .center) } }
         }
+        .environment(\.settingFocus, focus)
     }
 }
 
@@ -52,10 +62,12 @@ struct RowDivider: View {
 }
 
 /// Title and caption on the left, a control on the right, and optional
-/// extra controls underneath.
+/// extra controls underneath. A link to another setting shows as a badge
+/// under the caption, and when this one is held, its control is locked.
 struct SettingRow<Control: View, Extra: View>: View {
     let title: String
     var caption: String?
+    var link: SettingLink?
     @ViewBuilder var control: () -> Control
     @ViewBuilder var extra: () -> Extra
 
@@ -70,9 +82,14 @@ struct SettingRow<Control: View, Extra: View>: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    if let link {
+                        LinkBadge(link: link)
+                            .padding(.top, 5)
+                    }
                 }
                 Spacer(minLength: 0)
                 control()
+                    .disabled(link?.locks == true)
             }
             extra()
         }
@@ -82,8 +99,8 @@ struct SettingRow<Control: View, Extra: View>: View {
 }
 
 extension SettingRow where Extra == EmptyView {
-    init(title: String, caption: String? = nil, @ViewBuilder control: @escaping () -> Control) {
-        self.init(title: title, caption: caption, control: control, extra: { EmptyView() })
+    init(title: String, caption: String? = nil, link: SettingLink? = nil, @ViewBuilder control: @escaping () -> Control) {
+        self.init(title: title, caption: caption, link: link, control: control, extra: { EmptyView() })
     }
 }
 
@@ -119,9 +136,10 @@ struct ToggleRow: View {
     let title: String
     var caption: String?
     @Binding var isOn: Bool
+    var link: SettingLink?
 
     var body: some View {
-        SettingRow(title: title, caption: caption) {
+        SettingRow(title: title, caption: caption, link: link) {
             Toggle(title, isOn: $isOn)
                 .toggleStyle(.switch)
                 .labelsHidden()

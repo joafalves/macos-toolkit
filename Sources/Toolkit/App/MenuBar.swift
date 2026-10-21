@@ -2,7 +2,7 @@ import AppKit
 
 /// One piece of the toolkit's menu bar item.
 struct MenuBarSegment: Equatable {
-    enum Kind: Equatable { case toolkit, capture, recording, mixer }
+    enum Kind: Equatable { case toolkit, capture, recording, awake, mixer }
 
     let kind: Kind
     /// Drawn in the menu bar's own colour, like macOS's icons.
@@ -54,6 +54,12 @@ final class MenuBarItem: NSObject {
         row.show(segments)
         button?.setAccessibilityLabel(segments.map(\.label).joined(separator: ", "))
         button?.toolTip = segments.count == 1 ? segments[0].label : nil
+    }
+
+    /// Points between two parts; half of it on each side of every part.
+    var spacing: CGFloat {
+        get { row.padding * 2 }
+        set { row.padding = (newValue / 2).rounded() }
     }
 
     /// While a part's menu or panel is open, the other parts step back.
@@ -116,9 +122,15 @@ final class MenuBarRow: NSView {
     private var pressed: MenuBarSegment.Kind?
 
     static let height: CGFloat = 22
-    /// Space on each side of a part's content: a little less than between the
-    /// menu bar's items, so the group reads as one.
-    static let padding: CGFloat = 5
+    /// Space on each side of a part's content: by default a little less than
+    /// between the menu bar's items, so the group reads as one. Set in General.
+    var padding: CGFloat = 6 {
+        didSet {
+            guard padding != oldValue else { return }
+            parts.values.forEach { $0.needsLayout = true }
+            layoutParts()
+        }
+    }
 
     init() {
         super.init(frame: NSRect(x: 0, y: 0, width: 1, height: Self.height))
@@ -189,7 +201,7 @@ final class MenuBarRow: NSView {
                 dividers[index - 1].frame = NSRect(x: x, y: (Self.height - 12) / 2, width: 1, height: 12)
                 x += 1
             }
-            let width = part.contentWidth + Self.padding * 2
+            let width = part.contentWidth + padding * 2
             part.frame = NSRect(x: x, y: 0, width: width, height: Self.height)
             x += width
         }
@@ -269,7 +281,8 @@ final class MenuBarPartView: NSView {
 
     private func layoutContent() {
         guard let segment = shown else { return }
-        var x = MenuBarRow.padding
+        let padding = (superview as? MenuBarRow)?.padding ?? 6
+        var x = padding
         let height = bounds.height
         if let image = segment.colored {
             dot.frame = NSRect(x: x, y: ((height - image.size.height) / 2).rounded(), width: image.size.width, height: image.size.height)
@@ -282,7 +295,7 @@ final class MenuBarPartView: NSView {
         if segment.text != nil {
             if segment.colored != nil || segment.glyph != nil { x += Self.textGap }
             let size = label.intrinsicContentSize
-            label.frame = NSRect(x: x, y: ((height - size.height) / 2).rounded(), width: bounds.width - x - MenuBarRow.padding, height: size.height)
+            label.frame = NSRect(x: x, y: ((height - size.height) / 2).rounded(), width: bounds.width - x - padding, height: size.height)
         }
     }
 }
@@ -436,6 +449,60 @@ enum MenuBarArt {
             NSGraphicsContext.current?.compositingOperation = .destinationOut
             text.draw(at: NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
             NSGraphicsContext.current?.compositingOperation = .sourceOver
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    static let cupSymbols = ["cup.and.saucer", "cup.and.heat.waves.fill"]
+
+    /// Keep Awake's cup: empty while off, steaming while on. Against the
+    /// time when there is one, which would otherwise sit after a gap.
+    static func cup(on: Bool, beforeText: Bool = false) -> NSImage? {
+        let symbol = on ? cupSymbols[1] : cupSymbols[0]
+        return cached("cup \(symbol) \(beforeText)") { image(symbol, widthOf: cupSymbols, alignRight: beforeText) }
+    }
+
+    /// Keep Awake while on, like the volume badge: a pill filled with the time
+    /// left, the cup and the time cut out of it. With no end it's full and
+    /// holds only the cup. As wide as "8:88" with a time, so the menu bar
+    /// doesn't shift as it counts down.
+    static func awakeBadge(fraction: Double, time: String?) -> NSImage {
+        // By whole percent: finer than the minutes it changes with.
+        let percent = Int((min(1, max(0, fraction)) * 100).rounded())
+        return cached("awake \(percent) \(time ?? "")") { makeAwakeBadge(fraction: Double(percent) / 100, time: time) } ?? NSImage()
+    }
+
+    private static func makeAwakeBadge(fraction: Double, time: String?) -> NSImage {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .bold)
+        let text = time.map { NSAttributedString(string: $0, attributes: [.font: font, .foregroundColor: NSColor.black]) }
+        let widest = time.map { NSAttributedString(string: String($0.map { $0.isNumber ? "8" : $0 }), attributes: [.font: font]).size().width } ?? 0
+        let cup = NSImage(systemSymbolName: "cup.and.heat.waves.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 10.5, weight: .semibold))
+        let cupWidth = cup?.size.width ?? 10
+        let pill = NSRect(x: 0, y: 1, width: ceil(4 + cupWidth + (time == nil ? 0 : 2 + widest) + 4), height: 16)
+        let image = NSImage(size: NSSize(width: pill.width, height: 18), flipped: false) { _ in
+            let shape = NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2)
+            NSColor.black.withAlphaComponent(0.4).setFill()
+            shape.fill()
+            NSGraphicsContext.saveGraphicsState()
+            shape.addClip()
+            NSGraphicsContext.current?.compositingOperation = .copy
+            NSColor.black.setFill()
+            NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(fraction), height: pill.height).fill()
+            NSGraphicsContext.restoreGraphicsState()
+            if let cup {
+                cup.draw(in: NSRect(x: 4, y: pill.midY - cup.size.height / 2, width: cup.size.width, height: cup.size.height),
+                         from: .zero, operation: .destinationOut, fraction: 1)
+            }
+            if let text {
+                let size = text.size()
+                let area = NSRect(x: 4 + cupWidth + 2, y: pill.minY, width: widest, height: pill.height)
+                NSGraphicsContext.current?.compositingOperation = .destinationOut
+                text.draw(at: NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
+                NSGraphicsContext.current?.compositingOperation = .sourceOver
+            }
             return true
         }
         image.isTemplate = true

@@ -8,6 +8,7 @@
   A volume slider for every app. A ⌘Tab that lists windows. Windows snapped to halves or a grid,
   from the keyboard or by dragging. Mouse settings that stick, per mouse.
   ⌘X and a better right-click menu in Finder. Screenshots and small screen recordings on ⇧⌘3/4/5.
+  A Mac that stays awake for as long as you need.
 </p>
 
 <p align="center">
@@ -20,7 +21,7 @@
   <a href="#the-menu-bar">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-strip-dark.png">
-      <img src="docs/images/menu-bar-strip-light.png" width="420" alt="The toolkit in the menu bar: its menu, Screen Capture and the Audio Mixer's volume badge side by side">
+      <img src="docs/images/menu-bar-strip-light.png" width="460" alt="The toolkit in the menu bar: its menu, Screen Capture, Keep Awake with the time left, and the Audio Mixer's volume badge side by side">
     </picture>
   </a>
 </p>
@@ -88,6 +89,17 @@
       </a>
     </td>
   </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <a href="#keep-awake">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/images/awake-dark.png">
+          <img src="docs/images/awake-light.png" width="520" alt="Keep Awake settings: the session, menu bar look, shortcut, display, lid closed and battery">
+        </picture><br>
+        <b>Keep Awake</b>
+      </a>
+    </td>
+  </tr>
 </table>
 
 I missed a few things from Windows and from third-party apps, and I didn't want three more apps
@@ -102,10 +114,12 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 | 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse (SteerMouse-style), plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings (CleanShot-style), with window backdrops and small H.264 files. |
+| ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off (Amphetamine-style), with the lid closed if you like. |
 
 Each tool can be turned off or left on its macOS defaults, and anything the app changes outside
 itself is put back when it quits. No accounts, no telemetry, no network code. Settings are plain JSON in
 `~/Library/Application Support/MacOS Toolkit`, and **General → Export…** saves them all to one file.
+**Import…** takes the file's settings and leaves the rest as they are.
 
 ## Audio Mixer
 
@@ -472,6 +486,34 @@ asks again every so often to confirm it for apps that aren't Apple's. macOS's ow
 shortcuts are switched off only where they clash with the toolkit's, and back on when the toolkit
 quits or the tool is turned off.
 
+## Keep Awake
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/awake-dark.png">
+    <img src="docs/images/awake-light.png" width="520" alt="Keep Awake settings">
+  </picture>
+</p>
+
+A session keeps the Mac from sleeping until you turn it off, or for 5 minutes to 24 hours (picked from
+Minutes and Hours, as in Amphetamine), or until a time you pick. Start one from its menu in the menu bar, from its settings, or with a shortcut you
+set. A session carries on if the app is restarted or the Mac reboots, until its time is up.
+
+- **In the menu bar** it's a cup. While a session is on it becomes a **pill that empties as the time
+  runs out**, with the time left in it (full, with no time, when it has no end), or the cup with the
+  time beside it. With neither, its menu is in the toolkit menu.
+- **Keep the display on** is the default. Turned off, only the Mac stays awake: the display sleeps,
+  and downloads and long jobs go on.
+- **Stay awake with the lid closed**, on battery too, is off by default. macOS only allows that to an
+  admin, so turning it on asks for your password once and adds a rule to `/etc/sudoers.d` that lets
+  the toolkit run `pmset -a disablesleep` and nothing else. Turning it off removes the rule. Sleep is
+  put back when a session ends, when the app quits or is killed, and at the next launch after a
+  crash. If the Mac gets too hot with the lid closed, the session ends. Being tied to this Mac, it's
+  left out of exported settings.
+- **On battery below a level you pick** (never, by default) a session ends, and none starts. Charging
+  never ends one.
+- **When it ends** on its own, a sound (the default), a notification, both or neither.
+
 ## Install
 
 Needs **macOS 15 or later**. The released app is built for Apple silicon.
@@ -519,17 +561,17 @@ To remove it, quit the app, delete it from `/Applications`, and delete
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-dark.png">
-    <img src="docs/images/menu-bar-light.png" width="360" alt="The toolkit's menu bar item: the toolkit menu, Screen Capture and the mixer side by side with hairlines between them, then with the mixer open and the others dimmed, while recording, and on its own">
+    <img src="docs/images/menu-bar-light.png" width="360" alt="The toolkit's menu bar item: the toolkit menu, Screen Capture, Keep Awake and the mixer side by side with hairlines between them; with the mixer open and the others dimmed; while recording, with Keep Awake's cup and time; Keep Awake off; and on with no end">
   </picture>
 </p>
 
-The toolkit has one item in the menu bar. The toolkit menu is always there, and Screen Capture and
-the Audio Mixer join it when their settings put them in the menu bar, side by side with the same
+The toolkit has one item in the menu bar. The toolkit menu is always there, and Screen Capture, Keep
+Awake and the Audio Mixer join it when their settings put them in the menu bar, side by side with the same
 size and spacing and a hairline between them. While recording, Screen Capture's place shows a red
 stop button with the time and size. Each part opens its own menu or panel, and while one is open
 the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
 and other apps' icons can't end up between them. The toolkit menu opens each tool's settings, listed
-under a Settings header.
+under a Settings header. **General → Space between items** sets how far apart the parts sit.
 
 ## Good to know
 
@@ -539,7 +581,7 @@ under a Settings header.
   is a personal tool, so expect to rebuild when they do.
 - It is **not notarized**, which is why the install steps above remove the quarantine flag.
 - Anything the toolkit changes outside itself (⌘Tab, the screenshot keys, macOS's window tiling,
-  device properties, audio taps) is put back when it quits, when it is killed, and at the next launch if it crashed.
+  device properties, audio taps, sleep with the lid closed) is put back when it quits, when it is killed, and at the next launch if it crashed.
 
 ## Project layout
 
@@ -552,6 +594,7 @@ Sources/Toolkit
 ├── Mixer      the Audio Mixer tool
 ├── Finder     the Finder tool
 ├── Capture    the Screen Capture tool
+├── Awake      the Keep Awake tool
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu
 scripts        build.sh, make-cert.sh, make-icon.swift

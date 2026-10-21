@@ -5,8 +5,10 @@ enum Snapshot {
     static func write(to path: String, section: AppSection, light: Bool) {
         _ = NSApplication.shared
         let model = AppModel()
+        model.persists = false
+        model.general = GeneralConfig()
         model.section = section
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController.preview(), switcher: SwitcherController.preview(), layout: LayoutController.preview(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview())))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController.preview(), switcher: SwitcherController.preview(), layout: LayoutController.preview(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview(), awake: AwakeController.preview())))
         window.title = "MacOS Toolkit"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
@@ -165,11 +167,16 @@ enum Snapshot {
         let badge = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer")
         let percent = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: false), text: "60%", label: "Audio Mixer")
         let recording = MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: false), text: "0:42 · 3.1 MB", label: "Recording")
+        let awake = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24"), label: "Keep Awake")
+        let awakeOff = MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: false), label: "Keep Awake")
+        let awakeTime = MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: true, beforeText: true), text: "1:24", label: "Keep Awake")
+        let awakeFull = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 1, time: nil), label: "Keep Awake")
         let rows: [([MenuBarSegment], MenuBarSegment.Kind?)] = [
-            ([toolkit, capture, badge], nil),
-            ([toolkit, capture, badge], .mixer),
-            ([toolkit, recording, percent], nil),
-            ([toolkit], .toolkit),
+            ([toolkit, capture, awake, badge], nil),
+            ([toolkit, capture, awake, badge], .mixer),
+            ([toolkit, recording, awakeTime, percent], nil),
+            ([toolkit, awakeOff], nil),
+            ([toolkit, awakeFull], .toolkit),
         ]
         // The real views, as the menu bar item has them, on drawn strips of menu bar.
         let strip = NSSize(width: 360, height: 30)
@@ -206,9 +213,10 @@ enum Snapshot {
         row.show([
             MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit"),
             MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture"),
+            MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24"), label: "Keep Awake"),
             MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer"),
         ])
-        let size = NSSize(width: 420, height: 30)
+        let size = NSSize(width: 460, height: 30)
         let bar = NSView(frame: NSRect(origin: .zero, size: size))
         bar.wantsLayer = true
         bar.layer?.backgroundColor = (light ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.16, alpha: 1)).cgColor

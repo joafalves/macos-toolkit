@@ -115,6 +115,22 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-taps") {
     fflush(stdout)
     exit(0)
 }
+// Development aid: `--test-nudge <report>`, which input resets the idle time
+// chat apps read. Run the app bundle with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-nudge"), CommandLine.arguments.count > flag + 1 {
+    AwakeProbe.run(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+// `--test-awake <report>`: Keep Awake's assertion, times, lid rule and a
+// mouse drift. Run the app bundle with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-awake"), CommandLine.arguments.count > flag + 1 {
+    AwakeController.selfTest(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+if CommandLine.arguments.contains("--test-settings") {
+    SettingsTransfer.selfTest()
+    exit(0)
+}
 // `--test-overlay [png]`: the capture overlay's memory, and optionally a
 // picture of it (run the app bundle with `open -n` for that).
 if let flag = CommandLine.arguments.firstIndex(of: "--test-overlay") {

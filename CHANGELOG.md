@@ -3,6 +3,26 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.11.0 (unreleased)
+
+### Added
+
+- **Keep Awake:** a new tool, in place of Amphetamine. Keeps the Mac awake until you turn it off, for
+  5 minutes to 24 hours, or until a time, from the menu bar, its settings or a shortcut. Sessions
+  carry on after a restart. The display can stay on or sleep.
+- **Keep Awake:** in the menu bar, a pill that empties as the time runs out, or the cup with the
+  time beside it.
+- **Keep Awake:** optional awake with the lid closed, on battery too, after your password once. Ends
+  below a battery level you pick, and if the Mac gets too hot, with a sound or a notification.
+- **Keep Awake:** Stay available keeps Slack, Teams and the like from switching you to away, with a
+  signal that changes nothing on screen or a small mouse move. It keeps the display on while it's on.
+- **General:** the space between the toolkit's parts in the menu bar can be set, from tight to roomy.
+
+### Changed
+
+- **General:** importing settings keeps anything the file doesn't have as it is, instead of putting
+  it back to its default.
+
 ## 0.10.0 (2026-10-21)
 
 ### Changed

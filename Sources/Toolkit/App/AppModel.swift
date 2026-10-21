@@ -4,7 +4,7 @@ import ServiceManagement
 
 /// The tools shown in the sidebar of the main window.
 enum AppSection: String, CaseIterable, Identifiable {
-    case mouse, switcher, layout, mixer, finder, capture, general
+    case mouse, switcher, layout, mixer, finder, capture, awake, general
 
     var id: String { rawValue }
 
@@ -16,6 +16,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .mixer: return "Audio Mixer"
         case .finder: return "Finder"
         case .capture: return "Screen Capture"
+        case .awake: return "Keep Awake"
         case .general: return "General"
         }
     }
@@ -29,6 +30,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .mixer: return .pink
         case .finder: return .cyan
         case .capture: return .orange
+        case .awake: return .brown
         case .general: return .gray
         }
     }
@@ -41,6 +43,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .mixer: return "slider.vertical.3"
         case .finder: return "folder"
         case .capture: return "camera.viewfinder"
+        case .awake: return "cup.and.saucer.fill"
         case .general: return "gearshape"
         }
     }
@@ -48,6 +51,14 @@ enum AppSection: String, CaseIterable, Identifiable {
 
 final class AppModel: ObservableObject {
     @Published var section: AppSection? = .mouse
+    @Published var general = GeneralConfig.load() {
+        didSet {
+            guard general != oldValue, persists else { return }
+            general.save()
+        }
+    }
+    /// False for `--snapshot`, which shows the defaults.
+    var persists = true
     @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     func setLaunchAtLogin(_ enabled: Bool) {

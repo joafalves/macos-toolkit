@@ -17,13 +17,17 @@ tool; keep it in step with the code.
   permission check, `responsibility_get_pid_responsible_for_pid` for grouping helper processes,
   `CGSSetSymbolicHotKeyEnabled` to take ⌘Tab and ⇧⌘3/4/5 from macOS, and `SetsCursorInBackground`
   so the capture overlay can set the cursor without activating the app.
+- Root only through one narrow rule: Keep Awake's lid-closed option asks for the admin password once
+  and installs `/etc/sudoers.d/macos-toolkit`, which allows `pmset -a disablesleep 0/1` and removing
+  itself, checked with `visudo` first (`LidSleep.swift`). Nothing runs as root otherwise.
 
 ## Layout
 
 - `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (the menu
   bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
-  `MainView`, `SettingsTransfer` (export and import of all settings), `Snapshot`.
-- `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`: one folder per tool. Screen
+  `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing),
+  `SettingsTransfer` (export and import of all settings), `Snapshot`.
+- `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
   ⇧⌘3/4/5, and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
 - `Sources/FinderExtension`: the Finder extension. It is sandboxed, so it only builds the right-click
@@ -49,13 +53,21 @@ tool; keep it in step with the code.
   `@Published var config` whose `didSet` saves it and applies the change. The config is a `Codable`
   struct with a tolerant `init(from:)` (every key optional, with a default) stored as JSON in
   `~/Library/Application Support/MacOS Toolkit/<tool>.json`.
-- **Adding a tool:** a case in `AppSection` (title, symbol), a view in `MainView`, a field in
+- **Adding a tool:** a case in `AppSection` (title, symbol, colour), a view in `MainView`, a field in
   `SettingsFile` (optional, so old exports still import), a section in `README.md`.
+- **Import merges, setting by setting** (`SettingsTransfer.merge`): what a file lacks stays as it is
+  here. A setting that only holds on this Mac, because it goes with a grant made here (the lid-closed
+  admin rule), goes in `SettingsTransfer.localOnly`: never exported, never imported.
 - **Settings pages** use `Page` and `Card`. Controls that change behaviour go through the config.
   A tool's page starts with `ToolHeader` (its name and the Enabled switch, bound to the config's
   `enabled`) and wraps the rest in `WhenEnabled`. Shortcuts are `Shortcut` values set with
   `ShortcutRow` (`UI/Shortcut.swift`); a tool lets its own shortcuts through while
   `ShortcutRecording.active`, so they can be recorded.
+- **Linked settings** (`UI/LinkedSettings.swift`): when one setting holds another (Stay available
+  keeps the display on), pass a `SettingLink` to both rows while it's in force, `.heldBy(...)` on the
+  held one, which locks its control, and `.holds(...)` on the holder, and mark each row with
+  `.settingAnchor(_:)`. Both show a badge, and clicking one scrolls to the other row and lights it up.
+  The held setting keeps its own stored value, so it comes back when the link ends.
 - **`@State` does not compile** here: in the macOS 27 SDK it is a macro and the Command Line Tools lack
   its plugin. Use `@StateObject private var x = ViewState(value)` instead (`ViewState` is in
   `Components.swift`). `@GestureState` and `@StateObject` are fine.
@@ -83,12 +95,12 @@ tool; keep it in step with the code.
 - **Memory and CPU:** the settings window is released when it closes. Background work runs on
   change or on a slow timer, not on a fast poll; check with `--measure-idle` and `footprint`.
 - Clean up after yourself: anything the app changes outside itself (Cmd-Tab, the screenshot keys,
-  macOS's window tiling, device properties, Core Audio taps) is restored on quit, on `kill`, and at the next launch if the
+  macOS's window tiling, device properties, Core Audio taps, `pmset disablesleep`) is restored on quit, on `kill`, and at the next launch if the
   app crashed.
 - Comments say why, not what; match the surrounding density. Prose in the UI and README is plain and
   short, no marketing words.
 - Permissions: Accessibility (mouse wheel and buttons, switcher, Window Layout, Finder cut, the capture's Content
-  Only window style), System Audio Recording (mixer), Screen Recording (capture, and the switcher's
+  Only window style, Keep Awake's Stay available, whose posted events macOS drops without it), System Audio Recording (mixer), Screen Recording (capture, and the switcher's
   previews) and Microphone (capture). The Finder extension is a separate switch macOS keeps off
   until it is turned on
   (`pluginkit -e use -i dev.jalves.macos-toolkit.finder`, which the Finder page's button runs).
@@ -117,6 +129,9 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-menu-bar         # CPU per menu bar item update, minus the idle loop
 .build/debug/Toolkit --test-menu-bar-clicks  # every point across the item goes to the part it's over
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)
+.build/debug/Toolkit --test-awake <report>   # Keep Awake's assertion, times, lid rule (visudo) and one mouse drift (open -n)
+.build/debug/Toolkit --test-nudge <report>   # which posted input resets the idle time chat apps read (open -n; leave the mouse alone)
+.build/debug/Toolkit --test-settings        # export leaves out local-only settings; import merges and keeps the rest
 .build/debug/Toolkit --test-shortcuts        # config migration, and which macOS screenshot shortcuts clash
 .build/debug/Toolkit --test-toolbar          # the capture toolbar's panel against its content
 .build/debug/Toolkit --test-overlay [png]    # what the capture overlay costs in memory; with open -n, a picture of it

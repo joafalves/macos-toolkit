@@ -22,6 +22,7 @@ struct MainView: View {
     @ObservedObject var mixer: MixerController
     @ObservedObject var finder: FinderController
     @ObservedObject var capture: CaptureController
+    @ObservedObject var awake: AwakeController
 
     var body: some View {
         // A plain split rather than NavigationSplitView: that one runs the
@@ -49,7 +50,8 @@ struct MainView: View {
                 case .mixer: MixerSettingsView(mixer: mixer)
                 case .finder: FinderSettingsView(finder: finder, mouse: mouse)
                 case .capture: CaptureSettingsView(capture: capture)
-                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture)
+                case .awake: AwakeSettingsView(awake: awake, mouse: mouse)
+                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -66,6 +68,7 @@ private struct GeneralView: View {
     @ObservedObject var mixer: MixerController
     let finder: FinderController
     @ObservedObject var capture: CaptureController
+    let awake: AwakeController
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
@@ -87,17 +90,26 @@ private struct GeneralView: View {
                           isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
             }
 
+            Card(title: "Menu Bar") {
+                SettingRow(title: "Space between items", caption: "Between the toolkit's parts in the menu bar. It changes as you drag.") {
+                    EmptyView()
+                } extra: {
+                    ValueSlider(value: $model.general.menuBarSpacing, range: GeneralConfig.menuBarSpacings, step: 2,
+                                low: "Tight", high: "Roomy", format: { "\(Int($0)) pt" })
+                }
+            }
+
             Card(title: "Backup") {
                 SettingRow(title: "Settings file", caption: "Save every setting to a file, or load them from one.") {
                     HStack(spacing: 8) {
-                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture) }
-                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture) }
+                        Button("Export…") { SettingsTransfer.exportSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake) }
+                        Button("Import…") { SettingsTransfer.importSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake) }
                     }
                 }
             }
 
             Card(title: "Permissions") {
-                SettingRow(title: "Accessibility", caption: "Used by Mouse for the wheel direction, speed and smoothing, by the Window Switcher, by Window Layout to move windows, by Finder for Cut, and by Screen Capture to find where a window's content starts.") {
+                SettingRow(title: "Accessibility", caption: "Used by Mouse for the wheel direction, speed and smoothing, by the Window Switcher, by Window Layout to move windows, by Finder for Cut, by Screen Capture to find where a window's content starts, and by Keep Awake to stay available.") {
                     if mouse.accessibilityGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {

@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private var mixer: MixerController!
     private var finder: FinderController!
     private var capture: CaptureController!
+    private var awake: AwakeController!
     private var mixerPopover: NSPopover?
     private var popoverMonitors: [Any] = []
     private var resignObserver: NSObjectProtocol?
@@ -35,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         capture = CaptureController()
         capture.onOpenSettings = { [weak self] in self?.show(.capture) }
         capture.start()
+        awake = AwakeController()
+        awake.start()
 
         menuBar = MenuBarItem()
         menuBar.onClick = { [weak self] kind, rect, right in self?.menuBarClicked(kind, at: rect, right: right) }
@@ -47,6 +50,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             mixer.$mainMuted.sink { _ in redraw() },
             capture.$config.sink { _ in redraw() },
             capture.$recording.sink { _ in redraw() },
+            awake.$config.sink { _ in redraw() },
+            awake.$session.sink { _ in redraw() },
+            awake.$minute.sink { _ in redraw() },
+            model.$general.sink { [weak self] general in self?.menuBar.spacing = general.menuBarSpacing },
         ]
         updateMenuBar()
 
@@ -92,6 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         mixer.flush()
         finder.stop()
         capture.stop()
+        awake.stop()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -116,6 +124,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                                            label: state.paused ? "Recording paused. Click to stop, right-click for more." : "Recording. Click to stop, right-click to pause."))
         } else if capture.config.enabled, capture.config.standaloneIcon {
             segments.append(MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture"))
+        }
+        if awake.config.enabled, awake.config.menuBarIcon != .none {
+            let left = awake.isOn ? awake.session?.until.map { AwakeController.left($0.timeIntervalSinceNow) } : nil
+            let label = "Keep Awake, " + awake.status.prefix(1).lowercased() + awake.status.dropFirst()
+            if awake.config.menuBarIcon == .pill, awake.isOn, let session = awake.session {
+                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: session.fractionLeft(), time: left), label: label))
+            } else {
+                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: awake.isOn, beforeText: left != nil), text: left, label: label))
+            }
         }
         if mixer.config.enabled, mixer.config.menuBarIcon != .none {
             let volume = mixer.mainVolume, muted = mixer.mainMuted || mixer.mainVolume <= 0
@@ -158,6 +175,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             menu.addItem(.separator())
             menu.addItem(withTitle: "Discard Recording", action: #selector(discardRecording), keyEquivalent: "").target = self
             popUp(menu, from: .recording, at: rect)
+        case .awake:
+            let menu = NSMenu()
+            awake.menuItems { [weak self] in self?.show(.awake) }.forEach(menu.addItem)
+            popUp(menu, from: .awake, at: rect)
         case .mixer:
             if mixerPopover?.isShown == true {
                 mixerPopover?.performClose(nil)
@@ -195,6 +216,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             let item = NSMenuItem(title: "Screen Capture", action: #selector(openCaptureToolbar), keyEquivalent: "")
             item.image = NSImage(systemSymbolName: AppSection.capture.symbol, accessibilityDescription: nil)
             item.target = self
+            menu.addItem(item)
+            menu.addItem(.separator())
+        }
+        // With no part of its own, its menu is a submenu here.
+        if awake.config.enabled, awake.config.menuBarIcon == .none {
+            let item = NSMenuItem(title: "Keep Awake", action: nil, keyEquivalent: "")
+            item.image = NSImage(systemSymbolName: awake.isOn ? "cup.and.heat.waves.fill" : "cup.and.saucer", accessibilityDescription: nil)
+            item.state = awake.isOn ? .on : .off
+            let submenu = NSMenu()
+            awake.menuItems { [weak self] in self?.show(.awake) }.forEach(submenu.addItem)
+            item.submenu = submenu
             menu.addItem(item)
             menu.addItem(.separator())
         }
@@ -343,7 +375,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private func show(_ section: AppSection) {
         model.section = section
         if window == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture)))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake)))
             window.title = "MacOS Toolkit"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: 780, height: 640))
