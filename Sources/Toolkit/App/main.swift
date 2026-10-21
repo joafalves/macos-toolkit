@@ -93,6 +93,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-wheel"), CommandLine.
     WheelProbe.run(into: CommandLine.arguments[flag + 1])
     exit(0)
 }
+if CommandLine.arguments.contains("--test-menu-bar-clicks") {
+    MenuBarRow.clickTest()
+    exit(0)
+}
 if CommandLine.arguments.contains("--test-menu-bar") {
     MenuBarRow.selfTest()
     exit(0)

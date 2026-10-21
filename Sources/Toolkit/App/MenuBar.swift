@@ -96,7 +96,9 @@ final class MenuBarItem: NSObject {
         // click as if it landed in its middle.
         let point = row.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
         guard let kind = row.kind(at: point.x), let rect = rect(of: kind) else { return }
-        let right = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
+        // ⌃ from the keyboard as it is now: the click event macOS hands over
+        // is made up, and its modifiers can't be trusted.
+        let right = event?.type == .rightMouseUp || NSEvent.modifierFlags.contains(.control)
         onClick?(kind, rect, right)
     }
 }
@@ -166,9 +168,16 @@ final class MenuBarRow: NSView {
 
     func frame(of kind: MenuBarSegment.Kind) -> NSRect? { parts[kind]?.frame }
 
+    /// The part under the point. On a divider or beside the row, the part
+    /// whose edge is nearest: by centres, a wide part (the recording, with its
+    /// time) lost clicks well inside it to a narrow neighbour.
     func kind(at x: CGFloat) -> MenuBarSegment.Kind? {
-        // Between or beside the parts counts as the nearest one.
-        order.min { abs((parts[$0]?.frame.midX ?? .infinity) - x) < abs((parts[$1]?.frame.midX ?? .infinity) - x) }
+        if let hit = order.first(where: { parts[$0].map { $0.frame.minX <= x && x < $0.frame.maxX } ?? false }) { return hit }
+        func distance(_ kind: MenuBarSegment.Kind) -> CGFloat {
+            guard let frame = parts[kind]?.frame else { return .infinity }
+            return x < frame.minX ? frame.minX - x : x - frame.maxX
+        }
+        return order.min { distance($0) < distance($1) }
     }
 
     /// Positions the parts; tells the item only if the width changed.
@@ -461,5 +470,33 @@ extension MenuBarRow {
         let each = (busy - idle) * 10
         print(String(format: "an update: %.2f ms of CPU (%.1f ms for 100, %.1f ms of that the loop itself); once a second that's %.3f%% of one core",
                      each, busy * 1000, idle * 1000, each / 10))
+    }
+}
+
+extension MenuBarRow {
+    /// `--test-menu-bar-clicks`: every point across a row, toolkit and a wide
+    /// recording part and the mixer, goes to the part it's over, and points on
+    /// the dividers and beyond the ends to the nearest edge.
+    static func clickTest() {
+        _ = NSApplication.shared
+        let row = MenuBarRow()
+        row.show([
+            MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.glyph("wrench.and.screwdriver.fill"), label: "MacOS Toolkit"),
+            MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: false), text: "0:42 · 3.1 MB", label: "Recording"),
+            MenuBarSegment(kind: .mixer, glyph: MenuBarArt.speaker(volume: 0.6, muted: false), text: "60%", label: "Audio Mixer"),
+        ])
+        var wrong: [String] = []
+        for x in stride(from: -10, through: row.frame.width + 10, by: 0.5) {
+            let expected: MenuBarSegment.Kind? = [MenuBarSegment.Kind.toolkit, .recording, .mixer].first { kind in
+                guard let frame = row.frame(of: kind) else { return false }
+                return frame.minX <= x && x < frame.maxX
+            }
+            let got = row.kind(at: x)
+            if let expected, got != expected { wrong.append("x \(x): \(String(describing: got)) instead of \(expected)") }
+            if expected == nil, x < 0, got != .toolkit { wrong.append("x \(x) before the row: \(String(describing: got))") }
+            if expected == nil, x >= row.frame.width, got != .mixer { wrong.append("x \(x) after the row: \(String(describing: got))") }
+        }
+        let frames = [MenuBarSegment.Kind.toolkit, .recording, .mixer].compactMap { row.frame(of: $0) }.map { "\(Int($0.minX))–\(Int($0.maxX))" }
+        print("parts at \(frames.joined(separator: ", ")); " + (wrong.isEmpty ? "ok: every point went to its part" : "FAIL:\n" + wrong.prefix(10).joined(separator: "\n")))
     }
 }
