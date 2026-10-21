@@ -7,7 +7,7 @@
   <b>The little things macOS never shipped, in one menu bar app.</b><br>
   A volume slider for every app. A ⌘Tab that lists windows. Windows snapped to halves or a grid,
   from the keyboard or by dragging. Mouse settings that stick, per mouse.
-  ⌘X and a better right-click menu in Finder. Screenshots and small screen recordings on ⇧⌘3/4/5.
+  ⌘X, swipe back and forward, and a better right-click menu in Finder. Screenshots and small screen recordings on ⇧⌘3/4/5.
   A Mac that stays awake for as long as you need. CPU, memory and more in the menu bar, with memory that
   means something.
 </p>
@@ -73,7 +73,7 @@
       <a href="#finder">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="docs/images/finder-dark.png">
-          <img src="docs/images/finder-light.png" width="380" alt="Finder settings: cut and paste files, and the items added to the right-click menu">
+          <img src="docs/images/finder-light.png" width="380" alt="Finder settings: cut and paste files, swipe back and forward, and the items added to the right-click menu">
         </picture><br>
         <b>Finder</b>
       </a>
@@ -124,7 +124,7 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 | 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps (AltTab-style), across all Spaces. |
 | 🔲 **[Window Layout](#window-layout)** | Rectangle's shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, and snapping by dragging. |
 | 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse (SteerMouse-style), plus battery level. |
-| 📁 **[Finder](#finder)** | ⌘X to cut files, and New Text File and Open in Terminal in the right-click menu. |
+| 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings (CleanShot-style), with window backdrops and small H.264 files. |
 | 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar (Stats-style), with a memory figure that leaves out what macOS only caches. |
 | ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off (Amphetamine-style), with the lid closed if you like. |
@@ -435,7 +435,7 @@ Cursor settings need no permission. The wheel and button settings that go throug
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/finder-dark.png">
-    <img src="docs/images/finder-light.png" width="520" alt="Finder settings: cut and paste files, and the items added to the right-click menu">
+    <img src="docs/images/finder-light.png" width="520" alt="Finder settings: cut and paste files, swipe back and forward, and the items added to the right-click menu">
   </picture>
 </p>
 
@@ -450,6 +450,15 @@ Only keys pressed while Finder is in front are touched, and not while a name or 
 being edited, where ⌘X and ⌘V keep their text meaning. Copying anything else in between cancels the
 cut, and a ⌘V somewhere other than Finder just pastes a copy. Finder can't dim the cut files the way
 Windows does, so a short sound says the cut worked instead. Cut needs **Accessibility**.
+
+Finder also doesn't go back and forward on a two-finger swipe, which browsers do. With **Swipe back
+and forward** on, swiping two fingers to the right on the trackpad goes back and to the left goes
+forward, in the Finder window under the cursor. System Settings gets the same swipe, since it has
+Back and Forward but no swipe either. Finder is sent the navigation swipe a three-finger swipe
+makes; System Settings ignores that, so its own Back or Forward menu item is pressed. Scrolling
+is never changed: a swipe over something that can still scroll sideways (the column view, a wide
+list) scrolls it, and only goes back or forward once it's at the edge. Other apps are left alone.
+It needs **Accessibility** too.
 
 The right-click menu gets these items, each of which can be turned off in the Finder settings:
 
@@ -624,7 +633,7 @@ The window opens on **Welcome**, with a tile for each tool and a warning while a
 them needs is missing. **Settings**, under it, has the app's own settings. It opens there again after an update; otherwise on the page you left.
 
 - **Settings → Grant Access…** and enable *MacOS Toolkit* under System Settings → Privacy & Security →
-  Accessibility. This is for the window switcher, Window Layout, the Finder cut, and the mouse wheel and button settings.
+  Accessibility. This is for the window switcher, Window Layout, the Finder cut and swipes, and the mouse wheel and button settings.
 - System Audio Recording is asked for later, the first time you turn an app down in the mixer, and
   Screen Recording the first time you take a screenshot.
 - For the Finder right-click menu, press **Turn On** in the Finder settings.

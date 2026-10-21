@@ -23,12 +23,12 @@ struct FinderSettingsView: View {
         Page {
             ToolHeader(section: .finder, subtitle: "Small things Finder is missing.", enabled: $finder.config.enabled)
 
-            if finder.config.enabled, finder.config.cut, !finder.isPreview {
+            if finder.config.enabled, finder.config.cut || finder.config.swipe, !finder.isPreview {
                 if !mouse.accessibilityGranted {
-                    Banner(text: "Cut is not active yet. It needs the Accessibility permission to see the keys you press in Finder.",
+                    Banner(text: "Cut and swiping are not active yet. They need the Accessibility permission to see the keys you press and the swipes you make in Finder.",
                            button: "Grant Access…") { mouse.requestAccessibility() }
                 } else if finder.tapFailed {
-                    Banner(text: "Accessibility is granted, but the app has to restart before Cut takes effect.",
+                    Banner(text: "Accessibility is granted, but the app has to restart before Cut and swiping take effect.",
                            button: "Restart") { mouse.relaunch() }
                 }
             }
@@ -39,6 +39,13 @@ struct FinderSettingsView: View {
                     ToggleRow(title: "Cut and paste files",
                               caption: "Select files, press ⌘X or choose Cut from the right-click menu, open another folder, press ⌘V.",
                               isOn: $finder.config.cut)
+                }
+
+                Card(title: "Trackpad",
+                     footnote: "Scrolling is never changed: a swipe over something that can still scroll sideways, like the column view, scrolls it. The swipe goes back or forward once it's at the edge.") {
+                    ToggleRow(title: "Swipe back and forward",
+                              caption: "Two fingers to the right go back, to the left go forward, as in a browser. In System Settings too.",
+                              isOn: $finder.config.swipe)
                 }
 
                 Card(title: "Right-Click Menu",

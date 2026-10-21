@@ -109,7 +109,7 @@ tool; keep it in step with the code.
   app crashed.
 - Comments say why, not what; match the surrounding density. Prose in the UI and README is plain and
   short, no marketing words.
-- Permissions: Accessibility (mouse wheel and buttons, switcher, Window Layout, Finder cut, the capture's Content
+- Permissions: Accessibility (mouse wheel and buttons, switcher, Window Layout, Finder cut and swipes, the capture's Content
   Only window style, Keep Awake's Stay available, whose posted events macOS drops without it), System Audio Recording (mixer), Screen Recording (capture, and the switcher's
   previews) and Microphone (capture). The Finder extension is a separate switch macOS keeps off
   until it is turned on

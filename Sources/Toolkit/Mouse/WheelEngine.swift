@@ -121,7 +121,7 @@ final class WheelEngine {
 
     /// Posts the same event a three-finger trackpad swipe produces. Apps read
     /// it as "go back / forward", whatever the keyboard layout.
-    private static func postNavigationSwipe(back: Bool) {
+    static func postNavigationSwipe(back: Bool) {
         // Undocumented gesture fields: HID event type, swipe direction, phase.
         guard let event = CGEvent(source: nil),
               let gestureType = CGEventType(rawValue: 29),
