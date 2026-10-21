@@ -15,8 +15,9 @@ tool; keep it in step with the code.
   main window is open.
 - Uses private APIs on purpose: SkyLight and others for the Window Switcher, TCC for the audio
   permission check, `responsibility_get_pid_responsible_for_pid` for grouping helper processes,
-  `CGSSetSymbolicHotKeyEnabled` to take ⌘Tab and ⇧⌘3/4/5 from macOS, and `SetsCursorInBackground`
-  so the capture overlay can set the cursor without activating the app.
+  `CGSSetSymbolicHotKeyEnabled` to take ⌘Tab and ⇧⌘3/4/5 from macOS, `SetsCursorInBackground`
+  so the capture overlay can set the cursor without activating the app, and IOReport (through
+  `dlopen`) for System Stats' CPU and GPU watts, subscribed to only while the power stat is read.
 - Root only through one narrow rule: Keep Awake's lid-closed option asks for the admin password once
   and installs `/etc/sudoers.d/macos-toolkit`, which allows `pmset -a disablesleep 0/1` and removing
   itself, checked with `visudo` first (`LidSleep.swift`). Nothing runs as root otherwise.
@@ -27,7 +28,7 @@ tool; keep it in step with the code.
   bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing),
   `SettingsTransfer` (export and import of all settings), `Snapshot`.
-- `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`: one folder per tool. Screen
+- `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
   ⇧⌘3/4/5, and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
 - `Sources/FinderExtension`: the Finder extension. It is sandboxed, so it only builds the right-click
@@ -82,8 +83,17 @@ tool; keep it in step with the code.
   adds a `MenuBarSegment`, drawn as real views (`MenuBarPartView`), not a picture of them. Clicks
   arrive as if at the button's centre, so the part is found from `NSEvent.mouseLocation`. macOS
   ignores the button's highlight and state, so menus open with `MenuBarItem.open` (it sets the
-  item's menu and clicks it, which keeps the item lit); panels call `setPressed` before showing.
-  An update costs about 2 ms (`--test-menu-bar`); keep it there, a stats tool will update it often.
+  item's menu and clicks it, which keeps the item lit); panels hang from a part with
+  `MenuBarPopover`, which lights it and closes on a click elsewhere or Esc.
+  - **No `NSTextField` in it**, not even a hidden one: on macOS 27 a text field inside a status item
+    keeps the whole item redrawing, at 25–90% of a core while nothing changes. Text is
+    `MenuBarText`, a view that draws its own; it's vibrant like the icons unless it has a colour of
+    its own, which vibrancy would wash out. `--test-menu-bar-idle` puts real items in the menu bar
+    and should read 0.0% for each kind of part.
+  - **Parts don't change width** as their figures change: a segment's `widthOf` (or a column line's)
+    is the widest its text gets, and the part keeps that width with the text against its right edge
+    (`--test-menu-bar-widths`). Keep templates as small as what's really shown (stats stop at 99%).
+  - An update costs about 2 ms (`--test-menu-bar`); System Stats updates it every couple of seconds.
 - **Overlays are layers.** Full-screen overlays build `CALayer`s, not `draw(_:)`, which keeps a
   bitmap the size of each display (about 100 MB on large displays). Panels that call back into
   their owner hold it, or themselves, weakly; a cycle there kept every overlay alive.
@@ -118,6 +128,8 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
 .build/debug/Toolkit --snapshot out.png switcher-grid [light]   # drawn stand-ins, no real windows
 .build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
+.build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
+.build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power ...] [light]
 .build/debug/Toolkit --snapshot out.png menu-bar-strip [light]  # the item in a drawn menu bar, for the top of the README
 .build/debug/Toolkit --snapshot out.png layout-grid [light]     # the Window Layout grid over a drawn desktop
 .build/debug/Toolkit --snapshot out.png layout-slots [light]    # its layouts bar while dragging
@@ -129,6 +141,11 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-wheel <report>   # one scroll notch through the installed app's wheel tap: what comes out (open -n)
 .build/debug/Toolkit --test-menu-bar         # CPU per menu bar item update, minus the idle loop
 .build/debug/Toolkit --test-menu-bar-clicks  # every point across the item goes to the part it's over
+.build/debug/Toolkit --test-menu-bar-idle    # each kind of part, in a real menu bar item, costs nothing left alone
+.build/debug/Toolkit --test-menu-bar-widths  # each part keeps its width as its figure changes
+.build/debug/Toolkit --test-menu-bar-tint <png>   # coloured text in a real menu bar item, captured (open -n; delete the png)
+.build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
+.build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)
 .build/debug/Toolkit --test-awake <report>   # Keep Awake's assertion, times, lid rule (visudo) and one mouse drift (open -n)
 .build/debug/Toolkit --test-nudge <report>   # which posted input resets the idle time chat apps read (open -n; leave the mouse alone)

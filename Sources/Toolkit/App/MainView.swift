@@ -23,6 +23,7 @@ struct MainView: View {
     @ObservedObject var finder: FinderController
     @ObservedObject var capture: CaptureController
     @ObservedObject var awake: AwakeController
+    @ObservedObject var stats: StatsController
 
     var body: some View {
         // A plain split rather than NavigationSplitView: that one runs the
@@ -51,7 +52,8 @@ struct MainView: View {
                 case .finder: FinderSettingsView(finder: finder, mouse: mouse)
                 case .capture: CaptureSettingsView(capture: capture)
                 case .awake: AwakeSettingsView(awake: awake, mouse: mouse)
-                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake)
+                case .stats: StatsSettingsView(stats: stats)
+                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -69,6 +71,7 @@ private struct GeneralView: View {
     let finder: FinderController
     @ObservedObject var capture: CaptureController
     let awake: AwakeController
+    let stats: StatsController
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
@@ -102,8 +105,8 @@ private struct GeneralView: View {
             Card(title: "Backup") {
                 SettingRow(title: "Settings file", caption: "Save every setting to a file, or load them from one.") {
                     HStack(spacing: 8) {
-                        Button("Export…") { SettingsTransfer.exportSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake) }
-                        Button("Import…") { SettingsTransfer.importSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake) }
+                        Button("Export…") { SettingsTransfer.exportSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats) }
+                        Button("Import…") { SettingsTransfer.importSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats) }
                     }
                 }
             }

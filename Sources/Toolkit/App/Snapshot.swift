@@ -8,7 +8,7 @@ enum Snapshot {
         model.persists = false
         model.general = GeneralConfig()
         model.section = section
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController.preview(), switcher: SwitcherController.preview(), layout: LayoutController.preview(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview(), awake: AwakeController.preview())))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController.preview(), switcher: SwitcherController.preview(), layout: LayoutController.preview(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview(), awake: AwakeController.preview(), stats: StatsController.preview())))
         window.title = "MacOS Toolkit"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
@@ -165,11 +165,11 @@ enum Snapshot {
         let toolkit = MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")
         let capture = MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture")
         let badge = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer")
-        let percent = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: false), text: "60%", label: "Audio Mixer")
+        let percent = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: false), text: "60%", widthOf: "100%", label: "Audio Mixer")
         let recording = MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: false), text: "0:42 · 3.1 MB", label: "Recording")
-        let awake = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24"), label: "Keep Awake")
+        let awake = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24", widthOf: "2:00"), label: "Keep Awake")
         let awakeOff = MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: false), label: "Keep Awake")
-        let awakeTime = MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: true, beforeText: true), text: "1:24", label: "Keep Awake")
+        let awakeTime = MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: true, beforeText: true), text: "1:24", widthOf: "2:00", label: "Keep Awake")
         let awakeFull = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 1, time: nil), label: "Keep Awake")
         let rows: [([MenuBarSegment], MenuBarSegment.Kind?)] = [
             ([toolkit, capture, awake, badge], nil),
@@ -212,11 +212,12 @@ enum Snapshot {
         let row = MenuBarRow()
         row.show([
             MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit"),
+        ] + StatsController.preview().segments() + [
             MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture"),
-            MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24"), label: "Keep Awake"),
+            MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24", widthOf: "2:00"), label: "Keep Awake"),
             MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer"),
         ])
-        let size = NSSize(width: 460, height: 30)
+        let size = NSSize(width: 600, height: 30)
         let bar = NSView(frame: NSRect(origin: .zero, size: size))
         bar.wantsLayer = true
         bar.layer?.backgroundColor = (light ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.16, alpha: 1)).cgColor
@@ -248,6 +249,62 @@ enum Snapshot {
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         save(bar, to: path)
+    }
+
+    /// System Stats in the menu bar, in each layout and look, from made-up readings.
+    static func writeStatsBar(to path: String, light: Bool) {
+        _ = NSApplication.shared
+        let toolkit = MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")
+        let all = StatKind.allCases
+        // The default, every stat as a number, then the pills, then the charts.
+        let looks: [[StatKind: StatLook]] = [
+            [.cpu: .number, .memory: .number, .network: .number, .power: .number],
+            [.cpu: .pill, .memory: .pill, .gpu: .pill, .disk: .pill],
+            [.cpu: .chart, .memory: .chart, .network: .chart, .power: .chart],
+        ]
+        var rows: [[MenuBarSegment]] = [[toolkit] + StatsController.preview().segments()]
+        for look in looks {
+            rows.append([toolkit] + StatsController.preview(looks: look, shown: Array(look.keys)).segments())
+        }
+        rows.append([toolkit] + StatsController.preview(layout: .compact, shown: [.cpu, .memory]).segments())
+        rows.append([toolkit] + StatsController.preview(layout: .compact, shown: all).segments())
+        let strip = NSSize(width: 520, height: 30)
+        let gap: CGFloat = 8
+        let size = NSSize(width: strip.width, height: strip.height * CGFloat(rows.count) + gap * CGFloat(rows.count - 1))
+        let container = NSView(frame: NSRect(origin: .zero, size: size))
+        container.wantsLayer = true
+        for (index, row) in rows.enumerated() {
+            let y = size.height - CGFloat(index + 1) * strip.height - CGFloat(index) * gap
+            let bar = NSView(frame: NSRect(x: 0, y: y, width: strip.width, height: strip.height))
+            bar.wantsLayer = true
+            bar.layer?.backgroundColor = (light ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.16, alpha: 1)).cgColor
+            container.addSubview(bar)
+            let view = MenuBarRow()
+            view.show(row)
+            view.setFrameOrigin(NSPoint(x: strip.width - view.frame.width - 12, y: ((strip.height - view.frame.height) / 2).rounded()))
+            bar.addSubview(view)
+        }
+        let window = NSWindow(contentRect: container.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = container
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        save(container, to: path)
+    }
+
+    /// A System Stats panel, from made-up readings.
+    static func writeStatsPanel(to path: String, light: Bool, kinds: [StatKind]) {
+        _ = NSApplication.shared
+        let host = NSHostingController(rootView: StatsPanelView(stats: .preview(), kinds: kinds).background(Color(nsColor: .windowBackgroundColor)))
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.borderless]
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.setContentSize(host.view.fittingSize)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        if let view = window.contentView { save(view, to: path) }
     }
 
     /// Window Layout's suggestions after a drop on the left edge: a drawn

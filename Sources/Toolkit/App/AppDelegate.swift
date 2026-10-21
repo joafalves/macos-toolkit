@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private var finder: FinderController!
     private var capture: CaptureController!
     private var awake: AwakeController!
+    private var stats: StatsController!
+    private var statsPanel: MenuBarPopover!
     private var mixerPopover: NSPopover?
     private var popoverMonitors: [Any] = []
     private var resignObserver: NSObjectProtocol?
@@ -38,9 +40,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         capture.start()
         awake = AwakeController()
         awake.start()
+        stats = StatsController()
+        // `--measure-idle` with `--without-stats`: the cost of the rest, with
+        // nothing saved to the user's settings.
+        if measureIdlePath != nil, CommandLine.arguments.contains("--without-stats") {
+            stats.persists = false
+            stats.config.enabled = false
+        }
+        stats.start()
 
         menuBar = MenuBarItem()
         menuBar.onClick = { [weak self] kind, rect, right in self?.menuBarClicked(kind, at: rect, right: right) }
+        statsPanel = MenuBarPopover(menuBar: menuBar)
+        // Back to reading only what the menu bar shows.
+        statsPanel.onClose = { [weak self] in self?.stats.panel = [] }
         // Published values arrive before they're stored, so the item is drawn
         // again on the next pass, from the stored ones.
         let redraw: () -> Void = { [weak self] in DispatchQueue.main.async { self?.updateMenuBar() } }
@@ -53,6 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             awake.$config.sink { _ in redraw() },
             awake.$session.sink { _ in redraw() },
             awake.$minute.sink { _ in redraw() },
+            stats.$config.sink { _ in redraw() },
+            stats.live.$tick.sink { _ in redraw() },
             model.$general.sink { [weak self] general in self?.menuBar.spacing = general.menuBarSpacing },
         ]
         updateMenuBar()
@@ -100,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         finder.stop()
         capture.stop()
         awake.stop()
+        stats.stop()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -118,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
     private func updateMenuBar() {
         var segments = [MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")]
+        segments += stats.segments()
         if let state = capture.recording {
             let time = MenuBarArt.duration(state.elapsed) + (state.bytes > 0 ? " · " + MenuBarArt.bytes(state.bytes) : "")
             segments.append(MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: state.paused), text: time,
@@ -127,11 +144,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }
         if awake.config.enabled, awake.config.menuBarIcon != .none {
             let left = awake.isOn ? awake.session?.until.map { AwakeController.left($0.timeIntervalSinceNow) } : nil
+            // As wide as the session's longest time, so it doesn't shift as it counts down.
+            let widest = awake.session.flatMap { session in session.until.map { AwakeController.left($0.timeIntervalSince(session.started)) } }
             let label = "Keep Awake, " + awake.status.prefix(1).lowercased() + awake.status.dropFirst()
             if awake.config.menuBarIcon == .pill, awake.isOn, let session = awake.session {
-                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: session.fractionLeft(), time: left), label: label))
+                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: session.fractionLeft(), time: left, widthOf: widest), label: label))
             } else {
-                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: awake.isOn, beforeText: left != nil), text: left, label: label))
+                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: awake.isOn, beforeText: left != nil), text: left,
+                                               widthOf: widest, label: label))
             }
         }
         if mixer.config.enabled, mixer.config.menuBarIcon != .none {
@@ -146,7 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 // The volume next to the speaker, like the battery's percentage.
                 // Muted keeps the number, greyed, so you can see what unmuting brings back.
                 segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: muted),
-                                               text: "\(Int((volume * 100).rounded()))%", dimText: mixer.mainMuted, label: label))
+                                               text: "\(Int((volume * 100).rounded()))%", dimText: mixer.mainMuted, widthOf: "100%", label: label))
             case .volumeBadge:
                 segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: volume, muted: muted), label: label))
             case .none:
@@ -154,11 +174,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             }
         }
         menuBar.show(segments)
+        // A panel whose part was just turned off has nothing to hang from.
+        if let kind = statsPanel?.kind, !segments.contains(where: { $0.kind == kind }) { statsPanel.close() }
     }
 
     private func menuBarClicked(_ kind: MenuBarSegment.Kind, at rect: NSRect, right: Bool) {
         if kind != .mixer { mixerPopover?.performClose(nil) }
+        // A second click on the same part closes its panel.
+        if statsPanel.isShown {
+            let same = statsPanel.kind == kind
+            statsPanel.close()
+            if same { return }
+        }
         switch kind {
+        case .stat(let stat):
+            showStats([stat], from: kind)
+        case .stats:
+            showStats(stats.config.shown, from: kind)
         case .toolkit:
             let menu = NSMenu()
             fillMenu(menu)
@@ -184,6 +216,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 mixerPopover?.performClose(nil)
             } else {
                 showMixer(from: .mixer)
+            }
+        }
+    }
+
+    /// Its panel reads everything it shows while it's open, from now.
+    private func showStats(_ kinds: [StatKind], from kind: MenuBarSegment.Kind) {
+        stats.panel = kinds
+        statsPanel.show(from: kind) {
+            StatsPanelView(stats: stats, kinds: kinds, close: { [weak self] in self?.statsPanel.close() }) { [weak self] in
+                self?.statsPanel.close()
+                self?.show(.stats)
             }
         }
     }
@@ -375,7 +418,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private func show(_ section: AppSection) {
         model.section = section
         if window == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake)))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)))
             window.title = "MacOS Toolkit"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: 780, height: 640))
@@ -406,7 +449,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         func note(_ label: String) {
             report += String(format: "%@: %.1f MB\n", label, Double(processFootprint()) / 1_048_576)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+        func cpu() -> Double {
+            var usage = rusage()
+            getrusage(RUSAGE_SELF, &usage)
+            return Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1_000_000
+        }
+        var start = 0.0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { start = cpu() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 68) {
+            report += String(format: "CPU idle, no window: %.2f%% of a core over a minute\n", (cpu() - start) / 60 * 100)
             note("idle, no window")
             self.show(.mouse)
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) {

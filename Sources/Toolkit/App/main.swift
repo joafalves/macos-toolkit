@@ -28,6 +28,15 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeMixer(to: rest[0], light: rest.contains("light"), outputs: rest.contains("outputs"), software: rest.contains("software"), equalizer: rest.contains("equalizer"))
         exit(0)
     }
+    if rest.contains("stats-bar") {
+        Snapshot.writeStatsBar(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
+    if rest.contains("stats-panel") {
+        let kinds = rest.compactMap(StatKind.init)
+        Snapshot.writeStatsPanel(to: rest[0], light: rest.contains("light"), kinds: kinds.isEmpty ? StatKind.allCases : kinds)
+        exit(0)
+    }
     if rest.contains("menu-bar-strip") {
         Snapshot.writeMenuBarStrip(to: rest[0], light: rest.contains("light"))
         exit(0)
@@ -112,6 +121,18 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-wheel"), CommandLine.
     WheelProbe.run(into: CommandLine.arguments[flag + 1])
     exit(0)
 }
+if let flag = CommandLine.arguments.firstIndex(of: "--test-menu-bar-tint"), CommandLine.arguments.count > flag + 1 {
+    MenuBarRow.tintTest(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+if CommandLine.arguments.contains("--test-menu-bar-widths") {
+    MenuBarRow.widthTest()
+    exit(0)
+}
+if CommandLine.arguments.contains("--test-menu-bar-idle") {
+    MenuBarRow.idleTest()
+    exit(0)
+}
 if CommandLine.arguments.contains("--test-menu-bar-clicks") {
     MenuBarRow.clickTest()
     exit(0)
@@ -140,6 +161,14 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-nudge"), CommandLine.
 // mouse drift. Run the app bundle with `open -n`.
 if let flag = CommandLine.arguments.firstIndex(of: "--test-awake"), CommandLine.arguments.count > flag + 1 {
     AwakeController.selfTest(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+if CommandLine.arguments.contains("--test-stats-panels") {
+    StatsController.panelTest()
+    exit(0)
+}
+if CommandLine.arguments.contains("--test-stats") {
+    StatsController.selfTest()
     exit(0)
 }
 if CommandLine.arguments.contains("--test-settings") {

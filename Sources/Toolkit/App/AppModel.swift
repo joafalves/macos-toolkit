@@ -4,7 +4,7 @@ import ServiceManagement
 
 /// The tools shown in the sidebar of the main window.
 enum AppSection: String, CaseIterable, Identifiable {
-    case mouse, switcher, layout, mixer, finder, capture, awake, general
+    case mouse, switcher, layout, mixer, finder, capture, awake, stats, general
 
     var id: String { rawValue }
 
@@ -17,6 +17,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .finder: return "Finder"
         case .capture: return "Screen Capture"
         case .awake: return "Keep Awake"
+        case .stats: return "System Stats"
         case .general: return "General"
         }
     }
@@ -31,6 +32,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .finder: return .cyan
         case .capture: return .orange
         case .awake: return .brown
+        case .stats: return .green
         case .general: return .gray
         }
     }
@@ -44,6 +46,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .finder: return "folder"
         case .capture: return "camera.viewfinder"
         case .awake: return "cup.and.saucer.fill"
+        case .stats: return "gauge.with.dots.needle.50percent"
         case .general: return "gearshape"
         }
     }

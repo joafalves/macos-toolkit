@@ -8,7 +8,8 @@
   A volume slider for every app. A ⌘Tab that lists windows. Windows snapped to halves or a grid,
   from the keyboard or by dragging. Mouse settings that stick, per mouse.
   ⌘X and a better right-click menu in Finder. Screenshots and small screen recordings on ⇧⌘3/4/5.
-  A Mac that stays awake for as long as you need.
+  A Mac that stays awake for as long as you need. CPU, memory and more in the menu bar, with memory that
+  means something.
 </p>
 
 <p align="center">
@@ -21,7 +22,7 @@
   <a href="#the-menu-bar">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-strip-dark.png">
-      <img src="docs/images/menu-bar-strip-light.png" width="460" alt="The toolkit in the menu bar: its menu, Screen Capture, Keep Awake with the time left, and the Audio Mixer's volume badge side by side">
+      <img src="docs/images/menu-bar-strip-light.png" width="600" alt="The toolkit in the menu bar: its menu, CPU and memory, Screen Capture, Keep Awake with the time left, and the Audio Mixer's volume badge side by side">
     </picture>
   </a>
 </p>
@@ -100,6 +101,17 @@
       </a>
     </td>
   </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <a href="#system-stats">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/images/stats-memory-dark.png">
+          <img src="docs/images/stats-memory-light.png" width="300" alt="The System Stats memory panel: what apps need of the total, a history chart, where memory goes, pressure, swap and the top apps">
+        </picture><br>
+        <b>System Stats</b>
+      </a>
+    </td>
+  </tr>
 </table>
 
 I missed a few things from Windows and from third-party apps, and I didn't want three more apps
@@ -114,6 +126,7 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 | 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse (SteerMouse-style), plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings (CleanShot-style), with window backdrops and small H.264 files. |
+| 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar (Stats-style), with a memory figure that leaves out what macOS only caches. |
 | ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off (Amphetamine-style), with the lid closed if you like. |
 
 Each tool can be turned off or left on its macOS defaults, and anything the app changes outside
@@ -535,6 +548,47 @@ set. A session carries on if the app is restarted or the Mac reboots, until its 
   never ends one.
 - **When it ends** on its own, a sound (the default), a notification, both or neither.
 
+## System Stats
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/stats-bar-dark.png">
+    <img src="docs/images/stats-bar-light.png" width="520" alt="System Stats in the menu bar: as numbers, as pills, as small charts, and in the compact layout">
+  </picture>
+  <br><br>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/stats-cpu-dark.png">
+    <img src="docs/images/stats-cpu-light.png" width="300" alt="The CPU panel: a history chart, user and system time, each core, and the top apps">
+  </picture>
+  &nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/stats-memory-dark.png">
+    <img src="docs/images/stats-memory-light.png" width="300" alt="The memory panel">
+  </picture>
+</p>
+
+What the Mac is doing, in the menu bar: **CPU**, **memory**, **network**, **disk**, **GPU** and
+**power**. CPU and memory are on by default; turn on the others in the settings. Each stat is a
+number with its icon, a pill that fills, or a chart of the last minute, or they all go in one
+**compact** part as small labels. Click one for its last five minutes and the details.
+
+- **Memory** shows what apps need: their memory, the kernel's, and what's compressed. Most monitors
+  count everything that isn't free, but macOS fills spare memory with cached files it drops as soon
+  as an app needs room, so that figure always looks nearly full and says little. This one turns
+  yellow, then red, when macOS itself reports memory running short. Its panel shows where memory
+  goes, swap, and the apps using the most.
+- **CPU** shows the share of all cores in use, and its panel each core, grouped by kind, and the
+  apps using the most, their helpers counted in.
+- **Network** shows upload and download speed on the connection in use, **disk** the free space
+  and how fast it's read and written, and **GPU** how busy it is.
+- **Power** shows what the Mac draws, from the battery's own readings, and in its panel the GPU's
+  share, the charger, and the battery's charge, health and cycles. Some Macs only tell an admin
+  what the CPU draws; there that line is left out. Desktops have no battery readings and show what
+  the CPU and GPU draw.
+- Figures stop at 99%, so each part keeps the same width and the menu bar doesn't shift.
+- Every 2 seconds by default (1 or 5 in the settings). Only the stats in the menu bar are read, and
+  nothing at all while none are, or the tool is off. A reading of all six costs under 2 ms.
+
 ## Install
 
 Needs **macOS 15 or later**. The released app is built for Apple silicon.
@@ -616,6 +670,7 @@ Sources/Toolkit
 ├── Finder     the Finder tool
 ├── Capture    the Screen Capture tool
 ├── Awake      the Keep Awake tool
+├── Stats      the System Stats tool
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu
 scripts        build.sh, make-cert.sh, make-icon.swift

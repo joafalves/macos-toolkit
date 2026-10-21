@@ -103,7 +103,7 @@ enum AudioProcesses {
         return unsafeBitCast(symbol, to: ResponsibleFunc.self)
     }()
 
-    private static func responsiblePID(of pid: pid_t) -> pid_t? {
+    static func responsiblePID(of pid: pid_t) -> pid_t? {
         guard let pid = responsibleFunc?(pid), pid > 0 else { return nil }
         return pid
     }

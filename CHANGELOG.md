@@ -7,6 +7,11 @@ worked on; it gets its date when it's released.
 
 ### Added
 
+- **System Stats:** a new tool, in place of the Stats app. CPU, memory, network, disk, GPU and
+  power in the menu bar, each as a number, a pill or a small chart, or all in one compact part.
+  Click one for its last five minutes, the details, and for CPU and memory the apps using the most.
+- **System Stats:** memory shows what apps need, leaving out the files macOS only caches, and turns
+  yellow or red when macOS reports memory running short.
 - **Window Layout:** after a window snaps to an edge or into a layout from the ⌥ bar, the rest of the
   display offers your other windows to fill it, as Windows' Snap Assist does: click one or press
   its number. Windows from other displays can be offered too, only when there's none left here (the
@@ -17,6 +22,13 @@ worked on; it gets its date when it's released.
 - **Window Layout:** the gap starts at 8 points, macOS's own margin, and macOS's tiling margins follow
   it: with no gap, double-clicking a title bar fills the whole display. ⌃⌥↩ with a gap of up to 8
   points is macOS's own Fill.
+
+### Fixed
+
+- **Menu bar:** the toolkit's item no longer uses CPU while nothing changes. Text in it kept macOS
+  redrawing the whole item, at up to most of a core.
+- **Menu bar:** the volume percentage and Keep Awake's time keep their width as they change, so
+  the menu bar no longer shifts when a number gains or loses a digit.
 
 ## 0.11.0 (2026-10-21)
 

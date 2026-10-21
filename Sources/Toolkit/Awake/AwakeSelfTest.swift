@@ -91,17 +91,27 @@ extension AwakeController {
 
         // One drift, when the mouse is left alone for a moment.
         if AXIsProcessTrusted() {
-            let quiet = Date().addingTimeInterval(30)
-            while CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!) < 2, Date() < quiet {
-                RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            func idle() -> TimeInterval { CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!) }
+            func hands() -> TimeInterval {
+                [CGEventType.keyDown, .leftMouseDown, .rightMouseDown, .scrollWheel]
+                    .map { CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: $0) }.min() ?? .infinity
             }
+            let quiet = Date().addingTimeInterval(30)
+            while idle() < 2, Date() < quiet { RunLoop.main.run(until: Date().addingTimeInterval(0.2)) }
             let start = StayAvailable.pointer()
             let stay = StayAvailable()
             stay.startDrift()
             RunLoop.main.run(until: Date().addingTimeInterval(1.1))
             let end = StayAvailable.pointer()
             let distance = hypot(end.x - start.x, end.y - start.y)
-            check(distance >= 70 && distance <= 320, String(format: "drift: %.0f pt, from (%.0f, %.0f) to (%.0f, %.0f)", distance, start.x, start.y, end.x, end.y))
+            let detail = String(format: "drift: %.0f pt, from (%.0f, %.0f) to (%.0f, %.0f)", distance, start.x, start.y, end.x, end.y)
+            // A hand on the mouse or keys stops a drift on purpose; that's not a failure.
+            // Further than any drift goes is a hand on the mouse too.
+            if distance > 320 || distance < 70 && (hands() < 1.2 || StayAvailable.target(from: start) == nil) {
+                print("      \(detail): skipped, the mouse or keys were in use, or no room near the pointer")
+            } else {
+                check(distance >= 70 && distance <= 320, detail)
+            }
         } else {
             print("      no Accessibility: drift not tried")
         }

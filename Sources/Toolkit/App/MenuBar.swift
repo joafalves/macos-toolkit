@@ -2,7 +2,11 @@ import AppKit
 
 /// One piece of the toolkit's menu bar item.
 struct MenuBarSegment: Equatable {
-    enum Kind: Equatable { case toolkit, capture, recording, awake, mixer }
+    enum Kind: Hashable {
+        case toolkit, capture, recording, awake, mixer
+        /// One of System Stats' stats, or all of them in the compact layout.
+        case stat(StatKind), stats
+    }
 
     let kind: Kind
     /// Drawn in the menu bar's own colour, like macOS's icons.
@@ -12,11 +16,19 @@ struct MenuBarSegment: Equatable {
     var text: String?
     /// The text greyed, as for a muted volume.
     var dimText = false
+    /// The glyph and text in a colour of their own, as memory under pressure.
+    var tint: NSColor?
+    /// Small text, two lines to a column, in place of `text`.
+    var columns: [NSAttributedString]?
+    /// The widest `text` can get ("100%"): the part keeps that width, the text
+    /// to its right edge, so a digit more or less doesn't shift the menu bar.
+    var widthOf: String?
     /// For VoiceOver and the tooltip.
     var label: String
 
     static func == (a: MenuBarSegment, b: MenuBarSegment) -> Bool {
-        a.kind == b.kind && a.glyph === b.glyph && a.colored === b.colored && a.text == b.text && a.dimText == b.dimText && a.label == b.label
+        a.kind == b.kind && a.glyph === b.glyph && a.colored === b.colored && a.text == b.text && a.dimText == b.dimText
+            && a.tint == b.tint && a.columns == b.columns && a.widthOf == b.widthOf && a.label == b.label
     }
 }
 
@@ -49,6 +61,11 @@ final class MenuBarItem: NSObject {
     }
 
     var button: NSStatusBarButton? { item.button }
+
+    /// Out of the menu bar, for tests.
+    func remove() {
+        NSStatusBar.system.removeStatusItem(item)
+    }
 
     func show(_ segments: [MenuBarSegment]) {
         row.show(segments)
@@ -213,11 +230,12 @@ final class MenuBarRow: NSView {
 }
 
 /// One part: the coloured dot (recording), the icon, and the text, each a
-/// standard view, changed only when what it shows changes.
+/// view of its own, changed only when what it shows changes.
 final class MenuBarPartView: NSView {
     private let dot = NSImageView()
     private let icon = NSImageView()
-    private let label = NSTextField(labelWithString: "")
+    private let label = MenuBarText()
+    private var columns: [MenuBarText] = []
     private var shown: MenuBarSegment?
     private(set) var contentWidth: CGFloat = 0
 
@@ -225,6 +243,8 @@ final class MenuBarPartView: NSView {
     private static let labelInset: CGFloat = 2
     /// Between an icon and its text; the label's own inset adds to it.
     private static let textGap: CGFloat = 2
+    /// Between columns of small text.
+    private static let columnGap: CGFloat = 6
 
     init() {
         super.init(frame: .zero)
@@ -236,8 +256,6 @@ final class MenuBarPartView: NSView {
         // Template icons in the text colour, as macOS's own are; left alone,
         // an image view tints them fainter.
         icon.contentTintColor = .labelColor
-        label.font = Self.font
-        label.lineBreakMode = .byClipping
         addSubview(label)
     }
 
@@ -249,8 +267,16 @@ final class MenuBarPartView: NSView {
         shown = segment
         if before?.colored !== segment.colored { dot.image = segment.colored }
         if before?.glyph !== segment.glyph { icon.image = segment.glyph }
-        if before?.text != segment.text { label.stringValue = segment.text ?? "" }
-        if before?.dimText != segment.dimText { label.textColor = segment.dimText ? .secondaryLabelColor : .labelColor }
+        if before?.text != segment.text || before?.dimText != segment.dimText || before?.tint != segment.tint || before?.widthOf != segment.widthOf {
+            let style = NSMutableParagraphStyle()
+            style.alignment = segment.widthOf == nil ? .left : .right
+            label.text = NSAttributedString(string: segment.text ?? "", attributes: [
+                .font: Self.font, .foregroundColor: segment.tint ?? (segment.dimText ? NSColor.secondaryLabelColor : .labelColor),
+                .paragraphStyle: style,
+            ])
+        }
+        if before?.tint != segment.tint { icon.contentTintColor = segment.tint ?? .labelColor }
+        if before?.columns != segment.columns { showColumns(segment.columns ?? []) }
         dot.isHidden = segment.colored == nil
         icon.isHidden = segment.glyph == nil
         label.isHidden = segment.text == nil
@@ -261,17 +287,50 @@ final class MenuBarPartView: NSView {
         (superview as? MenuBarRow)?.layoutParts()
     }
 
+    private func showColumns(_ texts: [NSAttributedString]) {
+        while columns.count < texts.count {
+            let column = MenuBarText()
+            addSubview(column)
+            columns.append(column)
+        }
+        while columns.count > texts.count { columns.removeLast().removeFromSuperview() }
+        for (column, text) in zip(columns, texts) { column.text = text }
+    }
+
     /// As wide as the text with every digit at its widest, so a number
     /// changing doesn't change the width; only a digit more or less does.
     private static func width(of segment: MenuBarSegment) -> CGFloat {
         var width: CGFloat = 0
         for image in [segment.colored, segment.glyph].compactMap({ $0 }) { width += image.size.width }
         if let text = segment.text {
-            let widest = String(text.map { $0.isNumber ? "8" : $0 })
             // A label keeps a couple of points inside each edge.
-            width += (width > 0 ? textGap : 0) + NSAttributedString(string: widest, attributes: [.font: font]).size().width + labelInset * 2
+            width += (width > 0 ? textGap : 0) + widest(text, segment.widthOf, font) + labelInset * 2
+        }
+        if let columns = segment.columns, !columns.isEmpty {
+            width += (width > 0 ? textGap : 0) + columns.map(columnWidth).reduce(0, +) + columnGap * CGFloat(columns.count - 1)
         }
         return ceil(width)
+    }
+
+    /// Text as wide as it can get: its digits at their widest, and no
+    /// narrower than its template.
+    static func widest(_ text: String, _ template: String?, _ font: NSFont) -> CGFloat {
+        [text, template].compactMap { $0 }.map { string in
+            NSAttributedString(string: String(string.map { $0.isNumber ? "8" : $0 }), attributes: [.font: font]).size().width
+        }.max() ?? 0
+    }
+
+    /// The widest line of a column, each as wide as its template.
+    private static func columnWidth(_ text: NSAttributedString) -> CGFloat {
+        let font = text.length > 0 ? text.attribute(.font, at: 0, effectiveRange: nil) as? NSFont : nil
+        var widest: CGFloat = 0
+        // Runs with the same template come as one; each line is measured alone.
+        text.enumerateAttribute(MenuBarArt.widthOfKey, in: NSRange(location: 0, length: text.length)) { template, range, _ in
+            for line in (text.string as NSString).substring(with: range).split(separator: "\n") {
+                widest = max(widest, Self.widest(String(line), template as? String, font ?? MenuBarArt.smallFont))
+            }
+        }
+        return ceil(widest) + labelInset * 2
     }
 
     override func layout() {
@@ -294,9 +353,64 @@ final class MenuBarPartView: NSView {
         }
         if segment.text != nil {
             if segment.colored != nil || segment.glyph != nil { x += Self.textGap }
-            let size = label.intrinsicContentSize
+            let size = label.size
             label.frame = NSRect(x: x, y: ((height - size.height) / 2).rounded(), width: bounds.width - x - padding, height: size.height)
+            x += size.width
         }
+        if let texts = segment.columns, !texts.isEmpty {
+            if segment.colored != nil || segment.glyph != nil || segment.text != nil { x += Self.textGap }
+            for (column, text) in zip(columns, texts) {
+                let width = Self.columnWidth(text)
+                let size = column.size
+                column.frame = NSRect(x: x, y: ((height - size.height) / 2).rounded(), width: width, height: size.height)
+                x += width + Self.columnGap
+            }
+        }
+    }
+}
+
+/// Text in the menu bar, drawn by the view itself. A text field there (even a
+/// hidden one) kept macOS 27 redrawing the whole item without end, at most of
+/// a core; a view that draws its own text costs nothing until it changes.
+/// Vibrant, so its label colours follow the menu bar like the icons do.
+final class MenuBarText: NSView {
+    var text = NSAttributedString() {
+        didSet {
+            guard text != oldValue else { return }
+            var colored = false
+            text.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: text.length)) { color, _, _ in
+                if let color = color as? NSColor, color != .labelColor, color != .secondaryLabelColor { colored = true }
+            }
+            vibrant = !colored
+            needsDisplay = true
+        }
+    }
+
+    /// Off for a colour of its own: vibrancy blends it with what's behind the
+    /// menu bar, and red came out pink.
+    private var vibrant = true
+
+    /// A couple of points of room on each side, as a text field has.
+    static let inset: CGFloat = 2
+
+    var size: NSSize {
+        let bounds = text.boundingRect(with: NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude),
+                                       options: [.usesLineFragmentOrigin])
+        return NSSize(width: ceil(bounds.width) + Self.inset * 2, height: ceil(bounds.height))
+    }
+
+    override var allowsVibrancy: Bool { vibrant }
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        text.draw(with: NSRect(x: Self.inset, y: 0, width: bounds.width - Self.inset * 2, height: bounds.height),
+                  options: [.usesLineFragmentOrigin])
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
     }
 }
 
@@ -468,16 +582,18 @@ enum MenuBarArt {
     /// left, the cup and the time cut out of it. With no end it's full and
     /// holds only the cup. As wide as "8:88" with a time, so the menu bar
     /// doesn't shift as it counts down.
-    static func awakeBadge(fraction: Double, time: String?) -> NSImage {
+    static func awakeBadge(fraction: Double, time: String?, widthOf: String? = nil) -> NSImage {
         // By whole percent: finer than the minutes it changes with.
         let percent = Int((min(1, max(0, fraction)) * 100).rounded())
-        return cached("awake \(percent) \(time ?? "")") { makeAwakeBadge(fraction: Double(percent) / 100, time: time) } ?? NSImage()
+        return cached("awake \(percent) \(time ?? "") \(widthOf ?? "")") {
+            makeAwakeBadge(fraction: Double(percent) / 100, time: time, widthOf: widthOf)
+        } ?? NSImage()
     }
 
-    private static func makeAwakeBadge(fraction: Double, time: String?) -> NSImage {
+    private static func makeAwakeBadge(fraction: Double, time: String?, widthOf: String?) -> NSImage {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .bold)
         let text = time.map { NSAttributedString(string: $0, attributes: [.font: font, .foregroundColor: NSColor.black]) }
-        let widest = time.map { NSAttributedString(string: String($0.map { $0.isNumber ? "8" : $0 }), attributes: [.font: font]).size().width } ?? 0
+        let widest = time.map { MenuBarPartView.widest($0, widthOf, font) } ?? 0
         let cup = NSImage(systemSymbolName: "cup.and.heat.waves.fill", accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: 10.5, weight: .semibold))
         let cupWidth = cup?.size.width ?? 10
@@ -502,6 +618,130 @@ enum MenuBarArt {
                 NSGraphicsContext.current?.compositingOperation = .destinationOut
                 text.draw(at: NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
                 NSGraphicsContext.current?.compositingOperation = .sourceOver
+            }
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    // MARK: - System Stats
+
+    static let smallFont = NSFont.monospacedDigitSystemFont(ofSize: 9.5, weight: .medium)
+
+    /// A line of small text, in the menu bar's colour or a tint of its own,
+    /// as wide as its template, so the column doesn't shift.
+    struct Line: Equatable {
+        var text: String
+        var tint: NSColor?
+        var widthOf: String?
+    }
+
+    /// Where a column keeps each line's template.
+    static let widthOfKey = NSAttributedString.Key("dev.jalves.macos-toolkit.widthOf")
+
+    /// Up to two lines, tight enough to fill the menu bar's height together.
+    static func column(_ lines: [Line]) -> NSAttributedString {
+        let style = NSMutableParagraphStyle()
+        style.minimumLineHeight = 10.5
+        style.maximumLineHeight = 10.5
+        let text = NSMutableAttributedString()
+        for (index, line) in lines.enumerated() {
+            var attributes: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: line.tint ?? NSColor.labelColor, .paragraphStyle: style]
+            attributes[widthOfKey] = line.widthOf
+            text.append(NSAttributedString(string: (index > 0 ? "\n" : "") + line.text, attributes: attributes))
+        }
+        return text
+    }
+
+    /// A pill filled to a share, the symbol and number cut out of it, like
+    /// the volume badge. As wide as two digits, which System Stats' figures
+    /// stop at, so it doesn't shift.
+    static func fillBadge(symbol: String, fraction: Double, text: String) -> NSImage {
+        let percent = Int((min(1, max(0, fraction)) * 100).rounded())
+        return cached("fill \(symbol) \(percent) \(text)") { makeFillBadge(symbol: symbol, fraction: Double(percent) / 100, text: text) } ?? NSImage()
+    }
+
+    private static func makeFillBadge(symbol: String, fraction: Double, text: String) -> NSImage {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .bold)
+        let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: NSColor.black])
+        let widest = NSAttributedString(string: "88", attributes: [.font: font]).size().width
+        let glyph = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+        let glyphWidth = glyph?.size.width ?? 10
+        let pill = NSRect(x: 0, y: 1, width: ceil(4 + glyphWidth + 2 + widest + 4), height: 16)
+        let image = NSImage(size: NSSize(width: pill.width, height: 18), flipped: false) { _ in
+            let shape = NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2)
+            NSColor.black.withAlphaComponent(0.4).setFill()
+            shape.fill()
+            NSGraphicsContext.saveGraphicsState()
+            shape.addClip()
+            NSGraphicsContext.current?.compositingOperation = .copy
+            NSColor.black.setFill()
+            NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(fraction), height: pill.height).fill()
+            NSGraphicsContext.restoreGraphicsState()
+            if let glyph {
+                glyph.draw(in: NSRect(x: 4, y: pill.midY - glyph.size.height / 2, width: glyph.size.width, height: glyph.size.height),
+                           from: .zero, operation: .destinationOut, fraction: 1)
+            }
+            let size = string.size()
+            let area = NSRect(x: 4 + glyphWidth + 2, y: pill.minY, width: widest, height: pill.height)
+            NSGraphicsContext.current?.compositingOperation = .destinationOut
+            string.draw(at: NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    /// The last readings as a small chart after the stat's own small symbol,
+    /// so two charts side by side can be told apart: a faint area under a
+    /// line, and a second series as a dashed line. Up to `ceiling`, or the
+    /// highest reading. Made anew with each reading, so not cached; it's a few
+    /// dozen points.
+    static func sparkline(_ values: [Double], symbol: String, ceiling: Double? = nil, second: [Double]? = nil, count: Int = 30) -> NSImage {
+        let mark = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
+        let markWidth = ceil(mark?.size.width ?? 0)
+        let size = NSSize(width: markWidth + 3 + 30, height: 18)
+        let top = max(ceiling ?? max(values.max() ?? 0, second?.max() ?? 0), 1e-9)
+        let image = NSImage(size: size, flipped: false) { _ in
+            if let mark {
+                mark.draw(in: NSRect(x: 0, y: (size.height - mark.size.height) / 2, width: mark.size.width, height: mark.size.height))
+            }
+            let frame = NSRect(x: markWidth + 3.5, y: 2.5, width: 29, height: 13)
+            // A baseline, so an idle chart still reads as one.
+            NSColor.black.withAlphaComponent(0.3).setFill()
+            NSRect(x: frame.minX, y: frame.minY - 0.5, width: frame.width, height: 1).fill()
+            func path(_ values: [Double]) -> NSBezierPath? {
+                guard values.count > 1 else { return nil }
+                let step = frame.width / CGFloat(max(count - 1, 1))
+                let start = frame.maxX - step * CGFloat(values.count - 1)
+                let path = NSBezierPath()
+                for (index, value) in values.enumerated() {
+                    let point = NSPoint(x: start + step * CGFloat(index), y: frame.minY + frame.height * CGFloat(min(1, max(0, value / top))))
+                    index == 0 ? path.move(to: point) : path.line(to: point)
+                }
+                return path
+            }
+            if let line = path(values) {
+                let area = line.copy() as! NSBezierPath
+                area.line(to: NSPoint(x: frame.maxX, y: frame.minY))
+                area.line(to: NSPoint(x: frame.maxX - frame.width / CGFloat(max(count - 1, 1)) * CGFloat(values.count - 1), y: frame.minY))
+                area.close()
+                NSColor.black.withAlphaComponent(0.35).setFill()
+                area.fill()
+                NSColor.black.setStroke()
+                line.lineWidth = 1.2
+                line.lineJoinStyle = .round
+                line.stroke()
+            }
+            if let second, let line = path(second) {
+                NSColor.black.withAlphaComponent(0.6).setStroke()
+                line.lineWidth = 1
+                line.setLineDash([2, 1.5], count: 2, phase: 0)
+                line.stroke()
             }
             return true
         }
@@ -572,6 +812,120 @@ extension MenuBarRow {
         let each = (busy - idle) * 10
         print(String(format: "an update: %.2f ms of CPU (%.1f ms for 100, %.1f ms of that the loop itself); once a second that's %.3f%% of one core",
                      each, busy * 1000, idle * 1000, each / 10))
+    }
+}
+
+extension MenuBarRow {
+    /// `--test-menu-bar-idle`: a row showing each kind of part, left alone,
+    /// should cost nothing; a part whose layout keeps asking for another
+    /// layout shows here as CPU spent with nothing changing.
+    static func idleTest() {
+        _ = NSApplication.shared
+        func cpu() -> Double {
+            var usage = rusage()
+            getrusage(RUSAGE_SELF, &usage)
+            return Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1_000_000
+        }
+        let stats = StatsController.preview()
+        let cases: [(String, [MenuBarSegment])] = [
+            ("toolkit only", [MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")]),
+            ("text", [MenuBarSegment(kind: .stat(.cpu), glyph: MenuBarArt.glyph("cpu"), text: "23%", label: "CPU")]),
+            ("tinted text", [MenuBarSegment(kind: .stat(.memory), glyph: MenuBarArt.glyph("memorychip"), text: "59%", tint: .systemYellow, label: "Memory")]),
+            ("columns", [MenuBarSegment(kind: .stat(.network), columns: [MenuBarArt.column([.init(text: "↑ 48 KB/s"), .init(text: "↓ 1.2 MB/s")])], label: "Network")]),
+            ("pill", [MenuBarSegment(kind: .stat(.cpu), glyph: MenuBarArt.fillBadge(symbol: "cpu", fraction: 0.2, text: "20"), label: "CPU")]),
+            ("chart", [MenuBarSegment(kind: .stat(.cpu), glyph: MenuBarArt.sparkline([0.1, 0.3, 0.2], symbol: "cpu", ceiling: 1), text: "20%", label: "CPU")]),
+            ("all stats", stats.segments()),
+        ]
+        for (name, segments) in cases {
+            let row = MenuBarRow()
+            let window = NSWindow(contentRect: NSRect(x: -2000, y: -2000, width: 500, height: 30), styleMask: [.borderless], backing: .buffered, defer: false)
+            window.contentView?.addSubview(row)
+            window.orderFrontRegardless()
+            row.show(segments)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+            let start = cpu()
+            RunLoop.main.run(until: Date().addingTimeInterval(2))
+            print(String(format: "%@: %.1f%% of a core, left alone", name, (cpu() - start) / 2 * 100))
+            window.orderOut(nil)
+        }
+        // A real item in the menu bar, as the app has it, with each kind of part.
+        let toolkit = MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")
+        for (name, segments) in cases.dropFirst() + [("toolkit only", [])] {
+            let item = MenuBarItem()
+            item.show([toolkit] + segments.filter { $0.kind != .toolkit })
+            RunLoop.main.run(until: Date().addingTimeInterval(1))
+            let start = cpu()
+            RunLoop.main.run(until: Date().addingTimeInterval(3))
+            print(String(format: "in the menu bar, %@: %.1f%% of a core", name, (cpu() - start) / 3 * 100))
+            item.remove()
+        }
+    }
+}
+
+extension MenuBarRow {
+    /// `--test-menu-bar-tint <png>`: memory under pressure, yellow and red,
+    /// in a real menu bar item, captured to check the colours survive the
+    /// menu bar's vibrancy. Run with `open -n` for Screen Recording.
+    static func tintTest(into path: String) {
+        _ = NSApplication.shared
+        let item = MenuBarItem()
+        item.show([
+            MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit"),
+            MenuBarSegment(kind: .stat(.cpu), glyph: MenuBarArt.glyph("cpu"), text: "23%", widthOf: "99%", label: "CPU"),
+            MenuBarSegment(kind: .stat(.memory), glyph: MenuBarArt.glyph("memorychip"), text: "81%", tint: .systemYellow, widthOf: "99%", label: "Memory"),
+            MenuBarSegment(kind: .stats, columns: [MenuBarArt.column([.init(text: "CPU 23%", widthOf: "CPU 99%"), .init(text: "MEM 96%", tint: .systemRed, widthOf: "MEM 99%")])], label: "Stats"),
+        ])
+        RunLoop.main.run(until: Date().addingTimeInterval(1.5))
+        guard let window = item.button?.window else { return }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        let frame = window.frame, top = (NSScreen.screens.first?.frame.maxY ?? 0) - frame.maxY
+        task.arguments = ["-x", "-R\(Int(frame.minX)),\(Int(top)),\(Int(frame.width)),\(Int(frame.height))", path]
+        try? task.run()
+        task.waitUntilExit()
+        item.remove()
+    }
+}
+
+extension MenuBarRow {
+    /// `--test-menu-bar-widths`: a part keeps its width as its figure changes,
+    /// a digit more or less included, so the menu bar doesn't shift.
+    static func widthTest() {
+        _ = NSApplication.shared
+        var failures = 0
+        func widths(_ name: String, _ segments: [MenuBarSegment]) {
+            let row = MenuBarRow()
+            let found = segments.map { segment -> CGFloat in
+                row.show([segment])
+                return row.frame.width
+            }
+            let same = Set(found).count == 1
+            if !same { failures += 1 }
+            print((same ? "ok    " : "FAIL  ") + "\(name): " + found.map { "\(Int($0))" }.joined(separator: ", "))
+        }
+        func percent(_ kind: StatKind, _ symbol: String) -> [MenuBarSegment] {
+            [0.05, 0.42, 1].map { MenuBarSegment(kind: .stat(kind), glyph: MenuBarArt.glyph(symbol), text: StatsController.percent($0), widthOf: StatsController.widest(kind), label: "") }
+        }
+        widths("cpu", percent(.cpu, "cpu"))
+        widths("memory", percent(.memory, "memorychip"))
+        widths("power", ["7.4 W", "12 W", "120 W"].map { MenuBarSegment(kind: .stat(.power), glyph: MenuBarArt.glyph("bolt.fill"), text: $0, widthOf: StatsController.widest(.power), label: "") })
+        widths("disk", ["9 GB", "312 GB", "1.2 TB"].map { MenuBarSegment(kind: .stat(.disk), glyph: MenuBarArt.glyph("internaldrive"), text: $0, widthOf: StatsController.widest(.disk), label: "") })
+        widths("network", [("0 KB/s", "8 KB/s"), ("48 KB/s", "1.2 MB/s"), ("120 MB/s", "888 KB/s")].map { up, down in
+            MenuBarSegment(kind: .stat(.network), columns: [MenuBarArt.column([.init(text: "↑ " + up, widthOf: "↑ 888 MB/s"), .init(text: "↓ " + down, widthOf: "↓ 888 MB/s")])], label: "")
+        })
+        widths("compact", [(0.05, 0.09), (0.42, 0.61), (1, 1)].map { cpu, memory in
+            MenuBarSegment(kind: .stats, columns: [MenuBarArt.column([.init(text: "CPU " + StatsController.percent(cpu), widthOf: "CPU 99%"),
+                                                                      .init(text: "MEM " + StatsController.percent(memory), widthOf: "MEM 99%")])], label: "")
+        })
+        widths("cpu pill", [0.05, 0.42, 1].map { MenuBarSegment(kind: .stat(.cpu), glyph: MenuBarArt.fillBadge(symbol: "cpu", fraction: $0, text: "\(min(99, Int($0 * 100)))"), label: "") })
+        // Two lines with the same template are still measured one at a time.
+        let same = MenuBarArt.column([.init(text: "A 1", widthOf: "A 888"), .init(text: "A 2", widthOf: "A 888")])
+        let alone = MenuBarArt.column([.init(text: "A 1", widthOf: "A 888")])
+        widths("a column of two like lines", [MenuBarSegment(kind: .stats, columns: [same], label: ""), MenuBarSegment(kind: .stats, columns: [alone], label: "")])
+        widths("volume", ["5%", "60%", "100%"].map { MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: false), text: $0, widthOf: "100%", label: "") })
+        widths("keep awake, 10 h", ["10:00", "9:59", "0:05"].map { MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: true, beforeText: true), text: $0, widthOf: "10:00", label: "") })
+        widths("keep awake pill, 10 h", ["10:00", "9:59", "0:05"].map { MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.5, time: $0, widthOf: "10:00"), label: "") })
+        print(failures == 0 ? "all ok" : "\(failures) failed")
     }
 }
 
