@@ -75,13 +75,30 @@ final class MouseController: ObservableObject {
         refresh(force: false)
 
         // macOS re-pushes its global values now and then (wake, reconnect,
-        // System Settings changes), so keep re-asserting ours.
-        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in self?.refresh(force: false) }
+        // System Settings changes), so keep re-asserting ours. Only on the
+        // mice already found: listing them again is what costs, and a mouse
+        // coming or going is announced anyway.
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
 
     // MARK: - Devices
+
+    /// Battery levels change slowly; every so many ticks is plenty.
+    private var ticks = 0
+
+    private func tick() {
+        ticks += 1
+        // Now and then a full rescan anyway, in case a change went unannounced
+        // (some mice come back as new services after sleep).
+        if ticks % 30 == 0 { return refresh(force: false) }
+        if ticks % 15 == 0 {
+            let levels = Self.batteryLevels()
+            if levels != batteries { batteries = levels }
+        }
+        reapply(force: false)
+    }
 
     /// Rescans connected mice and applies their profiles. With `force`,
     /// settings left on "macOS" are actively put back to the system value.
@@ -107,7 +124,12 @@ final class MouseController: ObservableObject {
         }
         let levels = Self.batteryLevels()
         if levels != batteries { batteries = levels }
+        reapply(force: force)
+    }
 
+    /// The profiles onto the mice already found, and the checks that can
+    /// change without a mouse coming or going.
+    private func reapply(force: Bool) {
         for service in services where config.enabled {
             if let profile = config.profiles[service.identity.key] {
                 apply(profile, to: service, force: force)
