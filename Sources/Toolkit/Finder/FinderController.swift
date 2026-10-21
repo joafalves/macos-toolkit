@@ -49,10 +49,11 @@ final class FinderController: ObservableObject {
     private static let finder = "com.apple.finder"
 
     private var tap: EventTap?
+    /// Listens only: a tap in the path of every scroll would hold up scrolling
+    /// everywhere whenever the keys tap waits on Finder.
+    private var swipeTap: EventTap?
     private var timer: Timer?
     private let swipes = SwipeNavigator()
-    /// Whether Cut is on, for the tap's thread: the tap is also there for swipes.
-    private let cutOn = Locked(false)
 
     /// The pasteboard's change count right after the copy that ⌘X made. While
     /// the pasteboard still has that count, the next ⌘V in Finder is a move.
@@ -114,24 +115,39 @@ final class FinderController: ObservableObject {
     }
 
     private func apply() {
-        cutOn.value = config.enabled && config.cut
-        swipes.isOn.value = config.enabled && config.swipe
-        guard config.enabled, config.cut || config.swipe else { return uninstall() }
-        guard tap == nil, AXIsProcessTrusted() else { return }
-        let installed = installTap()
-        NSLog("Toolkit: finder event tap started = \(installed)")
+        let wantsKeys = config.enabled && config.cut
+        let wantsSwipes = config.enabled && config.swipe
+        swipes.isOn.value = wantsSwipes
+        if !wantsKeys { uninstallKeys() }
+        if !wantsSwipes { uninstallSwipes() }
+        let missing = (wantsKeys && tap == nil) || (wantsSwipes && swipeTap == nil)
+        guard missing, AXIsProcessTrusted() else { return }
+        var installed = true
+        if wantsKeys, tap == nil { installed = installTap() && installed }
+        if wantsSwipes, swipeTap == nil { installed = installSwipeTap() && installed }
+        NSLog("Toolkit: finder event taps started = \(installed)")
         if tapFailed == installed { tapFailed = !installed }
     }
 
     private func uninstall() {
+        uninstallKeys()
+        uninstallSwipes()
+    }
+
+    private func uninstallKeys() {
         guard let tap else { return }
         tap.stop()
         self.tap = nil
         heldKey = nil
     }
 
+    private func uninstallSwipes() {
+        swipeTap?.stop()
+        swipeTap = nil
+    }
+
     private func installTap() -> Bool {
-        tap = EventTap(name: "finder", events: [.keyDown, .keyUp, .scrollWheel]) { [weak self] type, event in
+        tap = EventTap(name: "finder-keys", events: [.keyDown, .keyUp]) { [weak self] type, event in
             // nil means "take the event": `??` here would pass it on after all.
             guard let self else { return Unmanaged.passUnretained(event) }
             return self.handle(type: type, event: event)
@@ -139,7 +155,16 @@ final class FinderController: ObservableObject {
         return tap != nil
     }
 
-    // MARK: - Keyboard and trackpad
+    private func installSwipeTap() -> Bool {
+        swipeTap = EventTap(name: "finder-swipe", events: [.scrollWheel], listenOnly: true) { [swipes] type, event in
+            // Only trackpad (and Magic Mouse) scrolling is continuous.
+            if type == .scrollWheel, event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0 { swipes.handle(event) }
+            return Unmanaged.passUnretained(event)
+        }
+        return swipeTap != nil
+    }
+
+    // MARK: - Keyboard
 
     /// On the tap's thread, which `heldKey` belongs to. The Accessibility
     /// check of Finder can take a moment; here that holds up only this tap.
@@ -147,11 +172,6 @@ final class FinderController: ObservableObject {
         let pass = Unmanaged.passUnretained(event)
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             heldKey = nil
-            return pass
-        }
-        if type == .scrollWheel {
-            // Only trackpad (and Magic Mouse) scrolling is continuous.
-            if event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0 { swipes.handle(event) }
             return pass
         }
         guard event.getIntegerValueField(.eventSourceUserData) != Self.marker else { return pass }
@@ -166,7 +186,7 @@ final class FinderController: ObservableObject {
 
         // Cmd alone: other combinations belong to Finder.
         let flags = event.flags
-        guard cutOn.value, code == Key.x || code == Key.v, flags.contains(.maskCommand),
+        guard code == Key.x || code == Key.v, flags.contains(.maskCommand),
               flags.isDisjoint(with: [.maskShift, .maskAlternate, .maskControl])
         else { return pass }
 
