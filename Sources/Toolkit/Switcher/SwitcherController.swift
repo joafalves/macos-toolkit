@@ -6,6 +6,7 @@ import ApplicationServices
 final class SwitcherController: ObservableObject {
     @Published var config: SwitcherConfig {
         didSet {
+            shortcut.value = config.shortcut
             guard config != oldValue, !isPreview else { return }
             config.save()
             apply()
@@ -32,8 +33,16 @@ final class SwitcherController: ObservableObject {
     private let previews = SwitcherPreviews()
     /// Takes new pictures while the grid is open, in Live mode.
     private var liveTimer: Timer?
-    private var tap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
+    private var tap: EventTap?
+    /// For the tap's thread: the shortcut, and the session that's on, if any
+    /// (from the shortcut until its held keys are let go). Sessions are
+    /// numbered so the main thread, ending one late, can't end the next.
+    private let shortcut = Locked(Shortcut.commandTab)
+    private let session = Locked<Int?>(nil)
+    /// The tap thread's count of sessions.
+    private var sessions = 0
+    /// The session the main thread is showing.
+    private var sessionShown: Int?
     private var timer: Timer?
 
     // The switcher is "active" from Cmd-Tab until Cmd is released.
@@ -54,6 +63,7 @@ final class SwitcherController: ObservableObject {
 
     init() {
         config = SwitcherConfig.load()
+        shortcut.value = config.shortcut
         catalog.onChange = { [weak self] in self?.refresh() }
         panel.onHover = { [weak self] in self?.select($0) }
         previews.onUpdate = { [weak self] id, image in
@@ -127,10 +137,8 @@ final class SwitcherController: ObservableObject {
     private func uninstall() {
         guard let tap else { return }
         end()
-        CGEvent.tapEnable(tap: tap, enable: false)
-        if let runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes) }
+        tap.stop()
         self.tap = nil
-        runLoopSource = nil
         catalog.stop()
         CGSSetSymbolicHotKeyEnabled(1, true)
         CGSSetSymbolicHotKeyEnabled(2, true)
@@ -139,42 +147,33 @@ final class SwitcherController: ObservableObject {
     }
 
     private func installTap() -> Bool {
-        let mask = CGEventMask(1 << CGEventType.keyDown.rawValue | 1 << CGEventType.keyUp.rawValue | 1 << CGEventType.flagsChanged.rawValue)
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: mask,
-            callback: { _, type, event, refcon in
-                let controller = Unmanaged<SwitcherController>.fromOpaque(refcon!).takeUnretainedValue()
-                return controller.handle(type: type, event: event)
-            },
-            userInfo: Unmanaged.passUnretained(self).toOpaque()
-        ) else { return false }
-
-        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
-        self.tap = tap
-        runLoopSource = source
-        return true
+        tap = EventTap(name: "switcher", events: [.keyDown, .keyUp, .flagsChanged]) { [weak self] type, event in
+            self?.handle(type: type, event: event) ?? Unmanaged.passUnretained(event)
+        }
+        return tap != nil
     }
 
     // MARK: - Keyboard
 
+    /// On the tap's thread: decides what to take from `session` and
+    /// `shortcut` alone, and hands everything the switcher does to the main
+    /// thread, in order.
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
+        func main(_ work: @escaping (SwitcherController) -> Void) {
+            DispatchQueue.main.async { [weak self] in if let self { work(self) } }
+        }
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             // The release of Cmd may have been among the events we missed.
-            end()
+            if session.update({ on in defer { on = nil }; return on != nil }) { main { $0.end() } }
             return pass
         }
+        let active = session.value != nil
         // A shortcut is being typed into the settings.
         if ShortcutRecording.active, !active { return pass }
         let flags = event.flags
         let code = event.getIntegerValueField(.keyboardEventKeycode)
-        let shortcut = config.shortcut
+        let shortcut = self.shortcut.value
         // The shortcut's ⌘ ⌥ ⌃ are what hold the list open. ⇧ goes backwards,
         // unless the shortcut itself has ⇧.
         let held = shortcut.cgFlags.subtracting(.maskShift)
@@ -187,21 +186,32 @@ final class SwitcherController: ObservableObject {
             guard type == .keyDown, code == Int64(shortcut.keyCode), flags.intersection(holding) == held,
                   shiftReverses || flags.contains(.maskShift)
             else { return pass }
-            begin(backwards: shiftReverses && flags.contains(.maskShift))
+            sessions += 1
+            let number = sessions
+            session.value = number
+            let backwards = shiftReverses && flags.contains(.maskShift)
+            main {
+                $0.sessionShown = number
+                $0.begin(backwards: backwards)
+            }
             return nil
         }
 
         // The held keys are what keep the switcher open. Checking them on every
         // event means a missed release can never leave the keyboard swallowed.
         guard flags.contains(held) else {
-            if type == .flagsChanged { confirm() } else { end() }
+            session.value = nil
+            if type == .flagsChanged { main { $0.confirm() } } else { main { $0.end() } }
             return pass
         }
         if type == .keyDown {
             if code == Int64(shortcut.keyCode) {
-                move(by: shiftReverses && flags.contains(.maskShift) ? -1 : 1)
+                let step = shiftReverses && flags.contains(.maskShift) ? -1 : 1
+                main { $0.move(by: step) }
             } else {
-                keyDown(code, shift: flags.contains(.maskShift), isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0)
+                let shift = flags.contains(.maskShift)
+                let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+                main { $0.keyDown(code, shift: shift, isRepeat: isRepeat) }
             }
         }
         // Keys pressed while the switcher is open must not reach the app behind
@@ -295,6 +305,10 @@ final class SwitcherController: ObservableObject {
     /// Closes the switcher without switching.
     private func end() {
         active = false
+        // Only the session this one showed: the tap may have started the next.
+        let shown = sessionShown
+        session.update { if $0 == shown { $0 = nil } }
+        sessionShown = nil
         reveal?.cancel()
         reveal = nil
         stopPreviews()

@@ -109,7 +109,9 @@ final class ActivityMonitor {
     private let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
     private var keys: [UnsafeMutableRawPointer: String] = [:]
 
-    private(set) var lastActiveKey: String?
+    /// Read by the wheel tap on its own thread.
+    private let active = Locked<String?>(nil)
+    var lastActiveKey: String? { active.value }
     /// True when macOS refused to let us listen to at least one mouse
     /// (it requires Input Monitoring for devices that also report keys).
     private(set) var listeningDenied = false
@@ -150,7 +152,7 @@ final class ActivityMonitor {
         IOHIDDeviceRegisterInputValueCallback(device, { context, _, sender, _ in
             guard let context, let sender else { return }
             let monitor = Unmanaged<ActivityMonitor>.fromOpaque(context).takeUnretainedValue()
-            if let key = monitor.keys[sender] { monitor.lastActiveKey = key }
+            if let key = monitor.keys[sender] { monitor.active.value = key }
         }, Unmanaged.passUnretained(self).toOpaque())
     }
 

@@ -1,9 +1,10 @@
 import AppKit
 
-/// Notices when a window is being dragged by the mouse. It only listens, so
-/// it never holds up a click, and it costs nothing while the mouse is still:
-/// the window under the pointer is looked up once a drag starts, and its
-/// position checked a few times until it moves, is resized, or the drag ends.
+/// Notices when a window is being dragged by the mouse, on a thread of its
+/// own. It only listens unless the edge hold is on, and it costs nothing
+/// while the mouse is still: the window under the pointer is looked up once a
+/// drag starts, and its position checked a few times until it moves, is
+/// resized, or the drag ends. What it notices is handed to the main thread.
 final class DragWatcher {
     struct Grab {
         let id: CGWindowID
@@ -15,6 +16,7 @@ final class DragWatcher {
         var pointer: CGPoint?
     }
 
+    // Called on the main thread.
     /// A window started moving with the mouse.
     var onStart: ((Grab) -> Void)?
     /// The pointer moved or a modifier changed while it moves. Core Graphics coordinates.
@@ -23,15 +25,19 @@ final class DragWatcher {
     var onDrop: ((CGPoint, CGEventFlags) -> Void)?
     /// The drag was lost track of.
     var onCancel: (() -> Void)?
-    /// While a window moves: the displays to hold the pointer at the edges
-    /// of, or nil not to. Only asked by an `active` watcher.
-    var holdDisplays: (() -> [LayoutDisplay]?)?
+
+    /// The displays to hold the pointer at the edges of while a window
+    /// moves, or nil not to. Set by the main thread; only an `active`
+    /// watcher acts on it.
+    let holdDisplays = Locked<[LayoutDisplay]?>(nil)
+
+    // The rest belongs to the tap's thread.
     private var hold = EdgeHold()
     /// macOS has been told to stop moving the cursor. Never left so: every
     /// click, release, restart and quiet second puts it back.
     private var frozen = false
     private var heldAt: CGPoint?
-    private var thaw: DispatchWorkItem?
+    private var thaw: Timer?
 
     private enum State {
         case idle
@@ -43,70 +49,72 @@ final class DragWatcher {
     }
 
     private var state = State.idle
-    private var tap: CFMachPort?
-    private var source: CFRunLoopSource?
+    private var tap: EventTap?
 
     var isRunning: Bool { tap != nil }
     /// In the path of the events rather than beside it, so it can hold the
-    /// pointer back. Only while that setting is on: every click then waits
-    /// for this, briefly.
+    /// pointer back. Only while that setting is on.
     private(set) var active = false
 
     func start(active: Bool) -> Bool {
         if tap != nil, active == self.active { return true }
         stop()
         self.active = active
-        let types: [CGEventType] = [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .flagsChanged]
-        let mask = types.reduce(CGEventMask(0)) { $0 | 1 << CGEventMask($1.rawValue) }
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .tailAppendEventTap,
-            options: active ? .defaultTap : .listenOnly,
-            eventsOfInterest: mask,
-            callback: { _, type, event, refcon in
-                Unmanaged<DragWatcher>.fromOpaque(refcon!).takeUnretainedValue().handle(type, event)
-                return Unmanaged.passUnretained(event)
-            },
-            userInfo: Unmanaged.passUnretained(self).toOpaque()
-        ) else { return false }
-        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
-        self.tap = tap
-        self.source = source
-        return true
+        tap = EventTap(name: "drags", events: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .flagsChanged],
+                       place: .tailAppendEventTap, listenOnly: !active) { [weak self] type, event in
+            self?.handle(type, event)
+            return Unmanaged.passUnretained(event)
+        }
+        return tap != nil
     }
 
     func stop() {
-        release()
         guard let tap else { return }
-        if case .moving = state { onCancel?() }
-        state = .idle
-        CGEvent.tapEnable(tap: tap, enable: false)
-        if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
         self.tap = nil
-        source = nil
+        // Finished on the tap's own thread, in order with its events.
+        tap.perform { [self] in
+            releaseCursor()
+            if case .moving = state { main { $0.onCancel?() } }
+            state = .idle
+            tap.stop()
+        }
+        // In case the thread is gone before it gets there.
+        CGAssociateMouseAndMouseCursorPosition(1)
+    }
+
+    /// Lets the cursor move again, if it was stopped. For Esc.
+    func release() {
+        tap?.perform { [weak self] in self?.releaseCursor() }
+    }
+
+    private func main(_ work: @escaping (DragWatcher) -> Void) {
+        DispatchQueue.main.async { [weak self] in if let self { work(self) } }
     }
 
     private func handle(_ type: CGEventType, _ event: CGEvent) {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            release()
-            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            if case .moving = state { onCancel?() }
+            releaseCursor()
+            if case .moving = state { main { $0.onCancel?() } }
             state = .idle
         case .leftMouseDown:
-            release()
+            releaseCursor()
             hold = EdgeHold()
             state = .pressed(event.location)
         case .leftMouseDragged:
             dragged(event)
         case .leftMouseUp:
-            release()
-            if case .moving = state { onDrop?(event.location, event.flags) }
+            releaseCursor()
+            if case .moving = state {
+                let (location, flags) = (event.location, event.flags)
+                main { $0.onDrop?(location, flags) }
+            }
             state = .idle
         case .flagsChanged:
-            if case .moving = state, let location = CGEvent(source: nil)?.location { onMove?(location, event.flags) }
+            if case .moving = state, let location = CGEvent(source: nil)?.location {
+                let flags = event.flags
+                main { $0.onMove?(location, flags) }
+            }
         default:
             break
         }
@@ -133,14 +141,18 @@ final class DragWatcher {
                 state = .ignored
             } else if abs(frame.minX - grab.frame.minX) > 2 || abs(frame.minY - grab.frame.minY) > 2 {
                 state = .moving
-                onStart?(Grab(id: grab.id, pid: grab.pid, frame: frame, pointer: event.location))
-                onMove?(event.location, event.flags)
+                let moved = Grab(id: grab.id, pid: grab.pid, frame: frame, pointer: event.location)
+                let (location, flags) = (event.location, event.flags)
+                main {
+                    $0.onStart?(moved)
+                    $0.onMove?(location, flags)
+                }
             } else {
                 state = .watching(grab, lastCheck: now)
             }
         case .moving:
             var location = event.location
-            if active, let displays = holdDisplays?() {
+            if active, let displays = holdDisplays.value {
                 let delta = CGVector(dx: event.getDoubleValueField(.mouseEventDeltaX), dy: event.getDoubleValueField(.mouseEventDeltaY))
                 switch hold.step(location, delta: delta, in: displays) {
                 case .free:
@@ -158,12 +170,13 @@ final class DragWatcher {
                         event.location = point
                         location = point
                     }
-                    release()
+                    releaseCursor()
                 }
             } else {
-                release()
+                releaseCursor()
             }
-            onMove?(location, event.flags)
+            let flags = event.flags
+            main { $0.onMove?(location, flags) }
         case .idle, .ignored:
             break
         }
@@ -182,15 +195,14 @@ final class DragWatcher {
             frozen = true
         }
         // A drag whose end was missed must not leave the cursor stopped.
-        thaw?.cancel()
-        let thaw = DispatchWorkItem { [weak self] in self?.release() }
+        thaw?.invalidate()
+        let thaw = Timer(timeInterval: 1, repeats: false) { [weak self] _ in self?.releaseCursor() }
+        RunLoop.current.add(thaw, forMode: .common)
         self.thaw = thaw
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: thaw)
     }
 
-    /// Lets the cursor move again, if it was stopped. Also for Esc.
-    func release() {
-        thaw?.cancel()
+    private func releaseCursor() {
+        thaw?.invalidate()
         thaw = nil
         heldAt = nil
         guard frozen else { return }

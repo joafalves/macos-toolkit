@@ -115,11 +115,13 @@ struct Shortcut: Codable, Equatable {
 /// shortcuts through, so pressing ⇧⌘4 or ⌘Tab records it instead.
 enum ShortcutRecording {
     static let changed = Notification.Name("dev.jalves.macos-toolkit.shortcut-recording")
-    private(set) static var active = false
+    /// Read by event taps on their own threads.
+    private static let state = Locked(false)
+    static var active: Bool { state.value }
 
     static func set(_ on: Bool) {
         guard on != active else { return }
-        active = on
+        state.value = on
         NotificationCenter.default.post(name: changed, object: nil)
     }
 }

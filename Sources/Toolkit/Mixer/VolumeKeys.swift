@@ -12,8 +12,9 @@ enum VolumeKey {
 final class VolumeKeys {
     private unowned let mixer: MixerController
     private let hud = VolumeHUD()
-    private var tap: CFMachPort?
-    private var source: CFRunLoopSource?
+    private var tap: EventTap?
+    /// Whether keys are taken now, kept by the main thread for the tap's.
+    private let catching = Locked(false)
 
     /// Whether the keys are meant to be caught right now.
     private(set) var wanted = false
@@ -32,6 +33,7 @@ final class VolumeKeys {
 
     func setWanted(_ wanted: Bool) {
         self.wanted = wanted
+        catching.value = wanted && mixer.handlesVolumeKeys
         sync()
     }
 
@@ -50,39 +52,22 @@ final class VolumeKeys {
     }
 
     private func install() -> Bool {
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(1 << Self.systemDefined),
-            callback: { _, type, event, refcon in
-                let keys = Unmanaged<VolumeKeys>.fromOpaque(refcon!).takeUnretainedValue()
-                return keys.handle(type: type, event: event)
-            },
-            userInfo: Unmanaged.passUnretained(self).toOpaque()
-        ) else { return false }
-        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
-        self.tap = tap
-        self.source = source
-        return true
+        tap = EventTap(name: "volume-keys", events: [CGEventType(rawValue: Self.systemDefined)!]) { [weak self] type, event in
+            self?.handle(type: type, event: event) ?? Unmanaged.passUnretained(event)
+        }
+        return tap != nil
     }
 
     private func uninstall() {
-        if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
-        if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+        tap?.stop()
         tap = nil
-        source = nil
     }
 
+    /// On the tap's thread: decides from `catching`, and leaves the volume and
+    /// the bar to the main thread.
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            return pass
-        }
-        guard type.rawValue == Self.systemDefined, wanted, mixer.handlesVolumeKeys,
+        guard type.rawValue == Self.systemDefined, catching.value,
               let ns = NSEvent(cgEvent: event), ns.type == .systemDefined, ns.subtype.rawValue == 8
         else { return pass }
 
@@ -105,8 +90,12 @@ final class VolumeKeys {
         // Both the press and the release are taken, or macOS would see half a key.
         guard isDown, !(key == .mute && isRepeat) else { return nil }
         // Shift and Option together: fine steps, like macOS.
-        mixer.volumeKey(key, fine: flags.contains(.maskAlternate) && flags.contains(.maskShift))
-        hud.show(volume: mixer.mainVolume, muted: mixer.mainMuted)
+        let fine = flags.contains(.maskAlternate) && flags.contains(.maskShift)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.mixer.volumeKey(key, fine: fine)
+            self.hud.show(volume: self.mixer.mainVolume, muted: self.mixer.mainMuted)
+        }
         return nil
     }
 }

@@ -83,6 +83,16 @@ if CommandLine.arguments.contains("--test-recording") {
     CaptureController.recordingTest()
     exit(0)
 }
+// Development aid: `--test-taps [report]`, the event taps keep up while the
+// main thread is stuck. Run the app bundle with `open -n` so Accessibility is
+// the app's own; the report goes to the file.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-taps") {
+    let path = CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil
+    if let path { freopen(path, "w", stdout) }
+    EventTap.selfTest()
+    fflush(stdout)
+    exit(0)
+}
 // `--test-overlay [png]`: the capture overlay's memory, and optionally a
 // picture of it (run the app bundle with `open -n` for that).
 if let flag = CommandLine.arguments.firstIndex(of: "--test-overlay") {

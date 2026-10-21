@@ -10,7 +10,7 @@ final class FinderController: ObservableObject {
         didSet {
             guard config != oldValue else { return }
             if persists { config.save() }
-            if !config.enabled || !config.cut { cutMark = nil }
+            if !config.enabled || !config.cut { cutMark.value = nil }
             apply()
         }
     }
@@ -47,13 +47,12 @@ final class FinderController: ObservableObject {
     private static let marker: Int64 = 0x46494E44
     private static let finder = "com.apple.finder"
 
-    private var tap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
+    private var tap: EventTap?
     private var timer: Timer?
 
     /// The pasteboard's change count right after the copy that ⌘X made. While
     /// the pasteboard still has that count, the next ⌘V in Finder is a move.
-    private var cutMark: Int?
+    private let cutMark = Locked<Int?>(nil)
     /// The key whose press we took, so its repeats and its release are taken too.
     private var heldKey: Int64?
 
@@ -120,41 +119,25 @@ final class FinderController: ObservableObject {
 
     private func uninstall() {
         guard let tap else { return }
-        CGEvent.tapEnable(tap: tap, enable: false)
-        if let runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes) }
+        tap.stop()
         self.tap = nil
-        runLoopSource = nil
         heldKey = nil
     }
 
     private func installTap() -> Bool {
-        let mask = CGEventMask(1 << CGEventType.keyDown.rawValue | 1 << CGEventType.keyUp.rawValue)
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: mask,
-            callback: { _, type, event, refcon in
-                let controller = Unmanaged<FinderController>.fromOpaque(refcon!).takeUnretainedValue()
-                return controller.handle(type: type, event: event)
-            },
-            userInfo: Unmanaged.passUnretained(self).toOpaque()
-        ) else { return false }
-
-        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
-        self.tap = tap
-        runLoopSource = source
-        return true
+        tap = EventTap(name: "finder-keys", events: [.keyDown, .keyUp]) { [weak self] type, event in
+            self?.handle(type: type, event: event) ?? Unmanaged.passUnretained(event)
+        }
+        return tap != nil
     }
 
     // MARK: - Keyboard
 
+    /// On the tap's thread, which `heldKey` belongs to. The Accessibility
+    /// check of Finder can take a moment; here that holds up only this tap.
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             heldKey = nil
             return pass
         }
@@ -181,11 +164,12 @@ final class FinderController: ObservableObject {
         if code == Key.x {
             cut()
         } else {
-            guard let mark = cutMark, mark == NSPasteboard.general.changeCount else {
-                cutMark = nil
-                return pass
+            let changes = NSPasteboard.general.changeCount
+            let pending = cutMark.update { mark -> Bool in
+                defer { mark = nil }
+                return mark == changes
             }
-            cutMark = nil
+            guard pending else { return pass }
             Self.post(key: Key.v, flags: [.maskCommand, .maskAlternate])
         }
         heldKey = code
@@ -194,7 +178,7 @@ final class FinderController: ObservableObject {
 
     /// Copies the selection, and remembers that it was meant as a cut.
     private func cut() {
-        cutMark = nil
+        cutMark.value = nil
         let pasteboard = NSPasteboard.general
         let before = pasteboard.changeCount
         Self.post(key: Key.c, flags: .maskCommand)
@@ -205,7 +189,7 @@ final class FinderController: ObservableObject {
             guard let self, pasteboard.changeCount != before,
                   pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
             else { return }
-            self.cutMark = pasteboard.changeCount
+            self.cutMark.value = pasteboard.changeCount
             NSSound(named: "Pop")?.play()
         }
     }

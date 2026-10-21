@@ -103,10 +103,7 @@ final class LayoutController: ObservableObject {
         drags.onMove = { [weak self] point, flags in self?.dragMoved(point, flags) }
         drags.onDrop = { [weak self] point, flags in self?.dropped(point, flags) }
         drags.onCancel = { [weak self] in self?.dragCancelled() }
-        drags.holdDisplays = { [weak self] in
-            guard let self, self.config.holdAtEdges, let session = self.drag, session.eligible != false, !session.cancelled else { return nil }
-            return self.displays
-        }
+
     }
 
     static func preview() -> LayoutController {
@@ -528,6 +525,8 @@ final class LayoutController: ObservableObject {
 
     func dragStarted(_ grab: DragWatcher.Grab) {
         drag = DragSession(grab: grab)
+        // The watcher holds at display edges, on its own thread, from now on.
+        drags.holdDisplays.value = config.holdAtEdges ? displays : nil
         watchEscape()
         let restore = config.restoreOnDragOut
         work.async {
@@ -535,6 +534,7 @@ final class LayoutController: ObservableObject {
                 DispatchQueue.main.async {
                     guard self.drag?.grab.id == grab.id else { return }
                     self.drag?.eligible = false
+                    self.drags.holdDisplays.value = nil
                     self.dragOverlay.hide()
                 }
                 return
@@ -645,6 +645,7 @@ final class LayoutController: ObservableObject {
         dragMoved(point, flags)
         dragOverlay.hide()
         stopWatchingEscape()
+        drags.holdDisplays.value = nil
         guard let session = drag else { return }
         drag = nil
         guard session.eligible != false, !session.cancelled, let target = session.target else { return }
@@ -659,6 +660,7 @@ final class LayoutController: ObservableObject {
 
     private func dragCancelled() {
         drag = nil
+        drags.holdDisplays.value = nil
         dragOverlay.hide()
         stopWatchingEscape()
     }
@@ -669,6 +671,7 @@ final class LayoutController: ObservableObject {
         let handle: (NSEvent) -> Void = { [weak self] event in
             guard event.keyCode == UInt16(kVK_Escape), let self, self.drag != nil else { return }
             self.drag?.cancelled = true
+            self.drags.holdDisplays.value = nil
             self.drag?.target = nil
             self.drags.release()
             self.dragOverlay.hide()

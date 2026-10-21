@@ -9,10 +9,11 @@ final class WheelEngine {
     private static let marker: Int64 = 0x54494C4C
 
     /// Returns the profile of the mouse that is scrolling, if it has one.
+    /// Called on the tap's thread, so it must be safe there.
     var profileProvider: () -> Profile? = { nil }
 
-    private var tap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
+    /// Everything below, the smoothing included, lives on the tap's thread.
+    private var tap: EventTap?
 
     // Smooth scrolling: distance still to be delivered, in pixels.
     private var remainingX = 0.0
@@ -31,35 +32,15 @@ final class WheelEngine {
     @discardableResult
     func start() -> Bool {
         if tap != nil { return true }
-        let mask = CGEventMask(1 << CGEventType.scrollWheel.rawValue)
-            | CGEventMask(1 << CGEventType.otherMouseDown.rawValue)
-            | CGEventMask(1 << CGEventType.otherMouseUp.rawValue)
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: mask,
-            callback: { _, type, event, refcon in
-                let engine = Unmanaged<WheelEngine>.fromOpaque(refcon!).takeUnretainedValue()
-                return engine.handle(type: type, event: event)
-            },
-            userInfo: Unmanaged.passUnretained(self).toOpaque()
-        ) else { return false }
-
-        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
-        self.tap = tap
-        runLoopSource = source
-        return true
+        tap = EventTap(name: "wheel", events: [.scrollWheel, .otherMouseDown, .otherMouseUp]) { [weak self] type, event in
+            self?.handle(type: type, event: event) ?? Unmanaged.passUnretained(event)
+        }
+        return tap != nil
     }
 
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            return pass
-        }
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { return pass }
         if type == .otherMouseDown || type == .otherMouseUp {
             return handleButton(type: type, event: event) ? nil : pass
         }
@@ -159,7 +140,8 @@ final class WheelEngine {
         guard timer == nil else { return }
         lastTick = CACurrentMediaTime()
         let timer = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] _ in self?.tick() }
-        RunLoop.main.add(timer, forMode: .common)
+        // On the tap's thread, with the rest of the smoothing.
+        RunLoop.current.add(timer, forMode: .common)
         self.timer = timer
     }
 

@@ -33,6 +33,11 @@ worked on; it gets its date when it's released.
 - **Settings window:** let go of when it's closed, and it opens again where it was.
 - **Screen Capture:** a cleaner selection: a crisp edge, round knobs at the corners, pills on the
   sides, and the size in a pill under the corner.
+- **Every tool that reads the keyboard or mouse** (Window Switcher, Finder, Mouse Settings, Audio
+  Mixer's volume keys, Window Layout's dragging) does so on a thread of its own, so a busy moment in
+  the toolkit can no longer hold up typing or scrolling.
+- **Window Switcher:** finds windows on other Spaces with a fifth of the work at login and when apps
+  open.
 - **Mouse Settings:** looks for mice only when one comes or goes (and once a minute), and reads
   battery levels every half minute, so it uses less CPU while idle.
 

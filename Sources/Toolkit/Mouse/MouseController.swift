@@ -124,6 +124,7 @@ final class MouseController: ObservableObject {
         }
         let levels = Self.batteryLevels()
         if levels != batteries { batteries = levels }
+        updateWheelChoice()
         reapply(force: force)
     }
 
@@ -260,15 +261,31 @@ final class MouseController: ObservableObject {
 
     // MARK: - Wheel
 
+    /// What the wheel tap needs to pick a profile, kept by the main thread
+    /// for the tap's own: the connected mice and their profiles.
+    private struct WheelChoice {
+        var enabled = false
+        var connected: [String] = []
+        var profiles: [String: Profile] = [:]
+    }
+
+    private let wheelChoice = Locked(WheelChoice())
+
+    private func updateWheelChoice() {
+        wheelChoice.value = WheelChoice(enabled: config.enabled, connected: devices.filter(\.connected).map(\.id), profiles: config.profiles)
+    }
+
+    /// On the wheel tap's thread.
     private func wheelProfile() -> Profile? {
-        guard config.enabled else { return nil }
-        let connected = devices.filter(\.connected)
-        if connected.count == 1 { return config.profiles[connected[0].id] }
-        if let key = monitor.lastActiveKey, connected.contains(where: { $0.id == key }) {
-            return config.profiles[key]
+        let choice = wheelChoice.value
+        guard choice.enabled else { return nil }
+        let connected = choice.connected
+        if connected.count == 1 { return choice.profiles[connected[0]] }
+        if let key = monitor.lastActiveKey, connected.contains(key) {
+            return choice.profiles[key]
         }
         // Can't tell the mice apart: only act when just one of them wants changes.
-        let candidates = connected.compactMap { config.profiles[$0.id] }.filter(\.needsEventTap)
+        let candidates = connected.compactMap { choice.profiles[$0] }.filter(\.needsEventTap)
         return candidates.count == 1 ? candidates[0] : nil
     }
 

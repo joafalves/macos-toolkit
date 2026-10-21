@@ -58,6 +58,10 @@ tool; keep it in step with the code.
 - **`@State` does not compile** here: in the macOS 27 SDK it is a macro and the Command Line Tools lack
   its plugin. Use `@StateObject private var x = ViewState(value)` instead (`ViewState` is in
   `Components.swift`). `@GestureState` and `@StateObject` are fine.
+- **Event taps** go through `EventTap` (`App/EventTap.swift`), which runs each on a thread of its
+  own: a tap in the path of the events holds up every key or click until it returns. The callback
+  decides from state it owns or from `Locked` values the main thread keeps current, and hands
+  anything else to the main queue; it never reads a controller's main-thread state directly.
 - Clean up after yourself: anything the app changes outside itself (Cmd-Tab, the screenshot keys,
   macOS's window tiling, device properties, Core Audio taps) is restored on quit, on `kill`, and at the next launch if the
   app crashed.
@@ -87,6 +91,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-recording        # the app's recording path: start, stop button, discard
 .build/debug/Toolkit --test-layout [report]  # geometry, then a helper's windows placed for real (run with open -n)
 .build/debug/Toolkit --measure-idle <file>   # memory idle, with the settings window, and after (run with open -n, app quit first)
+.build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)
 .build/debug/Toolkit --test-shortcuts        # config migration, and which macOS screenshot shortcuts clash
 .build/debug/Toolkit --test-toolbar          # the capture toolbar's panel against its content
 .build/debug/Toolkit --test-overlay [png]    # what the capture overlay costs in memory; with open -n, a picture of it
