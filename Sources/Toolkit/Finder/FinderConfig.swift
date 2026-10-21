@@ -7,6 +7,9 @@ struct FinderConfig: Codable, Equatable {
     /// ⌘X in Finder, or Cut in its right-click menu, marks the selection to be
     /// moved by the next ⌘V.
     var cut = true
+    /// A two-finger horizontal swipe on the trackpad goes back or forward, in
+    /// Finder and in System Settings.
+    var swipe = true
     // Right-click menu items. The Finder extension reads these keys too.
     var newTextFile = true
     var openInTerminal = true
@@ -20,6 +23,7 @@ struct FinderConfig: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
         cut = try c.decodeIfPresent(Bool.self, forKey: .cut) ?? true
+        swipe = try c.decodeIfPresent(Bool.self, forKey: .swipe) ?? true
         newTextFile = try c.decodeIfPresent(Bool.self, forKey: .newTextFile) ?? true
         openInTerminal = try c.decodeIfPresent(Bool.self, forKey: .openInTerminal) ?? true
         terminal = try c.decodeIfPresent(String.self, forKey: .terminal) ?? ""

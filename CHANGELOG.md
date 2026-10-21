@@ -3,6 +3,14 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.13.0 (unreleased)
+
+### Added
+
+- **Finder:** swipe two fingers right on the trackpad to go back and left to go forward, as in a
+  browser, in Finder and System Settings. A swipe over something that can still scroll sideways,
+  like the column view, scrolls it until it reaches the edge.
+
 ## 0.12.0 (2026-10-21)
 
 ### Added
