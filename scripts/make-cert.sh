@@ -10,6 +10,10 @@ if security find-identity -p codesigning | grep -q "\"$NAME\""; then
   exit 0
 fi
 
+# macOS's LibreSSL, not a Homebrew OpenSSL 3+ earlier in PATH: those export
+# PKCS12 files that `security import` rejects ("MAC verification failed").
+OPENSSL=/usr/bin/openssl
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -26,9 +30,9 @@ keyUsage = critical,digitalSignature
 extendedKeyUsage = critical,codeSigning
 CNF
 
-openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+"$OPENSSL" req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -keyout "$TMP/key.pem" -out "$TMP/cert.pem" -config "$TMP/cert.cnf" 2>/dev/null
-openssl pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" \
+"$OPENSSL" pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" \
   -out "$TMP/id.p12" -name "$NAME" -passout pass:toolkit 2>/dev/null
 security import "$TMP/id.p12" -k "$HOME/Library/Keychains/login.keychain-db" \
   -P toolkit -T /usr/bin/codesign
