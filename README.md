@@ -530,6 +530,6 @@ scripts        build.sh, make-cert.sh, make-icon.swift
 docs/images    the screenshots above
 ```
 
-A tool is a controller plus a config, stored as JSON. [`AGENTS.md`](AGENTS.md) has the conventions,
+What each version added and fixed is in [`CHANGELOG.md`](CHANGELOG.md). A tool is a controller plus a config, stored as JSON. [`AGENTS.md`](AGENTS.md) has the conventions,
 the dev flags (`--snapshot` renders any page to an image, `--list-windows` and `--list-audio` print
 what the tools see, `--test-capture` runs the screenshot and recording code without the UI, `--test-layout` places a helper's windows), and how versions and releases are made.

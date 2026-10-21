@@ -32,6 +32,7 @@ tool; keep it in step with the code.
 - `Sources/Toolkit/UI/Components.swift`: shared settings-page building blocks (`Page`, `Card`,
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
 - `Resources`: `Info.plist` (the only place the version lives), app icon.
+- `CHANGELOG.md`: what each version adds, changes and fixes (see Versions and releases).
 - `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `make-icon.swift`.
 - `docs/images`: the README's screenshots. **None of them is a screenshot of the desktop**: every
   one is rendered from the app's own views with `--snapshot`, through the tools' `preview()`
@@ -105,19 +106,32 @@ indicator, so run them only when needed.
 Version `X.Y.Z` follows semver: a new tool or user-visible feature bumps the minor (`0.2.0`), a fix
 bumps the patch (`0.1.2`).
 
-**Every change that ships a new version updates all of these together:**
+**The version being worked on** is the one after the last release: the next minor by default
+(`0.9.0` after `0.8.0`), a major only when the user says so. From the first change after a release:
 
-1. `Resources/Info.plist`: `CFBundleShortVersionString` to `X.Y.Z`, and `CFBundleVersion` up by one
-   (a plain integer build number, never reset).
-2. The version text shown in the app: **General** page header ("Version X.Y.Z") reads
-   `CFBundleShortVersionString`, so it follows the plist; don't hard-code a version anywhere else.
-   Search for the old version with `grep -rIn "<old>" . --exclude-dir=.git --exclude-dir=.build --exclude-dir=build`
-   and update any other hit (README, docs).
+- `Resources/Info.plist` carries it: `CFBundleShortVersionString` to `X.Y.Z`, and `CFBundleVersion`
+  up by one (a plain integer build number, never reset). The **General** page header reads
+  `CFBundleShortVersionString`, so don't hard-code a version anywhere else.
+- `CHANGELOG.md` has it at the top as `## X.Y.Z (unreleased)`.
+
+**`CHANGELOG.md` maps every version.** Each user-visible change goes into the top entry in the same
+commit as the change, under `### Added`, `### Changed` or `### Fixed`, starting with the bold tool
+name (`- **Window Layout:** …`) and kept to a line or two, in the README's plain voice. Internal-only
+changes (refactors, dev flags, tests) stay out.
+
+**A release** of the version being worked on:
+
+1. Check `Resources/Info.plist` has `X.Y.Z`, and search for the previous version with
+   `grep -rIn "<old>" . --exclude-dir=.git --exclude-dir=.build --exclude-dir=build`; update any
+   other hit (README, docs).
+2. `CHANGELOG.md`: the heading becomes `## X.Y.Z (YYYY-MM-DD)`, and the entry lists everything
+   since the last release.
 3. `README.md`: the tool table, the tool's section, and the project layout tree if a folder was added.
    If a page changed visibly, render new screenshots into `docs/images` (a `-light` and a `-dark`
    image each, from `--snapshot`) so the README doesn't show an old UI.
 4. Look at every image in `docs/images` and check it shows only preview data, nothing from this Mac.
-5. Commit as `chore: release X.Y.Z` and tag `vX.Y.Z` on that commit.
+5. Commit as `chore: release X.Y.Z` and tag `vX.Y.Z` on that commit. The next change starts the
+   next version (plist bumped, a new `(unreleased)` entry).
 
 To publish (only when asked; it pushes to GitHub):
 
@@ -128,8 +142,8 @@ git push origin main vX.Y.Z
 gh release create vX.Y.Z "MacOS-Toolkit-X.Y.Z.zip" --title "X.Y.Z" --notes-file notes.md
 ```
 
-The release is named `X.Y.Z` with tag `vX.Y.Z`. Notes list the user-visible changes as bold tool names
-with a sentence each, then the install block from the previous release (unzip into `/Applications`,
+The release is named `X.Y.Z` with tag `vX.Y.Z`. Notes are the version's `CHANGELOG.md` entry, then
+the install block from the previous release (unzip into `/Applications`,
 `xattr -dr com.apple.quarantine`, grant Accessibility; the app is self-signed, not notarized),
 ending with the Claude Code attribution line. Delete the zip and notes file afterwards.
 
