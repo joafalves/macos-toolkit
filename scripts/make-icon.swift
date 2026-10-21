@@ -2,6 +2,11 @@
 //   swift scripts/make-icon.swift
 import AppKit
 
+func color(_ hex: UInt32) -> NSColor {
+    NSColor(srgbRed: CGFloat((hex >> 16) & 0xff) / 255, green: CGFloat((hex >> 8) & 0xff) / 255,
+            blue: CGFloat(hex & 0xff) / 255, alpha: 1)
+}
+
 func render(_ pixels: Int) -> Data {
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
                                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
@@ -27,31 +32,36 @@ func render(_ pixels: Int) -> Data {
     shape.fill()
     NSGraphicsContext.restoreGraphicsState()
 
-    NSGradient(colors: [
-        NSColor(srgbRed: 0.36, green: 0.42, blue: 0.52, alpha: 1),
-        NSColor(srgbRed: 0.13, green: 0.16, blue: 0.22, alpha: 1),
-    ])!.draw(in: shape, angle: -90)
+    NSGradient(colors: [color(0x2B3550), color(0x141A2B)])!.draw(in: shape, angle: -90)
 
     // Soft highlight along the top edge.
     NSGraphicsContext.saveGraphicsState()
     shape.addClip()
-    NSGradient(colors: [NSColor.white.withAlphaComponent(0.16), NSColor.white.withAlphaComponent(0)])!
+    NSGradient(colors: [NSColor.white.withAlphaComponent(0.14), NSColor.white.withAlphaComponent(0)])!
         .draw(in: NSRect(x: 100, y: 512, width: 824, height: 412), angle: -90)
     NSGraphicsContext.restoreGraphicsState()
 
-    let config = NSImage.SymbolConfiguration(pointSize: 400, weight: .medium)
-        .applying(.init(paletteColors: [NSColor(srgbRed: 1.0, green: 0.78, blue: 0.3, alpha: 1)]))
-    if let glyph = NSImage(systemSymbolName: "wrench.and.screwdriver.fill", accessibilityDescription: nil)?
-        .withSymbolConfiguration(config) {
-        let fit = min(520 / glyph.size.width, 520 / glyph.size.height)
-        let size = NSSize(width: glyph.size.width * fit, height: glyph.size.height * fit)
-        let rect = NSRect(x: 512 - size.width / 2, y: 512 - size.height / 2, width: size.width, height: size.height)
-        let glow = NSShadow()
-        glow.shadowColor = NSColor.black.withAlphaComponent(0.35)
-        glow.shadowBlurRadius = 18
-        glow.shadowOffset = NSSize(width: 0, height: -8)
-        glow.set()
-        glyph.draw(in: rect)
+    // A kit of four tools, one colour each, as in the menu bar's glyph.
+    let side: CGFloat = 239, gap: CGFloat = 45
+    let colors = [color(0x4C8DFF), color(0x22C3A6), color(0xFF9F2E), color(0xB06CFF)]
+    for (i, fill) in colors.enumerated() {
+        let rect = NSRect(x: 512 - side - gap / 2 + CGFloat(i % 2) * (side + gap),
+                          y: 512 - side - gap / 2 + CGFloat(1 - i / 2) * (side + gap), width: side, height: side)
+        let piece = NSBezierPath(roundedRect: rect, xRadius: side * 0.24, yRadius: side * 0.24)
+        NSGraphicsContext.saveGraphicsState()
+        let lift = NSShadow()
+        lift.shadowColor = NSColor.black.withAlphaComponent(0.3)
+        lift.shadowBlurRadius = 14
+        lift.shadowOffset = NSSize(width: 0, height: -6)
+        lift.set()
+        fill.setFill()
+        piece.fill()
+        NSGraphicsContext.restoreGraphicsState()
+        NSGraphicsContext.saveGraphicsState()
+        piece.addClip()
+        NSGradient(colors: [NSColor.white.withAlphaComponent(0.28), NSColor.white.withAlphaComponent(0)])!
+            .draw(in: NSRect(x: rect.minX, y: rect.midY, width: side, height: side / 2), angle: -90)
+        NSGraphicsContext.restoreGraphicsState()
     }
 
     NSGraphicsContext.restoreGraphicsState()

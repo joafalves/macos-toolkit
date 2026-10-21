@@ -160,7 +160,7 @@ enum Snapshot {
     /// bar: plain, with a segment pressed, recording, and with the percentage.
     static func writeMenuBar(to path: String, light: Bool) {
         _ = NSApplication.shared
-        let toolkit = MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.glyph("wrench.and.screwdriver.fill"), label: "MacOS Toolkit")
+        let toolkit = MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")
         let capture = MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture")
         let badge = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer")
         let percent = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: false), text: "60%", label: "Audio Mixer")
@@ -196,6 +196,50 @@ enum Snapshot {
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         save(container, to: path)
+    }
+
+    /// The menu bar item as it sits in a menu bar, for the top of the README:
+    /// next to drawn stand-ins for macOS's own icons and a made-up clock.
+    static func writeMenuBarStrip(to path: String, light: Bool) {
+        _ = NSApplication.shared
+        let row = MenuBarRow()
+        row.show([
+            MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit"),
+            MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture"),
+            MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer"),
+        ])
+        let size = NSSize(width: 420, height: 30)
+        let bar = NSView(frame: NSRect(origin: .zero, size: size))
+        bar.wantsLayer = true
+        bar.layer?.backgroundColor = (light ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.16, alpha: 1)).cgColor
+        var x = size.width - 14
+        let clock = NSTextField(labelWithString: "Tue 21 Oct  9:41")
+        clock.font = .menuBarFont(ofSize: 0)
+        clock.textColor = .labelColor
+        clock.sizeToFit()
+        x -= clock.frame.width
+        clock.setFrameOrigin(NSPoint(x: x, y: ((size.height - clock.frame.height) / 2).rounded()))
+        bar.addSubview(clock)
+        for symbol in ["switch.2", "wifi", "battery.75percent"] {
+            let ink: NSColor = light ? .black : .white
+            guard let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: 15, weight: .regular).applying(.init(paletteColors: [ink]))) else { continue }
+            let icon = NSImageView(image: image)
+            icon.frame.size = image.size
+            x -= icon.frame.width + 16
+            icon.setFrameOrigin(NSPoint(x: x, y: ((size.height - icon.frame.height) / 2).rounded()))
+            bar.addSubview(icon)
+        }
+        x -= row.frame.width + 12
+        row.setFrameOrigin(NSPoint(x: x, y: ((size.height - row.frame.height) / 2).rounded()))
+        bar.addSubview(row)
+        let window = NSWindow(contentRect: bar.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = bar
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        save(bar, to: path)
     }
 
     /// The menu bar mixer, filled with made-up rows.

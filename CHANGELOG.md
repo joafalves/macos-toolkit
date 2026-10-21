@@ -3,6 +3,17 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.10.0 (unreleased)
+
+### Changed
+
+- **App icon:** a new icon, four tools in four colours, and a menu bar glyph to match in place of
+  the wrench and screwdriver.
+- **Settings window:** each tool has a coloured tile in the sidebar and at the top of its page,
+  under Tools and App headings. Mouse Settings is now just Mouse, like the other tools' names.
+- **Menu bar:** the toolkit menu lists the settings pages under a Settings header, each by the
+  tool's name, instead of some ending in "Settings" and some not.
+
 ## 0.9.0 (2026-10-21)
 
 ### Added

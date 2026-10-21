@@ -109,7 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     // MARK: - The menu bar item
 
     private func updateMenuBar() {
-        var segments = [MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.glyph("wrench.and.screwdriver.fill"), label: "MacOS Toolkit")]
+        var segments = [MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")]
         if let state = capture.recording {
             let time = MenuBarArt.duration(state.elapsed) + (state.bytes > 0 ? " · " + MenuBarArt.bytes(state.bytes) : "")
             segments.append(MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: state.paused), text: time,
@@ -198,11 +198,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             menu.addItem(item)
             menu.addItem(.separator())
         }
+        // Under a header, so the tools' own names don't read like the tools themselves.
+        menu.addItem(.sectionHeader(title: "Settings"))
         for section in AppSection.allCases {
             if section == .general { menu.addItem(.separator()) }
-            // "Audio Mixer…" would read like the mixer itself.
-            let title = section == .mixer || section == .capture ? "\(section.title) Settings…" : "\(section.title)…"
-            let item = NSMenuItem(title: title, action: #selector(openSection(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: section.title, action: #selector(openSection(_:)), keyEquivalent: "")
             item.image = NSImage(systemSymbolName: section.symbol, accessibilityDescription: nil)
             item.representedObject = section.rawValue
             item.target = self

@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import ServiceManagement
 
 /// The tools shown in the sidebar of the main window.
@@ -9,13 +10,26 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .mouse: return "Mouse Settings"
+        case .mouse: return "Mouse"
         case .switcher: return "Window Switcher"
         case .layout: return "Window Layout"
         case .mixer: return "Audio Mixer"
         case .finder: return "Finder"
         case .capture: return "Screen Capture"
         case .general: return "General"
+        }
+    }
+
+    /// The colour of its tile in the sidebar and at the top of its page.
+    var color: Color {
+        switch self {
+        case .mouse: return .blue
+        case .switcher: return .indigo
+        case .layout: return .teal
+        case .mixer: return .pink
+        case .finder: return .cyan
+        case .capture: return .orange
+        case .general: return .gray
         }
     }
 

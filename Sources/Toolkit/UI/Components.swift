@@ -194,7 +194,7 @@ struct ToolHeader: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            IconTile(symbol: section.symbol, size: 46)
+            IconTile(symbol: section.symbol, color: section.color, size: 46)
                 .saturation(enabled ? 1 : 0)
                 .opacity(enabled ? 1 : 0.55)
             VStack(alignment: .leading, spacing: 3) {
@@ -213,10 +213,10 @@ struct ToolHeader: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(enabled ? Color.accentColor.opacity(0.09) : Color.primary.opacity(0.045),
+        .background(enabled ? section.color.opacity(0.09) : Color.primary.opacity(0.045),
                     in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(enabled ? Color.accentColor.opacity(0.28) : Color.primary.opacity(0.08)))
+            .strokeBorder(enabled ? section.color.opacity(0.28) : Color.primary.opacity(0.08)))
         .animation(.easeOut(duration: 0.15), value: enabled)
     }
 }
@@ -254,13 +254,44 @@ struct ShortcutRow: View {
 /// A rounded tile with a glyph, used at the top of a page.
 struct IconTile: View {
     let symbol: String
+    var color: Color = .accentColor
     var size: CGFloat = 52
 
     var body: some View {
         RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-            .fill(LinearGradient(colors: [Color.accentColor.opacity(0.85), Color.accentColor], startPoint: .top, endPoint: .bottom))
+            .fill(color.gradient)
             .frame(width: size, height: size)
             .overlay(Image(systemName: symbol).font(.system(size: size * 0.46, weight: .medium)).foregroundStyle(.white))
+            .shadow(color: .black.opacity(size < 30 ? 0.12 : 0.18), radius: size < 30 ? 1 : 3, y: size < 30 ? 0.5 : 1)
+    }
+}
+
+/// The app icon, drawn: the bundle's icon isn't there for `--snapshot` runs.
+/// Keep it in step with `scripts/make-icon.swift`.
+struct KitIcon: View {
+    var size: CGFloat = 52
+
+    var body: some View {
+        let side = size * 0.29, gap = size * 0.055
+        let colors: [Color] = [Color(red: 0.30, green: 0.55, blue: 1.0), Color(red: 0.13, green: 0.76, blue: 0.65),
+                               Color(red: 1.0, green: 0.62, blue: 0.18), Color(red: 0.69, green: 0.42, blue: 1.0)]
+        RoundedRectangle(cornerRadius: size * 0.2245, style: .continuous)
+            .fill(LinearGradient(colors: [Color(red: 0.17, green: 0.21, blue: 0.31), Color(red: 0.08, green: 0.10, blue: 0.17)],
+                                 startPoint: .top, endPoint: .bottom))
+            .frame(width: size, height: size)
+            .overlay(
+                VStack(spacing: gap) {
+                    ForEach(0..<2) { row in
+                        HStack(spacing: gap) {
+                            ForEach(0..<2) { column in
+                                RoundedRectangle(cornerRadius: side * 0.24, style: .continuous)
+                                    .fill(colors[row * 2 + column].gradient)
+                                    .frame(width: side, height: side)
+                            }
+                        }
+                    }
+                }
+            )
             .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
     }
 }

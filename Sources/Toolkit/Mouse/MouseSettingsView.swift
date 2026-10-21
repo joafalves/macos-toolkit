@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The "Mouse Settings" section. The mouse chosen in the header is the one
+/// The "Mouse" section. The mouse chosen in the header is the one
 /// every control below it edits.
 struct MouseSettingsView: View {
     @ObservedObject var mouse: MouseController

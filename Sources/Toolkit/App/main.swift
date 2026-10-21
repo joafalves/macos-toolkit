@@ -27,6 +27,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeMixer(to: rest[0], light: rest.contains("light"), outputs: rest.contains("outputs"), software: rest.contains("software"), equalizer: rest.contains("equalizer"))
         exit(0)
     }
+    if rest.contains("menu-bar-strip") {
+        Snapshot.writeMenuBarStrip(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
     if rest.contains("menu-bar") {
         Snapshot.writeMenuBar(to: rest[0], light: rest.contains("light"))
         exit(0)

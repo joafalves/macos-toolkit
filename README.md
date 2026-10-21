@@ -16,6 +16,15 @@
   <img alt="Swift, no dependencies" src="https://img.shields.io/badge/Swift-no%20dependencies-f05138">
 </p>
 
+<p align="center">
+  <a href="#the-menu-bar">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-strip-dark.png">
+      <img src="docs/images/menu-bar-strip-light.png" width="420" alt="The toolkit in the menu bar: its menu, Screen Capture and the Audio Mixer's volume badge side by side">
+    </picture>
+  </a>
+</p>
+
 <table>
   <tr>
     <td align="center" width="50%">
@@ -50,12 +59,12 @@
   </tr>
   <tr>
     <td align="center" width="50%">
-      <a href="#mouse-settings">
+      <a href="#mouse">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="docs/images/mouse-dark.png">
           <img src="docs/images/mouse-light.png" width="380" alt="Mouse settings: cursor speed and acceleration, wheel direction, speed and smoothing">
         </picture><br>
-        <b>Mouse Settings</b>
+        <b>Mouse</b>
       </a>
     </td>
     <td align="center" width="50%">
@@ -90,7 +99,7 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 | 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, like the Windows volume mixer, plus an equalizer and volume control for outputs that have none. |
 | 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps (AltTab-style), across all Spaces. |
 | 🔲 **[Window Layout](#window-layout)** | Rectangle's shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, and snapping by dragging. |
-| 🖱️ **[Mouse Settings](#mouse-settings)** | Cursor and wheel settings per mouse (SteerMouse-style), plus battery level. |
+| 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse (SteerMouse-style), plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings (CleanShot-style), with window backdrops and small H.264 files. |
 
@@ -347,7 +356,7 @@ It needs **Accessibility**. While any kind of dragging is on, macOS's own tiling
 turns macOS's tiling on, so windows still snap; when the toolkit quits, it's put back as it was. If Rectangle is running, the settings offer to quit it, since the
 two would fight over the same keys and drags.
 
-## Mouse Settings
+## Mouse
 
 <p align="center">
   <picture>
@@ -519,7 +528,8 @@ the Audio Mixer join it when their settings put them in the menu bar, side by si
 size and spacing and a hairline between them. While recording, Screen Capture's place shows a red
 stop button with the time and size. Each part opens its own menu or panel, and while one is open
 the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
-and other apps' icons can't end up between them.
+and other apps' icons can't end up between them. The toolkit menu opens each tool's settings, listed
+under a Settings header.
 
 ## Good to know
 
@@ -536,7 +546,7 @@ and other apps' icons can't end up between them.
 ```
 Sources/Toolkit
 ├── App        menu bar items, main window, general settings, settings export
-├── Mouse      the Mouse Settings tool
+├── Mouse      the Mouse tool
 ├── Switcher   the Window Switcher tool
 ├── Layout     the Window Layout tool
 ├── Mixer      the Audio Mixer tool

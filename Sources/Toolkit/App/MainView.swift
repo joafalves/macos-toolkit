@@ -1,5 +1,19 @@
 import SwiftUI
 
+/// A sidebar row as System Settings has them: a small coloured tile, then the name.
+private struct SidebarRow: View {
+    let section: AppSection
+
+    var body: some View {
+        Label {
+            Text(section.title)
+        } icon: {
+            IconTile(symbol: section.symbol, color: section.color, size: 22)
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 struct MainView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var mouse: MouseController
@@ -14,13 +28,13 @@ struct MainView: View {
         // sidebar up into the title bar, leaving the bar two-toned.
         HStack(spacing: 0) {
             List(selection: $model.section) {
-                ForEach(AppSection.allCases.filter { $0 != .general }) { section in
-                    Label(section.title, systemImage: section.symbol).tag(section)
+                // The tools, then the app's own settings.
+                Section("Tools") {
+                    ForEach(AppSection.allCases.filter { $0 != .general }) { SidebarRow(section: $0).tag($0) }
                 }
-                // The tools above, the app's own settings below.
-                Divider()
-                    .padding(.vertical, 2)
-                Label(AppSection.general.title, systemImage: AppSection.general.symbol).tag(AppSection.general)
+                Section("App") {
+                    SidebarRow(section: .general).tag(AppSection.general)
+                }
             }
             .listStyle(.sidebar)
             .frame(width: 200)
@@ -60,7 +74,7 @@ private struct GeneralView: View {
     var body: some View {
         Page {
             HStack(spacing: 14) {
-                IconTile(symbol: "wrench.and.screwdriver.fill")
+                KitIcon()
                 VStack(alignment: .leading, spacing: 3) {
                     Text("MacOS Toolkit").font(.title2.weight(.semibold))
                     Text("Version \(version)").font(.subheadline).foregroundStyle(.secondary)
@@ -83,7 +97,7 @@ private struct GeneralView: View {
             }
 
             Card(title: "Permissions") {
-                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing, by the Window Switcher, by Window Layout to move windows, by Finder for Cut, and by Screen Capture to find where a window's content starts.") {
+                SettingRow(title: "Accessibility", caption: "Used by Mouse for the wheel direction, speed and smoothing, by the Window Switcher, by Window Layout to move windows, by Finder for Cut, and by Screen Capture to find where a window's content starts.") {
                     if mouse.accessibilityGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {

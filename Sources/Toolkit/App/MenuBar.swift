@@ -316,6 +316,31 @@ enum MenuBarArt {
         return image
     }
 
+    /// The toolkit's own glyph, the app icon's four tools: one filled, the
+    /// others outlined, so it still reads as a kit in one colour.
+    static let toolkit: NSImage = {
+        let image = NSImage(size: NSSize(width: 16, height: 18), flipped: false) { rect in
+            let side: CGFloat = 6.6, gap: CGFloat = 1.8
+            for i in 0..<4 {
+                let square = NSRect(x: rect.midX - side - gap / 2 + CGFloat(i % 2) * (side + gap),
+                                    y: rect.midY - side - gap / 2 + CGFloat(1 - i / 2) * (side + gap),
+                                    width: side, height: side)
+                NSColor.black.set()
+                if i == 0 {
+                    NSBezierPath(roundedRect: square, xRadius: 1.8, yRadius: 1.8).fill()
+                } else {
+                    let outline = NSBezierPath(roundedRect: square.insetBy(dx: 0.65, dy: 0.65), xRadius: 1.3, yRadius: 1.3)
+                    outline.lineWidth = 1.3
+                    outline.stroke()
+                }
+            }
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "MacOS Toolkit"
+        return image
+    }()
+
     /// A menu bar glyph at the size macOS draws its own status symbols, as
     /// wide as the glyph. Squeezing symbols into the square 18pt box shrank
     /// the wide ones to a fraction of the menu bar's other icons.
@@ -453,7 +478,7 @@ extension MenuBarRow {
         func segments(_ tick: Int) -> [MenuBarSegment] {
             let volume = Float(tick % 100) / 100
             return [
-                MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.glyph("wrench.and.screwdriver.fill"), label: "MacOS Toolkit"),
+                MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit"),
                 MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: false),
                                text: MenuBarArt.duration(TimeInterval(tick)) + " · " + MenuBarArt.bytes(Int64(tick) * 120_000), label: "Recording"),
                 MenuBarSegment(kind: .mixer, glyph: MenuBarArt.speaker(volume: volume, muted: false), text: "\(Int(volume * 100))%", label: "Audio Mixer"),
@@ -491,7 +516,7 @@ extension MenuBarRow {
         _ = NSApplication.shared
         let row = MenuBarRow()
         row.show([
-            MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.glyph("wrench.and.screwdriver.fill"), label: "MacOS Toolkit"),
+            MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit"),
             MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: false), text: "0:42 · 3.1 MB", label: "Recording"),
             MenuBarSegment(kind: .mixer, glyph: MenuBarArt.speaker(volume: 0.6, muted: false), text: "60%", label: "Audio Mixer"),
         ])
