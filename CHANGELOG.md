@@ -3,7 +3,7 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
-## 0.11.0 (unreleased)
+## 0.11.0 (2026-10-21)
 
 ### Added
 
