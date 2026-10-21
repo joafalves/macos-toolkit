@@ -4,9 +4,12 @@ import SwiftUI
 /// settings' badges scroll it to the row they name.
 struct Page<Content: View>: View {
     @ViewBuilder var content: () -> Content
+    /// A setting to go to as the page opens, from another page; cleared once there.
+    var goTo: Binding<String?>?
     @StateObject private var focus = SettingFocus()
 
-    init(@ViewBuilder content: @escaping () -> Content) {
+    init(goTo: Binding<String?>? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.goTo = goTo
         self.content = content
     }
 
@@ -21,7 +24,15 @@ struct Page<Content: View>: View {
                 .padding(.vertical, 24)
                 .frame(maxWidth: .infinity)
             }
-            .onAppear { focus.scroll = { anchor in proxy.scrollTo(anchor, anchor: .center) } }
+            .onAppear {
+                focus.scroll = { anchor in proxy.scrollTo(anchor, anchor: .center) }
+                guard let goTo, let anchor = goTo.wrappedValue else { return }
+                // Once the page is laid out, or there's nothing to scroll to.
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.3)) { focus.go(to: anchor) }
+                    goTo.wrappedValue = nil
+                }
+            }
         }
         .environment(\.settingFocus, focus)
     }
@@ -236,6 +247,29 @@ struct ToolHeader: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
             .strokeBorder(enabled ? section.color.opacity(0.28) : Color.primary.opacity(0.08)))
         .animation(.easeOut(duration: 0.15), value: enabled)
+    }
+}
+
+/// The top of a page that isn't a tool (Settings): the same look as a
+/// tool's header, without the switch.
+struct PageHeader: View {
+    let section: AppSection
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            IconTile(symbol: section.symbol, color: section.color, size: 46)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(section.title).font(.title2.weight(.semibold))
+                Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
     }
 }
 

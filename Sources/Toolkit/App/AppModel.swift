@@ -2,14 +2,20 @@ import AppKit
 import SwiftUI
 import ServiceManagement
 
-/// The tools shown in the sidebar of the main window.
+/// The pages of the main window: Welcome, Settings (the app's own), and the tools.
 enum AppSection: String, CaseIterable, Identifiable {
-    case mouse, switcher, layout, mixer, finder, capture, awake, stats, general
+    case welcome, mouse, switcher, layout, mixer, finder, capture, awake, stats, general
 
     var id: String { rawValue }
 
+    /// The tools by name, as the sidebar and the toolkit menu list them.
+    static var tools: [AppSection] {
+        allCases.filter { $0 != .welcome && $0 != .general }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
     var title: String {
         switch self {
+        case .welcome: return "Welcome"
         case .mouse: return "Mouse"
         case .switcher: return "Window Switcher"
         case .layout: return "Window Layout"
@@ -18,13 +24,15 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .capture: return "Screen Capture"
         case .awake: return "Keep Awake"
         case .stats: return "System Stats"
-        case .general: return "General"
+        // Stored as "general", as it was called before.
+        case .general: return "Settings"
         }
     }
 
     /// The colour of its tile in the sidebar and at the top of its page.
     var color: Color {
         switch self {
+        case .welcome: return .accentColor
         case .mouse: return .blue
         case .switcher: return .indigo
         case .layout: return .teal
@@ -39,6 +47,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        case .welcome: return "hand.wave"
         case .mouse: return "computermouse"
         case .switcher: return "macwindow.on.rectangle"
         case .layout: return "rectangle.split.2x2"
@@ -50,10 +59,34 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .general: return "gearshape"
         }
     }
+
+    /// What it does, in a line, for its tile on Welcome.
+    var summary: String {
+        switch self {
+        case .welcome: return ""
+        case .mouse: return "Cursor and wheel settings for each mouse."
+        case .switcher: return "⌘Tab through windows instead of apps."
+        case .layout: return "Snap windows to halves, thirds or a grid."
+        case .mixer: return "A volume for each app, and an equalizer."
+        case .finder: return "Cut and paste files, and more in the right-click menu."
+        case .capture: return "Screenshots and small screen recordings."
+        case .awake: return "Keeps the Mac awake for as long as you need."
+        case .stats: return "CPU, memory and more in the menu bar."
+        case .general: return ""
+        }
+    }
 }
 
 final class AppModel: ObservableObject {
-    @Published var section: AppSection? = .mouse
+    /// Remembered, so the window opens where it was left.
+    @Published var section: AppSection? = .welcome {
+        didSet {
+            guard persists, let section, section != oldValue else { return }
+            UserDefaults.standard.set(section.rawValue, forKey: Self.lastSectionKey)
+        }
+    }
+    /// A setting to scroll to and light up once its page shows.
+    @Published var goTo: String?
     @Published var general = GeneralConfig.load() {
         didSet {
             guard general != oldValue, persists else { return }
@@ -75,5 +108,20 @@ final class AppModel: ObservableObject {
             NSLog("Toolkit: launch at login failed: \(error.localizedDescription)")
         }
         launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    private static let lastSectionKey = "lastSection"
+    private static let welcomedKey = "welcomedVersion"
+
+    /// Where the window opens: Welcome the first time and after an update,
+    /// otherwise the page it was left on. Opening Welcome counts as seen.
+    func launchSection() -> AppSection {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: Self.welcomedKey) != version {
+            defaults.set(version, forKey: Self.welcomedKey)
+            return .welcome
+        }
+        return defaults.string(forKey: Self.lastSectionKey).flatMap(AppSection.init) ?? .welcome
     }
 }

@@ -180,8 +180,8 @@ The version being worked on is the one after the last release: the **next minor*
 asks for a fix-only release. From the first change after a release:
 
 - `Resources/Info.plist` carries it: `CFBundleShortVersionString` is `X.Y.Z`, and `CFBundleVersion`
-  is one more than at the last release (a plain integer build number, never reset). The **General**
-  page header reads `CFBundleShortVersionString`, so don't hard-code a version anywhere else.
+  is one more than at the last release (a plain integer build number, never reset). The **Welcome**
+  page reads `CFBundleShortVersionString`, so don't hard-code a version anywhere else.
 - `CHANGELOG.md` has it as its top entry, headed `## X.Y.Z (unreleased)`.
 - Every user-visible change goes into that entry **in the same commit as the change**, under
   `### Added`, `### Changed` or `### Fixed` (leave out a heading with nothing under it). Each item

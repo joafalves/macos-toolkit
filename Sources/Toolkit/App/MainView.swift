@@ -8,7 +8,11 @@ private struct SidebarRow: View {
         Label {
             Text(section.title)
         } icon: {
-            IconTile(symbol: section.symbol, color: section.color, size: 22)
+            if section == .welcome {
+                KitIcon(size: 22)
+            } else {
+                IconTile(symbol: section.symbol, color: section.color, size: 22)
+            }
         }
         .padding(.vertical, 2)
     }
@@ -25,17 +29,31 @@ struct MainView: View {
     @ObservedObject var awake: AwakeController
     @ObservedObject var stats: StatsController
 
+    /// Whether a tool is on, for its tile on Welcome.
+    private func enabled(_ section: AppSection) -> Bool {
+        switch section {
+        case .mouse: return mouse.config.enabled
+        case .switcher: return switcher.config.enabled
+        case .layout: return layout.config.enabled
+        case .mixer: return mixer.config.enabled
+        case .finder: return finder.config.enabled
+        case .capture: return capture.config.enabled
+        case .awake: return awake.config.enabled
+        case .stats: return stats.config.enabled
+        case .welcome, .general: return true
+        }
+    }
+
     var body: some View {
         // A plain split rather than NavigationSplitView: that one runs the
         // sidebar up into the title bar, leaving the bar two-toned.
         HStack(spacing: 0) {
             List(selection: $model.section) {
-                // The tools, then the app's own settings.
+                // Welcome and the app's own settings, then the tools.
+                SidebarRow(section: .welcome).tag(AppSection.welcome)
+                SidebarRow(section: .general).tag(AppSection.general)
                 Section("Tools") {
-                    ForEach(AppSection.allCases.filter { $0 != .general }) { SidebarRow(section: $0).tag($0) }
-                }
-                Section("App") {
-                    SidebarRow(section: .general).tag(AppSection.general)
+                    ForEach(AppSection.tools) { SidebarRow(section: $0).tag($0) }
                 }
             }
             .listStyle(.sidebar)
@@ -44,7 +62,8 @@ struct MainView: View {
             Divider()
 
             Group {
-                switch model.section ?? .mouse {
+                switch model.section ?? .welcome {
+                case .welcome: WelcomeView(model: model, mouse: mouse, mixer: mixer, capture: capture, enabled: enabled)
                 case .mouse: MouseSettingsView(mouse: mouse)
                 case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
                 case .layout: LayoutSettingsView(layout: layout, mouse: mouse)
@@ -73,19 +92,9 @@ private struct GeneralView: View {
     let awake: AwakeController
     let stats: StatsController
 
-    private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    }
-
     var body: some View {
-        Page {
-            HStack(spacing: 14) {
-                KitIcon()
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("MacOS Toolkit").font(.title2.weight(.semibold))
-                    Text("Version \(version)").font(.subheadline).foregroundStyle(.secondary)
-                }
-            }
+        Page(goTo: $model.goTo) {
+            PageHeader(section: .general, subtitle: "The app's own settings: startup, the menu bar, backups and permissions.")
 
             Card(title: "Startup") {
                 ToggleRow(title: "Launch at login",
@@ -136,6 +145,7 @@ private struct GeneralView: View {
                     }
                 }
             }
+            .settingAnchor(WelcomeView.permissionsAnchor)
         }
     }
 }

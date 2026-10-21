@@ -140,7 +140,7 @@ final class MenuBarRow: NSView {
 
     static let height: CGFloat = 22
     /// Space on each side of a part's content: by default a little less than
-    /// between the menu bar's items, so the group reads as one. Set in General.
+    /// between the menu bar's items, so the group reads as one. Set in Settings.
     var padding: CGFloat = 6 {
         didSet {
             guard padding != oldValue else { return }

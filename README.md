@@ -131,7 +131,7 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 
 Each tool can be turned off or left on its macOS defaults, and anything the app changes outside
 itself is put back when it quits. No accounts, no telemetry, no network code. Settings are plain JSON in
-`~/Library/Application Support/MacOS Toolkit`, and **General → Export…** saves them all to one file.
+`~/Library/Application Support/MacOS Toolkit`, and **Settings → Export…** saves them all to one file.
 **Import…** takes the file's settings and leaves the rest as they are.
 
 ## Audio Mixer
@@ -620,13 +620,16 @@ To update later: `git pull && ./scripts/build.sh --install`.
 
 ### First run
 
-- **General → Grant Access…** and enable *MacOS Toolkit* under System Settings → Privacy & Security →
+The window opens on **Welcome**, with a tile for each tool and a warning while a permission one of
+them needs is missing. **Settings**, under it, has the app's own settings. It opens there again after an update; otherwise on the page you left.
+
+- **Settings → Grant Access…** and enable *MacOS Toolkit* under System Settings → Privacy & Security →
   Accessibility. This is for the window switcher, Window Layout, the Finder cut, and the mouse wheel and button settings.
 - System Audio Recording is asked for later, the first time you turn an app down in the mixer, and
   Screen Recording the first time you take a screenshot.
 - For the Finder right-click menu, press **Turn On** in the Finder settings.
 - Turn on **Launch at login** if you want it always there.
-- To carry your settings to another Mac, use **General → Export…** and **Import…**.
+- To carry your settings to another Mac, use **Settings → Export…** and **Import…**.
 
 To remove it, quit the app, delete it from `/Applications`, and delete
 `~/Library/Application Support/MacOS Toolkit`.
@@ -646,7 +649,7 @@ size and spacing and a hairline between them. While recording, Screen Capture's 
 stop button with the time and size. Each part opens its own menu or panel, and while one is open
 the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
 and other apps' icons can't end up between them. The toolkit menu opens each tool's settings, listed
-under a Settings header. **General → Space between items** sets how far apart the parts sit.
+under a Tool Settings header. **Settings → Space between items** sets how far apart the parts sit.
 
 ## Good to know
 

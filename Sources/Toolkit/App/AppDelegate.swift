@@ -85,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         if let path = measureIdlePath {
             measureIdle(into: path)
         } else if !Self.launchedAsLoginItem {
-            show(.mouse)
+            show(model.launchSection())
         }
     }
 
@@ -95,7 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        show(model.section ?? .mouse)
+        show(model.section ?? .welcome)
         return true
     }
 
@@ -274,15 +274,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             menu.addItem(.separator())
         }
         // Under a header, so the tools' own names don't read like the tools themselves.
-        menu.addItem(.sectionHeader(title: "Settings"))
-        for section in AppSection.allCases {
-            if section == .general { menu.addItem(.separator()) }
-            let item = NSMenuItem(title: section.title, action: #selector(openSection(_:)), keyEquivalent: "")
-            item.image = NSImage(systemSymbolName: section.symbol, accessibilityDescription: nil)
-            item.representedObject = section.rawValue
-            item.target = self
-            menu.addItem(item)
+        menu.addItem(.sectionHeader(title: "Tool Settings"))
+        for section in AppSection.tools {
+            menu.addItem(sectionItem(section, title: section.title))
         }
+        menu.addItem(.separator())
+        let welcome = sectionItem(.welcome, title: "Welcome")
+        welcome.image = MenuBarArt.toolkit
+        menu.addItem(welcome)
+        menu.addItem(sectionItem(.general, title: "Settings…"))
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit MacOS Toolkit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
@@ -294,6 +294,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
     @objc private func stopRecording() {
         capture.stopRecording()
+    }
+
+    private func sectionItem(_ section: AppSection, title: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: #selector(openSection(_:)), keyEquivalent: "")
+        item.image = NSImage(systemSymbolName: section.symbol, accessibilityDescription: nil)
+        item.representedObject = section.rawValue
+        item.target = self
+        return item
     }
 
     @objc private func openSection(_ sender: NSMenuItem) {
@@ -390,7 +398,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         return popover
     }
 
-    @objc private func openGeneral() {
+    @objc private func openSettings() {
         show(.general)
     }
 
@@ -399,7 +407,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         let main = NSMenu()
 
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "Settings…", action: #selector(openGeneral), keyEquivalent: ",").target = self
+        appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide MacOS Toolkit", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(withTitle: "Quit MacOS Toolkit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")

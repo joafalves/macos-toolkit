@@ -16,12 +16,19 @@ worked on; it gets its date when it's released.
   display offers your other windows to fill it, as Windows' Snap Assist does: click one or press
   its number. Windows from other displays can be offered too, only when there's none left here (the
   default), or always.
+- **Settings window:** a Welcome page, with a tile for each tool and whether it's on, and a warning
+  while a permission a tool needs is missing, which leads to the list in Settings. The window opens
+  on it the first time and after an update, and otherwise where it was left.
 
 ### Changed
 
 - **Window Layout:** the gap starts at 8 points, macOS's own margin, and macOS's tiling margins follow
   it: with no gap, double-clicking a title bar fills the whole display. ⌃⌥↩ with a gap of up to 8
   points is macOS's own Fill.
+- **Settings window and toolkit menu:** the tools are listed by name.
+- **Settings window:** General is now Settings, under Welcome, with only the app's own settings; the
+  version is on Welcome. The toolkit menu lists the tools under Tool Settings, then Welcome and
+  Settings.
 
 ### Fixed
 
