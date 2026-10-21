@@ -211,6 +211,8 @@ final class MenuBarPartView: NSView {
 
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
     private static let labelInset: CGFloat = 2
+    /// Between an icon and its text; the label's own inset adds to it.
+    private static let textGap: CGFloat = 2
 
     init() {
         super.init(frame: .zero)
@@ -255,7 +257,7 @@ final class MenuBarPartView: NSView {
         if let text = segment.text {
             let widest = String(text.map { $0.isNumber ? "8" : $0 })
             // A label keeps a couple of points inside each edge.
-            width += (width > 0 ? 4 : 0) + NSAttributedString(string: widest, attributes: [.font: font]).size().width + labelInset * 2
+            width += (width > 0 ? textGap : 0) + NSAttributedString(string: widest, attributes: [.font: font]).size().width + labelInset * 2
         }
         return ceil(width)
     }
@@ -278,7 +280,7 @@ final class MenuBarPartView: NSView {
             x += image.size.width
         }
         if segment.text != nil {
-            if segment.colored != nil || segment.glyph != nil { x += 4 }
+            if segment.colored != nil || segment.glyph != nil { x += Self.textGap }
             let size = label.intrinsicContentSize
             label.frame = NSRect(x: x, y: ((height - size.height) / 2).rounded(), width: bounds.width - x - MenuBarRow.padding, height: size.height)
         }
@@ -324,7 +326,7 @@ enum MenuBarArt {
     /// Every symbol is drawn at the same size, in an image as wide as the
     /// widest of `widthOf`, so a glyph that switches between them doesn't
     /// change width. The glyph sits at the left, like macOS's Sound icon.
-    static func image(_ symbol: String, widthOf symbols: [String], description: String? = nil) -> NSImage? {
+    static func image(_ symbol: String, widthOf symbols: [String], description: String? = nil, alignRight: Bool = false) -> NSImage? {
         let configuration = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
         func symbolImage(_ name: String) -> NSImage? {
             NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
@@ -336,7 +338,7 @@ enum MenuBarArt {
         let fit = min(1, height / glyph.size.height)
         let size = NSSize(width: glyph.size.width * fit, height: glyph.size.height * fit)
         let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
-            glyph.draw(in: NSRect(x: 0, y: rect.midY - size.height / 2, width: size.width, height: size.height))
+            glyph.draw(in: NSRect(x: alignRight ? rect.maxX - size.width : 0, y: rect.midY - size.height / 2, width: size.width, height: size.height))
             return true
         }
         image.isTemplate = true
@@ -345,6 +347,14 @@ enum MenuBarArt {
     }
 
     static let volumeSymbols = ["speaker.slash.fill", "speaker.wave.1.fill", "speaker.wave.2.fill", "speaker.wave.3.fill"]
+
+    /// The speaker without waves, for beside the percentage, which already
+    /// says how loud: as wide as its muted version, so neither leaves a gap.
+    static func plainSpeaker(muted: Bool) -> NSImage? {
+        let symbol = muted ? "speaker.slash.fill" : "speaker.fill"
+        // Against the number, whichever is shown.
+        return cached("plain speaker \(symbol)") { image(symbol, widthOf: ["speaker.fill", "speaker.slash.fill"], alignRight: true) }
+    }
 
     /// The speaker macOS's own Sound item uses: more waves as the volume goes
     /// up, crossed out when muted.

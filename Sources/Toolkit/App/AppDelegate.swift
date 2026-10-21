@@ -128,7 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             case .volumePercent:
                 // The volume next to the speaker, like the battery's percentage.
                 // Muted keeps the number, greyed, so you can see what unmuting brings back.
-                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.speaker(volume: volume, muted: muted),
+                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: muted),
                                                text: "\(Int((volume * 100).rounded()))%", dimText: mixer.mainMuted, label: label))
             case .volumeBadge:
                 segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: volume, muted: muted), label: label))
