@@ -166,7 +166,7 @@ final class SelectionOverlay {
     }
 
     fileprivate func redraw() {
-        windows.forEach { $0.contentView?.needsDisplay = true }
+        windows.forEach { ($0.contentView as? OverlayView)?.update() }
     }
 
     /// The crosshair (or camera) over the overlay, the arrow over anything
@@ -175,7 +175,26 @@ final class SelectionOverlay {
         guard !windows.isEmpty else { return }
         let top = NSWindow.windowNumber(at: NSEvent.mouseLocation, belowWindowWithWindowNumber: 0)
         guard windows.contains(where: { $0.windowNumber == top }) else { return NSCursor.arrow.set() }
-        (mode == .window ? CaptureCursor.camera : NSCursor.crosshair).set()
+        areaCursor().set()
+    }
+
+    /// Over an area kept on screen: a resize cursor on its knobs, a hand
+    /// inside it (closed while moving it), the crosshair elsewhere.
+    private func areaCursor() -> NSCursor {
+        guard mode == .area else { return mode == .window ? CaptureCursor.camera : .crosshair }
+        switch drag {
+        case .resize(let handle, _): return handle.cursor
+        case .move: return .closedHand
+        case .create: return .crosshair
+        case nil: break
+        }
+        guard !quick, let selection else { return .crosshair }
+        // Where the pointer is now: some cursor updates come before the move
+        // that caused them has been recorded, and a stale point picked the
+        // old cursor until the next move or click.
+        let point = NSEvent.mouseLocation
+        if let handle = Handle.hit(point, in: selection) { return handle.cursor }
+        return selection.contains(point) ? .openHand : .crosshair
     }
 
     // MARK: - Input
@@ -208,6 +227,8 @@ final class SelectionOverlay {
 
     fileprivate func mouseDown(at point: NSPoint, on screen: NSScreen) {
         mouse = point
+        // Pressing on a knob or inside the area changes the cursor at once.
+        defer { cursorUpdate() }
         switch mode {
         case .window, .screen:
             break
@@ -248,6 +269,7 @@ final class SelectionOverlay {
 
     fileprivate func mouseUp(at point: NSPoint) {
         mouse = point
+        defer { cursorUpdate() }
         let copy = Self.controlDown(lastEvent)
         switch mode {
         case .area:
@@ -337,8 +359,24 @@ fileprivate enum Handle: CaseIterable {
         }
     }
 
+    /// macOS's own cursor for resizing from this side or corner.
+    var cursor: NSCursor {
+        let position: NSCursor.FrameResizePosition
+        switch self {
+        case .bottomLeft: position = .bottomLeft
+        case .bottom: position = .bottom
+        case .bottomRight: position = .bottomRight
+        case .right: position = .right
+        case .topRight: position = .topRight
+        case .top: position = .top
+        case .topLeft: position = .topLeft
+        case .left: position = .left
+        }
+        return .frameResize(position: position, directions: .all)
+    }
+
     static func hit(_ p: NSPoint, in r: NSRect) -> Handle? {
-        allCases.first { hypot($0.point(in: r).x - p.x, $0.point(in: r).y - p.y) <= 8 }
+        allCases.first { hypot($0.point(in: r).x - p.x, $0.point(in: r).y - p.y) <= 10 }
     }
 
     func resize(_ r: NSRect, to p: NSPoint) -> NSRect {
@@ -365,6 +403,12 @@ private final class OverlayView: NSView {
         self.overlay = overlay
         self.screen = screen
         super.init(frame: NSRect(origin: .zero, size: screen.frame.size))
+        // Layers, not drawing: a layer that's only colour and border needs no
+        // picture behind it. Drawn, each display's overlay held a picture of
+        // the whole display, close to 100 MB across two. Set before asking for
+        // layers, so the view hosts this one and never draws.
+        layer = CALayer()
+        wantsLayer = true
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeAlways, .inVisibleRect, .cursorUpdate, .mouseEnteredAndExited],
                                        owner: self, userInfo: nil))
     }
@@ -407,79 +451,125 @@ private final class OverlayView: NSView {
     /// Not quite clear, so the window server hands every click to us.
     static let base = NSColor.black.withAlphaComponent(0.01)
 
-    override func draw(_ dirtyRect: NSRect) {
-        Self.base.setFill()
-        bounds.fill()
+    func update() {
+        guard let root = layer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        root.sublayers = nil
+        root.backgroundColor = Self.base.cgColor
         let dim = NSColor.black.withAlphaComponent(0.42)
         switch overlay.mode {
         case .area:
             guard let selection = overlay.selection, selection.intersects(screen.frame) else {
                 // Nothing picked yet: the toolbar's kind dims everything, the
                 // quick kind shows only the crosshair, like macOS.
-                if !overlay.quick {
-                    dim.setFill()
-                    bounds.fill()
-                }
-                drawCoordinates()
+                if !overlay.quick { box(bounds, fill: dim) }
+                coordinates()
                 return
             }
             let hole = local(selection)
-            let path = NSBezierPath(rect: bounds)
-            path.append(NSBezierPath(rect: hole))
-            path.windingRule = .evenOdd
-            dim.setFill()
-            path.fill()
-            NSColor.white.withAlphaComponent(0.9).setStroke()
-            let border = NSBezierPath(rect: hole.insetBy(dx: -0.5, dy: -0.5))
-            border.lineWidth = 1
-            border.stroke()
+            // The dim around the area, as four pieces: one piece with a hole
+            // in it would need a picture of its own.
+            let open = hole.intersection(bounds)
+            box(NSRect(x: 0, y: open.maxY, width: bounds.width, height: bounds.maxY - open.maxY), fill: dim)
+            box(NSRect(x: 0, y: 0, width: bounds.width, height: open.minY), fill: dim)
+            box(NSRect(x: 0, y: open.minY, width: open.minX, height: open.height), fill: dim)
+            box(NSRect(x: open.maxX, y: open.minY, width: bounds.maxX - open.maxX, height: open.height), fill: dim)
+            // A crisp white edge, with a faint dark one outside it so it shows
+            // on light and dark content alike.
+            box(hole.insetBy(dx: -2, dy: -2), stroke: NSColor.black.withAlphaComponent(0.25))
+            box(hole.insetBy(dx: -1, dy: -1), stroke: NSColor.white.withAlphaComponent(0.95))
             if !overlay.quick {
-                for handle in Handle.allCases {
-                    let p = handle.point(in: hole)
-                    let dot = NSBezierPath(ovalIn: NSRect(x: p.x - 4.5, y: p.y - 4.5, width: 9, height: 9))
-                    NSColor.white.setFill()
-                    dot.fill()
-                    NSColor.black.withAlphaComponent(0.35).setStroke()
-                    dot.lineWidth = 0.5
-                    dot.stroke()
-                }
+                for handle in Handle.allCases { knob(handle, at: handle.point(in: hole)) }
             }
-            drawLabel("\(Int(selection.width)) × \(Int(selection.height))",
-                      at: NSPoint(x: hole.maxX, y: hole.minY), below: true)
+            size("\(Int(selection.width)) × \(Int(selection.height))", under: hole)
         case .window:
             // The highlight is a window of its own, in among the others.
             break
         case .screen:
             if overlay.hoveredScreen == screen {
-                NSColor.controlAccentColor.withAlphaComponent(0.18).setFill()
-                bounds.fill()
-                drawLabel("Click to capture this display", at: NSPoint(x: bounds.midX, y: bounds.midY), below: false, centered: true)
+                box(bounds, fill: NSColor.controlAccentColor.withAlphaComponent(0.18))
+                label("Click to capture this display", at: NSPoint(x: bounds.midX, y: bounds.midY), below: false, centered: true)
             }
         }
     }
 
-    private func drawCoordinates() {
+    /// A white dot at a corner, a short pill along an edge, lifted by a soft shadow.
+    private func knob(_ handle: Handle, at p: NSPoint) {
+        let size: NSSize
+        switch handle {
+        case .top, .bottom: size = NSSize(width: 22, height: 6)
+        case .left, .right: size = NSSize(width: 6, height: 22)
+        default: size = NSSize(width: 10, height: 10)
+        }
+        let rect = NSRect(x: p.x - size.width / 2, y: p.y - size.height / 2, width: size.width, height: size.height)
+        guard let knob = box(rect, fill: .white, stroke: NSColor.black.withAlphaComponent(0.15), width: 0.5, radius: min(size.width, size.height) / 2)
+        else { return }
+        knob.shadowColor = NSColor.black.cgColor
+        knob.shadowOpacity = 0.35
+        knob.shadowRadius = 2
+        knob.shadowOffset = CGSize(width: 0, height: -0.5)
+        // Given, so the shadow isn't worked out from the layer's pixels each frame.
+        knob.shadowPath = CGPath(roundedRect: knob.bounds, cornerWidth: knob.cornerRadius, cornerHeight: knob.cornerRadius, transform: nil)
+    }
+
+    /// The area's size in a pill just under its bottom right corner, or inside
+    /// it when there's no room below.
+    private func size(_ text: String, under hole: NSRect) {
+        let string = NSAttributedString(string: text, attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
+            .foregroundColor: NSColor.white,
+        ])
+        let size = string.size()
+        var frame = NSRect(x: hole.maxX - size.width - 20, y: hole.minY - size.height - 16, width: size.width + 20, height: size.height + 8)
+        if frame.minY < 4 { frame.origin.y = hole.minY + 10 }
+        frame.origin.x = min(max(frame.minX, 4), bounds.maxX - frame.width - 4)
+        box(frame, fill: NSColor.black.withAlphaComponent(0.7), stroke: NSColor.white.withAlphaComponent(0.15), radius: frame.height / 2)
+        self.text(string, at: NSPoint(x: frame.minX + 10, y: frame.minY + 4), size: size)
+    }
+
+    private func text(_ string: NSAttributedString, at origin: NSPoint, size: NSSize) {
+        let text = CATextLayer()
+        text.string = string
+        text.contentsScale = screen.backingScaleFactor
+        text.frame = NSRect(origin: origin, size: size)
+        layer?.addSublayer(text)
+    }
+
+    @discardableResult
+    private func box(_ rect: NSRect, fill: NSColor? = nil, stroke: NSColor? = nil, width: CGFloat = 1, radius: CGFloat = 0) -> CALayer? {
+        guard rect.width > 0, rect.height > 0 else { return nil }
+        let box = CALayer()
+        box.frame = rect
+        box.backgroundColor = fill?.cgColor
+        box.borderColor = stroke?.cgColor
+        box.borderWidth = stroke == nil ? 0 : width
+        box.cornerRadius = radius
+        layer?.addSublayer(box)
+        return box
+    }
+
+    private func coordinates() {
         guard overlay.drag == nil, screen.frame.contains(overlay.mouse) else { return }
         let p = NSPoint(x: overlay.mouse.x - screen.frame.minX, y: overlay.mouse.y - screen.frame.minY)
         // Points from the top left of this display.
-        drawLabel("\(Int(p.x)), \(Int(bounds.height - p.y))", at: NSPoint(x: p.x + 14, y: p.y - 14), below: true)
+        label("\(Int(p.x)), \(Int(bounds.height - p.y))", at: NSPoint(x: p.x + 14, y: p.y - 14), below: true)
     }
 
-    private func drawLabel(_ text: String, at point: NSPoint, below: Bool, centered: Bool = false) {
-        let attributes: [NSAttributedString.Key: Any] = [
+    private func label(_ text: String, at point: NSPoint, below: Bool, centered: Bool = false) {
+        let string = NSAttributedString(string: text, attributes: [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
             .foregroundColor: NSColor.white,
-        ]
-        let string = NSAttributedString(string: text, attributes: attributes)
+        ])
         let size = string.size()
-        var box = NSRect(x: point.x - (centered ? size.width / 2 + 6 : size.width + 12), y: below ? point.y - size.height - 10 : point.y,
-                         width: size.width + 12, height: size.height + 4)
+        var frame = NSRect(x: point.x - (centered ? size.width / 2 + 6 : size.width + 12), y: below ? point.y - size.height - 10 : point.y,
+                           width: size.width + 12, height: size.height + 4)
         // Kept on the display.
-        box.origin.x = min(max(box.minX, 4), bounds.maxX - box.width - 4)
-        box.origin.y = min(max(box.minY, 4), bounds.maxY - box.height - 4)
-        NSColor.black.withAlphaComponent(0.6).setFill()
-        NSBezierPath(roundedRect: box, xRadius: 5, yRadius: 5).fill()
-        string.draw(at: NSPoint(x: box.minX + 6, y: box.minY + 2))
+        frame.origin.x = min(max(frame.minX, 4), bounds.maxX - frame.width - 4)
+        frame.origin.y = min(max(frame.minY, 4), bounds.maxY - frame.height - 4)
+        box(frame, fill: NSColor.black.withAlphaComponent(0.6), radius: 5)
+        self.text(string, at: NSPoint(x: frame.minX + 6, y: frame.minY + 2), size: size)
     }
 }
 

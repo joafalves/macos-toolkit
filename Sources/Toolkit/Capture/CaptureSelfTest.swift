@@ -1,4 +1,5 @@
 import AVFoundation
+import ScreenCaptureKit
 import AppKit
 
 extension CaptureController {
@@ -167,6 +168,46 @@ extension CaptureController {
 }
 
 extension CaptureController {
+    /// `--test-overlay`: what the selection overlay costs in memory while it's
+    /// up, with an area picked, on every display.
+    static func overlayTest(picture: String? = nil) {
+        _ = NSApplication.shared
+        let overlay = SelectionOverlay()
+        let before = processFootprint()
+        let main = NSScreen.screens[0].frame
+        overlay.show(mode: .area, quick: false, area: NSRect(x: main.midX - 300, y: main.midY - 200, width: 600, height: 400))
+        // As in use: the area moves a little, so every display draws again.
+        for step in 0..<6 {
+            overlay.selection = NSRect(x: main.midX - 300 + CGFloat(step * 10), y: main.midY - 200, width: 600, height: 400)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        }
+        let during = processFootprint()
+        // A picture of the main display's overlay window alone, to look at.
+        if let picture, let id = overlay.windowNumbers.first(where: { id in
+            (CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]])?.first
+                .flatMap { $0[kCGWindowBounds as String] as? NSDictionary }
+                .flatMap { CGRect(dictionaryRepresentation: $0) }?.origin == .zero
+        }) {
+            let done = DispatchSemaphore(value: 0)
+            Task.detached {
+                defer { done.signal() }
+                guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
+                      let window = content.windows.first(where: { $0.windowID == id }) else { return }
+                let config = SCStreamConfiguration()
+                config.width = Int(window.frame.width) * 2
+                config.height = Int(window.frame.height) * 2
+                guard let image = try? await SCScreenshotManager.captureImage(contentFilter: SCContentFilter(desktopIndependentWindow: window), configuration: config),
+                      let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: picture) as CFURL, "public.png" as CFString, 1, nil)
+                else { return }
+                CGImageDestinationAddImage(dest, image, nil)
+                CGImageDestinationFinalize(dest)
+            }
+            while done.wait(timeout: .now()) == .timedOut { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+        }
+        overlay.hide()
+        print(String(format: "overlay on %d display(s): %.1f MB while it's up", NSScreen.screens.count, Double(during - before) / 1_048_576))
+    }
+
     /// Puts the window highlight over the second window from the front and
     /// checks the window server has it directly above that window.
     static func highlightTest() {

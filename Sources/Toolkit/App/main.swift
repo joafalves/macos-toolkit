@@ -83,6 +83,12 @@ if CommandLine.arguments.contains("--test-recording") {
     CaptureController.recordingTest()
     exit(0)
 }
+// `--test-overlay [png]`: the capture overlay's memory, and optionally a
+// picture of it (run the app bundle with `open -n` for that).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-overlay") {
+    CaptureController.overlayTest(picture: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
 if CommandLine.arguments.contains("--test-highlight") {
     CaptureController.highlightTest()
     exit(0)

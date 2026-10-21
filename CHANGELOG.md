@@ -31,12 +31,18 @@ worked on; it gets its date when it's released.
 - **Audio Mixer:** opening the mixer from the menu bar no longer brings the settings window to the
   front. Esc closes it from any app.
 - **Settings window:** let go of when it's closed, and it opens again where it was.
+- **Screen Capture:** a cleaner selection: a crisp edge, round knobs at the corners, pills on the
+  sides, and the size in a pill under the corner.
 
 ### Fixed
 
 - **Finder:** the right-click menu's actions are only accepted from the toolkit's own Finder
   extension, and only ever on folders. Before, another app could ask the toolkit to open a file in
   the terminal, which runs it.
+- **Screen Capture:** the area's knobs show resize cursors straight away, and the area a hand,
+  instead of the crosshair.
+- **Screen Capture:** the selection overlay no longer takes about 100 MB while it's up (it held a
+  picture of each display), and follows the mouse smoothly.
 - **Window Layout, Window Switcher, Screen Capture, Finder:** an app answering Accessibility with
   something unexpected can no longer upset them.
 

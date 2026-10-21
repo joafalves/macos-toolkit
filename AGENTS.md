@@ -89,6 +89,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --measure-idle <file>   # memory idle, with the settings window, and after (run with open -n, app quit first)
 .build/debug/Toolkit --test-shortcuts        # config migration, and which macOS screenshot shortcuts clash
 .build/debug/Toolkit --test-toolbar          # the capture toolbar's panel against its content
+.build/debug/Toolkit --test-overlay [png]    # what the capture overlay costs in memory; with open -n, a picture of it
 .build/debug/Toolkit --test-highlight        # the window highlight sits right above its window
 .build/debug/Toolkit --test-switcher-previews   # times the grid's pictures of real windows; keeps none
 .build/debug/Toolkit --list-windows          # what the Window Switcher would list
