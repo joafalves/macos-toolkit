@@ -137,8 +137,6 @@ final class Autoscroller {
                                   wheel1: Int32(-stepY), wheel2: Int32(-stepX), wheel3: 0)
         else { return }
         event.setIntegerValueField(.eventSourceUserData, value: WheelEngine.marker)
-        // At the pointer, where a new event is made: one placed at the anchor
-        // would move the cursor back there.
         event.flags = flags
         event.post(tap: .cgSessionEventTap)
     }

@@ -2,8 +2,8 @@ import AppKit
 import CoreGraphics
 
 /// Rewrites events from mice: wheel direction, distance and smoothing, the
-/// side buttons, and autoscroll on the wheel button. Trackpad and Magic Mouse scrolling (continuous events)
-/// is never touched.
+/// side buttons, and autoscroll on the wheel button. Trackpad and Magic Mouse
+/// scrolling (continuous events) is never touched.
 final class WheelEngine {
     /// Stamped on events we post ourselves so the tap lets them through.
     static let marker: Int64 = 0x54494C4C
