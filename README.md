@@ -123,7 +123,7 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 | 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, like the Windows volume mixer, plus an equalizer and volume control for outputs that have none. |
 | 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps (AltTab-style), across all Spaces. |
 | 🔲 **[Window Layout](#window-layout)** | Rectangle's shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, and snapping by dragging. |
-| 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse (SteerMouse-style), plus battery level. |
+| 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse (SteerMouse-style), autoscroll on the wheel button, plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings (CleanShot-style), with window backdrops and small H.264 files. |
 | 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar (Stats-style), with a memory figure that leaves out what macOS only caches. |
@@ -426,9 +426,19 @@ soon as the same mouse is connected.
 | Wheel acceleration | macOS / off / custom | `HIDMouseScrollAcceleration` on the device's HID service |
 | Wheel smoothing | macOS / smooth | scroll event tap |
 | Back and forward buttons | macOS / navigate | event tap; sends a navigation swipe to Apple apps |
+| Wheel button | macOS / autoscroll, with a speed | event tap; posts scroll events while the button is held |
 
 Cursor settings need no permission. The wheel and button settings that go through the event tap need
 **Accessibility**. Trackpad scrolling is never modified.
+
+**Autoscroll** is the Windows browser feature, in every app: hold the wheel button and move the mouse,
+and the window scrolls that way, faster the farther you move from where you pressed. A marker shows
+that spot, and letting go stops. A wheel click without moving is still a normal middle click, so
+links still open in new tabs. Hold **⌥** (or the key picked in the settings) while pressing the wheel
+to get the app's own behaviour for that press, such as its own autoscroll or panning, without giving
+up autoscroll in that app. Apps that should always get the button (design apps that pan with it,
+remote desktops, virtual machines) can be added to **Leave the wheel button to these apps**; the app
+under the cursor when you press decides. Both count for every mouse.
 
 ## Finder
 

@@ -1,16 +1,18 @@
 import AppKit
 import CoreGraphics
 
-/// Rewrites events from mice: wheel direction, distance and smoothing, and
-/// the side buttons. Trackpad and Magic Mouse scrolling (continuous events)
+/// Rewrites events from mice: wheel direction, distance and smoothing, the
+/// side buttons, and autoscroll on the wheel button. Trackpad and Magic Mouse scrolling (continuous events)
 /// is never touched.
 final class WheelEngine {
     /// Stamped on events we post ourselves so the tap lets them through.
-    private static let marker: Int64 = 0x54494C4C
+    static let marker: Int64 = 0x54494C4C
 
     /// Returns the profile of the mouse that is scrolling, if it has one.
     /// Called on the tap's thread, so it must be safe there.
     var profileProvider: () -> Profile? = { nil }
+    /// On the tap's thread, like the smoothing.
+    let autoscroller = Autoscroller()
 
     /// Everything below, the smoothing included, lives on the tap's thread.
     private var tap: EventTap?
@@ -32,7 +34,7 @@ final class WheelEngine {
     @discardableResult
     func start() -> Bool {
         if tap != nil { return true }
-        tap = EventTap(name: "wheel", events: [.scrollWheel, .otherMouseDown, .otherMouseUp]) { [weak self] type, event in
+        tap = EventTap(name: "wheel", events: [.scrollWheel, .otherMouseDown, .otherMouseUp, .otherMouseDragged]) { [weak self] type, event in
             // nil means "take the event": `??` here would pass it on after all.
             guard let self else { return Unmanaged.passUnretained(event) }
             return self.handle(type: type, event: event)
@@ -42,8 +44,17 @@ final class WheelEngine {
 
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { return pass }
-        if type == .otherMouseDown || type == .otherMouseUp {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            // The wheel button's release may have gone by unseen.
+            autoscroller.cancel()
+            return pass
+        }
+        if type == .otherMouseDown || type == .otherMouseUp || type == .otherMouseDragged {
+            if event.getIntegerValueField(.mouseEventButtonNumber) == 2,
+               event.getIntegerValueField(.eventSourceUserData) != Self.marker {
+                return autoscroller.handle(type: type, event: event, profile: profileProvider) ? nil : pass
+            }
+            if type == .otherMouseDragged { return pass }
             return handleButton(type: type, event: event) ? nil : pass
         }
         if type == .scrollWheel, loggedEvents < 5 {

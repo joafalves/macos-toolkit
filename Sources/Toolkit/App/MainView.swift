@@ -121,7 +121,7 @@ private struct GeneralView: View {
             }
 
             Card(title: "Permissions") {
-                SettingRow(title: "Accessibility", caption: "Used by Mouse for the wheel direction, speed and smoothing, by the Window Switcher, by Window Layout to move windows, by Finder for Cut and swipes, by Screen Capture to find where a window's content starts, and by Keep Awake to stay available.") {
+                SettingRow(title: "Accessibility", caption: "Used by Mouse for the wheel direction, speed, smoothing and autoscroll, by the Window Switcher, by Window Layout to move windows, by Finder for Cut and swipes, by Screen Capture to find where a window's content starts, and by Keep Awake to stay available.") {
                     if mouse.accessibilityGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
