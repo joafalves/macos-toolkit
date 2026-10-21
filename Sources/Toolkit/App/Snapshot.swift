@@ -250,6 +250,78 @@ enum Snapshot {
         save(bar, to: path)
     }
 
+    /// Window Layout's suggestions after a drop on the left edge: a drawn
+    /// window in the left half, and the switcher's grid of made-up windows
+    /// in the right half. Nothing from the screen.
+    static func writeLayoutSuggest(to path: String, light: Bool) {
+        _ = NSApplication.shared
+        let size = CGSize(width: 1512, height: 982)
+        let usable = CGRect(x: 0, y: 33, width: size.width, height: 949 - 70)
+        let gap: CGFloat = 8
+        let leftHalf = LayoutGeometry.place(CGRect(x: 0, y: 0, width: 0.5, height: 1), in: usable, gap: gap)
+        let rightHalf = LayoutGeometry.place(CGRect(x: 0.5, y: 0, width: 0.5, height: 1), in: usable, gap: gap)
+        // Core Graphics frames, top left origin, into this unflipped view.
+        func local(_ r: CGRect) -> CGRect { CGRect(x: r.minX, y: size.height - r.maxY, width: r.width, height: r.height) }
+
+        let desktop = NSImage(size: size, flipped: true) { rect in
+            let colors: [NSColor] = light ? [NSColor(calibratedRed: 0.55, green: 0.7, blue: 0.95, alpha: 1), NSColor(calibratedRed: 0.85, green: 0.75, blue: 0.95, alpha: 1)]
+                                          : [NSColor(calibratedRed: 0.1, green: 0.14, blue: 0.3, alpha: 1), NSColor(calibratedRed: 0.3, green: 0.15, blue: 0.35, alpha: 1)]
+            NSGradient(colors: colors)?.draw(in: rect, angle: 60)
+            (light ? NSColor(white: 1, alpha: 0.7) : NSColor(white: 0.1, alpha: 0.7)).setFill()
+            NSRect(x: 0, y: 0, width: rect.width, height: 33).fill()
+            if let image = fakeWindow(accent: .systemBlue, dark: !light, wide: false) {
+                NSImage(cgImage: image, size: leftHalf.size).draw(in: leftHalf)
+            }
+            return true
+        }
+        let container = NSView(frame: CGRect(origin: .zero, size: size))
+        let background = NSImageView(frame: container.bounds)
+        background.image = desktop
+        background.imageScaling = .scaleAxesIndependently
+        container.addSubview(background)
+
+        func icon(_ app: String) -> NSImage { NSWorkspace.shared.icon(forFile: "/System/Applications/\(app).app") }
+        let rows: [(String, String, NSColor)] = [("Inbox — 3 new messages", "Mail", .systemBlue), ("Notes", "Notes", .systemYellow),
+                                                 ("October 2026", "Calendar", .systemRed), ("macos-toolkit — zsh", "Terminal", .darkGray),
+                                                 ("Untitled", "TextEdit", .systemOrange)]
+        let model = SwitcherListModel()
+        model.items = rows.enumerated().map { index, row in
+            SwitcherItem(id: "\(index)", window: CGWindowID(index + 1), pid: 0, title: row.0, appName: row.1, icon: icon(row.1), state: .window)
+        }
+        for (index, row) in rows.enumerated() {
+            if let image = fakeWindow(accent: row.2, dark: !light, wide: index % 2 == 0) { model.previews[CGWindowID(index + 1)] = image }
+        }
+        model.style = .previews
+        model.layout = GridLayout(count: rows.count, maxTileWidth: PreviewSize.large.maxTileWidth,
+                                  area: CGSize(width: rightHalf.width - 24, height: rightHalf.height - 24))
+        model.selection = 0
+        let panelSize = model.layout.size
+        let panelFrame = CGRect(x: rightHalf.midX - panelSize.width / 2, y: rightHalf.midY - panelSize.height / 2,
+                                width: panelSize.width, height: panelSize.height)
+        // The part offered, outlined the way the app shows it.
+        let display = LayoutDisplay(id: 1, uuid: "preview", name: "Built-in Display", frame: CGRect(origin: .zero, size: size), usable: usable)
+        let outline = LayoutOverlayView(display: display)
+        outline.content = LayoutOverlayContent(highlight: rightHalf)
+        outline.frame = container.bounds
+        container.addSubview(outline)
+        let panel = NSView(frame: local(panelFrame))
+        panel.wantsLayer = true
+        panel.layer?.cornerRadius = 14
+        panel.layer?.backgroundColor = (light ? NSColor(white: 0.96, alpha: 0.92) : NSColor(white: 0.16, alpha: 0.92)).cgColor
+        let grid = NSHostingView(rootView: SwitcherView(model: model))
+        grid.frame = panel.bounds
+        panel.addSubview(grid)
+        container.addSubview(panel)
+
+        let window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = container
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        save(container, to: path)
+    }
+
     /// The menu bar mixer, filled with made-up rows.
     static func writeMixer(to path: String, light: Bool, outputs: Bool, software: Bool, equalizer: Bool) {
         _ = NSApplication.shared

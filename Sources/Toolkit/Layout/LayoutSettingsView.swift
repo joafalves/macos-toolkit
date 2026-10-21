@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The "Window Layout" section.
@@ -6,6 +7,8 @@ struct LayoutSettingsView: View {
     @ObservedObject var mouse: MouseController
 
     private var config: LayoutConfig { layout.config }
+    /// Screen Recording, checked again when the app comes back to the front.
+    @StateObject private var recording = ViewState(SwitcherPreviews.permitted)
 
     private static let groups: [(String, [LayoutAction])] = [
         ("Halves", [.leftHalf, .rightHalf, .topHalf, .bottomHalf]),
@@ -69,6 +72,15 @@ struct LayoutSettingsView: View {
                     Banner(text: "Rectangle is running. It has the same shortcuts and snaps windows too, so the two get in each other's way.",
                            button: "Quit Rectangle") { layout.quitRectangle() }
                 }
+                if config.suggest == .previews, !recording.value, !layout.isPreview {
+                    Banner(text: "Suggestions show pictures of your windows with the Screen Recording permission. Until then they show the list.",
+                           button: "Allow…") {
+                        if !CGRequestScreenCaptureAccess() {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
+                        }
+                        recording.value = SwitcherPreviews.permitted
+                    }
+                }
                 if !layout.failedShortcuts.isEmpty {
                     Banner(text: "Another app already has \(layout.failedShortcuts.joined(separator: ", ")). Change them below, or quit that app and turn Window Layout off and on.",
                            button: "Retry") { layout.retryShortcuts() }
@@ -118,6 +130,18 @@ struct LayoutSettingsView: View {
                               }),
                               options: DragModifier.allCases.map { ($0, $0.title) })
                     RowDivider()
+                    OptionRow(title: "Suggest windows for the rest",
+                              caption: "After you drop a window into part of a display, other windows are offered for the part that's left; click one, or press its number. Previews need Screen Recording, and show the list until then.",
+                              selection: $layout.config.suggest,
+                              options: SuggestStyle.allCases.map { ($0, $0.title) })
+                    if layout.config.suggest != .off {
+                        RowDivider()
+                        OptionRow(title: "Windows from other displays",
+                                  caption: "This Display offers only that display's windows. If None Here offers the others' when it has none. Always lists them after its own.",
+                                  selection: $layout.config.suggestFrom,
+                                  options: SuggestFrom.allCases.map { ($0, $0.title) })
+                    }
+                    RowDivider()
                     ToggleRow(title: "Stop at the edge between displays",
                               caption: "While dragging a window, the pointer stops where one display meets another, so the snap there is easy to hit. Moving away or along the edge lets go; keep pushing to cross. Once per drag.",
                               isOn: $layout.config.holdAtEdges)
@@ -128,7 +152,7 @@ struct LayoutSettingsView: View {
                 }
 
                 Card(title: "Placement") {
-                    SettingRow(title: "Gap", caption: "Space between windows and around the edges of the display.") {
+                    SettingRow(title: "Gap", caption: "Space between windows and around the edges of the display. macOS's own margins follow it: off with no gap, otherwise its fixed 8 points. Up to 8, Maximize is macOS's own Fill, so the window counts as filled; above that it's placed with the gap.") {
                         EmptyView()
                     } extra: {
                         ValueSlider(value: $layout.config.gap, range: 0...40, step: 2, low: "0", high: "40") {
@@ -151,6 +175,9 @@ struct LayoutSettingsView: View {
                     }
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            recording.value = SwitcherPreviews.permitted
         }
     }
 }

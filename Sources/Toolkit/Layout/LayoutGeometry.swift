@@ -51,6 +51,9 @@ enum LayoutGeometry {
     /// pointer has to stop short of it, often while moving fast: more room there.
     static let sharedEdgeMargin: CGFloat = 24
     static let cornerSize: CGFloat = 20
+    /// The margin macOS leaves around a window it fills, with its margins
+    /// on; it has no setting for the size.
+    static let macOSMargin: CGFloat = 8
     /// What Larger and Smaller change each side by.
     static let step: CGFloat = 30
 
@@ -131,6 +134,22 @@ enum LayoutGeometry {
         case .almostMaximize: return CGRect(x: 0.05, y: 0.05, width: 0.9, height: 0.9)
         default: return nil
         }
+    }
+
+    /// What's left of the display beside a part that runs its whole height
+    /// or width from one edge (a half, a third, two thirds): nil for any
+    /// other shape, which leaves no single part to fill.
+    static func complement(of unit: CGRect) -> CGRect? {
+        let e: CGFloat = 0.001
+        if abs(unit.minY) < e, abs(unit.height - 1) < e {
+            if abs(unit.minX) < e, unit.maxX < 1 - e { return CGRect(x: unit.maxX, y: 0, width: 1 - unit.maxX, height: 1) }
+            if abs(unit.maxX - 1) < e, unit.minX > e { return CGRect(x: 0, y: 0, width: unit.minX, height: 1) }
+        }
+        if abs(unit.minX) < e, abs(unit.width - 1) < e {
+            if abs(unit.minY) < e, unit.maxY < 1 - e { return CGRect(x: 0, y: unit.maxY, width: 1, height: 1 - unit.maxY) }
+            if abs(unit.maxY - 1) < e, unit.minY > e { return CGRect(x: 0, y: 0, width: 1, height: unit.minY) }
+        }
+        return nil
     }
 
     /// Where a left or right half goes next: the display that way, as the

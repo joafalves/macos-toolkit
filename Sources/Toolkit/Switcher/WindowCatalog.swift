@@ -70,6 +70,22 @@ final class WindowCatalog {
 
     // MARK: - Lifecycle
 
+    /// One list for every tool that needs it (the switcher, Window Layout's
+    /// suggestions), watched while any of them does.
+    static let shared = WindowCatalog()
+    private var users = Set<ObjectIdentifier>()
+
+    func use(_ user: AnyObject, _ on: Bool) {
+        let id = ObjectIdentifier(user)
+        if on {
+            guard users.insert(id).inserted else { return }
+            if users.count == 1 { start() }
+        } else {
+            guard users.remove(id) != nil else { return }
+            if users.isEmpty { stop() }
+        }
+    }
+
     func start() {
         guard tokens.isEmpty else { return }
         // An app that has hung should cost us a moment, not the default six seconds.

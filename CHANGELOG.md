@@ -3,6 +3,21 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.12.0 (unreleased)
+
+### Added
+
+- **Window Layout:** after a window snaps to an edge or into a layout from the ⌥ bar, the rest of the
+  display offers your other windows to fill it, as Windows' Snap Assist does: click one or press
+  its number. Windows from other displays can be offered too, only when there's none left here (the
+  default), or always.
+
+### Changed
+
+- **Window Layout:** the gap starts at 8 points, macOS's own margin, and macOS's tiling margins follow
+  it: with no gap, double-clicking a title bar fills the whole display. ⌃⌥↩ with a gap of up to 8
+  points is macOS's own Fill.
+
 ## 0.11.0 (2026-10-21)
 
 ### Added

@@ -294,7 +294,7 @@ changes; each one can be changed or cleared in the settings.
 | ⌃⌥ U I J K | Top left, top right, bottom left, bottom right quarter |
 | ⌃⌥ D F G | First, center, last third (down the display on one that stands upright) |
 | ⌃⌥ E T | First, last two thirds |
-| ⌃⌥↩ | Maximize. Almost maximize (nine tenths, centred) is there too, without a key |
+| ⌃⌥↩ | Maximize. With a gap of up to 8 points it's macOS's own Fill, so macOS treats the window as filled, as after a double-click on its title bar. Almost maximize (nine tenths, centred) is there too, without a key |
 | ⌃⌥⇧↑ | Maximize the height, keeping the width |
 | ⌃⌥C | Center |
 | ⌃⌥= ⌃⌥- | Larger, smaller: 30 points on every side |
@@ -353,6 +353,22 @@ Dragging across the cells with the mouse works too.
   displays as usual otherwise.
 - A snapped window you drag away gets back the size it had before, with the pointer at the same
   place on it.
+- **Suggest windows for the rest** (on, set to Previews): after a window is dropped on an edge or
+  into a layout from the ⌥ bar, the part of the display that's left shows your other windows on
+  the current Space, most recently used first, as Windows' Snap Assist does. **Windows from other
+  displays** sets whether yours elsewhere are offered: **This Display** only, **If None Here**
+  (the default: when that display has nothing else on it), or **Always**, after its own. Click one, or
+  press its number (arrows and ↩ work too), and it goes there; in a layout of three, the part after
+  that is offered next. Esc, a click elsewhere or typing makes it go away. Nothing is offered for a
+  part that already has a window in it, or after keyboard moves. It uses the Window Switcher's list
+  and grid; **Previews** needs Screen Recording and shows the **List** until then.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-suggest-dark.png">
+    <img src="docs/images/layout-suggest-light.png" width="620" alt="A window in the left half of a display, and pictures of five other windows filling the right half to pick from">
+  </picture>
+</p>
 
 <p align="center">
   <picture>
@@ -361,7 +377,12 @@ Dragging across the cells with the mouse works too.
   </picture>
 </p>
 
-A **gap** of up to 40 points can go between windows and around the edges. A window that can't take
+A **gap** of up to 40 points (8 to begin with, macOS's own margin) can go between windows and around the edges. macOS's own tiling
+margins follow it while the tool is on: with no gap they're off, so double-clicking a title bar
+(set to Fill in System Settings → Desktop & Dock) fills the whole display; with a gap they're on,
+at macOS's fixed 8 points (there's no setting for their size).
+macOS reads that setting only when its window manager starts, so the toolkit restarts it when the
+setting changes (desktop widgets redraw for a moment). A window that can't take
 the size (it has a minimum, or can't be resized) gets as close as it goes, centred on the spot.
 Windows in full screen, panels, dialogs and sheets are left alone.
 
@@ -580,7 +601,7 @@ under a Settings header. **General → Space between items** sets how far apart 
   keys). They can change in any macOS update, and this
   is a personal tool, so expect to rebuild when they do.
 - It is **not notarized**, which is why the install steps above remove the quarantine flag.
-- Anything the toolkit changes outside itself (⌘Tab, the screenshot keys, macOS's window tiling,
+- Anything the toolkit changes outside itself (⌘Tab, the screenshot keys, macOS's window tiling and its margins,
   device properties, audio taps, sleep with the lid closed) is put back when it quits, when it is killed, and at the next launch if it crashed.
 
 ## Project layout

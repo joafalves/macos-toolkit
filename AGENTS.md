@@ -121,6 +121,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png menu-bar-strip [light]  # the item in a drawn menu bar, for the top of the README
 .build/debug/Toolkit --snapshot out.png layout-grid [light]     # the Window Layout grid over a drawn desktop
 .build/debug/Toolkit --snapshot out.png layout-slots [light]    # its layouts bar while dragging
+.build/debug/Toolkit --snapshot out.png layout-suggest [light]  # the windows it offers for the rest of a display
 .build/debug/Toolkit --test-capture <folder> [app]   # each screenshot kind and short recordings, with a report
 .build/debug/Toolkit --test-recording        # the app's recording path: start, stop button, discard
 .build/debug/Toolkit --test-layout [report]  # geometry, then a helper's windows placed for real (run with open -n)
@@ -138,6 +139,8 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-highlight        # the window highlight sits right above its window
 .build/debug/Toolkit --test-switcher-previews   # times the grid's pictures of real windows; keeps none
 .build/debug/Toolkit --list-windows [--counts <file>]   # what the Window Switcher would list; with --counts, how many and the lookups it took
+.build/debug/Toolkit --list-suggestions [file]  # per display, what Window Layout would offer for the rest
+.build/debug/Toolkit --dump-menus <app> [file]  # an app's menu items with key equivalents and identifiers
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
 ```

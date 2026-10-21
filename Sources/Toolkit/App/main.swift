@@ -16,7 +16,8 @@ if CommandLine.arguments.contains("--register-login-item") {
 // `switcher-list` in place of a section renders the window switcher's list,
 // `mixer-popover [outputs] [software] [equalizer]` the menu bar mixer,
 // `capture-toolbar [video]` the Screen Capture toolbar, `layout-grid` the
-// Window Layout grid over a drawn desktop, `layout-slots` its drag layouts.
+// Window Layout grid over a drawn desktop, `layout-slots` its drag layouts,
+// `layout-suggest` the windows it offers for the rest of a display.
 if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.arguments.count > flag + 1 {
     let rest = Array(CommandLine.arguments[(flag + 1)...])
     if rest.contains("switcher-list") || rest.contains("switcher-grid") {
@@ -33,6 +34,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     }
     if rest.contains("menu-bar") {
         Snapshot.writeMenuBar(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
+    if rest.contains("layout-suggest") {
+        Snapshot.writeLayoutSuggest(to: rest[0], light: rest.contains("light"))
         exit(0)
     }
     if rest.contains("layout-grid") || rest.contains("layout-slots") {
@@ -77,6 +82,16 @@ if CommandLine.arguments.contains("--test-switcher-previews") {
 // Accessibility is the app's own.
 if let flag = CommandLine.arguments.firstIndex(of: "--test-layout") {
     LayoutController.selfTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+if let flag = CommandLine.arguments.firstIndex(of: "--list-suggestions") {
+    LayoutController.dumpSuggestions(CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+if let flag = CommandLine.arguments.firstIndex(of: "--dump-menus"), CommandLine.arguments.count > flag + 1 {
+    let output = CommandLine.arguments.count > flag + 2 ? CommandLine.arguments[flag + 2] : nil
+    if let output { freopen(output, "w", stdout) }
+    LayoutController.dumpMenus(CommandLine.arguments[flag + 1])
     exit(0)
 }
 if CommandLine.arguments.contains("--layout-test-window") {

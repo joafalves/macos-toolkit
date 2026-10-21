@@ -111,6 +111,74 @@ extension LayoutController {
         check("stacked: caught at the bottom edge", down.step(CGPoint(x: 700, y: 979), delta: CGVector(dx: 0, dy: 3), in: stacked, now: 0.01) == .hold(CGPoint(x: 700, y: 981)))
         _ = down.step(CGPoint(x: 700, y: 981), delta: none, in: stacked, now: 0.02)
         check("pushing down with a little sideways stays put", down.step(CGPoint(x: 700, y: 981), delta: CGVector(dx: 2, dy: 8), in: stacked, now: 0.03) == .hold(CGPoint(x: 700, y: 981)))
+        // macOS's settings, remembered and put back, on a made-up domain and file.
+        let realDomain = SystemTiling.domain, realFile = SystemTiling.savedURL
+        let testDomain = "dev.jalves.macos-toolkit.selftest.tiling" as CFString
+        SystemTiling.domain = testDomain
+        SystemTiling.savedURL = FileManager.default.temporaryDirectory.appendingPathComponent("toolkit-selftest-tiling.json")
+        try? FileManager.default.removeItem(at: SystemTiling.savedURL)
+        func put(_ key: String, _ on: Bool?) {
+            CFPreferencesSetValue(key as CFString, on.map { NSNumber(value: $0) }, testDomain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        }
+        let margins = SystemTiling.marginsKey, edge = SystemTiling.dragKeys[0]
+        put(margins, true)
+        put(edge, nil)
+        SystemTiling.change([margins: false, edge: false])
+        check("margins off, edge tiling off", SystemTiling.value(margins) == false && SystemTiling.value(edge) == false)
+        SystemTiling.change([margins: true])
+        SystemTiling.change([margins: false])
+        SystemTiling.restore([margins])
+        check("margins back as they were first, the rest still changed", SystemTiling.value(margins) == true && SystemTiling.value(edge) == false)
+        SystemTiling.restore()
+        check("edge tiling back to never set", SystemTiling.value(edge) == nil)
+        check("nothing left to put back", !FileManager.default.fileExists(atPath: SystemTiling.savedURL.path))
+        put(margins, false)
+        SystemTiling.change([margins: false])
+        check("a key already right isn't remembered", !FileManager.default.fileExists(atPath: SystemTiling.savedURL.path))
+        put(margins, true)
+        SystemTiling.change([margins: false, edge: false])
+        SystemTiling.hand([edge: true])
+        SystemTiling.restore()
+        check("handed back stays, the rest is put back", SystemTiling.value(edge) == true && SystemTiling.value(margins) == true)
+        put(margins, nil)
+        put(edge, nil)
+        CFPreferencesSynchronize(testDomain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        // The made-up domain leaves an empty file behind otherwise.
+        let leftover = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences/\(testDomain).plist")
+        try? FileManager.default.removeItem(at: leftover)
+        SystemTiling.domain = realDomain
+        SystemTiling.savedURL = realFile
+
+        // What's left after a drop, for the suggestions.
+        let left = CGRect(x: 0, y: 0, width: 0.5, height: 1)
+        check("beside the left half: the right half", LayoutGeometry.complement(of: left) == CGRect(x: 0.5, y: 0, width: 0.5, height: 1))
+        check("beside the bottom third: the top two thirds",
+              LayoutGeometry.complement(of: CGRect(x: 0, y: 2.0 / 3, width: 1, height: 1.0 / 3)).map { abs($0.height - 2.0 / 3) < 0.001 && $0.minY == 0 } ?? false)
+        check("beside a quarter: nothing clean", LayoutGeometry.complement(of: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)) == nil)
+        check("beside the whole display: nothing", LayoutGeometry.complement(of: CGRect(x: 0, y: 0, width: 1, height: 1)) == nil)
+        let rightHalf = LayoutGeometry.place(CGRect(x: 0.5, y: 0, width: 0.5, height: 1), in: laptop.usable, gap: 8)
+        let shown = [SnapAssist.OnScreen(id: 1, frame: LayoutGeometry.place(left, in: laptop.usable, gap: 8)),
+                     SnapAssist.OnScreen(id: 2, frame: CGRect(x: 300, y: 200, width: 600, height: 400)),
+                     SnapAssist.OnScreen(id: 3, frame: CGRect(x: 2000, y: 200, width: 600, height: 400)),
+                     SnapAssist.OnScreen(id: 4, frame: rightHalf.insetBy(dx: 3, dy: 3))]
+        check("a slot with a window in it is filled", SnapAssist.filled(rightHalf, by: shown, except: [1]))
+        check("not by the window just dropped", !SnapAssist.filled(rightHalf, by: Array(shown.prefix(3)), except: [1]))
+        let maximized = SnapAssist.OnScreen(id: 9, frame: LayoutGeometry.place(CGRect(x: 0, y: 0, width: 1, height: 1), in: laptop.usable, gap: 8))
+        check("nor by one in the slot but under a maximized window", !SnapAssist.filled(rightHalf, by: [shown[0], maximized, shown[3]], except: [1]))
+        check("but by one in front of it", SnapAssist.filled(rightHalf, by: [shown[0], shown[3], maximized], except: [1]))
+        func row(_ id: CGWindowID, _ state: SwitcherItem.State = .window) -> SwitcherItem {
+            SwitcherItem(id: "w\(id)", window: id, pid: 1, title: "\(id)", appName: "App", icon: nil, state: state)
+        }
+        let offered = SnapAssist.candidates([row(4), row(2), row(3), row(1), row(5, .minimized), row(6)],
+                                            onScreen: shown, on: laptop, in: pair, excluding: [1])
+        check("offered, always: this display's open windows first, then the other display's, not the dropped one",
+              offered.compactMap(\.window) == [4, 2, 3], "\(offered.compactMap(\.window))")
+        let only = SnapAssist.candidates([row(4), row(2), row(3)], onScreen: shown, on: laptop, in: pair, excluding: [1], from: .display)
+        check("this display only: not the other display's", only.compactMap(\.window) == [4, 2])
+        let fallback = SnapAssist.candidates([row(4), row(2), row(3)], onScreen: shown, on: laptop, in: pair, excluding: [1], from: .fallback)
+        check("if none here, with some here: just this display's", fallback.compactMap(\.window) == [4, 2])
+        let elsewhere = SnapAssist.candidates([row(4), row(2), row(3)], onScreen: shown, on: wide, in: pair, excluding: [1, 3], from: .fallback)
+        check("if none here, with none here: the other display's", elsewhere.compactMap(\.window) == [4, 2], "\(elsewhere.compactMap(\.window))")
         let picker = SlotPicker(display: laptop, pointer: CGPoint(x: 700, y: 500))
         check("layouts bar sits above the pointer", picker.frame.maxY <= 500 - 20 && picker.frame.contains(CGPoint(x: 700, y: picker.frame.midY)))
         check("or below it near the top", SlotPicker(display: laptop, pointer: CGPoint(x: 700, y: 60)).frame.minY > 60)
@@ -240,6 +308,22 @@ extension LayoutController {
                     }
                 }
                 expect("restore brings it back", .action(.restore), start)
+                // A new gap: windows we placed, and still there, take it.
+                layout.place(window, .action(.leftHalf), displays: displays, gap: 0, cycle: false)
+                layout.config.gap = 12
+                layout.applyGap()
+                let regapped = LayoutGeometry.place(CGRect(x: 0, y: 0, width: 0.5, height: 1), in: display.usable, gap: 12)
+                for _ in 0..<40 where !(window.frame.map { LayoutWindow.close($0, regapped) } ?? false) {
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+                }
+                check("a new gap moves a placed window to match", window.frame.map { LayoutWindow.close($0, regapped) } ?? false, text(window.frame))
+                window.setFrame(CGRect(x: 300, y: 300, width: 500, height: 400), within: display.usable)
+                layout.config.gap = 20
+                layout.applyGap()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+                check("but not one moved by hand since", window.frame.map { LayoutWindow.close($0, CGRect(x: 300, y: 300, width: 500, height: 400)) } ?? false, text(window.frame))
+                layout.config.gap = 0
+                window.setFrame(start, within: display.usable)
                 // The real window list, as a drag sees it: through the Dock's
                 // overlay and anything else that covers a display.
                 if let frame = window.frame {
@@ -282,6 +366,48 @@ extension LayoutController {
                 expect("restore: back to where it was put by hand", .action(.restore), unit(.leftHalf))
                 window.setFrame(start, within: display.usable)
                 expect("maximize", .action(.maximize), unit(.maximize))
+                // Fill through the helper's Window menu, as macOS would do it. Only
+                // the app in front has a focused window, so the helper comes
+                // forward for a moment, and the app that was there goes back.
+                let front = NSWorkspace.shared.frontmostApplication
+                NSRunningApplication(processIdentifier: helper.processIdentifier)?.activate()
+                for _ in 0..<20 where !window.isFocusedInApp { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+                // Its menus are filled in once it's in front.
+                RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+                if window.isFocusedInApp {
+                    layout.place(window, .action(.restore), displays: displays, gap: 0, cycle: false)
+                    var filled = false
+                    var attempts = 0
+                    while !filled, attempts < 50 {
+                        attempts += 1
+                        filled = window.perform(.fill)
+                        if !filled { RunLoop.main.run(until: Date().addingTimeInterval(0.2)) }
+                    }
+                    lines.append("     Fill pressed: \(filled) after \(attempts) tries, focused \(window.isFocusedInApp)")
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+                    let after = window.frame
+                    check("macOS's Fill is there to press", filled)
+                    let inset = after.map { a in [a.minX - display.usable.minX, a.minY - display.usable.minY, display.usable.maxX - a.maxX, display.usable.maxY - a.maxY].map { Int($0) } } ?? []
+                    lines.append("     macOS Fill: \(text(after)) in \(text(display.usable)), margins \(inset), EnableTiledWindowMargins = \(SystemTiling.value(SystemTiling.marginsKey).map(String.init) ?? "missing")")
+                    if SystemTiling.value(SystemTiling.marginsKey) == false {
+                        check("with macOS's margins off, Fill takes the whole display", after.map { LayoutWindow.close($0, display.usable) } ?? false, text(after))
+                    }
+                    // Through the controller: a maximize with no gap is macOS's Fill.
+                    layout.place(window, .action(.maximize), displays: displays, gap: 0, cycle: false)
+                    let maximized = window.frame
+                    check("maximize with no gap uses macOS's Fill", maximized.map { LayoutWindow.near($0, unit(.maximize)) } ?? false, text(maximized))
+                    // Filled by macOS, then placed by us: ours sticks.
+                    layout.place(window, .action(.leftHalf), displays: displays, gap: 0, cycle: false)
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+                    check("a window macOS filled still goes where we put it", window.frame.map { LayoutWindow.close($0, unit(.leftHalf)) } ?? false, text(window.frame))
+                    window.setFrame(start, within: display.usable)
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+                } else {
+                    lines.append("skip Fill check: the helper's window isn't its focused one")
+                }
+                // The rest with the helper in the background, placed by our own frames.
+                front?.activate()
+                for _ in 0..<20 where window.isFocusedInApp { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
                 var cells = CellRange(CellRange.Cell(column: 1, row: 1))
                 cells.cursor = CellRange.Cell(column: 2, row: 2)
                 expect("grid cells", .unit(cells.unit(in: grid), display),
@@ -418,6 +544,13 @@ extension LayoutController {
     static func runTestWindows() {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
+        // A Window menu, which macOS fills with its tiling commands, as every app has.
+        let main = NSMenu()
+        main.addItem(withTitle: "Helper", action: nil, keyEquivalent: "").submenu = NSMenu()
+        let windowMenu = NSMenu(title: "Window")
+        main.addItem(withTitle: "Window", action: nil, keyEquivalent: "").submenu = windowMenu
+        app.mainMenu = main
+        app.windowsMenu = windowMenu
         func window(_ title: String, _ frame: CGRect, min: CGSize? = nil) -> NSWindow {
             let window = NSWindow(contentRect: frame, styleMask: [.titled, .resizable, .closable], backing: .buffered, defer: false)
             window.title = title
@@ -430,7 +563,9 @@ extension LayoutController {
             window("Layout Test", CGRect(x: 240, y: 240, width: 520, height: 380)),
             window("Layout Test Big", CGRect(x: 300, y: 200, width: 960, height: 640), min: CGSize(width: 900, height: 600)),
         ]
-        _ = windows
+        // The key window of its app, without the app coming to the front:
+        // the Window menu's commands act on that one.
+        windows[0].makeKeyAndOrderFront(nil)
         app.run()
     }
 
@@ -460,5 +595,61 @@ extension LayoutController {
             guard _AXUIElementGetWindow(element, &id) == .success else { return nil }
             return (id, LayoutWindow.attribute(element, kAXTitleAttribute) ?? "")
         }
+    }
+}
+
+extension LayoutController {
+    /// `--dump-menus <app name>`: the app's menu items with their key
+    /// equivalents and identifiers, to find macOS's own tiling commands.
+    static func dumpMenus(_ name: String) {
+        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName == name }) else {
+            print("not running: \(name)")
+            return
+        }
+        let element = AXUIElementCreateApplication(app.processIdentifier)
+        guard let bar: AXUIElement = LayoutWindow.attribute(element, kAXMenuBarAttribute) else { return print("no menu bar") }
+        func walk(_ item: AXUIElement, _ depth: Int) {
+            let children: [AXUIElement] = LayoutWindow.attribute(item, kAXChildrenAttribute) ?? []
+            for child in children {
+                let title: String = LayoutWindow.attribute(child, kAXTitleAttribute) ?? ""
+                let char: String = LayoutWindow.attribute(child, kAXMenuItemCmdCharAttribute) ?? ""
+                let mods: Int = LayoutWindow.attribute(child, kAXMenuItemCmdModifiersAttribute) ?? -1
+                let key: Int = LayoutWindow.attribute(child, kAXMenuItemCmdVirtualKeyAttribute) ?? -1
+                let glyph: Int = LayoutWindow.attribute(child, kAXMenuItemCmdGlyphAttribute) ?? -1
+                let id: String = LayoutWindow.attribute(child, "AXIdentifier") ?? ""
+                let role: String = LayoutWindow.attribute(child, kAXRoleAttribute) ?? ""
+                if role != "AXMenu" {
+                    print(String(repeating: "  ", count: depth) + "\(title) | char=\(char) mods=\(mods) key=\(key) glyph=\(glyph) id=\(id)")
+                }
+                if depth < 4 { walk(child, role == "AXMenu" ? depth : depth + 1) }
+            }
+        }
+        let top: [AXUIElement] = LayoutWindow.attribute(bar, kAXChildrenAttribute) ?? []
+        for item in top {
+            let title: String = LayoutWindow.attribute(item, kAXTitleAttribute) ?? ""
+            print("[\(title)]")
+            walk(item, 1)
+        }
+    }
+}
+
+extension LayoutController {
+    /// `--list-suggestions [file]`: per display, the windows the suggestions
+    /// would offer now, front to back.
+    static func dumpSuggestions(_ path: String?) {
+        _ = NSApplication.shared
+        WindowCatalog.shared.start()
+        RunLoop.main.run(until: Date().addingTimeInterval(3))
+        let displays = LayoutDisplay.all()
+        let onScreen = SnapAssist.onScreen()
+        let items = WindowCatalog.shared.snapshot().items
+        var lines = ["\(onScreen.count) windows on screen, \(items.filter { $0.state == .window }.count) open in the list"]
+        for display in displays {
+            let offered = SnapAssist.candidates(items, onScreen: onScreen, on: display, in: displays, excluding: [])
+            lines.append("\(display.name): \(offered.count) — " + offered.map { "\($0.appName): \($0.title)" }.joined(separator: " | "))
+        }
+        let output = lines.joined(separator: "\n") + "\n"
+        print(output, terminator: "")
+        if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
     }
 }

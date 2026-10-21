@@ -102,6 +102,38 @@ struct GridSize: Codable, Equatable {
     static let ultrawideAspect: CGFloat = 2.1
 }
 
+/// What's offered for the rest of a display after a window is dropped into
+/// part of it: nothing, the switcher's list, or its pictures.
+enum SuggestStyle: String, Codable, CaseIterable {
+    case off, list, previews
+
+    var title: String {
+        switch self {
+        case .off: return "Off"
+        case .list: return "List"
+        case .previews: return "Previews"
+        }
+    }
+}
+
+/// Whether windows on other displays are offered for the rest of one.
+enum SuggestFrom: String, Codable, CaseIterable {
+    /// Only this display's.
+    case display
+    /// This display's, or the others' when it has none.
+    case fallback
+    /// This display's first, then the others'.
+    case all
+
+    var title: String {
+        switch self {
+        case .display: return "This Display"
+        case .fallback: return "If None Here"
+        case .all: return "Always"
+        }
+    }
+}
+
 /// The key held while dragging a window to place it on the grid.
 enum DragModifier: String, Codable, CaseIterable {
     case none, shift, control, option, command
@@ -135,8 +167,9 @@ struct LayoutConfig: Codable, Equatable {
     var gridShortcut = Self.defaultGridShortcut
     /// By display UUID, so each monitor keeps its own.
     var grids: [String: GridSize] = [:]
-    /// Points between windows and around the edges of the display.
-    var gap: Double = 0
+    /// Points between windows and around the edges of the display. 8 is
+    /// macOS's own margin, so its Fill and ours look the same.
+    var gap: Double = 8
     /// Pressing a half again goes through its sizes, then on to the next display.
     /// At the outer edge of the last display, left and right pressed again
     /// go through ⅔ and ⅓ instead of stopping. Its own key, so the earlier
@@ -153,6 +186,11 @@ struct LayoutConfig: Codable, Equatable {
     /// While a window is dragged, the pointer stops at an edge between
     /// displays until pushed on, so that edge's snap is easy to hit.
     var holdAtEdges = false
+    /// After a window is dropped into part of a display (an edge, a layout),
+    /// the other windows there are offered for the rest. Pictures fall back
+    /// to the list without Screen Recording.
+    var suggest = SuggestStyle.previews
+    var suggestFrom = SuggestFrom.fallback
 
     /// ⌃⌥Space is macOS's "next input source".
     static let defaultGridShortcut = Shortcut(keyCode: kVK_Space, flags: [.control, .option, .command])
@@ -165,7 +203,7 @@ struct LayoutConfig: Codable, Equatable {
         shortcuts = (try? c.decodeIfPresent([String: Shortcut].self, forKey: .shortcuts)) ?? [:]
         gridShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .gridShortcut)) ?? Self.defaultGridShortcut
         grids = (try? c.decodeIfPresent([String: GridSize].self, forKey: .grids)) ?? [:]
-        gap = min(max(try c.decodeIfPresent(Double.self, forKey: .gap) ?? 0, 0), 40)
+        gap = min(max(try c.decodeIfPresent(Double.self, forKey: .gap) ?? 8, 0), 40)
         cycleAtEdge = try c.decodeIfPresent(Bool.self, forKey: .cycleAtEdge) ?? false
         edgeSnapping = try c.decodeIfPresent(Bool.self, forKey: .edgeSnapping) ?? true
         dragGrid = (try? c.decodeIfPresent(DragModifier.self, forKey: .dragGrid)) ?? .shift
@@ -174,6 +212,8 @@ struct LayoutConfig: Codable, Equatable {
         if dragSlots == dragGrid { dragGrid = .none }
         restoreOnDragOut = try c.decodeIfPresent(Bool.self, forKey: .restoreOnDragOut) ?? true
         holdAtEdges = try c.decodeIfPresent(Bool.self, forKey: .holdAtEdges) ?? false
+        suggest = (try? c.decodeIfPresent(SuggestStyle.self, forKey: .suggest)) ?? .previews
+        suggestFrom = (try? c.decodeIfPresent(SuggestFrom.self, forKey: .suggestFrom)) ?? .fallback
         // For a while it had strengths; any of them was on.
         if !c.contains(.holdAtEdges), let old = try? decoder.container(keyedBy: Legacy.self).decodeIfPresent(String.self, forKey: .edgeHold) {
             holdAtEdges = old != "off"

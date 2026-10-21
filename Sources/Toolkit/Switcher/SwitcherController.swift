@@ -28,7 +28,7 @@ final class SwitcherController: ObservableObject {
     /// A quick Cmd-Tab is over before this, and switches without showing anything.
     private static let revealDelay = 0.15
 
-    private let catalog = WindowCatalog()
+    private let catalog = WindowCatalog.shared
     private let panel = SwitcherPanel()
     private let previews = SwitcherPreviews()
     /// Takes new pictures while the grid is open, in Live mode.
@@ -112,7 +112,7 @@ final class SwitcherController: ObservableObject {
             NSLog("Toolkit: switcher event tap started = \(installed)")
             if tapFailed == installed { tapFailed = !installed }
             guard installed else { return }
-            catalog.start()
+            catalog.use(self, true)
         }
         // macOS handles its own ⌘Tab before event taps see the keys, so it has
         // to be switched off while ours is ⌘Tab, and only then.
@@ -139,7 +139,7 @@ final class SwitcherController: ObservableObject {
         end()
         tap.stop()
         self.tap = nil
-        catalog.stop()
+        catalog.use(self, false)
         CGSSetSymbolicHotKeyEnabled(1, true)
         CGSSetSymbolicHotKeyEnabled(2, true)
         systemSwitcherOn = true

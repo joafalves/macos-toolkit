@@ -10,6 +10,7 @@ final class LayoutController: ObservableObject {
         didSet {
             guard config != oldValue, !isPreview else { return }
             config.save()
+            if config.gap != oldValue.gap { scheduleGap() }
             // Switched off by hand (not at launch, nor by a quit): macOS's
             // own tiling takes over.
             if oldValue.enabled && oldValue.watchesDrags, !(config.enabled && config.watchesDrags) { handBack = true }
@@ -31,6 +32,7 @@ final class LayoutController: ObservableObject {
     private let drags = DragWatcher()
     private let gridOverlay = LayoutOverlay()
     private let dragOverlay = LayoutOverlay()
+    private let assist = SnapAssist()
     /// Accessibility calls wait for the other app, so they all happen here,
     /// one at a time and in order.
     private let work = DispatchQueue(label: "dev.jalves.macos-toolkit.layout", qos: .userInitiated)
@@ -56,6 +58,12 @@ final class LayoutController: ObservableObject {
         var action: LayoutAction?
         /// The fraction of its display, so a move to another display keeps it.
         var unit: CGRect?
+        /// Filled by macOS itself, which then also puts it back when it's
+        /// dragged away.
+        var tiledByMacOS = false
+        /// To find the window again, and where its `unit` is, when the gap changes.
+        var pid: pid_t = 0
+        var display: CGDirectDisplayID?
     }
 
     enum Target: Equatable {
@@ -103,6 +111,7 @@ final class LayoutController: ObservableObject {
         drags.onMove = { [weak self] point, flags in self?.dragMoved(point, flags) }
         drags.onDrop = { [weak self] point, flags in self?.dropped(point, flags) }
         drags.onCancel = { [weak self] in self?.dragCancelled() }
+        assist.onPick = { [weak self] item, slot in self?.suggested(item, into: slot) }
 
     }
 
@@ -124,7 +133,10 @@ final class LayoutController: ObservableObject {
     static func testing() -> LayoutController {
         let layout = LayoutController()
         layout.isPreview = true
-        layout.config = LayoutConfig()
+        var config = LayoutConfig()
+        // The checks measure against frames with no gap.
+        config.gap = 0
+        layout.config = config
         layout.refreshDisplays()
         return layout
     }
@@ -158,7 +170,10 @@ final class LayoutController: ObservableObject {
         drags.stop()
         closeGrid()
         dragOverlay.hide()
+        assist.dismiss()
+        WindowCatalog.shared.use(self, false)
         SystemTiling.restore()
+        SystemTiling.commit()
     }
 
     private func apply() {
@@ -176,8 +191,9 @@ final class LayoutController: ObservableObject {
             closeGrid()
             if !failedShortcuts.isEmpty { failedShortcuts = [] }
         }
+        let dragTiling = Dictionary(uniqueKeysWithValues: SystemTiling.dragKeys.map { ($0, false) })
         if config.enabled, config.watchesDrags {
-            SystemTiling.disable()
+            SystemTiling.change(dragTiling)
             startDrags()
         } else {
             drags.stop()
@@ -186,13 +202,25 @@ final class LayoutController: ObservableObject {
             accessTimer?.invalidate()
             accessTimer = nil
             if handBack {
-                SystemTiling.enable()
+                SystemTiling.hand(dragTiling.mapValues { _ in true })
             } else {
                 // Also what puts it back after a crash left it off.
-                SystemTiling.restore()
+                SystemTiling.restore(SystemTiling.dragKeys)
             }
             handBack = false
         }
+        // What macOS fills (a double-clicked title bar, ⌃🌐 arrows) gets our
+        // gap's worth of margin: none at 0, macOS's own otherwise.
+        if config.enabled {
+            SystemTiling.change([SystemTiling.marginsKey: config.gap > 0])
+        } else {
+            SystemTiling.restore([SystemTiling.marginsKey])
+        }
+        SystemTiling.commit()
+        // The suggestions read the switcher's list of windows.
+        let suggesting = config.enabled && config.suggest != .off
+        WindowCatalog.shared.use(self, suggesting)
+        if !suggesting { assist.dismiss() }
     }
 
     /// The drag tap needs Accessibility, which may be granted after launch;
@@ -257,8 +285,10 @@ final class LayoutController: ObservableObject {
         switch command {
         case .action(let action):
             closeGrid()
+            assist.dismiss()
             run(action)
         case .grid:
+            assist.dismiss()
             if grid != nil { closeGrid() } else { openGrid() }
         }
     }
@@ -284,7 +314,7 @@ final class LayoutController: ObservableObject {
         if placements.count > 500 { placements.removeAll() }
         // Only counts if the window is still where we put it.
         let record = placements[window.id].flatMap { LayoutWindow.close($0.applied, frame) ? $0 : nil }
-        var placement = Placement(original: record?.original ?? frame, applied: frame)
+        var placement = Placement(original: record?.original ?? frame, applied: frame, pid: window.pid)
         var display = current
         let rect: CGRect
 
@@ -315,7 +345,9 @@ final class LayoutController: ObservableObject {
             switch action {
             case .restore:
                 guard let record else { return Self.beep() }
-                window.setFrame(record.original, within: current.usable)
+                if !(record.tiledByMacOS && window.perform(.untile)) {
+                    window.setFrame(record.original, within: current.usable)
+                }
                 placements[window.id] = nil
                 return
             case .center:
@@ -399,9 +431,70 @@ final class LayoutController: ObservableObject {
                 rect = fill(unit, on: current)
             }
         }
-        guard let actual = window.setFrame(rect, within: display.usable) else { return Self.beep() }
+        // The whole display is macOS's own Fill, with a gap macOS can come
+        // close to (its margin, on above 0, is 8): the app is asked to do it,
+        // so macOS treats the window as filled, title bar and all. Onto
+        // another display, it goes there first.
+        if gap <= LayoutGeometry.macOSMargin, placement.unit == CGRect(x: 0, y: 0, width: 1, height: 1), window.isFocusedInApp {
+            if display.id != current.id { window.setFrame(rect, within: display.usable) }
+            if window.perform(.fill), let filled = Self.settled(window, near: rect) {
+                placement.applied = filled
+                placement.tiledByMacOS = true
+                placement.display = display.id
+                placements[window.id] = placement
+                return
+            }
+        }
+        guard let actual = window.setFrame(rect, within: display.usable, tiled: record?.tiledByMacOS ?? false) else { return Self.beep() }
         placement.applied = actual
+        // Moved by us, it may still be in macOS's tiling, which then puts it
+        // back by itself when it's dragged away.
+        placement.tiledByMacOS = window.isTiledByMacOS
+        placement.display = display.id
         placements[window.id] = placement
+    }
+
+    // MARK: - Gap changes
+
+    private var gapChange: DispatchWorkItem?
+
+    /// Once the slider has stopped: dragging it would move windows at every step.
+    private func scheduleGap() {
+        gapChange?.cancel()
+        let item = DispatchWorkItem { [weak self] in self?.applyGap() }
+        gapChange = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: item)
+    }
+
+    /// Windows we placed, and that are still there, take the new gap. One
+    /// moved since is left alone, and so is one macOS filled: its margins
+    /// follow the gap by themselves.
+    func applyGap() {
+        let displays = self.displays, gap = CGFloat(config.gap)
+        work.async {
+            for (id, record) in self.placements {
+                guard let unit = record.unit, !record.tiledByMacOS, let displayID = record.display,
+                      let display = displays.first(where: { $0.id == displayID }),
+                      let window = LayoutWindow.find(id: id, pid: record.pid), let frame = window.frame,
+                      LayoutWindow.close(frame, record.applied),
+                      let actual = window.setFrame(LayoutGeometry.place(unit, in: display.usable, gap: gap), within: display.usable)
+                else { continue }
+                self.placements[id]?.applied = actual
+            }
+        }
+    }
+
+    /// Where a window ends up once macOS has finished moving it, which it
+    /// may animate: read until it stops changing, for a moment at most.
+    private static func settled(_ window: LayoutWindow, near target: CGRect) -> CGRect? {
+        var last = window.frame
+        for _ in 0..<12 {
+            usleep(25_000)
+            let now = window.frame
+            if let now, let previous = last, LayoutWindow.close(now, previous), LayoutWindow.near(now, target) { return now }
+            last = now
+        }
+        return last
     }
 
     // MARK: - Grid
@@ -524,6 +617,7 @@ final class LayoutController: ObservableObject {
     // MARK: - Dragging
 
     func dragStarted(_ grab: DragWatcher.Grab) {
+        assist.dismiss()
         drag = DragSession(grab: grab)
         // The watcher holds at display edges, on its own thread, from now on.
         drags.holdDisplays.value = config.holdAtEdges ? displays : nil
@@ -544,7 +638,8 @@ final class LayoutController: ObservableObject {
             }
             // A snapped window dragged away gets its old size back, with the
             // pointer at the same place across it, as Rectangle does.
-            guard restore, let record = self.placements[grab.id], LayoutWindow.close(record.applied.size, grab.frame.size),
+            // A window macOS filled is put back by macOS.
+            guard restore, let record = self.placements[grab.id], !record.tiledByMacOS, LayoutWindow.close(record.applied.size, grab.frame.size),
                   let frame = window.frame, let pointer = CGEvent(source: nil)?.location
             else { return }
             self.placements[grab.id] = nil
@@ -650,11 +745,50 @@ final class LayoutController: ObservableObject {
         drag = nil
         guard session.eligible != false, !session.cancelled, let target = session.target else { return }
         let displays = self.displays, gap = CGFloat(config.gap), grab = session.grab
+        let rest = Self.rest(after: target, picker: session.picker, gap: gap)
+        let suggest = config.suggest, from = config.suggestFrom
         // A moment for the app to finish with the drag, or it may put the
         // window back where the mouse left it.
         work.asyncAfter(deadline: .now() + 0.03) {
             guard let window = LayoutWindow.find(id: grab.id, pid: grab.pid) else { return }
             self.place(window, target, displays: displays, gap: gap, cycle: false)
+            guard suggest != .off, !rest.isEmpty else { return }
+            DispatchQueue.main.async {
+                self.assist.offer(rest, after: grab.id, displays: displays, style: suggest, from: from)
+            }
+        }
+    }
+
+    /// The parts of the display left after a drop, to offer windows for: the
+    /// other parts of a layout picked in the ⌥ bar, or what's beside a half
+    /// or a third. None for shapes that leave no clean part.
+    private static func rest(after target: Target, picker: SlotPicker?, gap: CGFloat) -> [SnapAssist.Slot] {
+        func slot(_ unit: CGRect, _ display: LayoutDisplay) -> SnapAssist.Slot {
+            SnapAssist.Slot(unit: unit, display: display, frame: LayoutGeometry.place(unit, in: display.usable, gap: gap))
+        }
+        switch target {
+        case .unit(let unit, let display):
+            if let picker, let hit = picker.hovered, picker.unit(of: hit) == unit {
+                return picker.layouts[hit.layout].enumerated().filter { $0.offset != hit.zone }.map { slot($0.element, display) }
+            }
+            return LayoutGeometry.complement(of: unit).map { [slot($0, display)] } ?? []
+        case .snap(let action, let display):
+            guard let unit = LayoutGeometry.unit(for: action, portrait: display.portrait) else { return [] }
+            return LayoutGeometry.complement(of: unit).map { [slot($0, display)] } ?? []
+        case .action:
+            return []
+        }
+    }
+
+    /// A window picked for the rest of the display: put there, then the next part.
+    private func suggested(_ item: SwitcherItem, into slot: SnapAssist.Slot) {
+        guard let id = item.window else { return assist.next() }
+        let displays = self.displays, gap = CGFloat(config.gap)
+        work.async {
+            if let window = LayoutWindow.find(id: id, pid: item.pid) {
+                self.place(window, .unit(slot.unit, slot.display), displays: displays, gap: gap, cycle: false)
+            }
+            DispatchQueue.main.async { self.assist.next() }
         }
     }
 

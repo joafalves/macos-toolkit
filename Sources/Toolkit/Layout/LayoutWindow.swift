@@ -11,6 +11,13 @@ enum LayoutWindow {
     case other(window: AXUIElement, app: AXUIElement, id: CGWindowID, pid: pid_t)
     case own(NSWindow, id: CGWindowID)
 
+    var pid: pid_t {
+        switch self {
+        case .other(_, _, _, let pid): return pid
+        case .own: return ProcessInfo.processInfo.processIdentifier
+        }
+    }
+
     var id: CGWindowID {
         switch self {
         case .other(_, _, let id, _), .own(_, let id): return id
@@ -96,8 +103,10 @@ enum LayoutWindow {
     /// Moves and resizes the window, and returns where it ended up. A window
     /// that won't take the size (it has a minimum, or can't be resized) gets
     /// as close as it goes, centred on the target and kept within `area`.
+    /// `tiled`: known to be in macOS's tiling, which the menu can't tell
+    /// while macOS is still animating it there.
     @discardableResult
-    func setFrame(_ target: CGRect, within area: CGRect) -> CGRect? {
+    func setFrame(_ target: CGRect, within area: CGRect, tiled known: Bool = false) -> CGRect? {
         switch self {
         case .other(let window, let app, _, _):
             // With this on (VoiceOver, some window managers, Chrome and
@@ -113,14 +122,45 @@ enum LayoutWindow {
                 set(position: target.origin, of: window)
                 set(size: target.size, of: window)
             }
+            let tiled = known || isTiledByMacOS
+            let before = frame
             send()
             guard var actual = frame else { return nil }
-            // A window that just changed display may still be fitted to it
-            // by its app a moment later, undoing part of the move.
+            // Tried again a little later when it didn't take: a window that
+            // just changed display may be fitted to it by its app a moment
+            // later. Twice at most, so an app that won't have its window
+            // moved doesn't hold up the shortcuts after it.
             for _ in 0..<2 where !Self.close(actual, target) {
-                usleep(50_000)
+                usleep(60_000)
                 send()
                 actual = frame ?? actual
+            }
+            // A window macOS tiled: for a moment after tiling it, macOS puts
+            // any move back where it tiled it. Checked again after a beat,
+            // and sent again until it stays. (Asking macOS to untile it
+            // instead brings back its old size first, and a longer wait.)
+            // Done once it has stayed put somewhere other than where macOS
+            // held it: on the target, or as close as a window with a minimum
+            // size gets.
+            if tiled {
+                var stayed = 0
+                var last = actual
+                let until = Date().addingTimeInterval(2.5)
+                while stayed < 3, Date() < until {
+                    usleep(120_000)
+                    guard let now = frame else { break }
+                    let putBack = before.map { Self.near(now, $0) && !Self.near(target, $0) } ?? false
+                    if putBack {
+                        stayed = 0
+                        send()
+                    } else if Self.close(now, last) || Self.close(now, target) {
+                        stayed += 1
+                    } else {
+                        stayed = 0
+                    }
+                    last = now
+                    actual = frame ?? now
+                }
             }
             guard !Self.close(actual.size, target.size) else { return actual }
             set(position: Self.centred(actual.size, on: target, within: area), of: window)
@@ -171,6 +211,75 @@ enum LayoutWindow {
     private func set(position: CGPoint, of window: AXUIElement) {
         var position = position
         if let value = AXValueCreate(.cgPoint, &position) { AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value) }
+    }
+
+    // MARK: - macOS's own tiling
+
+    /// macOS's tiling commands in every app's Window menu, by identifier,
+    /// which stays the same in any language.
+    enum TilingCommand: String {
+        case fill = "_zoomFill:"
+        case untile = "_zoomUntile:"
+    }
+
+    /// Whether this is the window with the keyboard in its app: the Window
+    /// menu's commands act on that one.
+    var isFocusedInApp: Bool {
+        guard case .other(_, let app, let id, _) = self,
+              let focused: AXUIElement = Self.attribute(app, kAXFocusedWindowAttribute) else { return false }
+        var found: CGWindowID = 0
+        return _AXUIElementGetWindow(focused, &found) == .success && found == id
+    }
+
+    /// macOS has tiled it (filled it, or put it in a half): its Return to
+    /// Previous Size is there to press, which it is for no other window.
+    var isTiledByMacOS: Bool {
+        guard case .other(_, let app, _, let pid) = self, isFocusedInApp,
+              let item = Self.menuItem(TilingCommand.untile.rawValue, in: app, pid: pid),
+              let enabled: Bool = Self.attribute(item, kAXEnabledAttribute) else { return false }
+        return enabled
+    }
+
+    /// Has the app run one of macOS's tiling commands on this window, so
+    /// macOS treats it as tiled (and draws it so). False if the app has no
+    /// such command, or this isn't its focused window.
+    func perform(_ command: TilingCommand) -> Bool {
+        guard case .other(_, let app, _, let pid) = self, isFocusedInApp,
+              let item = Self.menuItem(command.rawValue, in: app, pid: pid) else { return false }
+        if let enabled: Bool = Self.attribute(item, kAXEnabledAttribute), !enabled { return false }
+        return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
+    }
+
+    /// Found items, by app. An app that quit, or rebuilt its menus, is
+    /// looked through again.
+    private static var menuItems: [pid_t: [String: AXUIElement]] = [:]
+    private static let menuLock = NSLock()
+
+    private static func menuItem(_ identifier: String, in app: AXUIElement, pid: pid_t) -> AXUIElement? {
+        menuLock.lock()
+        let cached = menuItems[pid]?[identifier]
+        menuLock.unlock()
+        if let cached, attribute(cached, "AXIdentifier") as String? == identifier { return cached }
+        guard let bar: AXUIElement = attribute(app, kAXMenuBarAttribute) else { return nil }
+        // The Window menu is near the end, before Help.
+        let menus: [AXUIElement] = attribute(bar, kAXChildrenAttribute) ?? []
+        for menu in menus.reversed() {
+            guard let found = search(menu, identifier, depth: 0) else { continue }
+            menuLock.lock()
+            menuItems[pid, default: [:]][identifier] = found
+            menuLock.unlock()
+            return found
+        }
+        return nil
+    }
+
+    private static func search(_ element: AXUIElement, _ identifier: String, depth: Int) -> AXUIElement? {
+        let children: [AXUIElement] = attribute(element, kAXChildrenAttribute) ?? []
+        for child in children {
+            if attribute(child, "AXIdentifier") as String? == identifier { return child }
+            if depth < 4, let found = search(child, identifier, depth: depth + 1) { return found }
+        }
+        return nil
     }
 
     static func close(_ a: CGSize, _ b: CGSize) -> Bool {

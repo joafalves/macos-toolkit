@@ -272,22 +272,41 @@ private struct SwitcherRow: View {
     }
 }
 
-/// The floating list. It never becomes key: the keyboard is handled by the
-/// controller's event tap, and the mouse by a view laid over the rows.
+/// The floating list. For the switcher it never becomes key: the keyboard is
+/// handled by the controller's event tap, and the mouse by a view laid over
+/// the rows. Window Layout's suggestions use it too, filling an empty part of
+/// a display, and there it takes the keys itself, still without making the
+/// toolkit the active app.
 final class SwitcherPanel {
     let model = SwitcherListModel()
     /// The pointer moved onto the row at this index.
     var onHover: (Int) -> Void = { _ in }
     var onClick: (Int) -> Void = { _ in }
+    /// Keys, when it `takesKeys`; and the keyboard went elsewhere.
+    var onKey: (NSEvent) -> Void = { _ in }
+    var onResign: () -> Void = {}
 
+    private let takesKeys: Bool
     private lazy var panel = makePanel()
     /// Area of the display the list is on. Chosen when it opens, so it does
     /// not jump displays while open.
     private var screen = NSRect.zero
+    /// Shown in `screen` filling it, rather than centred in part of it.
+    private var fills = false
     private(set) var isVisible = false
 
+    init(takesKeys: Bool = false) {
+        self.takesKeys = takesKeys
+    }
+
     private func makePanel() -> NSPanel {
-        let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        let panel = KeyPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        panel.takesKeys = takesKeys
+        panel.onKey = { [weak self] in self?.onKey($0) }
+        panel.onResign = { [weak self] in
+            guard let self, self.isVisible else { return }
+            self.onResign()
+        }
         panel.level = .popUpMenu
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -327,10 +346,26 @@ final class SwitcherPanel {
         }
         screen = (chosen ?? screens.first)?.visibleFrame ?? .zero
         scale = (chosen ?? screens.first)?.backingScaleFactor ?? 2
+        fills = false
         isVisible = true
         update(items, selection: selection)
         panel.orderFrontRegardless()
     }
+
+    /// Fills `area` (AppKit coordinates) with the list or grid, for as long
+    /// as it's shown.
+    func show(_ items: [SwitcherItem], selection: Int, filling area: NSRect) {
+        screen = area
+        scale = NSScreen.screens.first { $0.frame.intersects(area) }?.backingScaleFactor ?? 2
+        fills = true
+        isVisible = true
+        update(items, selection: selection)
+        panel.orderFrontRegardless()
+        if takesKeys { panel.makeKey() }
+    }
+
+    /// Margin between the panel and the edges of the area it fills.
+    private static let inset: CGFloat = 12
 
     /// Set before `show`, for the session.
     var style = SwitcherStyle.list
@@ -341,7 +376,8 @@ final class SwitcherPanel {
         guard isVisible else { return }
         model.style = style
         if style == .previews {
-            let area = CGSize(width: screen.width * 0.92, height: screen.height * 0.8)
+            let area = fills ? CGSize(width: screen.width - Self.inset * 2, height: screen.height - Self.inset * 2)
+                             : CGSize(width: screen.width * 0.92, height: screen.height * 0.8)
             let layout = GridLayout(count: items.count, maxTileWidth: previewSize.maxTileWidth, area: area)
             model.items = items
             model.selection = selection
@@ -349,13 +385,14 @@ final class SwitcherPanel {
             place(layout.size)
             return
         }
-        let room = Int((screen.height * 0.7 - SwitcherListView.padding * 2) / SwitcherListView.rowHeight)
+        let height = fills ? screen.height - Self.inset * 2 : screen.height * 0.7
+        let room = Int((height - SwitcherListView.padding * 2) / SwitcherListView.rowHeight)
         model.items = items
         model.selection = selection
-        model.shown = min(items.count, max(room, 3))
+        model.shown = min(items.count, max(room, fills ? 1 : 3))
         model.scroll()
 
-        place(NSSize(width: min(620, screen.width - 80),
+        place(NSSize(width: min(620, screen.width - (fills ? Self.inset * 2 : 80)),
                      height: CGFloat(max(model.shown, 1)) * SwitcherListView.rowHeight + SwitcherListView.padding * 2))
     }
 
@@ -387,6 +424,21 @@ final class SwitcherPanel {
         if style == .previews { return model.layout.index(at: point) }
         let row = Int(floor((point.y - SwitcherListView.padding) / SwitcherListView.rowHeight))
         return (0..<model.shown).contains(row) ? model.first + row : nil
+    }
+}
+
+/// Takes keys only when asked to, and says when it lets go of them.
+private final class KeyPanel: NSPanel {
+    var takesKeys = false
+    var onKey: (NSEvent) -> Void = { _ in }
+    var onResign: () -> Void = {}
+
+    override var canBecomeKey: Bool { takesKeys }
+    override func keyDown(with event: NSEvent) { onKey(event) }
+    override func cancelOperation(_ sender: Any?) {}
+    override func resignKey() {
+        super.resignKey()
+        onResign()
     }
 }
 
