@@ -38,8 +38,11 @@ final class MenuBarItem: NSObject {
     private var pressed: MenuBarSegment.Kind?
 
     private static let height: CGFloat = 22
-    /// Space on each side of a segment's content.
+    /// Space on each side of a segment's content: a little less than between
+    /// the menu bar's items, so the group reads as one.
     private static let padding: CGFloat = 5
+    /// The hairline between segments.
+    private static let divider: CGFloat = 1
 
     override init() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -50,6 +53,9 @@ final class MenuBarItem: NSObject {
         item.button?.action = #selector(clicked)
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         item.button?.imagePosition = .imageOnly
+        // macOS draws its own highlight behind the whole item; the item adds
+        // none of its own on top.
+        (item.button?.cell as? NSButtonCell)?.highlightsBy = []
     }
 
     var button: NSStatusBarButton? { item.button }
@@ -74,14 +80,18 @@ final class MenuBarItem: NSObject {
     }
 
     @objc private func clicked() {
-        guard let button, let event = NSApp.currentEvent else { return }
-        let x = button.convert(event.locationInWindow, from: nil).x - (button.bounds.width - imageWidth) / 2
+        guard let button, let window = button.window else { return }
+        let event = NSApp.currentEvent
+        // From the pointer's place on screen: macOS hands the button every
+        // click as if it landed in its middle.
+        let point = button.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        let x = point.x - (button.bounds.width - imageWidth) / 2
         // Between or beside the segments counts as the nearest one.
         guard let span = spans.first(where: { $0.range.contains(x) })
                 ?? spans.min(by: { abs(($0.range.lowerBound + $0.range.upperBound) / 2 - x) < abs(($1.range.lowerBound + $1.range.upperBound) / 2 - x) }),
               let rect = rect(of: span.kind)
         else { return }
-        let right = event.type == .rightMouseUp || event.modifierFlags.contains(.control)
+        let right = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
         onClick?(span.kind, rect, right)
     }
 
@@ -113,20 +123,24 @@ final class MenuBarItem: NSObject {
         var x: CGFloat = 0
         var spans: [(kind: MenuBarSegment.Kind, range: ClosedRange<CGFloat>)] = []
         var pieces: [(MenuBarSegment, CGFloat, CGFloat)] = []
-        for segment in segments {
+        for (index, segment) in segments.enumerated() {
+            if index > 0 { x += divider }
             let width = contentWidth(segment) + padding * 2
             pieces.append((segment, x, width))
             spans.append((segment.kind, x...(x + width)))
             x += width
         }
         let image = NSImage(size: NSSize(width: max(x, 1), height: height), flipped: false) { _ in
-            for (segment, left, width) in pieces {
-                if segment.kind == pressed {
-                    // The highlight macOS draws behind a pressed item, faint.
-                    tint.withAlphaComponent(0.22).setFill()
-                    NSBezierPath(roundedRect: NSRect(x: left, y: 0, width: width, height: height), xRadius: 6, yRadius: 6).fill()
+            for (index, (segment, left, _)) in pieces.enumerated() {
+                if index > 0 {
+                    // A hairline between segments, like a grouped control's.
+                    tint.withAlphaComponent(0.3).setFill()
+                    NSRect(x: left - divider, y: (height - 12) / 2, width: divider, height: 12).fill()
                 }
-                drawContent(segment, at: left + padding, tint: template ? nil : tint)
+                // With one segment's menu or panel open, the others step back:
+                // macOS's own highlight is the only background.
+                let alpha: CGFloat = pressed != nil && segment.kind != pressed ? 0.4 : 1
+                drawContent(segment, at: left + padding, tint: template ? nil : tint, alpha: alpha)
             }
             return true
         }
@@ -146,24 +160,21 @@ final class MenuBarItem: NSObject {
 
     /// The pieces left to right, centred on the strip. `tint` nil means a
     /// template, drawn in black for macOS to colour.
-    private static func drawContent(_ segment: MenuBarSegment, at left: CGFloat, tint: NSColor?) {
+    private static func drawContent(_ segment: MenuBarSegment, at left: CGFloat, tint: NSColor?, alpha: CGFloat) {
         var x = left
         if let colored = segment.colored {
-            colored.draw(in: NSRect(x: x, y: (height - colored.size.height) / 2, width: colored.size.width, height: colored.size.height))
+            colored.draw(in: NSRect(x: x, y: (height - colored.size.height) / 2, width: colored.size.width, height: colored.size.height),
+                         from: .zero, operation: .sourceOver, fraction: alpha)
             x += colored.size.width
         }
         if let glyph = segment.glyph {
             let rect = NSRect(x: x, y: (height - glyph.size.height) / 2, width: glyph.size.width, height: glyph.size.height)
-            if let tint {
-                tinted(glyph, tint).draw(in: rect)
-            } else {
-                glyph.draw(in: rect)
-            }
+            (tint.map { tinted(glyph, $0) } ?? glyph).draw(in: rect, from: .zero, operation: .sourceOver, fraction: alpha)
             x += glyph.size.width
         }
         if let text = segment.text {
             if segment.colored != nil || segment.glyph != nil { x += 4 }
-            let color = (tint ?? .black).withAlphaComponent(segment.dimText ? 0.5 : 1)
+            let color = (tint ?? .black).withAlphaComponent((segment.dimText ? 0.5 : 1) * alpha)
             let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
             string.draw(at: NSPoint(x: x, y: (height - string.size().height) / 2))
         }

@@ -34,8 +34,8 @@ worked on; it gets its date when it's released.
 - **Screen Capture:** a cleaner selection: a crisp edge, round knobs at the corners, pills on the
   sides, and the size in a pill under the corner.
 - **Menu bar:** one item for the whole toolkit. The toolkit menu, Screen Capture and the Audio
-  Mixer sit side by side in it with the same size, spacing and highlight, move together, and can't
-  be split up by other apps' icons.
+  Mixer sit side by side in it with hairlines between them, move together, share macOS's highlight,
+  and can't be split up by other apps' icons. While one part's menu or panel is open, the others dim.
 - **Every tool that reads the keyboard or mouse** (Window Switcher, Finder, Mouse Settings, Audio
   Mixer's volume keys, Window Layout's dragging) does so on a thread of its own, so a busy moment in
   the toolkit can no longer hold up typing or scrolling.

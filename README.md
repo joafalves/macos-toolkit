@@ -510,15 +510,16 @@ To remove it, quit the app, delete it from `/Applications`, and delete
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-dark.png">
-    <img src="docs/images/menu-bar-light.png" width="360" alt="The toolkit's menu bar item: the toolkit menu, Screen Capture and the mixer side by side, then with the mixer open, while recording, and on its own">
+    <img src="docs/images/menu-bar-light.png" width="360" alt="The toolkit's menu bar item: the toolkit menu, Screen Capture and the mixer side by side with hairlines between them, then with the mixer open and the others dimmed, while recording, and on its own">
   </picture>
 </p>
 
 The toolkit has one item in the menu bar. The toolkit menu is always there, and Screen Capture and
 the Audio Mixer join it when their settings put them in the menu bar, side by side with the same
-size and spacing. While recording, Screen Capture's place shows a red stop button with the time and
-size. Each part opens its own menu or panel, shown pressed while it's open. Being one item, they
-move together when you ⌘-drag it, and other apps' icons can't end up between them.
+size and spacing and a hairline between them. While recording, Screen Capture's place shows a red
+stop button with the time and size. Each part opens its own menu or panel, and while one is open
+the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
+and other apps' icons can't end up between them.
 
 ## Good to know
 
