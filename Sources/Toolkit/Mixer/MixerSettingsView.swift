@@ -24,15 +24,22 @@ struct MixerSettingsView: View {
 
             WhenEnabled(enabled: mixer.config.enabled) {
                 Card(title: "Options") {
-                    OptionRow(title: "Menu bar icon",
-                              caption: "Opens the mixer in one click. Volume shows a speaker that follows the volume.",
-                              selection: $mixer.config.menuBarIcon,
-                              options: [(.none, "None"), (.mixer, "Mixer"), (.volume, "Volume")])
+                    // A pop-up rather than segments: four choices don't fit beside a caption.
+                    SettingRow(title: "Menu bar icon", caption: "Opens the mixer in one click.") {
+                        Picker("Menu bar icon", selection: $mixer.config.menuBarIcon) {
+                            Text("None").tag(MixerMenuBarIcon.none)
+                            Text("Mixer").tag(MixerMenuBarIcon.mixer)
+                            Text("Volume").tag(MixerMenuBarIcon.volume)
+                            Text("Volume and percentage").tag(MixerMenuBarIcon.volumePercent)
+                            Text("Volume badge").tag(MixerMenuBarIcon.volumeBadge)
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
                     RowDivider()
                     ToggleRow(title: "Software volume",
-                              caption: mixer.softwareActive
-                                  ? "In use now: \(mixer.currentOutput?.name ?? "this output") has no volume control of its own, so the toolkit lowers its sound itself."
-                                  : "For outputs with no volume control of their own, like most monitors. The toolkit lowers their sound itself.",
+                              caption: "Lets the toolkit control the sound itself when an output has no volume control of its own, as many monitors don't.",
                               isOn: $mixer.config.softwareVolume)
                 }
 

@@ -113,7 +113,9 @@ every app that has sound gets its own slider.
 - Volumes are remembered per app. Right-click an app to hide it until it plays again, or to
   **Never Touch** it.
 - A **menu bar icon** of its own, one click away, set in the mixer's settings: none, the mixer glyph,
-  or **Volume**, a speaker that follows the volume and shows when it's muted.
+  **Volume**, a speaker that follows the volume and shows when it's muted, **Volume and
+  percentage**, or **Volume badge**, a pill that fills with the volume like the battery, with the speaker and the
+  number cut out of it.
 - **The volume keys** go through the mixer on every output while it's on, so they always behave the
   same: 5% a press (1% with ⇧⌥), mute toggles, and the toolkit's own on-screen bar in place of
   macOS's. On outputs with a volume of their own that volume is set directly; on the rest it's the

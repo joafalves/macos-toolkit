@@ -40,6 +40,10 @@ enum MixerMenuBarIcon: String, Codable, CaseIterable {
     case mixer
     /// A speaker that follows the volume and shows when it's muted.
     case volume
+    /// The speaker with the volume next to it, like the battery's icon and percentage.
+    case volumePercent
+    /// A solid pill with the speaker and the volume cut out of it.
+    case volumeBadge
 }
 
 struct MixerConfig: Codable, Equatable {

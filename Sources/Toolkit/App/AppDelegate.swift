@@ -191,6 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             item.button?.toolTip = "Audio Mixer"
             mixerItem = item
             if kind == .mixer {
+                item.button?.title = ""
                 item.button?.image = Self.makeStatusIcon(symbol: AppSection.mixer.symbol, description: "Audio Mixer")
             } else {
                 updateVolumeIcon(volume: mixer.mainVolume, muted: mixer.mainMuted)
@@ -205,15 +206,76 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     /// The speaker macOS's own Sound item uses: more waves as the volume goes
     /// up, crossed out when muted.
     private func updateVolumeIcon(volume: Float, muted: Bool) {
-        guard mixerItemKind == .volume, let button = mixerItem?.button else { return }
+        guard [.volume, .volumePercent, .volumeBadge].contains(mixerItemKind), let button = mixerItem?.button else { return }
         let symbol: String
         if muted || volume <= 0 {
             symbol = "speaker.slash.fill"
         } else {
             symbol = volume < 0.34 ? "speaker.wave.1.fill" : volume < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill"
         }
+        let percent = "\(Int((volume * 100).rounded()))%"
+        if mixerItemKind == .volumeBadge {
+            button.title = ""
+            button.image = Self.makeVolumeBadge(volume: volume, muted: muted || volume <= 0)
+            button.image?.accessibilityDescription = muted ? "Audio Mixer, muted" : "Audio Mixer, volume \(percent)"
+            return
+        }
         button.image = Self.makeVolumeIcon(symbol: symbol)
-        button.image?.accessibilityDescription = muted ? "Audio Mixer, muted" : "Audio Mixer, volume \(Int((volume * 100).rounded()))%"
+        button.image?.accessibilityDescription = muted ? "Audio Mixer, muted" : "Audio Mixer, volume \(percent)"
+        guard mixerItemKind == .volumePercent else {
+            button.title = ""
+            return
+        }
+        // The volume next to the speaker, like the battery's percentage. Muted
+        // keeps the number, greyed, so you can see what unmuting brings back.
+        button.imagePosition = .imageLeading
+        button.attributedTitle = NSAttributedString(string: " " + percent, attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+            .foregroundColor: muted ? NSColor.secondaryLabelColor : NSColor.labelColor,
+        ])
+    }
+
+    /// A pill filled up to the volume, with the speaker and the number cut out
+    /// of it, like the battery's icon with its percentage inside. Always as wide as "100", so
+    /// the menu bar doesn't shift as the number changes.
+    static func makeVolumeBadge(volume: Float, muted: Bool) -> NSImage {
+        let font = NSFont.systemFont(ofSize: 11.5, weight: .bold)
+        let text = NSAttributedString(string: muted ? "off" : "\(Int((volume * 100).rounded()))",
+                                      attributes: [.font: font, .foregroundColor: NSColor.black])
+        let widest = NSAttributedString(string: "100", attributes: [.font: font]).size().width
+        let cone = NSImage(systemSymbolName: muted ? "speaker.slash.fill" : "speaker.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 10.5, weight: .semibold))
+        let coneWidth = cone?.size.width ?? 8
+        // As tall as the other menu bar symbols, about 16pt of the 18pt box.
+        let pill = NSRect(x: 0, y: 1, width: ceil(3 + coneWidth + 1 + widest + 3), height: 16)
+        let image = NSImage(size: NSSize(width: pill.width, height: 18), flipped: false) { _ in
+            // Filled up to the volume like the battery's charge, the rest faint.
+            let shape = NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2)
+            NSColor.black.withAlphaComponent(0.4).setFill()
+            shape.fill()
+            if !muted {
+                NSGraphicsContext.saveGraphicsState()
+                shape.addClip()
+                // Two lots of 40% would show where they overlap, so the fill replaces it.
+                NSGraphicsContext.current?.compositingOperation = .copy
+                NSColor.black.setFill()
+                NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(min(1, max(0, volume))), height: pill.height).fill()
+                NSGraphicsContext.restoreGraphicsState()
+            }
+            if let cone {
+                cone.draw(in: NSRect(x: 3, y: pill.midY - cone.size.height / 2, width: cone.size.width, height: cone.size.height),
+                          from: .zero, operation: .destinationOut, fraction: 1)
+            }
+            // The number is cut out too, centred in the space after the speaker.
+            let size = text.size()
+            let area = NSRect(x: 3 + coneWidth + 1, y: pill.minY, width: widest, height: pill.height)
+            NSGraphicsContext.current?.compositingOperation = .destinationOut
+            text.draw(at: NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     private static let volumeSymbols = ["speaker.slash.fill", "speaker.wave.1.fill", "speaker.wave.2.fill", "speaker.wave.3.fill"]
@@ -242,7 +304,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             let popover = mixerPopover ?? makeMixerPopover()
             mixerPopover = popover
             mixer.refreshPermission()
-            NSApp.activate(ignoringOtherApps: true)
+            // Not activating the app: that brings every one of its windows to
+            // the front, the settings window included. The popover works
+            // without it, and closing is watched for below.
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             watchForDismissal()
             // After showing, so creating the listening taps doesn't hold up the panel.
@@ -256,6 +320,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         guard popoverMonitors.isEmpty else { return }
         let close: () -> Void = { [weak self] in self?.mixerPopover?.performClose(nil) }
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { _ in close() }) {
+            popoverMonitors.append(monitor)
+        }
+        // Esc while another app has the keyboard, which is the usual case now
+        // that opening the mixer doesn't activate the toolkit.
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown], handler: { event in
+            if event.keyCode == 53 { close() }
+        }) {
             popoverMonitors.append(monitor)
         }
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown], handler: { [weak self] event in
