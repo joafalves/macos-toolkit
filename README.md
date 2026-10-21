@@ -5,7 +5,8 @@
 
 <p align="center">
   <b>The little things macOS never shipped, in one menu bar app.</b><br>
-  A volume slider for every app. A ⌘Tab that lists windows. Mouse settings that stick, per mouse.
+  A volume slider for every app. A ⌘Tab that lists windows. Windows snapped to halves or a grid,
+  from the keyboard or by dragging. Mouse settings that stick, per mouse.
   ⌘X and a better right-click menu in Finder. Screenshots and small screen recordings on ⇧⌘3/4/5.
 </p>
 
@@ -33,6 +34,17 @@
           <img src="docs/images/switcher-light.png" width="380" alt="The window switcher: one row per window">
         </picture><br>
         <b>Window Switcher</b>
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <a href="#window-layout">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-grid-dark.png">
+          <img src="docs/images/layout-grid-light.png" width="620" alt="The Window Layout grid over a display: a key on each cell, and the block picked with two keys highlighted">
+        </picture><br>
+        <b>Window Layout</b>
       </a>
     </td>
   </tr>
@@ -77,6 +89,7 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 | --- | --- |
 | 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, like the Windows volume mixer, plus an equalizer and volume control for outputs that have none. |
 | 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps (AltTab-style), across all Spaces. |
+| 🔲 **[Window Layout](#window-layout)** | Rectangle's shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, and snapping by dragging. |
 | 🖱️ **[Mouse Settings](#mouse-settings)** | Cursor and wheel settings per mouse (SteerMouse-style), plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings (CleanShot-style), with window backdrops and small H.264 files. |
@@ -233,6 +246,107 @@ It needs **Accessibility**, and relies on private macOS APIs to find windows on 
 focus a single window, and to switch the system's own ⌘Tab off while the switcher has it. That is
 switched back on when the toolkit quits or the tool is turned off.
 
+## Window Layout
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-grid-dark.png">
+    <img src="docs/images/layout-grid-light.png" width="620" alt="The grid over a display: a key on each cell, the block from Q to D highlighted, the window's name at the top and the keys at the bottom">
+  </picture>
+  <br><br>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-dark.png">
+    <img src="docs/images/layout-light.png" width="520" alt="Window Layout settings: the grid shortcut and each display's grid">
+  </picture>
+</p>
+
+Snaps the focused window to part of its display. The keys are Rectangle's, so coming from it nothing
+changes; each one can be changed or cleared in the settings.
+
+| Key | Action |
+| --- | --- |
+| ⌃⌥ ← → | Left or right half. Again to move it on to the next display that way, as its near half. At the outer edge it stops, or goes through ⅔ and ⅓ with **Sizes at the outer edge** on |
+| ⌃⌥↑ | Top half. Again to maximize, and again to move it, maximized, to the display above |
+| ⌃⌥↓ | Bottom half, maximized windows too. Again to move it to the top half of the display below |
+| ⌃⌥ U I J K | Top left, top right, bottom left, bottom right quarter |
+| ⌃⌥ D F G | First, center, last third (down the display on one that stands upright) |
+| ⌃⌥ E T | First, last two thirds |
+| ⌃⌥↩ | Maximize. Almost maximize (nine tenths, centred) is there too, without a key |
+| ⌃⌥⇧↑ | Maximize the height, keeping the width |
+| ⌃⌥C | Center |
+| ⌃⌥= ⌃⌥- | Larger, smaller: 30 points on every side |
+| ⌃⌥⌫ | Restore the size and place it had before it was snapped |
+| ⌃⌥⌘ ← → | Previous, next display. A snapped window stays snapped the same way |
+
+The arrows go by where the window is, however it got there: a window you maximized yourself goes
+straight to the display above with ⌃⌥↑, and one already at the left half moves on to the display on
+the left with ⌃⌥←.
+
+### The grid
+
+**⌃⌥⌘Space** lays a grid over the display with the focused window, a key on each cell. Type the key
+of one corner, then the key of the opposite corner, and the window fills that block: on the 4 × 3
+grid like the one above, Q then D is three quarters wide and two thirds high.
+
+| Key (in the grid) | Action |
+| --- | --- |
+| two letter keys | One corner, then the other. The same key twice is one cell |
+| ← → ↑ ↓ | Move the selection |
+| ⇧ ← → ↑ ↓ | Grow or shrink it |
+| ↩ or space | Place the window |
+| ⌫ | Start the corners again |
+| ⇥ | Move the grid to the next display, to send the window there |
+| esc | Cancel |
+
+Dragging across the cells with the mouse works too.
+
+- The keys go by **where they sit on the keyboard**, not by letter: the top left cell is always the
+  key right of Tab, on any keyboard layout, and the cells show what your layout types there. Up to
+  three rows use the letter rows; a fourth adds the number row.
+- **Each display has its own grid**, up to 10 columns and 4 rows, set in the settings. Until it has
+  one, a display gets halves (2 × 1), an ultrawide quarters (4 × 1), and one standing upright 1 × 2.
+  Grids are kept per monitor, so two monitors that take turns on the same cable each keep theirs.
+
+### Dragging
+
+- **Snap at the edges**: drag a window to a side of the display or the bottom for half of it, to a
+  corner for a quarter, or to the top to fill it. A preview shows where it will go. The menu bar and
+  the Dock count as part of their edge, so the top snaps as soon as the pointer reaches the menu bar.
+  Sides against another display snap too, in a strip 24 points wide (8 at the outer edges): stop
+  short of the edge and let go. Keep going and the window crosses over as usual.
+- **Layouts while dragging**: hold ⌥ while dragging and a bar of small layouts appears by the
+  pointer: the whole display, halves both ways, thirds, ⅔ and ⅓, quarters, and on an ultrawide
+  fourths and a wide middle. Move onto a part of one, and the screen shows where the window will go;
+  let go to put it there.
+- **Grid while dragging**: hold ⇧ while dragging and the grid appears. The cell under the pointer
+  is one corner: move to the other and let go. Let go of ⇧ to start the corners again.
+- **Esc** during the drag drops the window where it is, without snapping. Both keys can be changed
+  or turned off in the settings.
+- **Stop at the edge between displays** (off unless turned on): while a window is dragged, the
+  pointer stops where one display meets another, so the snap on that edge is easy to hit. Moving
+  away or along the edge lets go at once, and pushing on for a moment crosses over. Once through,
+  the rest of that drag moves freely between the displays. A
+  fast flick is held as long as a steady push. Only while dragging; the pointer moves between
+  displays as usual otherwise.
+- A snapped window you drag away gets back the size it had before, with the pointer at the same
+  place on it.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-slots-dark.png">
+    <img src="docs/images/layout-slots-light.png" width="620" alt="A window being dragged with ⌥ held: a bar of small layouts by the pointer, the ⅔ part of one picked, and the left two thirds of the display highlighted">
+  </picture>
+</p>
+
+A **gap** of up to 40 points can go between windows and around the edges. A window that can't take
+the size (it has a minimum, or can't be resized) gets as close as it goes, centred on the spot.
+Windows in full screen, panels, dialogs and sheets are left alone.
+
+It needs **Accessibility**. While any kind of dragging is on, macOS's own tiling by dragging
+(System Settings → Desktop & Dock → Windows) is switched off. Turning the tool or its dragging off
+turns macOS's tiling on, so windows still snap; when the toolkit quits, it's put back as it was. If Rectangle is running, the settings offer to quit it, since the
+two would fight over the same keys and drags.
+
 ## Mouse Settings
 
 <p align="center">
@@ -379,7 +493,7 @@ To update later: `git pull && ./scripts/build.sh --install`.
 ### First run
 
 - **General → Grant Access…** and enable *MacOS Toolkit* under System Settings → Privacy & Security →
-  Accessibility. This is for the window switcher, the Finder cut, and the mouse wheel and button settings.
+  Accessibility. This is for the window switcher, Window Layout, the Finder cut, and the mouse wheel and button settings.
 - System Audio Recording is asked for later, the first time you turn an app down in the mixer, and
   Screen Recording the first time you take a screenshot.
 - For the Finder right-click menu, press **Turn On** in the Finder settings.
@@ -396,8 +510,8 @@ To remove it, quit the app, delete it from `/Applications`, and delete
   keys). They can change in any macOS update, and this
   is a personal tool, so expect to rebuild when they do.
 - It is **not notarized**, which is why the install steps above remove the quarantine flag.
-- Anything the toolkit changes outside itself (⌘Tab, the screenshot keys, device properties, audio
-  taps) is put back when it quits, when it is killed, and at the next launch if it crashed.
+- Anything the toolkit changes outside itself (⌘Tab, the screenshot keys, macOS's window tiling,
+  device properties, audio taps) is put back when it quits, when it is killed, and at the next launch if it crashed.
 
 ## Project layout
 
@@ -406,6 +520,7 @@ Sources/Toolkit
 ├── App        menu bar items, main window, general settings, settings export
 ├── Mouse      the Mouse Settings tool
 ├── Switcher   the Window Switcher tool
+├── Layout     the Window Layout tool
 ├── Mixer      the Audio Mixer tool
 ├── Finder     the Finder tool
 ├── Capture    the Screen Capture tool
@@ -417,4 +532,4 @@ docs/images    the screenshots above
 
 A tool is a controller plus a config, stored as JSON. [`AGENTS.md`](AGENTS.md) has the conventions,
 the dev flags (`--snapshot` renders any page to an image, `--list-windows` and `--list-audio` print
-what the tools see, `--test-capture` runs the screenshot and recording code without the UI), and how versions and releases are made.
+what the tools see, `--test-capture` runs the screenshot and recording code without the UI, `--test-layout` places a helper's windows), and how versions and releases are made.

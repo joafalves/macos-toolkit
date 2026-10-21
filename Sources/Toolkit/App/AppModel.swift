@@ -3,7 +3,7 @@ import ServiceManagement
 
 /// The tools shown in the sidebar of the main window.
 enum AppSection: String, CaseIterable, Identifiable {
-    case mouse, switcher, mixer, finder, capture, general
+    case mouse, switcher, layout, mixer, finder, capture, general
 
     var id: String { rawValue }
 
@@ -11,6 +11,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .mouse: return "Mouse Settings"
         case .switcher: return "Window Switcher"
+        case .layout: return "Window Layout"
         case .mixer: return "Audio Mixer"
         case .finder: return "Finder"
         case .capture: return "Screen Capture"
@@ -22,6 +23,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .mouse: return "computermouse"
         case .switcher: return "macwindow.on.rectangle"
+        case .layout: return "rectangle.split.2x2"
         case .mixer: return "slider.vertical.3"
         case .finder: return "folder"
         case .capture: return "camera.viewfinder"

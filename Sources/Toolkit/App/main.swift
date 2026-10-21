@@ -15,7 +15,8 @@ if CommandLine.arguments.contains("--register-login-item") {
 // to an image without showing it, so layout can be checked from the terminal.
 // `switcher-list` in place of a section renders the window switcher's list,
 // `mixer-popover [outputs] [software] [equalizer]` the menu bar mixer,
-// `capture-toolbar [video]` the Screen Capture toolbar.
+// `capture-toolbar [video]` the Screen Capture toolbar, `layout-grid` the
+// Window Layout grid over a drawn desktop, `layout-slots` its drag layouts.
 if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.arguments.count > flag + 1 {
     let rest = Array(CommandLine.arguments[(flag + 1)...])
     if rest.contains("switcher-list") || rest.contains("switcher-grid") {
@@ -24,6 +25,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     }
     if rest.contains("mixer-popover") {
         Snapshot.writeMixer(to: rest[0], light: rest.contains("light"), outputs: rest.contains("outputs"), software: rest.contains("software"), equalizer: rest.contains("equalizer"))
+        exit(0)
+    }
+    if rest.contains("layout-grid") || rest.contains("layout-slots") {
+        Snapshot.writeLayoutGrid(to: rest[0], light: rest.contains("light"), slots: rest.contains("layout-slots"))
         exit(0)
     }
     if rest.contains("capture-toolbar") {
@@ -59,6 +64,17 @@ if CommandLine.arguments.contains("--test-switcher-previews") {
     SwitcherController.previewTest()
     exit(0)
 }
+// Development aid: `--test-layout [report]` checks Window Layout's geometry
+// and places a helper's windows. Run the app bundle with `open -n` so
+// Accessibility is the app's own.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-layout") {
+    LayoutController.selfTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+if CommandLine.arguments.contains("--layout-test-window") {
+    LayoutController.runTestWindows()
+    exit(0)
+}
 if CommandLine.arguments.contains("--test-shortcuts") {
     CaptureController.shortcutTest()
     exit(0)
@@ -80,6 +96,12 @@ if CommandLine.arguments.contains("--test-toolbar") {
 if CommandLine.arguments.contains("--show-hud") {
     VolumeHUD.demo()
     exit(0)
+}
+
+// Development aid: `--measure-idle <file>` starts as at login (no window),
+// then writes the memory used idle, with the settings window, and after it.
+let measureIdlePath: String? = CommandLine.arguments.firstIndex(of: "--measure-idle").flatMap {
+    CommandLine.arguments.count > $0 + 1 ? CommandLine.arguments[$0 + 1] : nil
 }
 
 // Two instances would fight over the same device properties.

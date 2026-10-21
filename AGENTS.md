@@ -23,7 +23,7 @@ tool; keep it in step with the code.
 - `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (menu bar
   items, the mixer popover, the main window), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `SettingsTransfer` (export and import of all settings), `Snapshot`.
-- `Sources/Toolkit/Mouse`, `Switcher`, `Mixer`, `Finder`, `Capture`: one folder per tool. Screen
+- `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
   ⇧⌘3/4/5, and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
 - `Sources/FinderExtension`: the Finder extension. It is sandboxed, so it only builds the right-click
@@ -58,11 +58,11 @@ tool; keep it in step with the code.
   its plugin. Use `@StateObject private var x = ViewState(value)` instead (`ViewState` is in
   `Components.swift`). `@GestureState` and `@StateObject` are fine.
 - Clean up after yourself: anything the app changes outside itself (Cmd-Tab, the screenshot keys,
-  device properties, Core Audio taps) is restored on quit, on `kill`, and at the next launch if the
+  macOS's window tiling, device properties, Core Audio taps) is restored on quit, on `kill`, and at the next launch if the
   app crashed.
 - Comments say why, not what; match the surrounding density. Prose in the UI and README is plain and
   short, no marketing words.
-- Permissions: Accessibility (mouse wheel and buttons, switcher, Finder cut, the capture's Content
+- Permissions: Accessibility (mouse wheel and buttons, switcher, Window Layout, Finder cut, the capture's Content
   Only window style), System Audio Recording (mixer), Screen Recording (capture, and the switcher's
   previews) and Microphone (capture). The Finder extension is a separate switch macOS keeps off
   until it is turned on
@@ -76,12 +76,16 @@ tool; keep it in step with the code.
 swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
-.build/debug/Toolkit --snapshot out.png [mouse|switcher|mixer|finder|capture|general] [light]
+.build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general] [light]
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
 .build/debug/Toolkit --snapshot out.png switcher-grid [light]   # drawn stand-ins, no real windows
+.build/debug/Toolkit --snapshot out.png layout-grid [light]     # the Window Layout grid over a drawn desktop
+.build/debug/Toolkit --snapshot out.png layout-slots [light]    # its layouts bar while dragging
 .build/debug/Toolkit --test-capture <folder> [app]   # each screenshot kind and short recordings, with a report
 .build/debug/Toolkit --test-recording        # the app's recording path: start, stop button, discard
+.build/debug/Toolkit --test-layout [report]  # geometry, then a helper's windows placed for real (run with open -n)
+.build/debug/Toolkit --measure-idle <file>   # memory idle, with the settings window, and after (run with open -n, app quit first)
 .build/debug/Toolkit --test-shortcuts        # config migration, and which macOS screenshot shortcuts clash
 .build/debug/Toolkit --test-toolbar          # the capture toolbar's panel against its content
 .build/debug/Toolkit --test-highlight        # the window highlight sits right above its window

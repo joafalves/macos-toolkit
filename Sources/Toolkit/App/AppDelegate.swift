@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private let model = AppModel()
     private var mouse: MouseController!
     private var switcher: SwitcherController!
+    private var layout: LayoutController!
     private var mixer: MixerController!
     private var finder: FinderController!
     private var capture: CaptureController!
@@ -25,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         mouse = MouseController()
         switcher = SwitcherController()
         switcher.start()
+        layout = LayoutController()
+        layout.start()
         mixer = MixerController()
         mixer.start()
         finder = FinderController()
@@ -60,7 +63,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         termSource = source
 
         // A launch from the login item should stay in the background.
-        if !Self.launchedAsLoginItem { show(.mouse) }
+        if let path = measureIdlePath {
+            measureIdle(into: path)
+        } else if !Self.launchedAsLoginItem {
+            show(.mouse)
+        }
     }
 
     /// Actions from the Finder extension's right-click menu.
@@ -83,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     func applicationWillTerminate(_ notification: Notification) {
         if mouse.config.restoreOnQuit { mouse.restoreAll() }
         switcher.stop()
+        layout.stop()
         mixer.stop()
         mixer.flush()
         finder.stop()
@@ -402,13 +410,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private func show(_ section: AppSection) {
         model.section = section
         if window == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, mixer: mixer, finder: finder, capture: capture)))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture)))
             window.title = "MacOS Toolkit"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.setContentSize(NSSize(width: 780, height: 640))
             window.isReleasedWhenClosed = false
             window.delegate = self
             window.center()
+            // Made anew each time it opens, so it comes back where it was.
+            window.setFrameAutosaveName("Main")
             self.window = window
         }
         // Behave like a regular app (Dock icon, Cmd-Tab) while the window is open.
@@ -419,5 +429,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func windowWillClose(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // Let go of it: kept, its views held on to their memory while
+        // nothing showed them. It's quick to make again.
+        DispatchQueue.main.async { self.window = nil }
+    }
+
+    /// `--measure-idle <file>`: memory with no window, with the settings
+    /// window open, and after closing it, written to the file.
+    private func measureIdle(into path: String) {
+        var report = ""
+        func note(_ label: String) {
+            report += String(format: "%@: %.1f MB\n", label, Double(processFootprint()) / 1_048_576)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+            note("idle, no window")
+            self.show(.mouse)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                note("settings window open")
+                weak var closed = self.window
+                self.window?.close()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+                    note("after closing it")
+                    // Most of what the window cost stays: AppKit and SwiftUI keep
+                    // their caches once loaded. The window itself should be gone.
+                    report += "window freed: \(closed == nil)\n"
+                    try? report.write(toFile: path, atomically: true, encoding: .utf8)
+                    NSApp.terminate(nil)
+                }
+            }
+        }
     }
 }

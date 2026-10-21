@@ -6,7 +6,7 @@ enum Snapshot {
         _ = NSApplication.shared
         let model = AppModel()
         model.section = section
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController.preview(), switcher: SwitcherController.preview(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview())))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController.preview(), switcher: SwitcherController.preview(), layout: LayoutController.preview(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview())))
         window.title = "MacOS Toolkit"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
@@ -89,6 +89,71 @@ enum Snapshot {
             return true
         }
         return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    }
+
+    /// The Window Layout grid over a made-up desktop: a drawn backdrop and
+    /// stand-in windows, nothing from the screen. With `slots`, the bar of
+    /// layouts shown while a window is dragged with ⌥.
+    static func writeLayoutGrid(to path: String, light: Bool, slots: Bool = false) {
+        _ = NSApplication.shared
+        let size = CGSize(width: 1512, height: 982)
+        let display = LayoutDisplay(id: 1, uuid: "preview", name: "Built-in Display",
+                                    frame: CGRect(origin: .zero, size: size), usable: CGRect(x: 0, y: 33, width: size.width, height: 949 - 70))
+        let grid = GridSize(columns: 4, rows: 3)
+        var range = CellRange(CellRange.Cell(column: 0, row: 0))
+        range.cursor = CellRange.Cell(column: 2, row: 1)
+        let gap: CGFloat = 8
+        let overlay = LayoutOverlayView(display: display)
+        if slots {
+            var picker = SlotPicker(display: display, pointer: CGPoint(x: 560, y: 360))
+            picker.hovered = SlotPicker.Hit(layout: 4, zone: 0)
+            overlay.content = LayoutOverlayContent(
+                highlight: LayoutGeometry.place(picker.unit(of: picker.hovered!), in: display.usable, gap: gap),
+                hint: "Let go over a layout  ·  esc: don't snap", gap: gap, picker: picker)
+        } else {
+            overlay.content = LayoutOverlayContent(
+                grid: grid, selection: range, highlight: LayoutGeometry.place(range.unit(in: grid), in: display.usable, gap: gap),
+                labels: GridKeys.usLabels(for: grid), dim: 0.45, title: "Notes — Shopping list",
+                hint: ["Type two corners", "←↑↓→ move", "⇧ extends", "↩ place", "⇥ next display", "esc cancel"].joined(separator: "  ·  "), gap: gap)
+        }
+
+        let desktop = NSImage(size: size, flipped: true) { rect in
+            let colors: [NSColor] = light ? [NSColor(calibratedRed: 0.55, green: 0.7, blue: 0.95, alpha: 1), NSColor(calibratedRed: 0.85, green: 0.75, blue: 0.95, alpha: 1)]
+                                          : [NSColor(calibratedRed: 0.1, green: 0.14, blue: 0.3, alpha: 1), NSColor(calibratedRed: 0.3, green: 0.15, blue: 0.35, alpha: 1)]
+            NSGradient(colors: colors)?.draw(in: rect, angle: 60)
+            (light ? NSColor(white: 1, alpha: 0.7) : NSColor(white: 0.1, alpha: 0.7)).setFill()
+            NSRect(x: 0, y: 0, width: rect.width, height: 33).fill()
+            let windows: [(NSColor, CGRect, Bool)] = [
+                (.systemOrange, CGRect(x: 820, y: 120, width: 600, height: 420), true),
+                (.systemBlue, CGRect(x: 150, y: 300, width: 640, height: 400), true),
+            ]
+            for (accent, frame, wide) in windows {
+                guard let image = fakeWindow(accent: accent, dark: !light, wide: wide) else { continue }
+                NSImage(cgImage: image, size: frame.size).draw(in: frame)
+            }
+            return true
+        }
+        // The overlay is layers, which don't draw into a view's cache, so the
+        // picture is put together by hand: the desktop, then the layers.
+        overlay.scale = 2
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: rep)
+        else { return }
+        NSAppearance(named: light ? .aqua : .darkAqua)?.performAsCurrentDrawingAppearance {
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = context
+            context.cgContext.scaleBy(x: 2, y: 2)
+            desktop.draw(in: CGRect(origin: .zero, size: size))
+            // Rendering by hand doesn't apply the root layer's top-down
+            // geometry the way the screen does, so the image is turned here.
+            context.cgContext.translateBy(x: 0, y: size.height)
+            context.cgContext.scaleBy(x: 1, y: -1)
+            overlay.layer?.render(in: context.cgContext)
+            NSGraphicsContext.restoreGraphicsState()
+        }
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
     }
 
     /// The menu bar mixer, filled with made-up rows.

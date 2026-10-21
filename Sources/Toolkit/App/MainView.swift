@@ -4,6 +4,7 @@ struct MainView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var mouse: MouseController
     @ObservedObject var switcher: SwitcherController
+    @ObservedObject var layout: LayoutController
     @ObservedObject var mixer: MixerController
     @ObservedObject var finder: FinderController
     @ObservedObject var capture: CaptureController
@@ -30,10 +31,11 @@ struct MainView: View {
                 switch model.section ?? .mouse {
                 case .mouse: MouseSettingsView(mouse: mouse)
                 case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
+                case .layout: LayoutSettingsView(layout: layout, mouse: mouse)
                 case .mixer: MixerSettingsView(mixer: mixer)
                 case .finder: FinderSettingsView(finder: finder, mouse: mouse)
                 case .capture: CaptureSettingsView(capture: capture)
-                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, mixer: mixer, finder: finder, capture: capture)
+                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -46,6 +48,7 @@ private struct GeneralView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var mouse: MouseController
     let switcher: SwitcherController
+    let layout: LayoutController
     @ObservedObject var mixer: MixerController
     let finder: FinderController
     @ObservedObject var capture: CaptureController
@@ -73,14 +76,14 @@ private struct GeneralView: View {
             Card(title: "Backup") {
                 SettingRow(title: "Settings file", caption: "Save every setting to a file, or load them from one.") {
                     HStack(spacing: 8) {
-                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher, mixer: mixer, finder: finder, capture: capture) }
-                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher, mixer: mixer, finder: finder, capture: capture) }
+                        Button("Export…") { SettingsTransfer.exportSettings(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture) }
+                        Button("Import…") { SettingsTransfer.importSettings(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture) }
                     }
                 }
             }
 
             Card(title: "Permissions") {
-                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing, by the Window Switcher, by Finder for Cut, and by Screen Capture to find where a window's content starts.") {
+                SettingRow(title: "Accessibility", caption: "Used by Mouse Settings for wheel direction, speed and smoothing, by the Window Switcher, by Window Layout to move windows, by Finder for Cut, and by Screen Capture to find where a window's content starts.") {
                     if mouse.accessibilityGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
