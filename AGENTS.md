@@ -33,7 +33,8 @@ tool; keep it in step with the code.
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
 - `Resources`: `Info.plist` (the only place the version lives), app icon.
 - `CHANGELOG.md`: what each version adds, changes and fixes (see Versions and releases).
-- `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `make-icon.swift`.
+- `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `make-icon.swift` (the app icon;
+  `KitIcon` in `Components.swift` and `MenuBarArt.toolkit` draw it too, keep them in step).
 - `docs/images`: the README's screenshots. **None of them is a screenshot of the desktop**: every
   one is rendered from the app's own views with `--snapshot`, through the tools' `preview()`
   controllers, which use made-up data (a "Wireless Mouse", invented mixer apps and outputs, invented
@@ -62,6 +63,25 @@ tool; keep it in step with the code.
   own: a tap in the path of the events holds up every key or click until it returns. The callback
   decides from state it owns or from `Locked` values the main thread keeps current, and hands
   anything else to the main queue; it never reads a controller's main-thread state directly.
+  Returning nil swallows the event, so a handler that means to pass it returns it; never
+  `?? Unmanaged.passUnretained(event)` a result that is nil on purpose. The front app comes from
+  `FrontApp` (start it on the main thread before any tap), not from `NSWorkspace` on the tap thread.
+- **The menu bar is one item** (`MenuBarItem` in `App/MenuBar.swift`): each tool that shows there
+  adds a `MenuBarSegment`, drawn as real views (`MenuBarPartView`), not a picture of them. Clicks
+  arrive as if at the button's centre, so the part is found from `NSEvent.mouseLocation`. macOS
+  ignores the button's highlight and state, so menus open with `MenuBarItem.open` (it sets the
+  item's menu and clicks it, which keeps the item lit); panels call `setPressed` before showing.
+  An update costs about 2 ms (`--test-menu-bar`); keep it there, a stats tool will update it often.
+- **Overlays are layers.** Full-screen overlays build `CALayer`s, not `draw(_:)`, which keeps a
+  bitmap the size of each display (about 100 MB on large displays). Panels that call back into
+  their owner hold it, or themselves, weakly; a cycle there kept every overlay alive.
+- **Accessibility values are type-checked** (`attribute<T>` in `LayoutWindow` and
+  `WindowCatalog`): an app can answer with anything, and a forced cast crashes the toolkit.
+- **The Finder extension's URLs carry a token** that the app writes at launch (`finder-token`,
+  0600) and checks in constant time; any app can open a `macos-toolkit://` URL. Actions only ever
+  work on folders.
+- **Memory and CPU:** the settings window is released when it closes. Background work runs on
+  change or on a slow timer, not on a fast poll; check with `--measure-idle` and `footprint`.
 - Clean up after yourself: anything the app changes outside itself (Cmd-Tab, the screenshot keys,
   macOS's window tiling, device properties, Core Audio taps) is restored on quit, on `kill`, and at the next launch if the
   app crashed.
@@ -86,6 +106,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
 .build/debug/Toolkit --snapshot out.png switcher-grid [light]   # drawn stand-ins, no real windows
 .build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
+.build/debug/Toolkit --snapshot out.png menu-bar-strip [light]  # the item in a drawn menu bar, for the top of the README
 .build/debug/Toolkit --snapshot out.png layout-grid [light]     # the Window Layout grid over a drawn desktop
 .build/debug/Toolkit --snapshot out.png layout-slots [light]    # its layouts bar while dragging
 .build/debug/Toolkit --test-capture <folder> [app]   # each screenshot kind and short recordings, with a report
