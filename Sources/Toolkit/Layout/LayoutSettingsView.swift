@@ -9,6 +9,7 @@ struct LayoutSettingsView: View {
     private var config: LayoutConfig { layout.config }
     /// Screen Recording, checked again when the app comes back to the front.
     @StateObject private var recording = ViewState(SwitcherPreviews.permitted)
+    @StateObject private var page = ViewState(LayoutPage.snapping)
 
     private static let groups: [(String, [LayoutAction])] = [
         ("Halves", [.leftHalf, .rightHalf, .topHalf, .bottomHalf]),
@@ -40,6 +41,8 @@ struct LayoutSettingsView: View {
         case .larger, .smaller: return "\(Int(LayoutGeometry.step)) points on every side."
         case .restore: return "Back to the size and place it had before it was snapped."
         case .previousDisplay, .nextDisplay: return action == .nextDisplay ? "A snapped window stays snapped the same way." : nil
+        case .joinTabs: return "The window you're in joins the window under it."
+        case .takeOutOfTabs: return "It stays where it is, on its own."
         default: return nil
         }
     }
@@ -53,6 +56,148 @@ struct LayoutSettingsView: View {
         var all = LayoutAction.allCases.filter { $0 != action }.compactMap { config.shortcut($0).active }
         if action != nil, let grid = config.gridShortcut.active { all.append(grid) }
         return all
+    }
+
+    /// Keeps a key from being on two drag settings at once: given to one,
+    /// it's taken off the others.
+    private func dragKey(_ path: WritableKeyPath<LayoutConfig, DragModifier>) -> Binding<DragModifier> {
+        Binding(get: { layout.config[keyPath: path] }, set: { key in
+            var config = layout.config
+            config[keyPath: path] = key
+            for other in [\LayoutConfig.dragSlots, \LayoutConfig.dragGrid, \LayoutConfig.tabsKey] where other != path {
+                if key != .none, config[keyPath: other] == key { config[keyPath: other] = .none }
+            }
+            layout.config = config
+        })
+    }
+
+    @ViewBuilder private var snapping: some View {
+        Card(title: "Dragging",
+             footnote: "Esc while dragging drops the window without snapping. macOS's own tiling by dragging is off while any of these is on, and turned on when you turn them off. If the app quits, it's put back as it was.") {
+            ToggleRow(title: "Snap at the edges",
+                      caption: "Drag a window to a side or the bottom for half the display, to a corner for a quarter, or to the top to fill it. Where a side meets another display, stop just short of the edge.",
+                      isOn: $layout.config.edgeSnapping)
+            RowDivider()
+            OptionRow(title: "Layouts while dragging",
+                      caption: "Hold this key while dragging a window: a bar of layouts shows by the pointer. Move onto a part of one and let go.",
+                      selection: dragKey(\.dragSlots), options: DragModifier.allCases.map { ($0, $0.title) })
+            RowDivider()
+            OptionRow(title: "Grid while dragging",
+                      caption: "Hold this key while dragging a window to drop it on the grid. The cell under the pointer is one corner: move to the other and let go. Let go of the key to start again.",
+                      selection: dragKey(\.dragGrid), options: DragModifier.allCases.map { ($0, $0.title) })
+            RowDivider()
+            OptionRow(title: "Suggest windows for the rest",
+                      caption: "After you drop a window into part of a display, other windows are offered for the part that's left; click one, or press its number. Previews need Screen Recording, and show the list until then.",
+                      selection: $layout.config.suggest,
+                      options: SuggestStyle.allCases.map { ($0, $0.title) })
+            if layout.config.suggest != .off {
+                RowDivider()
+                OptionRow(title: "Windows from other displays",
+                          caption: "This Display offers only that display's windows. If None Here offers the others' when it has none. Always lists them after its own.",
+                          selection: $layout.config.suggestFrom,
+                          options: SuggestFrom.allCases.map { ($0, $0.title) })
+            }
+            RowDivider()
+            ToggleRow(title: "Stop at the edge between displays",
+                      caption: "While dragging a window, the pointer stops where one display meets another, so the snap there is easy to hit. Moving away or along the edge lets go; keep pushing to cross. Once per drag.",
+                      isOn: $layout.config.holdAtEdges)
+            RowDivider()
+            ToggleRow(title: "Restore the size when dragged away",
+                      caption: "A snapped window you drag away gets back the size it had.",
+                      isOn: $layout.config.restoreOnDragOut)
+        }
+
+        Card(title: "Placement") {
+            SettingRow(title: "Gap", caption: "Space between windows and around the edges of the display. macOS's own margins follow it: off with no gap, otherwise its fixed 8 points. Up to 8, Maximize is macOS's own Fill, so the window counts as filled; above that it's placed with the gap.") {
+                EmptyView()
+            } extra: {
+                ValueSlider(value: $layout.config.gap, range: 0...40, step: 2, low: "0", high: "40") {
+                    $0 == 0 ? "None" : "\(Int($0)) pt"
+                }
+            }
+        }
+
+        Card(title: "Grids",
+             footnote: "For the grid while dragging and the one from the keyboard. Each display keeps its own.") {
+            ForEach(Array(layout.displays.enumerated()), id: \.element.uuid) { index, display in
+                if index > 0 { RowDivider() }
+                GridRow(layout: layout, display: display)
+            }
+        }
+    }
+
+    @ViewBuilder private var tabsPage: some View {
+        Card(title: "Stacks",
+             footnote: "The windows not shown wait behind the shown one, at the same size. One dragged out, resized so it no longer fits, closed or minimized leaves the stack; with one left, it gets the whole slot back.") {
+            ToggleRow(title: "Stack windows",
+                      caption: "A preview, still rough in places, so off until you turn it on. Several windows in one slot, one shown at a time, with tabs to switch between them.",
+                      isOn: Binding(get: { layout.config.tabsJoin != .off }, set: { on in
+                          var config = layout.config
+                          config.tabsJoin = on ? .key : .off
+                          // Its key may have gone to another drag setting while it was off.
+                          let used = [config.dragSlots, config.dragGrid]
+                          if on, config.tabsKey == .none || used.contains(config.tabsKey),
+                             let free = [DragModifier.control, .option, .command, .shift].first(where: { !used.contains($0) }) {
+                              config.tabsKey = free
+                          }
+                          layout.config = config
+                      }))
+            if config.tabsJoin != .off {
+                RowDivider()
+                OptionRow(title: "Key", caption: "Hold it while dragging a window: the windows you can stack it with are outlined. Let go over one.",
+                          selection: dragKey(\.tabsKey), options: DragModifier.allCases.filter { $0 != .none }.map { ($0, $0.title) })
+                // RowDivider()
+                // OptionRow(title: "Look", caption: "Tabs with titles, in a band of their own, or a small pill of app icons over the window.",
+                //           selection: $layout.config.tabsStyle, options: TabsStyle.allCases.map { ($0, $0.title) })
+                RowDivider()
+                OptionRow(title: "Place", caption: "Along the slot's bottom edge, or its top.",
+                          selection: $layout.config.tabsPosition, options: TabsPosition.allCases.map { ($0, $0.title) })
+            }
+        }
+
+        if config.tabsJoin != .off {
+            Card(title: "Stack Shortcuts", footnote: "For the stack of the window you're in. Right-click a tab to take its window out, or to close it.") {
+                ForEach(Array([LayoutAction.nextTab, .previousTab, .takeOutOfTabs, .joinTabs].enumerated()), id: \.offset) { index, action in
+                    if index > 0 { RowDivider() }
+                    ShortcutRow(title: action.title, caption: caption(action), shortcut: binding(action),
+                                defaultValue: action.defaultShortcut, taken: taken(except: action))
+                }
+                RowDivider()
+                OptionRow(title: "Pick one", caption: "That window of the stack, by number.",
+                          selection: $layout.config.tabNumbers, options: TabNumbers.allCases.map { ($0, $0.title) })
+            }
+        }
+    }
+
+    @ViewBuilder private var keyboard: some View {
+        Card(title: "Grid",
+             footnote: "The letters are the keys in the grid's place on the keyboard, whatever the layout: the top left cell is always the key where Q is on a US keyboard.") {
+            ShortcutRow(title: "Open the grid", caption: "Over the display with the focused window.",
+                        shortcut: $layout.config.gridShortcut, defaultValue: LayoutConfig.defaultGridShortcut,
+                        taken: taken(except: nil))
+            ForEach(Array(Self.gridKeys.enumerated()), id: \.offset) { _, key in
+                RowDivider()
+                SettingRow(title: key.0) {
+                    Text(key.1).font(.callout).foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        ForEach(Self.groups, id: \.0) { group in
+            Card(title: group.0, footnote: group.0 == "Halves" ? Self.halvesNote : nil) {
+                ForEach(Array(group.1.enumerated()), id: \.offset) { index, action in
+                    if index > 0 { RowDivider() }
+                    ShortcutRow(title: action.title, caption: caption(action), shortcut: binding(action),
+                                defaultValue: action.defaultShortcut, taken: taken(except: action))
+                }
+                if group.0 == "Halves" {
+                    RowDivider()
+                    ToggleRow(title: "Sizes at the outer edge",
+                              caption: "At the outer edge of the last display, left or right pressed again goes through ⅔ and ⅓ instead of stopping.",
+                              isOn: $layout.config.cycleAtEdge)
+                }
+            }
+        }
     }
 
     var body: some View {
@@ -88,96 +233,39 @@ struct LayoutSettingsView: View {
             }
 
             WhenEnabled(enabled: config.enabled) {
-                Card(title: "Grid",
-                     footnote: "The letters are the keys in the grid's place on the keyboard, whatever the layout: the top left cell is always the key where Q is on a US keyboard. Each display keeps its own grid.") {
-                    ShortcutRow(title: "Open the grid", caption: "Over the display with the focused window.",
-                                shortcut: $layout.config.gridShortcut, defaultValue: LayoutConfig.defaultGridShortcut,
-                                taken: taken(except: nil))
-                    ForEach(layout.displays, id: \.uuid) { display in
-                        RowDivider()
-                        GridRow(layout: layout, display: display)
-                    }
+                Picker("Page", selection: $page.value) {
+                    ForEach(LayoutPage.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 360)
+                .frame(maxWidth: .infinity)
 
-                Card(title: "In the Grid") {
-                    ForEach(Array(Self.gridKeys.enumerated()), id: \.offset) { index, key in
-                        if index > 0 { RowDivider() }
-                        SettingRow(title: key.0) {
-                            Text(key.1).font(.callout).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                Card(title: "Dragging",
-                     footnote: "Esc while dragging drops the window without snapping. macOS's own tiling by dragging is off while any of these is on, and turned on when you turn them off. If the app quits, it's put back as it was.") {
-                    ToggleRow(title: "Snap at the edges",
-                              caption: "Drag a window to a side or the bottom for half the display, to a corner for a quarter, or to the top to fill it. Where a side meets another display, stop just short of the edge.",
-                              isOn: $layout.config.edgeSnapping)
-                    RowDivider()
-                    OptionRow(title: "Layouts while dragging",
-                              caption: "Hold this key while dragging a window: a bar of layouts shows by the pointer. Move onto a part of one and let go.",
-                              selection: Binding(get: { layout.config.dragSlots }, set: { key in
-                                  layout.config.dragSlots = key
-                                  if key != .none, layout.config.dragGrid == key { layout.config.dragGrid = .none }
-                              }),
-                              options: DragModifier.allCases.map { ($0, $0.title) })
-                    RowDivider()
-                    OptionRow(title: "Grid while dragging",
-                              caption: "Hold this key while dragging a window to drop it on the grid. The cell under the pointer is one corner: move to the other and let go. Let go of the key to start again.",
-                              selection: Binding(get: { layout.config.dragGrid }, set: { key in
-                                  layout.config.dragGrid = key
-                                  if key != .none, layout.config.dragSlots == key { layout.config.dragSlots = .none }
-                              }),
-                              options: DragModifier.allCases.map { ($0, $0.title) })
-                    RowDivider()
-                    OptionRow(title: "Suggest windows for the rest",
-                              caption: "After you drop a window into part of a display, other windows are offered for the part that's left; click one, or press its number. Previews need Screen Recording, and show the list until then.",
-                              selection: $layout.config.suggest,
-                              options: SuggestStyle.allCases.map { ($0, $0.title) })
-                    if layout.config.suggest != .off {
-                        RowDivider()
-                        OptionRow(title: "Windows from other displays",
-                                  caption: "This Display offers only that display's windows. If None Here offers the others' when it has none. Always lists them after its own.",
-                                  selection: $layout.config.suggestFrom,
-                                  options: SuggestFrom.allCases.map { ($0, $0.title) })
-                    }
-                    RowDivider()
-                    ToggleRow(title: "Stop at the edge between displays",
-                              caption: "While dragging a window, the pointer stops where one display meets another, so the snap there is easy to hit. Moving away or along the edge lets go; keep pushing to cross. Once per drag.",
-                              isOn: $layout.config.holdAtEdges)
-                    RowDivider()
-                    ToggleRow(title: "Restore the size when dragged away",
-                              caption: "A snapped window you drag away gets back the size it had.",
-                              isOn: $layout.config.restoreOnDragOut)
-                }
-
-                Card(title: "Placement") {
-                    SettingRow(title: "Gap", caption: "Space between windows and around the edges of the display. macOS's own margins follow it: off with no gap, otherwise its fixed 8 points. Up to 8, Maximize is macOS's own Fill, so the window counts as filled; above that it's placed with the gap.") {
-                        EmptyView()
-                    } extra: {
-                        ValueSlider(value: $layout.config.gap, range: 0...40, step: 2, low: "0", high: "40") {
-                            $0 == 0 ? "None" : "\(Int($0)) pt"
-                        }
-                    }
-                    RowDivider()
-                    ToggleRow(title: "Sizes at the outer edge",
-                              caption: "At the outer edge of the last display, left or right pressed again goes through ⅔ and ⅓ instead of stopping.",
-                              isOn: $layout.config.cycleAtEdge)
-                }
-
-                ForEach(Self.groups, id: \.0) { group in
-                    Card(title: group.0, footnote: group.0 == "Halves" ? Self.halvesNote : nil) {
-                        ForEach(Array(group.1.enumerated()), id: \.offset) { index, action in
-                            if index > 0 { RowDivider() }
-                            ShortcutRow(title: action.title, caption: caption(action), shortcut: binding(action),
-                                        defaultValue: action.defaultShortcut, taken: taken(except: action))
-                        }
-                    }
+                switch page.value {
+                case .snapping: snapping
+                case .tabs: tabsPage
+                case .keyboard: keyboard
                 }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             recording.value = SwitcherPreviews.permitted
+        }
+        .onAppear {
+            if layout.isPreview, let preview = LayoutController.previewPage { page.value = preview }
+        }
+    }
+}
+
+/// The parts of the Window Layout page, most used first.
+enum LayoutPage: CaseIterable {
+    case snapping, tabs, keyboard
+
+    var title: String {
+        switch self {
+        case .snapping: return "Snapping"
+        case .tabs: return "Stacks"
+        case .keyboard: return "Keyboard"
         }
     }
 }

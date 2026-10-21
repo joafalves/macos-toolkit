@@ -9,6 +9,11 @@ enum LayoutAction: String, Codable, CaseIterable {
     case firstThird, centerThird, lastThird, firstTwoThirds, lastTwoThirds
     case maximize, almostMaximize, maximizeHeight, center, larger, smaller, restore
     case previousDisplay, nextDisplay
+    /// For windows sharing a slot as tabs.
+    case nextTab, previousTab, takeOutOfTabs, joinTabs
+
+    /// Act on the tabs of the focused window rather than move it.
+    var isTabs: Bool { [.nextTab, .previousTab, .takeOutOfTabs, .joinTabs].contains(self) }
 
     var title: String {
         switch self {
@@ -34,6 +39,10 @@ enum LayoutAction: String, Codable, CaseIterable {
         case .restore: return "Restore"
         case .previousDisplay: return "Previous display"
         case .nextDisplay: return "Next display"
+        case .nextTab: return "Next window in the stack"
+        case .previousTab: return "Previous window in the stack"
+        case .takeOutOfTabs: return "Take the window out of its stack"
+        case .joinTabs: return "Stack with the window under it"
         }
     }
 
@@ -65,6 +74,10 @@ enum LayoutAction: String, Codable, CaseIterable {
         case .restore: return key(kVK_Delete)
         case .previousDisplay: return key(kVK_LeftArrow, nil, co.union(.command))
         case .nextDisplay: return key(kVK_RightArrow, nil, co.union(.command))
+        case .nextTab: return key(kVK_Tab)
+        case .previousTab: return key(kVK_Tab, nil, co.union(.shift))
+        case .takeOutOfTabs: return key(kVK_Delete, nil, co.union(.shift))
+        case .joinTabs: return key(kVK_Return, nil, co.union(.shift))
         }
     }
 
@@ -134,6 +147,70 @@ enum SuggestFrom: String, Codable, CaseIterable {
     }
 }
 
+/// Whether windows can be stacked in a slot: with `tabsKey` held while a
+/// window is dragged, the windows it can stack with are outlined.
+enum TabsJoin: String, Codable, CaseIterable {
+    case off
+    case key
+
+    var title: String { self == .off ? "Off" : "On" }
+
+    init(from decoder: Decoder) throws {
+        // An "always" from before is on.
+        self = (try decoder.singleValueContainer().decode(String.self)) == "off" ? .off : .key
+    }
+}
+
+/// Where a slot's tabs go.
+enum TabsPosition: String, Codable, CaseIterable {
+    case bottom, top
+
+    var title: String { self == .bottom ? "Bottom" : "Top" }
+}
+
+/// The compact pill, a small bar of app icons over the window's bottom edge,
+/// is left out of 0.13.0. Its code is kept below, commented out. To solve
+/// before it comes back:
+/// - It sits on its window, so a window coming forward (a click in it, ⌘Tab,
+///   picking a tab) covers it until it's ordered above again: it flashes for
+///   up to a second. Ordering it again after each raise wasn't enough.
+/// - Floating it over every ordinary window (`.floating`) stops that, but then
+///   it must be hidden whenever another window covers its spot, and macOS
+///   says nothing when a window comes forward: clicks and keys were watched
+///   for it, untested (the start of it is in `TabStrip.show`).
+/// How a slot's tabs look. Only the strip for now; with the pill back, it
+/// becomes a setting again (`tabsStyle` in the config, "Look" in the settings).
+enum TabsStyle: String, Codable, CaseIterable {
+    /// A strip of tabs with titles, in a band of its own.
+    case strip
+    // /// A small pill of app icons over the window's edge.
+    // case pill
+
+    var title: String { "Tabs" }
+    // var title: String { self == .strip ? "Tabs" : "Compact" }
+}
+
+/// The modifiers for picking a tab by number, 1 to 9.
+enum TabNumbers: String, Codable, CaseIterable {
+    case off, controlOption, controlOptionCommand
+
+    var title: String {
+        switch self {
+        case .off: return "Off"
+        case .controlOption: return "⌃⌥ 1–9"
+        case .controlOptionCommand: return "⌃⌥⌘ 1–9"
+        }
+    }
+
+    var flags: NSEvent.ModifierFlags? {
+        switch self {
+        case .off: return nil
+        case .controlOption: return [.control, .option]
+        case .controlOptionCommand: return [.control, .option, .command]
+        }
+    }
+}
+
 /// The key held while dragging a window to place it on the grid.
 enum DragModifier: String, Codable, CaseIterable {
     case none, shift, control, option, command
@@ -191,6 +268,12 @@ struct LayoutConfig: Codable, Equatable {
     /// to the list without Screen Recording.
     var suggest = SuggestStyle.previews
     var suggestFrom = SuggestFrom.fallback
+    /// Several windows in one slot, one shown at a time.
+    var tabsJoin = TabsJoin.off
+    var tabsKey = DragModifier.control
+    var tabsPosition = TabsPosition.bottom
+    // var tabsStyle = TabsStyle.strip
+    var tabNumbers = TabNumbers.controlOption
 
     /// ⌃⌥Space is macOS's "next input source".
     static let defaultGridShortcut = Shortcut(keyCode: kVK_Space, flags: [.control, .option, .command])
@@ -214,6 +297,11 @@ struct LayoutConfig: Codable, Equatable {
         holdAtEdges = try c.decodeIfPresent(Bool.self, forKey: .holdAtEdges) ?? false
         suggest = (try? c.decodeIfPresent(SuggestStyle.self, forKey: .suggest)) ?? .previews
         suggestFrom = (try? c.decodeIfPresent(SuggestFrom.self, forKey: .suggestFrom)) ?? .fallback
+        tabsJoin = (try? c.decodeIfPresent(TabsJoin.self, forKey: .tabsJoin)) ?? .off
+        tabsKey = (try? c.decodeIfPresent(DragModifier.self, forKey: .tabsKey)) ?? .control
+        tabsPosition = (try? c.decodeIfPresent(TabsPosition.self, forKey: .tabsPosition)) ?? .bottom
+        // tabsStyle = (try? c.decodeIfPresent(TabsStyle.self, forKey: .tabsStyle)) ?? .strip
+        tabNumbers = (try? c.decodeIfPresent(TabNumbers.self, forKey: .tabNumbers)) ?? .controlOption
         // For a while it had strengths; any of them was on.
         if !c.contains(.holdAtEdges), let old = try? decoder.container(keyedBy: Legacy.self).decodeIfPresent(String.self, forKey: .edgeHold) {
             holdAtEdges = old != "off"

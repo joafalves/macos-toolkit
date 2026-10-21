@@ -16,6 +16,10 @@ struct LayoutOverlayContent: Equatable {
     var hint: String?
     var gap: CGFloat = 0
     var picker: SlotPicker?
+    /// The drop would join the window in the slot, as a tab.
+    var joining = false
+    /// Windows that can be stacked with, outlined.
+    var outlines: [CGRect] = []
 }
 
 /// One display's worth of grid, selection and snap preview. As the keyboard
@@ -148,6 +152,9 @@ final class LayoutOverlayView: NSView {
                 }
             }
         }
+        for outline in content.outlines where outline != content.highlight {
+            shape(local(outline).insetBy(dx: 1.5, dy: 1.5), fill: accent.withAlphaComponent(0.08), stroke: accent.withAlphaComponent(0.8), width: 2, radius: 12)
+        }
         if let highlight = content.highlight {
             shape(local(highlight).insetBy(dx: 1.5, dy: 1.5), fill: accent.withAlphaComponent(0.3), stroke: accent, width: 3, radius: 12)
         }
@@ -161,6 +168,7 @@ final class LayoutOverlayView: NSView {
                 }
             }
         }
+        if content.joining, let highlight = content.highlight { joiningBadge(in: local(highlight)) }
         if let picker = content.picker { bar(picker) }
         let usable = local(display.usable)
         if let title = content.title, !title.isEmpty {
@@ -189,6 +197,27 @@ final class LayoutOverlayView: NSView {
         text.contentsScale = scale
         text.frame = CGRect(origin: origin, size: string.size())
         layer?.addSublayer(text)
+    }
+
+    /// In the middle of the preview: this drop adds a tab.
+    private func joiningBadge(in rect: CGRect) {
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 15, weight: .semibold), .foregroundColor: NSColor.white]
+        let text = NSAttributedString(string: "Add as a tab", attributes: attributes)
+        let size = text.size()
+        let symbol = NSImage(systemSymbolName: "rectangle.stack.badge.plus", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 18, weight: .semibold).applying(.init(paletteColors: [.white])))
+        let iconWidth: CGFloat = symbol == nil ? 0 : 28
+        let box = CGRect(x: rect.midX - (size.width + iconWidth + 28) / 2, y: rect.midY - 20, width: size.width + iconWidth + 28, height: 40)
+        shape(box, fill: .controlAccentColor, radius: 20)
+        if let symbol, let image = symbol.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            let icon = CALayer()
+            icon.contents = image
+            icon.contentsScale = scale
+            icon.contentsGravity = .resizeAspect
+            icon.frame = CGRect(x: box.minX + 14, y: box.midY - symbol.size.height / 2, width: symbol.size.width, height: symbol.size.height)
+            layer?.addSublayer(icon)
+        }
+        self.text(text, at: CGPoint(x: box.minX + 14 + iconWidth, y: box.midY - size.height / 2))
     }
 
     private func bar(_ picker: SlotPicker) {

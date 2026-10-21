@@ -14,6 +14,21 @@ worked on; it gets its date when it's released.
   the mouse to scroll, faster the farther you move, with a speed setting. A wheel click without
   moving is still a middle click. Hold ⌥ while pressing to give the app its own wheel button, or
   list apps that should always get it.
+- **Window Layout:** stacks, as a preview, off until turned on: several windows in one slot, one
+  shown at a time, with tabs to switch between them. Hold ⌃ while dragging a window to see the
+  windows it can stack with, and let go over one. Click a tab to switch, or use the shortcuts.
+
+### Changed
+
+- **Window Layout:** the settings are in three tabs: Snapping, Stacks and Keyboard.
+- **Window Layout:** windows are offered for the rest of the display as soon as one is dropped,
+  rather than once it has finished moving.
+
+### Fixed
+
+- **Window Layout:** a window dropped on an edge sometimes stayed where it was let go.
+- **Window Layout:** Maximize, in an app that takes macOS's Fill and doesn't fill, now places the
+  window itself.
 
 ## 0.12.0 (2026-10-21)
 

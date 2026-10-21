@@ -7,6 +7,8 @@ final class LayoutKeys {
     enum Command: Equatable {
         case action(LayoutAction)
         case grid
+        /// The tab at this place, from 0, in the focused window's slot.
+        case tab(Int)
     }
 
     var onCommand: ((Command) -> Void)?

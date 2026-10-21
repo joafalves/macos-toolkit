@@ -122,7 +122,7 @@ tool is a section in the sidebar and (where it makes sense) an entry in the menu
 | --- | --- |
 | 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, like the Windows volume mixer, plus an equalizer and volume control for outputs that have none. |
 | 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps (AltTab-style), across all Spaces. |
-| 🔲 **[Window Layout](#window-layout)** | Rectangle's shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, and snapping by dragging. |
+| 🔲 **[Window Layout](#window-layout)** | Rectangle's shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, snapping by dragging, and stacks of windows sharing a slot (a preview). |
 | 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse (SteerMouse-style), autoscroll on the wheel button, plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings (CleanShot-style), with window backdrops and small H.264 files. |
@@ -292,7 +292,7 @@ switched back on when the toolkit quits or the tool is turned off.
   <br><br>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-dark.png">
-    <img src="docs/images/layout-light.png" width="520" alt="Window Layout settings: the grid shortcut and each display's grid">
+    <img src="docs/images/layout-light.png" width="520" alt="Window Layout settings, on the Snapping tab: dragging, the gap and each display's grid">
   </picture>
 </p>
 
@@ -389,6 +389,35 @@ Dragging across the cells with the mouse works too.
     <img src="docs/images/layout-slots-light.png" width="620" alt="A window being dragged with ⌥ held: a bar of small layouts by the pointer, the ⅔ part of one picked, and the left two thirds of the display highlighted">
   </picture>
 </p>
+
+### Stacks (preview)
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-tabs-dark.png">
+    <img src="docs/images/layout-tabs-light.png" width="620" alt="A window in the left half of a display, and three windows sharing the right half, with their tabs along its bottom edge">
+  </picture>
+</p>
+
+Several windows can be stacked in one slot, one shown at a time, with tabs to switch between them:
+a browser and a terminal in the right half, say, whatever apps they're from. Stacks are a preview,
+still rough in places, and off until turned on in the settings, under **Stacks**.
+
+- **Stacking:** while dragging a window, hold **⌃**. Every window you can stack it with on that
+  display is outlined: ones already in a stack, and ones in sight filling a half, third, quarter or
+  grid block. Move over one (anywhere on it) and it says *Add as a tab*; let go and the two share
+  its slot. Let go of ⌃ to snap as usual. **⌃⌥⇧↩** stacks the window you're in with the window
+  under it.
+- **Switching:** click a tab, or **⌃⌥⇥** / **⌃⌥⇧⇥** for the next and previous, **⌃⌥1–9** for one by
+  number. A window brought forward any other way (⌘Tab, the Dock, a click) becomes the shown tab.
+- **Leaving:** a window dragged out, resized so it no longer fits, closed or minimized leaves the
+  stack, and so does one taken out with **⌃⌥⇧⌫** or by right-clicking its tab. With one left, it
+  gets the whole slot back.
+- The windows not shown wait behind the shown one at the same size, so switching is instant. The
+  tabs sit just above the shown window, so a window of another app in front of the slot covers them
+  too. They have titles, in a band of their own along the bottom of the slot by default, or the top.
+- Stacks last as long as their windows; they don't come back after the toolkit or the Mac restarts.
+  The key and the place of the tabs are in the settings under **Stacks**.
 
 A **gap** of up to 40 points (8 to begin with, macOS's own margin) can go between windows and around the edges. macOS's own tiling
 margins follow it while the tool is on: with no gap they're off, so double-clicking a title bar

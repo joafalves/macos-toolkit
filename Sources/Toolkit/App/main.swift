@@ -45,6 +45,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeMenuBar(to: rest[0], light: rest.contains("light"))
         exit(0)
     }
+    if rest.contains("layout-tabs") {
+        Snapshot.writeLayoutTabs(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
     if rest.contains("layout-suggest") {
         Snapshot.writeLayoutSuggest(to: rest[0], light: rest.contains("light"))
         exit(0)
@@ -57,6 +61,8 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeCaptureToolbar(to: rest[0], light: rest.contains("light"), video: rest.contains("video"))
         exit(0)
     }
+    // `layout tabs` or `layout keyboard`: that tab of the Window Layout page.
+    LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
     Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"))
     exit(0)
 }

@@ -104,9 +104,10 @@ enum LayoutWindow {
     /// that won't take the size (it has a minimum, or can't be resized) gets
     /// as close as it goes, centred on the target and kept within `area`.
     /// `tiled`: known to be in macOS's tiling, which the menu can't tell
-    /// while macOS is still animating it there.
+    /// while macOS is still animating it there. `afterDrag`: just dropped,
+    /// when macOS may still put it back where the mouse left it.
     @discardableResult
-    func setFrame(_ target: CGRect, within area: CGRect, tiled known: Bool = false) -> CGRect? {
+    func setFrame(_ target: CGRect, within area: CGRect, tiled known: Bool = false, afterDrag: Bool = false) -> CGRect? {
         switch self {
         case .other(let window, let app, _, _):
             // With this on (VoiceOver, some window managers, Chrome and
@@ -128,9 +129,15 @@ enum LayoutWindow {
             guard var actual = frame else { return nil }
             // Tried again a little later when it didn't take: a window that
             // just changed display may be fitted to it by its app a moment
-            // later. Twice at most, so an app that won't have its window
-            // moved doesn't hold up the shortcuts after it.
-            for _ in 0..<2 where !Self.close(actual, target) {
+            // later. Twice, so an app that won't have its window moved
+            // doesn't hold up the shortcuts after it; but right after a drag,
+            // while macOS may still be finishing it and put the window back
+            // where the mouse left it, for as long as it hasn't moved at all.
+            let deadline = Date().addingTimeInterval(1.5)
+            var tries = 0
+            while !Self.close(actual, target),
+                  tries < 2 || (afterDrag && (before.map { Self.near(actual, $0) } ?? false) && Date() < deadline) {
+                tries += 1
                 usleep(60_000)
                 send()
                 actual = frame ?? actual
@@ -141,12 +148,13 @@ enum LayoutWindow {
             // instead brings back its old size first, and a longer wait.)
             // Done once it has stayed put somewhere other than where macOS
             // held it: on the target, or as close as a window with a minimum
-            // size gets.
-            if tiled {
+            // size gets. Right after a drag too: macOS may finish the drag
+            // a moment after our move and put the window back.
+            if tiled || afterDrag {
                 var stayed = 0
                 var last = actual
-                let until = Date().addingTimeInterval(2.5)
-                while stayed < 3, Date() < until {
+                let until = Date().addingTimeInterval(tiled ? 2.5 : 1.5)
+                while stayed < (tiled ? 3 : 2), Date() < until {
                     usleep(120_000)
                     guard let now = frame else { break }
                     let putBack = before.map { Self.near(now, $0) && !Self.near(target, $0) } ?? false
@@ -174,6 +182,27 @@ enum LayoutWindow {
                 let origin = Self.close(size, target.size) ? target.origin : Self.centred(size, on: target, within: area)
                 window.setFrame(Coordinates.toAppKit(CGRect(origin: origin, size: size)), display: true)
                 return Coordinates.toCG(window.frame)
+            }
+        }
+    }
+
+    /// Brings this window forward, and its app with it.
+    func raise() {
+        switch self {
+        case .other(let window, _, _, let pid):
+            // As the Window Switcher does, as if the window were clicked:
+            // asking the app to activate isn't enough, as macOS may turn
+            // down an activation that comes from another app.
+            var psn = ProcessSerialNumber()
+            GetProcessForPID(pid, &psn)
+            _SLPSSetFrontProcessWithOptions(&psn, id, 0x200)
+            WindowCatalog.makeKey(id, &psn)
+            AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+            AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        case .own(let window, _):
+            DispatchQueue.main.async {
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
             }
         }
     }
@@ -253,13 +282,18 @@ enum LayoutWindow {
     /// Found items, by app. An app that quit, or rebuilt its menus, is
     /// looked through again.
     private static var menuItems: [pid_t: [String: AXUIElement]] = [:]
+    /// Not found, by app, and when: looked for again only after a while, as
+    /// a search goes through every menu of an app that has none.
+    private static var menuMisses: [pid_t: [String: Date]] = [:]
     private static let menuLock = NSLock()
 
     private static func menuItem(_ identifier: String, in app: AXUIElement, pid: pid_t) -> AXUIElement? {
         menuLock.lock()
         let cached = menuItems[pid]?[identifier]
+        let missed = menuMisses[pid]?[identifier]
         menuLock.unlock()
         if let cached, attribute(cached, "AXIdentifier") as String? == identifier { return cached }
+        if let missed, Date().timeIntervalSince(missed) < 60 { return nil }
         guard let bar: AXUIElement = attribute(app, kAXMenuBarAttribute) else { return nil }
         // The Window menu is near the end, before Help.
         let menus: [AXUIElement] = attribute(bar, kAXChildrenAttribute) ?? []
@@ -267,8 +301,15 @@ enum LayoutWindow {
             guard let found = search(menu, identifier, depth: 0) else { continue }
             menuLock.lock()
             menuItems[pid, default: [:]][identifier] = found
+            menuMisses[pid]?[identifier] = nil
             menuLock.unlock()
             return found
+        }
+        // An app still starting may not have its menus yet: only a full bar counts as a miss.
+        if !menus.isEmpty {
+            menuLock.lock()
+            menuMisses[pid, default: [:]][identifier] = Date()
+            menuLock.unlock()
         }
         return nil
     }

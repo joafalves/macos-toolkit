@@ -18,11 +18,15 @@ final class SnapAssist {
     struct OnScreen: Equatable {
         let id: CGWindowID
         let frame: CGRect
+        var pid: pid_t = 0
     }
 
     /// A window was picked for a slot. The controller puts it there, then
     /// calls `next()`.
     var onPick: ((SwitcherItem, Slot) -> Void)?
+    /// Taken by a stack, or by a window on its way into it, which the
+    /// windows on screen don't show yet.
+    var taken: (CGRect) -> Bool = { _ in false }
 
     private let panel = SwitcherPanel(takesKeys: true)
     /// The part being offered, drawn like a drop preview, under the panel.
@@ -75,7 +79,7 @@ final class SnapAssist {
         let all = WindowCatalog.shared.snapshot().items
         while !pending.isEmpty {
             let slot = pending.removeFirst()
-            if Self.filled(slot.frame, by: onScreen, except: used) { continue }
+            if taken(slot.frame) || Self.filled(slot.frame, by: onScreen, except: used) { continue }
             let candidates = Self.candidates(all, onScreen: onScreen, on: slot.display, in: displays, excluding: used, from: from)
             guard !candidates.isEmpty else { continue }
             show(candidates, in: slot)
@@ -142,7 +146,8 @@ final class SnapAssist {
         switch Int(event.keyCode) {
         // Not Space: someone typing straight after a snap would drop a window in.
         case kVK_Return, kVK_ANSI_KeypadEnter: pick(selection)
-        case kVK_RightArrow, kVK_Tab where !event.modifierFlags.contains(.shift): select(min(selection + 1, items.count - 1))
+        case kVK_Tab where !event.modifierFlags.contains(.shift): select(min(selection + 1, items.count - 1))
+        case kVK_RightArrow: select(min(selection + 1, items.count - 1))
         case kVK_LeftArrow, kVK_Tab: select(max(selection - 1, 0))
         case kVK_DownArrow: select(grid ? panel.neighbour(of: selection, rows: 1) : min(selection + 1, items.count - 1))
         case kVK_UpArrow: select(grid ? panel.neighbour(of: selection, rows: -1) : max(selection - 1, 0))
@@ -169,7 +174,7 @@ final class SnapAssist {
                   let bounds = info[kCGWindowBounds as String] as? NSDictionary,
                   let frame = CGRect(dictionaryRepresentation: bounds)
             else { return nil }
-            return OnScreen(id: id, frame: frame)
+            return OnScreen(id: id, frame: frame, pid: info[kCGWindowOwnerPID as String] as? pid_t ?? 0)
         }
     }
 
@@ -178,15 +183,20 @@ final class SnapAssist {
     /// another window, a maximized one say, doesn't count: the slot looks
     /// empty. `onScreen` is front to back.
     static func filled(_ slot: CGRect, by onScreen: [OnScreen], except: Set<CGWindowID>) -> Bool {
+        occupant(of: slot, by: onScreen, except: except) != nil
+    }
+
+    /// The window that fills the slot, in sight, if one does.
+    static func occupant(of slot: CGRect, by onScreen: [OnScreen], except: Set<CGWindowID>) -> OnScreen? {
         let others = onScreen.filter { !except.contains($0.id) }
         for (index, window) in others.enumerated() where LayoutWindow.near(window.frame, slot) {
             let covered = others[..<index].contains { above in
                 let overlap = above.frame.intersection(slot)
                 return !overlap.isNull && overlap.width * overlap.height > slot.width * slot.height * 0.1
             }
-            if !covered { return true }
+            if !covered { return window }
         }
-        return false
+        return nil
     }
 
     /// Open windows on the current Space, leaving out the ones in

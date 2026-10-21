@@ -379,6 +379,55 @@ enum Snapshot {
         save(container, to: path)
     }
 
+    /// Window Layout's tabs: a drawn window in the left half, and three
+    /// made-up ones sharing the right half, with their tab strip at the
+    /// bottom. Nothing from the screen.
+    static func writeLayoutTabs(to path: String, light: Bool) {
+        _ = NSApplication.shared
+        let size = CGSize(width: 1512, height: 982)
+        let usable = CGRect(x: 0, y: 33, width: size.width, height: 949 - 70)
+        let gap: CGFloat = 8
+        let leftHalf = LayoutGeometry.place(CGRect(x: 0, y: 0, width: 0.5, height: 1), in: usable, gap: gap)
+        let rightHalf = LayoutGeometry.place(CGRect(x: 0.5, y: 0, width: 0.5, height: 1), in: usable, gap: gap)
+        let shown = TabGeometry.member(in: rightHalf, style: .strip, position: .bottom)
+        let strip = TabGeometry.tabs(in: rightHalf, style: .strip, position: .bottom, count: 3)
+        func local(_ r: CGRect) -> CGRect { CGRect(x: r.minX, y: size.height - r.maxY, width: r.width, height: r.height) }
+
+        let desktop = NSImage(size: size, flipped: true) { rect in
+            let colors: [NSColor] = light ? [NSColor(calibratedRed: 0.55, green: 0.7, blue: 0.95, alpha: 1), NSColor(calibratedRed: 0.85, green: 0.75, blue: 0.95, alpha: 1)]
+                                          : [NSColor(calibratedRed: 0.1, green: 0.14, blue: 0.3, alpha: 1), NSColor(calibratedRed: 0.3, green: 0.15, blue: 0.35, alpha: 1)]
+            NSGradient(colors: colors)?.draw(in: rect, angle: 60)
+            (light ? NSColor(white: 1, alpha: 0.7) : NSColor(white: 0.1, alpha: 0.7)).setFill()
+            NSRect(x: 0, y: 0, width: rect.width, height: 33).fill()
+            if let image = fakeWindow(accent: .systemBlue, dark: !light, wide: false) { NSImage(cgImage: image, size: leftHalf.size).draw(in: leftHalf) }
+            if let image = fakeWindow(accent: .systemOrange, dark: !light, wide: true) { NSImage(cgImage: image, size: shown.size).draw(in: shown) }
+            return true
+        }
+        let container = NSView(frame: CGRect(origin: .zero, size: size))
+        let background = NSImageView(frame: container.bounds)
+        background.image = desktop
+        background.imageScaling = .scaleAxesIndependently
+        container.addSubview(background)
+
+        func icon(_ app: String) -> NSImage { NSWorkspace.shared.icon(forFile: "/System/Applications/\(app).app") }
+        let model = TabStripModel()
+        model.tabs = [TabItem(id: 1, title: "Notes — Shopping list", appName: "Notes", icon: icon("Notes")),
+                      TabItem(id: 2, title: "Inbox — 3 new messages", appName: "Mail", icon: icon("Mail")),
+                      TabItem(id: 3, title: "October 2026", appName: "Calendar", icon: icon("Calendar"))]
+        model.shown = 1
+        let tabs = NSHostingView(rootView: TabStripView(model: model))
+        tabs.frame = local(strip)
+        container.addSubview(tabs)
+
+        let window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = container
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        save(container, to: path)
+    }
+
     /// The menu bar mixer, filled with made-up rows.
     static func writeMixer(to path: String, light: Bool, outputs: Bool, software: Bool, equalizer: Bool) {
         _ = NSApplication.shared

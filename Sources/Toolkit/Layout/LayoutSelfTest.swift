@@ -149,6 +149,18 @@ extension LayoutController {
         SystemTiling.domain = realDomain
         SystemTiling.savedURL = realFile
 
+        // Tabs: where the windows and the tabs go in a slot.
+        let slotRect = CGRect(x: 0, y: 30, width: 1000, height: 800)
+        check("tab strip at the bottom: the windows above it", TabGeometry.member(in: slotRect, style: .strip, position: .bottom) == CGRect(x: 0, y: 30, width: 1000, height: 762))
+        check("and the strip along the bottom edge", TabGeometry.tabs(in: slotRect, style: .strip, position: .bottom, count: 3) == CGRect(x: 0, y: 796, width: 1000, height: 34))
+        check("tab strip at the top: the windows below it", TabGeometry.member(in: slotRect, style: .strip, position: .top).minY == 68)
+        // With the pill back (see TabsStyle):
+        // check("a pill leaves the windows the whole slot", TabGeometry.member(in: slotRect, style: .pill, position: .bottom) == slotRect)
+        // check("a pill is as wide as its icons, centred", TabGeometry.tabs(in: slotRect, style: .pill, position: .bottom, count: 3).width == 102)
+        // and TabGeometry.index(at: 40, width: 102, count: 3, style: .pill) == 1 below.
+        check("clicks find the tab under them", TabGeometry.index(at: 600, width: 1000, count: 3, style: .strip) == 2
+              && TabGeometry.index(at: 990, width: 1000, count: 3, style: .strip) == nil)
+
         // What's left after a drop, for the suggestions.
         let left = CGRect(x: 0, y: 0, width: 0.5, height: 1)
         check("beside the left half: the right half", LayoutGeometry.complement(of: left) == CGRect(x: 0.5, y: 0, width: 0.5, height: 1))
@@ -327,7 +339,13 @@ extension LayoutController {
                 // The real window list, as a drag sees it: through the Dock's
                 // overlay and anything else that covers a display.
                 if let frame = window.frame {
+                    // In front for this one, then the app that was there gets the keyboard back.
+                    let previous = NSWorkspace.shared.frontmostApplication
+                    window.raise()
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.4))
                     let grab = DragWatcher.window(at: CGPoint(x: frame.midX, y: frame.minY + 10))
+                    previous?.activate()
+                    for _ in 0..<20 where window.isFocusedInApp { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
                     check("a drag on the title bar finds the window", grab?.pid == helper.processIdentifier, "found \(grab.map { "pid \($0.pid)" } ?? "nothing")")
                     let seen = grab.flatMap { DragWatcher.bounds(of: $0.id) }
                     check("and can follow where it is", seen.flatMap { s in grab.map { LayoutWindow.close(s, $0.frame) } } ?? false, "\(text(seen)) vs \(text(grab?.frame))")
@@ -521,6 +539,120 @@ extension LayoutController {
             } else {
                 check("helper window found", false, "windows: \(windows)")
             }
+            // Tabs, live: the helper's two windows in the right half of a display.
+            let found = ["Layout Test", "Layout Test Big"].compactMap { title in
+                windows.first(where: { $0.1 == title }).flatMap { LayoutWindow.find(id: $0.0, pid: helper.processIdentifier) }
+            }
+            if found.count == 2, let display = found[0].frame.flatMap({ LayoutGeometry.display(of: $0, in: displays) }) {
+                let (a, b) = (found[0], found[1])
+                let tabsFront = NSWorkspace.shared.frontmostApplication
+                let startA = a.frame ?? .zero, startB = b.frame ?? .zero
+                let tabs = layout.tabs
+                tabs.gap = 0
+                // The big one has a minimum width: the right half if it fits, else the whole display.
+                let right = display.usable.width / 2 >= 920 ? CGRect(x: 0.5, y: 0, width: 0.5, height: 1) : CGRect(x: 0, y: 0, width: 1, height: 1)
+                let slotFrame = LayoutGeometry.place(right, in: display.usable, gap: 0)
+                for window in [a, b] { layout.place(window, .unit(right, display), displays: displays, gap: 0, cycle: false) }
+                func member(_ w: LayoutWindow) -> WindowTabs.Member { WindowTabs.Member(id: w.id, pid: w.pid) }
+                func wait(_ seconds: TimeInterval) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
+                func order() -> [CGWindowID] { SnapAssist.onScreen().map(\.id) }
+                tabs.join(member(b), unit: right, display: display, with: member(a))
+                wait(1.2)
+                let stack = tabs.stack(containing: a.id)
+                let memberFrame = stack.map { tabs.memberFrame(of: $0) } ?? .null
+                check("tabs: both windows share the slot, above the strip", [a, b].allSatisfy { $0.frame.map { LayoutWindow.near($0, memberFrame) } ?? false },
+                      "\(text(a.frame)) \(text(b.frame)) vs \(text(memberFrame))")
+                if let stack {
+                    let strip = CGWindowID(stack.strip.windowNumber)
+                    let z = order()
+                    let (iStrip, iA, iB) = (z.firstIndex(of: strip), z.firstIndex(of: a.id), z.firstIndex(of: b.id))
+                    check("the strip is right above the window shown, the other behind",
+                          iStrip != nil && iB != nil && iA != nil && iStrip! < iB! && iB! < iA!, "strip \(String(describing: iStrip)) b \(String(describing: iB)) a \(String(describing: iA))")
+                    tabs.select(a.id, in: stack)
+                    wait(0.8)
+                    let z2 = order()
+                    check("picking the other tab brings it forward, the strip with it",
+                          (z2.firstIndex(of: a.id) ?? 99) < (z2.firstIndex(of: b.id) ?? -1) && (z2.firstIndex(of: strip) ?? 99) < (z2.firstIndex(of: a.id) ?? -1))
+                    // Back and forth quickly, as clicks on the tabs: each stays picked, its window in front.
+                    var picks: [Bool] = []
+                    for id in [b.id, a.id, b.id] {
+                        tabs.select(id, in: stack)
+                        wait(0.45)
+                        let z = order()
+                        picks.append(stack.shown == id && z.first(where: { $0 == a.id || $0 == b.id }) == id)
+                    }
+                    wait(1)
+                    let z3 = order()
+                    check("tabs picked one after another: each comes forward and stays picked", picks.allSatisfy { $0 } && stack.shown == b.id
+                          && z3.first(where: { $0 == a.id || $0 == b.id }) == b.id, "\(picks) shown \(stack.shown == b.id ? "b" : "a")")
+                    tabs.remove(a.id, raiseNext: false)
+                    wait(0.8)
+                    check("taking one out of two: no tabs left, the other gets its slot back",
+                          tabs.stack(containing: b.id) == nil && (b.frame.map { LayoutWindow.near($0, slotFrame) } ?? false), text(b.frame))
+                    check("and the strip is gone", !order().contains(strip))
+                    // Resized by hand: out of the tabs.
+                    tabs.join(member(b), unit: right, display: display, with: member(a))
+                    wait(1.8)
+                    a.setFrame(CGRect(x: display.usable.minX + 100, y: display.usable.minY + 100, width: 500, height: 400), within: display.usable)
+                    wait(1.0)
+                    check("a window moved by hand leaves its tabs", tabs.stack(containing: a.id) == nil)
+
+                    // ⌃ while dragging: the window in the slot is outlined, and dropping over it stacks the two.
+                    layout.place(a, .unit(right, display), displays: displays, gap: 0, cycle: false)
+                    // In front, so none of this Mac's own windows covers it.
+                    a.raise()
+                    wait(0.6)
+                    let over = CGPoint(x: slotFrame.midX, y: slotFrame.midY)
+                    check("⌃ while dragging outlines the window in the slot",
+                          layout.stackTargets(on: display, excluding: b.id).contains { $0.occupant.id == a.id })
+                    func drag(_ window: LayoutWindow, to point: CGPoint, _ flags: CGEventFlags) {
+                        guard let frame = window.frame else { return }
+                        layout.dragStarted(DragWatcher.Grab(id: window.id, pid: window.pid, frame: frame))
+                        wait(0.3)
+                        layout.dragMoved(point, flags)
+                        layout.dropped(point, flags)
+                        wait(1.4)
+                    }
+                    drag(b, to: over, .maskControl)
+                    check("let go over it with ⌃: the two are stacked", tabs.stack(containing: a.id)?.contains(b.id) == true)
+                    // Dragged out to the middle of nowhere: the other keeps its slot.
+                    drag(b, to: CGPoint(x: display.usable.minX + 300, y: display.usable.midY), [])
+                    check("one dragged out of two: the other gets its whole slot back",
+                          tabs.stack(containing: a.id) == nil && (a.frame.map { LayoutWindow.near($0, slotFrame) } ?? false), text(a.frame))
+                    // Broken up, the slot is taken at once, before the last window has grown back into it.
+                    tabs.join(member(b), unit: right, display: display, with: member(a))
+                    wait(1.2)
+                    check("a stack's slot is taken", tabs.occupies(slotFrame))
+                    tabs.remove(b.id, raiseNext: false)
+                    check("and still is the moment it's broken up", tabs.occupies(slotFrame))
+                    wait(1.2)
+                    // Two windows snapped into the same slot, no stacks: ⌃ stacks with the one in front.
+                    if let c = windows.first(where: { $0.1 == "Layout Test Three" }).flatMap({ LayoutWindow.find(id: $0.0, pid: helper.processIdentifier) }) {
+                        let startC = c.frame ?? .zero
+                        layout.place(c, .unit(right, display), displays: displays, gap: 0, cycle: false)
+                        c.raise()
+                        wait(0.6)
+                        let targets = layout.stackTargets(on: display, excluding: b.id).filter { $0.frame.contains(over) }
+                        check("two in one slot: ⌃ outlines the one in front", targets.first?.occupant.id == c.id,
+                              "\(targets.map { $0.occupant.id == c.id ? "front" : $0.occupant.id == a.id ? "behind" : "other" })")
+                        drag(b, to: over, .maskControl)
+                        check("and stacks with it, not the one behind", tabs.stack(containing: c.id)?.contains(b.id) == true && tabs.stack(containing: a.id) == nil)
+                        // A window snapped over that stack: now that one is the one in front.
+                        layout.place(a, .unit(right, display), displays: displays, gap: 0, cycle: false)
+                        a.raise()
+                        wait(0.8)
+                        let covered = layout.stackTargets(on: display, excluding: kCGNullWindowID).filter { $0.frame.contains(over) }
+                        check("a stack under another window isn't offered, the window over it is", covered.first?.occupant.id == a.id,
+                              "\(covered.map { $0.occupant.id })")
+                        tabs.dissolveAll(restore: false)
+                        c.setFrame(startC, within: display.usable)
+                    }
+                }
+                tabs.dissolveAll(restore: false)
+                a.setFrame(startA, within: display.usable)
+                b.setFrame(startB, within: display.usable)
+                tabsFront?.activate()
+            }
             if let window = windows.first(where: { $0.1 == "Layout Test Big" }).flatMap({ LayoutWindow.find(id: $0.0, pid: helper.processIdentifier) }),
                let start = window.frame, let display = LayoutGeometry.display(of: start, in: displays) {
                 let target = LayoutGeometry.place(LayoutGeometry.unit(for: .topLeft)!, in: display.usable, gap: 0)
@@ -539,7 +671,7 @@ extension LayoutController {
         if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
     }
 
-    /// `--layout-test-window`: the helper's two windows, one of them with a
+    /// `--layout-test-window`: the helper's three windows, one of them with a
     /// minimum size larger than a quarter of most displays.
     static func runTestWindows() {
         let app = NSApplication.shared
@@ -562,6 +694,7 @@ extension LayoutController {
         let windows = [
             window("Layout Test", CGRect(x: 240, y: 240, width: 520, height: 380)),
             window("Layout Test Big", CGRect(x: 300, y: 200, width: 960, height: 640), min: CGSize(width: 900, height: 600)),
+            window("Layout Test Three", CGRect(x: 360, y: 280, width: 480, height: 360)),
         ]
         // The key window of its app, without the app coming to the front:
         // the Window menu's commands act on that one.
@@ -579,7 +712,7 @@ extension LayoutController {
         while Date() < deadline {
             RunLoop.main.run(until: Date().addingTimeInterval(0.2))
             let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
-            if list.filter({ $0[kCGWindowOwnerPID as String] as? pid_t == process.processIdentifier }).count >= 2 { break }
+            if list.filter({ $0[kCGWindowOwnerPID as String] as? pid_t == process.processIdentifier }).count >= 3 { break }
         }
         // A moment for its windows to answer Accessibility.
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))

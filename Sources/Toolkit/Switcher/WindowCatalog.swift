@@ -475,7 +475,7 @@ final class WindowCatalog {
 
     /// Tells the window server the window is key by replaying the two event
     /// records a click on it would produce.
-    private static func makeKey(_ window: CGWindowID, _ psn: inout ProcessSerialNumber) {
+    static func makeKey(_ window: CGWindowID, _ psn: inout ProcessSerialNumber) {
         var bytes = [UInt8](repeating: 0, count: 0xf8)
         bytes[0x04] = 0xf8
         bytes[0x3a] = 0x10

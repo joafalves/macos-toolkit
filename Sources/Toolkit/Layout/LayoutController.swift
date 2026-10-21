@@ -33,6 +33,8 @@ final class LayoutController: ObservableObject {
     private let gridOverlay = LayoutOverlay()
     private let dragOverlay = LayoutOverlay()
     private let assist = SnapAssist()
+    /// Windows sharing a slot as tabs.
+    private(set) lazy var tabs = WindowTabs(work: work)
     /// Accessibility calls wait for the other app, so they all happen here,
     /// one at a time and in order.
     private let work = DispatchQueue(label: "dev.jalves.macos-toolkit.layout", qos: .userInitiated)
@@ -47,6 +49,8 @@ final class LayoutController: ObservableObject {
     private var drag: DragSession?
 
     private(set) var isPreview = false
+    /// For `--snapshot … layout tabs|keyboard`: the page's tab to show.
+    static var previewPage: LayoutPage?
 
     private struct Placement {
         /// Before the first snap, for Restore and for dragging out.
@@ -96,6 +100,14 @@ final class LayoutController: ObservableObject {
         var picker: SlotPicker?
         /// Esc was pressed: this drag snaps nowhere.
         var cancelled = false
+        /// A window dragged out of its tabs: back in if it's dropped on its slot.
+        var leaving: CGWindowID?
+        /// The window it would join as a tab if dropped now.
+        var joining: WindowTabs.Member?
+        /// The windows it can be stacked with, while the key is held, and the
+        /// display they were found on: looked up once per display.
+        var stackTargets: [StackTarget] = []
+        var stackTargetsOn: CGDirectDisplayID?
     }
 
     /// Esc while a window is dragged, from other apps and from ours.
@@ -112,6 +124,7 @@ final class LayoutController: ObservableObject {
         drags.onDrop = { [weak self] point, flags in self?.dropped(point, flags) }
         drags.onCancel = { [weak self] in self?.dragCancelled() }
         assist.onPick = { [weak self] item, slot in self?.suggested(item, into: slot) }
+        assist.taken = { [weak self] slot in self?.tabs.occupies(slot) ?? false }
 
     }
 
@@ -134,8 +147,9 @@ final class LayoutController: ObservableObject {
         let layout = LayoutController()
         layout.isPreview = true
         var config = LayoutConfig()
-        // The checks measure against frames with no gap.
+        // The checks measure against frames with no gap, and use stacks.
         config.gap = 0
+        config.tabsJoin = .key
         layout.config = config
         layout.refreshDisplays()
         return layout
@@ -171,6 +185,8 @@ final class LayoutController: ObservableObject {
         closeGrid()
         dragOverlay.hide()
         assist.dismiss()
+        // Waited for: the app is about to go.
+        tabs.dissolveAll(restore: true, waiting: true)
         WindowCatalog.shared.use(self, false)
         SystemTiling.restore()
         SystemTiling.commit()
@@ -178,11 +194,19 @@ final class LayoutController: ObservableObject {
 
     private func apply() {
         guard !isPreview else { return }
+        let tabbing = config.enabled && config.tabsJoin != .off
         if config.enabled {
-            var bindings: [(Shortcut, LayoutKeys.Command)] = LayoutAction.allCases.compactMap { action in
+            // The tabs' keys only while windows can share a slot.
+            var bindings: [(Shortcut, LayoutKeys.Command)] = LayoutAction.allCases.filter { tabbing || !$0.isTabs }.compactMap { action in
                 config.shortcut(action).active.map { ($0, .action(action)) }
             }
             if let grid = config.gridShortcut.active { bindings.append((grid, .grid)) }
+            if tabbing, let flags = config.tabNumbers.flags {
+                let digits = [kVK_ANSI_1, kVK_ANSI_2, kVK_ANSI_3, kVK_ANSI_4, kVK_ANSI_5, kVK_ANSI_6, kVK_ANSI_7, kVK_ANSI_8, kVK_ANSI_9]
+                for (index, code) in digits.enumerated() {
+                    bindings.append((Shortcut(keyCode: code, flags: flags, key: "\(index + 1)"), .tab(index)))
+                }
+            }
             keys.start(bindings)
             let failed = keys.failed.map(title)
             if failed != failedShortcuts { failedShortcuts = failed }
@@ -221,6 +245,15 @@ final class LayoutController: ObservableObject {
         let suggesting = config.enabled && config.suggest != .off
         WindowCatalog.shared.use(self, suggesting)
         if !suggesting { assist.dismiss() }
+        // Turned off: each stack's shown window gets its slot back.
+        if !tabbing { tabs.dissolveAll(restore: true) }
+        // The gap is applied once the slider stops (`applyGap`), not at every step.
+        if tabs.stacks.isEmpty { tabs.gap = CGFloat(config.gap) }
+        if tabs.position != config.tabsPosition {
+            // tabs.style = config.tabsStyle (only the strip for now: see TabsStyle)
+            tabs.position = config.tabsPosition
+            tabs.layoutAll()
+        }
     }
 
     /// The drag tap needs Accessibility, which may be granted after launch;
@@ -246,6 +279,7 @@ final class LayoutController: ObservableObject {
         if fresh != displays { displays = fresh }
         // A grid on a display that went away has nothing left to stand on.
         if let grid, !fresh.contains(grid.display) { closeGrid() }
+        tabs.displaysChanged(fresh)
     }
 
     private static let rectangleIDs = ["com.knollsoft.Rectangle", "com.knollsoft.Hookshot"]
@@ -271,6 +305,7 @@ final class LayoutController: ObservableObject {
         switch command {
         case .action(let action): return "\(action.title) (\(config.shortcut(action).display))"
         case .grid: return "Grid (\(config.gridShortcut.display))"
+        case .tab(let index): return "Tab \(index + 1)"
         }
     }
 
@@ -283,6 +318,10 @@ final class LayoutController: ObservableObject {
 
     private func handle(_ command: LayoutKeys.Command) {
         switch command {
+        case .action(let action) where action.isTabs:
+            closeGrid()
+            assist.dismiss()
+            runTabs(action)
         case .action(let action):
             closeGrid()
             assist.dismiss()
@@ -290,7 +329,144 @@ final class LayoutController: ObservableObject {
         case .grid:
             assist.dismiss()
             if grid != nil { closeGrid() } else { openGrid() }
+        case .tab(let index):
+            closeGrid()
+            assist.dismiss()
+            withFocusedStack { stack, _ in self.tabs.select(at: index, in: stack) }
         }
+    }
+
+    // MARK: - Tabs
+
+    /// The focused window's stack, if it's in one; a beep if not.
+    private func withFocusedStack(_ body: @escaping (WindowTabs.Stack, CGWindowID) -> Void) {
+        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        work.async {
+            guard let window = LayoutWindow.focused(pid: pid) else { return Self.beep() }
+            let id = window.id
+            DispatchQueue.main.async {
+                guard let stack = self.tabs.stack(containing: id) else { return NSSound.beep() }
+                body(stack, id)
+            }
+        }
+    }
+
+    private func runTabs(_ action: LayoutAction) {
+        switch action {
+        case .nextTab: withFocusedStack { stack, _ in self.tabs.step(stack, by: 1) }
+        case .previousTab: withFocusedStack { stack, _ in self.tabs.step(stack, by: -1) }
+        // It stays where it is, on its own.
+        case .takeOutOfTabs: withFocusedStack { _, id in self.tabs.remove(id, raiseNext: false) }
+        case .joinTabs: joinUnderFocused()
+        default: break
+        }
+    }
+
+    /// The focused window joins the slot it's over: the first window under
+    /// its middle that's in a stack, or that we put in a slot.
+    private func joinUnderFocused() {
+        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        work.async {
+            guard let window = LayoutWindow.focused(pid: pid), let frame = window.frame else { return Self.beep() }
+            let center = CGPoint(x: frame.midX, y: frame.midY)
+            let below = SnapAssist.onScreen().drop { $0.id != window.id }.dropFirst().filter { $0.frame.contains(center) }
+            let placed: [CGWindowID: (CGRect, CGDirectDisplayID)] = Dictionary(uniqueKeysWithValues: below.compactMap { other in
+                guard let record = self.placements[other.id], let unit = record.unit, let display = record.display,
+                      LayoutWindow.close(record.applied, other.frame) else { return nil }
+                return (other.id, (unit, display))
+            })
+            let new = WindowTabs.Member(id: window.id, pid: window.pid)
+            DispatchQueue.main.async {
+                for other in below {
+                    if let stack = self.tabs.stack(containing: other.id), let shown = stack.members.first(where: { $0.id == stack.shown }) {
+                        return self.tabs.join(new, unit: stack.unit, display: stack.display, with: shown)
+                    }
+                    if let (unit, displayID) = placed[other.id], let display = self.displays.first(where: { $0.id == displayID }) {
+                        return self.tabs.join(new, unit: unit, display: display, with: WindowTabs.Member(id: other.id, pid: other.pid))
+                    }
+                }
+                NSSound.beep()
+            }
+        }
+    }
+
+    /// The part of a display a target puts a window in, if it's one.
+    private static func slot(of target: Target?) -> (CGRect, LayoutDisplay)? {
+        switch target {
+        case .unit(let unit, let display): return (unit, display)
+        case .snap(let action, let display): return LayoutGeometry.unit(for: action, portrait: display.portrait).map { ($0, display) }
+        default: return nil
+        }
+    }
+
+    /// Whether the drag is for stacking: stacks on, and their key held.
+    private func wantsTabs(_ flags: CGEventFlags) -> Bool {
+        config.tabsJoin == .key && config.tabsKey != .none && flags.contains(config.tabsKey.flag)
+    }
+
+    /// A window that can be stacked with: in a stack already, or in sight
+    /// filling a part of the display a window can be snapped to.
+    struct StackTarget: Equatable {
+        let unit: CGRect
+        let display: LayoutDisplay
+        /// The whole slot, in Core Graphics coordinates.
+        let frame: CGRect
+        let occupant: WindowTabs.Member
+    }
+
+    /// Every window on this display the dragged one could be stacked with.
+    func stackTargets(on display: LayoutDisplay, excluding dragged: CGWindowID) -> [StackTarget] {
+        let gap = CGFloat(config.gap)
+        var targets: [StackTarget] = []
+        let own = ProcessInfo.processInfo.processIdentifier
+        // Every window counts for covering one, the ones in stacks too.
+        let windows = SnapAssist.onScreen().filter { $0.pid != own && $0.id != dragged }
+        for stack in tabs.stacks where stack.display.id == display.id {
+            // Shown by another of its windows if the shown one is being dragged out.
+            guard let occupant = stack.members.first(where: { $0.id == stack.shown && $0.id != dragged }) ?? stack.members.first(where: { $0.id != dragged })
+            else { continue }
+            // A window snapped over the stack hides it: that window is the one to stack with.
+            let slot = tabs.slot(of: stack)
+            if let index = windows.firstIndex(where: { $0.id == occupant.id }), windows[..<index].contains(where: { above in
+                let overlap = above.frame.intersection(slot)
+                return !overlap.isNull && overlap.width * overlap.height > slot.width * slot.height * 0.1
+            }) { continue }
+            targets.append(StackTarget(unit: stack.unit, display: display, frame: slot, occupant: occupant))
+        }
+        let stacked = Set(tabs.stacks.flatMap(\.members).map(\.id))
+        for unit in Self.slotUnits(on: display, grid: gridSize(for: display)) {
+            let slot = LayoutGeometry.place(unit, in: display.usable, gap: gap)
+            guard let window = SnapAssist.occupant(of: slot, by: windows, except: []), !stacked.contains(window.id),
+                  !targets.contains(where: { $0.occupant.id == window.id }) else { continue }
+            targets.append(StackTarget(unit: unit, display: display, frame: slot, occupant: WindowTabs.Member(id: window.id, pid: window.pid)))
+        }
+        return targets
+    }
+
+    /// The parts of a display a window can be snapped to: the shortcuts'
+    /// halves, thirds and quarters, the layouts bar's, and the grid's blocks.
+    private static func slotUnits(on display: LayoutDisplay, grid: GridSize) -> [CGRect] {
+        var units = LayoutAction.allCases.compactMap { LayoutGeometry.unit(for: $0, portrait: display.portrait) }
+        for action in [LayoutAction.leftHalf, .rightHalf] {
+            units += (1...2).compactMap { LayoutGeometry.unit(for: action, step: $0) }
+        }
+        units += SlotPicker.layouts(for: display).flatMap { $0 }
+        for c0 in 0..<grid.columns {
+            for c1 in c0..<grid.columns {
+                for r0 in 0..<grid.rows {
+                    for r1 in r0..<grid.rows {
+                        var range = CellRange(CellRange.Cell(column: c0, row: r0))
+                        range.cursor = CellRange.Cell(column: c1, row: r1)
+                        units.append(range.unit(in: grid))
+                    }
+                }
+            }
+        }
+        var unique: [CGRect] = []
+        for unit in units where !unique.contains(where: { abs($0.minX - unit.minX) < 0.001 && abs($0.minY - unit.minY) < 0.001 && abs($0.width - unit.width) < 0.001 && abs($0.height - unit.height) < 0.001 }) {
+            unique.append(unit)
+        }
+        return unique
     }
 
     private func run(_ action: LayoutAction) {
@@ -309,7 +485,7 @@ final class LayoutController: ObservableObject {
     // MARK: - Placing (on `work`, or the main thread in the self-test)
 
     /// `cycle`: at the outer edge, left and right go on through ⅔ and ⅓.
-    func place(_ window: LayoutWindow, _ target: Target, displays: [LayoutDisplay], gap: CGFloat, cycle: Bool) {
+    func place(_ window: LayoutWindow, _ target: Target, displays: [LayoutDisplay], gap: CGFloat, cycle: Bool, afterDrag: Bool = false) {
         guard let frame = window.frame, let current = LayoutGeometry.display(of: frame, in: displays) else { return Self.beep() }
         if placements.count > 500 { placements.removeAll() }
         // Only counts if the window is still where we put it.
@@ -437,7 +613,8 @@ final class LayoutController: ObservableObject {
         // another display, it goes there first.
         if gap <= LayoutGeometry.macOSMargin, placement.unit == CGRect(x: 0, y: 0, width: 1, height: 1), window.isFocusedInApp {
             if display.id != current.id { window.setFrame(rect, within: display.usable) }
-            if window.perform(.fill), let filled = Self.settled(window, near: rect) {
+            // Only if it really filled: an app can take the command and do nothing.
+            if window.perform(.fill), let filled = Self.settled(window, near: rect), LayoutWindow.near(filled, rect) {
                 placement.applied = filled
                 placement.tiledByMacOS = true
                 placement.display = display.id
@@ -445,7 +622,7 @@ final class LayoutController: ObservableObject {
                 return
             }
         }
-        guard let actual = window.setFrame(rect, within: display.usable, tiled: record?.tiledByMacOS ?? false) else { return Self.beep() }
+        guard let actual = window.setFrame(rect, within: display.usable, tiled: record?.tiledByMacOS ?? false, afterDrag: afterDrag) else { return Self.beep() }
         placement.applied = actual
         // Moved by us, it may still be in macOS's tiling, which then puts it
         // back by itself when it's dragged away.
@@ -471,6 +648,10 @@ final class LayoutController: ObservableObject {
     /// follow the gap by themselves.
     func applyGap() {
         let displays = self.displays, gap = CGFloat(config.gap)
+        if tabs.gap != gap {
+            tabs.gap = gap
+            tabs.layoutAll()
+        }
         work.async {
             for (id, record) in self.placements {
                 guard let unit = record.unit, !record.tiledByMacOS, let displayID = record.display,
@@ -619,6 +800,10 @@ final class LayoutController: ObservableObject {
     func dragStarted(_ grab: DragWatcher.Grab) {
         assist.dismiss()
         drag = DragSession(grab: grab)
+        if tabs.stack(containing: grab.id) != nil {
+            drag?.leaving = grab.id
+            tabs.dragging = grab.id
+        }
         // The watcher holds at display edges, on its own thread, from now on.
         drags.holdDisplays.value = config.holdAtEdges ? displays : nil
         watchEscape()
@@ -688,7 +873,25 @@ final class LayoutController: ObservableObject {
             }
         }
         let escape = "esc: don't snap"
-        if config.dragSlots != .none, flags.contains(config.dragSlots.flag),
+        if wantsTabs(flags), let display = LayoutGeometry.display(at: point, in: displays) {
+            // Stacking: every window it can stack with is outlined; the one
+            // under the pointer is where it goes.
+            session.anchor = nil
+            session.picker = nil
+            if session.stackTargetsOn != display.id {
+                session.stackTargets = stackTargets(on: display, excluding: session.grab.id)
+                session.stackTargetsOn = display.id
+            }
+            let hit = session.stackTargets.first { $0.frame.contains(point) }
+            session.target = hit.map { .unit($0.unit, $0.display) }
+            session.joining = hit?.occupant
+            content.outlines = session.stackTargets.map(\.frame)
+            content.highlight = hit?.frame
+            content.joining = hit != nil
+            content.hint = session.stackTargets.isEmpty ? "No windows here to stack with  ·  \(escape)"
+                                                        : "Let go over a window to stack with it  ·  \(escape)"
+            shownOn = display
+        } else if config.dragSlots != .none, flags.contains(config.dragSlots.flag),
            let display = LayoutGeometry.display(at: point, in: displays) {
             session.anchor = nil
             // Where the pointer is when the key goes down; on another display, it starts again there.
@@ -730,6 +933,10 @@ final class LayoutController: ObservableObject {
             session.picker = nil
             edge()
         }
+        if !wantsTabs(flags) {
+            session.joining = nil
+            session.stackTargetsOn = nil
+        }
         drag = session
         guard let shownOn else { return dragOverlay.hide() }
         dragOverlay.content = content
@@ -743,19 +950,33 @@ final class LayoutController: ObservableObject {
         drags.holdDisplays.value = nil
         guard let session = drag else { return }
         drag = nil
-        guard session.eligible != false, !session.cancelled, let target = session.target else { return }
+        tabs.dragging = nil
+        let target = session.eligible != false && !session.cancelled ? session.target : nil
+        // Out of its tabs, unless it was dropped right back on its slot.
+        if let leaving = session.leaving {
+            if let stack = tabs.stack(containing: leaving), let (unit, display) = Self.slot(of: target),
+               tabs.stack(at: unit, on: display) === stack {
+                return tabs.putBack(leaving)
+            }
+            tabs.remove(leaving, raiseNext: false)
+        }
+        guard let target else { return }
         let displays = self.displays, gap = CGFloat(config.gap), grab = session.grab
+        if let occupant = session.joining, let (unit, display) = Self.slot(of: target) {
+            return tabs.join(WindowTabs.Member(id: grab.id, pid: grab.pid), unit: unit, display: display, with: occupant)
+        }
         let rest = Self.rest(after: target, picker: session.picker, gap: gap)
         let suggest = config.suggest, from = config.suggestFrom
         // A moment for the app to finish with the drag, or it may put the
         // window back where the mouse left it.
         work.asyncAfter(deadline: .now() + 0.03) {
             guard let window = LayoutWindow.find(id: grab.id, pid: grab.pid) else { return }
-            self.place(window, target, displays: displays, gap: gap, cycle: false)
-            guard suggest != .off, !rest.isEmpty else { return }
-            DispatchQueue.main.async {
-                self.assist.offer(rest, after: grab.id, displays: displays, style: suggest, from: from)
-            }
+            self.place(window, target, displays: displays, gap: gap, cycle: false, afterDrag: true)
+        }
+        // At once, not after the window has finished moving: the part that's
+        // left is known now, and the dropped window isn't offered anyway.
+        if suggest != .off, !rest.isEmpty {
+            assist.offer(rest, after: grab.id, displays: displays, style: suggest, from: from)
         }
     }
 
@@ -793,6 +1014,8 @@ final class LayoutController: ObservableObject {
     }
 
     private func dragCancelled() {
+        if let leaving = drag?.leaving { tabs.recheck(leaving) }
+        tabs.dragging = nil
         drag = nil
         drags.holdDisplays.value = nil
         dragOverlay.hide()
