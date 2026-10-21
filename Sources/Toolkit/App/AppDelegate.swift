@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var termSource: DispatchSourceSignal?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Before the tools: their taps read it from their own threads.
+        FrontApp.start()
         mouse = MouseController()
         switcher = SwitcherController()
         switcher.start()

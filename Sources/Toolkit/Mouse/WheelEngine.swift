@@ -33,7 +33,9 @@ final class WheelEngine {
     func start() -> Bool {
         if tap != nil { return true }
         tap = EventTap(name: "wheel", events: [.scrollWheel, .otherMouseDown, .otherMouseUp]) { [weak self] type, event in
-            self?.handle(type: type, event: event) ?? Unmanaged.passUnretained(event)
+            // nil means "take the event": `??` here would pass it on after all.
+            guard let self else { return Unmanaged.passUnretained(event) }
+            return self.handle(type: type, event: event)
         }
         return tap != nil
     }
@@ -109,7 +111,7 @@ final class WheelEngine {
             return swallowedButtons.remove(button) != nil
         }
         guard profileProvider()?.navigationButtons == true,
-              NSWorkspace.shared.frontmostApplication?.bundleIdentifier?.hasPrefix("com.apple.") == true
+              FrontApp.bundleID?.hasPrefix("com.apple.") == true
         else { return false }
 
         swallowedButtons.insert(button)

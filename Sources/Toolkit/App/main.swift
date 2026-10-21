@@ -83,6 +83,12 @@ if CommandLine.arguments.contains("--test-recording") {
     CaptureController.recordingTest()
     exit(0)
 }
+// Development aid: `--test-wheel <report>`, one notch through the installed
+// app's wheel tap. Run the app bundle with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-wheel"), CommandLine.arguments.count > flag + 1 {
+    WheelProbe.run(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
 // Development aid: `--test-taps [report]`, the event taps keep up while the
 // main thread is stuck. Run the app bundle with `open -n` so Accessibility is
 // the app's own; the report goes to the file.

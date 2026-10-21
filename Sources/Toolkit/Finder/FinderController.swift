@@ -126,7 +126,9 @@ final class FinderController: ObservableObject {
 
     private func installTap() -> Bool {
         tap = EventTap(name: "finder-keys", events: [.keyDown, .keyUp]) { [weak self] type, event in
-            self?.handle(type: type, event: event) ?? Unmanaged.passUnretained(event)
+            // nil means "take the event": `??` here would pass it on after all.
+            guard let self else { return Unmanaged.passUnretained(event) }
+            return self.handle(type: type, event: event)
         }
         return tap != nil
     }
@@ -157,9 +159,7 @@ final class FinderController: ObservableObject {
               flags.isDisjoint(with: [.maskShift, .maskAlternate, .maskControl])
         else { return pass }
 
-        guard let app = NSWorkspace.shared.frontmostApplication, app.bundleIdentifier == Self.finder,
-              !Self.isEditingText(in: app.processIdentifier)
-        else { return pass }
+        guard FrontApp.bundleID == Self.finder, let pid = FrontApp.pid, !Self.isEditingText(in: pid) else { return pass }
 
         if code == Key.x {
             cut()

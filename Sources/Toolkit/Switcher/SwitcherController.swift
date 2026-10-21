@@ -148,7 +148,9 @@ final class SwitcherController: ObservableObject {
 
     private func installTap() -> Bool {
         tap = EventTap(name: "switcher", events: [.keyDown, .keyUp, .flagsChanged]) { [weak self] type, event in
-            self?.handle(type: type, event: event) ?? Unmanaged.passUnretained(event)
+            // nil means "take the event": `??` here would pass it on after all.
+            guard let self else { return Unmanaged.passUnretained(event) }
+            return self.handle(type: type, event: event)
         }
         return tap != nil
     }

@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 import CoreGraphics
 import Foundation
@@ -37,7 +38,12 @@ final class EventTap {
             userInfo: box
         ) else { return nil }
         self.port = port
-        guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0) else { return nil }
+        guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0) else {
+            // Not left behind: it would call back into a tap that's gone.
+            CGEvent.tapEnable(tap: port, enable: false)
+            CFMachPortInvalidate(port)
+            return nil
+        }
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [self] in
             let loop = CFRunLoopGetCurrent()
@@ -81,6 +87,26 @@ final class EventTap {
     }
 
     deinit { stop() }
+}
+
+/// The app in front, for taps: NSWorkspace is the main thread's, so it keeps
+/// this current there and taps read it from theirs.
+enum FrontApp {
+    private static let current = Locked<(id: String?, pid: pid_t)?>(nil)
+    private static var observer: NSObjectProtocol?
+
+    /// On the main thread, before any tap that reads it.
+    static func start() {
+        guard observer == nil else { return }
+        let read = { (app: NSRunningApplication?) in current.value = app.map { ($0.bundleIdentifier, $0.processIdentifier) } }
+        read(NSWorkspace.shared.frontmostApplication)
+        observer = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { note in
+            read(note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)
+        }
+    }
+
+    static var bundleID: String? { current.value?.id }
+    static var pid: pid_t? { current.value?.pid }
 }
 
 /// A value the main thread sets and a tap's thread reads, or the other way round.
