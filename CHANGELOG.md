@@ -16,6 +16,8 @@ worked on; it gets its date when it's released.
   announce it the way the mixer listened for, so it could take many seconds to catch up.
 - **Audio Mixer:** if macOS refuses the tap for an app you muted or turned down, it's tried again a
   few seconds later, rather than leaving that app at full volume until its sound output changes.
+- **Audio Mixer:** the bars next to a playing app no longer use CPU; with the mixer open they took
+  about 10% of a core. With Reduce Motion on they stand still.
 - **Window Layout:** quitting with one of the toolkit's own windows in a stack no longer crashes,
   which also skipped putting other things back as the app quit.
 

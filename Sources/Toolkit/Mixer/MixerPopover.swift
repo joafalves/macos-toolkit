@@ -460,19 +460,66 @@ private struct VolumeSlider: View {
     }
 }
 
-/// Three bars bouncing, shown next to an app that is playing.
-private struct PlayingBars: View {
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 24)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            HStack(alignment: .bottom, spacing: 1.5) {
-                ForEach(0..<3) { i in
-                    Capsule()
-                        .fill(Color.accentColor)
-                        .frame(width: 2, height: 3 + 6 * abs(sin(t * (5 + Double(i) * 1.7) + Double(i))))
-                }
-            }
-            .frame(height: 9, alignment: .bottom)
+/// Three bars bouncing, shown next to an app that is playing. Core Animation
+/// moves them, outside the app: drawn by SwiftUI each frame, a few rows of
+/// them kept the toolkit at about 10% of a core while the mixer was open.
+private struct PlayingBars: NSViewRepresentable {
+    func makeNSView(context: Context) -> PlayingBarsView { PlayingBarsView() }
+    func updateNSView(_ view: PlayingBarsView, context: Context) {}
+    // Its own size, not the row's height: the bars stand on the view's bottom.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: PlayingBarsView, context: Context) -> CGSize? { PlayingBarsView.size }
+}
+
+private final class PlayingBarsView: NSView {
+    private static let width: CGFloat = 2, gap: CGFloat = 1.5, low: CGFloat = 3, high: CGFloat = 9
+    static let size = CGSize(width: width * 3 + gap * 2, height: high)
+    /// Seconds from low to high for each bar, so they don't move together.
+    private static let periods: [CFTimeInterval] = [0.63, 0.47, 0.37]
+    /// Where each bar stands when nothing moves it (snapshots, Reduce Motion).
+    private static let resting: [CGFloat] = [6, 9, 4]
+    private var bars: [CALayer] = []
+
+    init() {
+        super.init(frame: NSRect(origin: .zero, size: Self.size))
+        wantsLayer = true
+        for index in 0..<3 {
+            let bar = CALayer()
+            bar.anchorPoint = CGPoint(x: 0.5, y: 0)
+            bar.cornerRadius = Self.width / 2
+            bar.frame = CGRect(x: CGFloat(index) * (Self.width + Self.gap), y: 0, width: Self.width, height: Self.resting[index])
+            layer?.addSublayer(bar)
+            bars.append(bar)
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { false }
+    override var intrinsicContentSize: NSSize { Self.size }
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        let color = NSColor.controlAccentColor.cgColor
+        bars.forEach { $0.backgroundColor = color }
+    }
+
+    // Animations go with the layer tree a view leaves, so they're added each
+    // time it's put in a window.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        bars.forEach { $0.removeAllAnimations() }
+        guard window != nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        for (index, bar) in bars.enumerated() {
+            let bounce = CABasicAnimation(keyPath: "bounds.size.height")
+            bounce.fromValue = Self.low
+            bounce.toValue = Self.high
+            bounce.duration = Self.periods[index]
+            bounce.autoreverses = true
+            bounce.repeatCount = .infinity
+            bounce.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            bounce.timeOffset = Self.periods[index] * Double(index) / 3
+            bounce.isRemovedOnCompletion = false
+            bar.add(bounce, forKey: "bounce")
         }
     }
 }
