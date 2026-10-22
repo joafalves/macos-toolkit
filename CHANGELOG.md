@@ -7,6 +7,7 @@ worked on; it gets its date when it's released.
 
 ### Added
 
+- **License:** the toolkit is open source, under the Apache License 2.0.
 - **Keep Awake:** 50 and 55 minutes among the times to turn it on for.
 
 ### Changed

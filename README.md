@@ -670,7 +670,8 @@ To update later: `git pull && ./scripts/build.sh --install`.
 ### First run
 
 The window opens on **Overview**, with a tile for each tool and a warning while a permission one of
-them needs is missing. **Settings**, under it, has the app's own settings. It opens there again after an update; otherwise on the page you left.
+them needs is missing. It opens there again after an update; otherwise on the page you left.
+**Settings**, under it, has the app's own settings.
 
 - Every tool starts off. Click its tile, or its name in the sidebar, and turn it on with the switch
   at the top of its page.
@@ -734,3 +735,7 @@ docs/images    the screenshots above
 What each version added and fixed is in [`CHANGELOG.md`](CHANGELOG.md). A tool is a controller plus a config, stored as JSON. [`AGENTS.md`](AGENTS.md) has the conventions,
 the dev flags (`--snapshot` renders any page to an image, `--list-windows` and `--list-audio` print
 what the tools see, `--test-capture` runs the screenshot and recording code without the UI, `--test-layout` places a helper's windows), and how versions and releases are made.
+
+## License
+
+Copyright 2026 João Alves. Licensed under the [Apache License, Version 2.0](LICENSE).

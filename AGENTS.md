@@ -39,6 +39,7 @@ tool; keep it in step with the code.
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
 - `Resources`: `Info.plist` (the only place the version lives), app icon.
 - `CHANGELOG.md`: what each version adds, changes and fixes (see Versions and releases).
+- `LICENSE`: the Apache License 2.0, unchanged; the copyright line is in the README and on About.
 - `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `make-icon.swift` (the app icon;
   `KitIcon` in `Components.swift` and `MenuBarArt.toolkit` draw it too, keep them in step).
 - `docs/images`: the README's screenshots. **None of them is a screenshot of the desktop**: every
