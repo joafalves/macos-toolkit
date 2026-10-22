@@ -20,6 +20,7 @@ worked on; it gets its date when it's released.
   about 10% of a core. With Reduce Motion on they stand still.
 - **Keep Awake:** the pill in the menu bar no longer keeps a picture of every minute it has shown,
   which grew the toolkit by about 80 MB a day. The same for the volume and System Stats pills.
+- **Mouse:** with the tool off, scrolling and middle clicks no longer pass through the toolkit.
 - **Window Layout:** quitting with one of the toolkit's own windows in a stack no longer crashes,
   which also skipped putting other things back as the app quit.
 

@@ -42,6 +42,22 @@ final class WheelEngine {
         return tap != nil
     }
 
+    /// Takes the tap out, while the mouse tool is off: left in, it kept every
+    /// scroll and middle click going through the toolkit for nothing.
+    func stop() {
+        guard let tap else { return }
+        self.tap = nil
+        // Wound down on the tap's own thread, where the smoothing and autoscroll live.
+        tap.perform { [self] in
+            autoscroller.cancel()
+            timer?.invalidate()
+            timer = nil
+            remainingX = 0
+            remainingY = 0
+            tap.stop()
+        }
+    }
+
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {

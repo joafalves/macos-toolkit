@@ -145,10 +145,12 @@ final class MouseController: ObservableObject {
             accessibilityGranted = trusted
             NSLog("Toolkit: accessibility granted = \(trusted)")
         }
-        if trusted, !wheel.isRunning {
+        if config.enabled, trusted, !wheel.isRunning {
             let started = wheel.start()
             NSLog("Toolkit: scroll event tap started = \(started)")
             if wheelTapFailed == started { wheelTapFailed = !started }
+        } else if !config.enabled, wheel.isRunning {
+            wheel.stop()
         }
     }
 
