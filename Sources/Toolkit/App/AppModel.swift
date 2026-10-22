@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import ServiceManagement
 
-/// The pages of the main window: Welcome, Settings (the app's own), and the tools.
+/// The pages of the main window: Overview, Settings (the app's own), and the tools.
 enum AppSection: String, CaseIterable, Identifiable {
     case welcome, mouse, switcher, layout, mixer, finder, capture, awake, stats, general
 
@@ -15,7 +15,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .welcome: return "Welcome"
+        case .welcome: return "Overview"
         case .mouse: return "Mouse"
         case .switcher: return "Window Switcher"
         case .layout: return "Window Layout"
@@ -60,7 +60,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         }
     }
 
-    /// What it does, in a line, for its tile on Welcome.
+    /// What it does, in a line, for its tile on Overview.
     var summary: String {
         switch self {
         case .welcome: return ""
@@ -113,8 +113,8 @@ final class AppModel: ObservableObject {
     private static let lastSectionKey = "lastSection"
     private static let welcomedKey = "welcomedVersion"
 
-    /// Where the window opens: Welcome the first time and after an update,
-    /// otherwise the page it was left on. Opening Welcome counts as seen.
+    /// Where the window opens: Overview the first time and after an update,
+    /// otherwise the page it was left on. Opening Overview counts as seen.
     func launchSection() -> AppSection {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
         let defaults = UserDefaults.standard

@@ -287,14 +287,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             menu.addItem(.separator())
         }
         // The tools that are on, under a header, so their names don't read
-        // like the tools themselves. The others are turned on from Welcome.
+        // like the tools themselves. The others are turned on from Overview.
         let on = AppSection.tools.filter(isOn)
         if !on.isEmpty {
             menu.addItem(.sectionHeader(title: "Tool Settings"))
             for section in on { menu.addItem(sectionItem(section, title: section.title)) }
             menu.addItem(.separator())
         }
-        let welcome = sectionItem(.welcome, title: "Welcome")
+        let welcome = sectionItem(.welcome, title: "Overview")
         welcome.image = MenuBarArt.toolkit
         menu.addItem(welcome)
         menu.addItem(sectionItem(.general, title: "Settings…"))

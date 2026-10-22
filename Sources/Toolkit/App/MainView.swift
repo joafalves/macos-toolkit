@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A sidebar row as System Settings has them: a small coloured tile, then the
-/// name. A tool that's off is greyed, as on Welcome.
+/// name. A tool that's off is greyed, as on Overview.
 private struct SidebarRow: View {
     let section: AppSection
     var on = true
@@ -35,7 +35,7 @@ struct MainView: View {
     @ObservedObject var awake: AwakeController
     @ObservedObject var stats: StatsController
 
-    /// Whether a tool is on, for its tile on Welcome and its sidebar row.
+    /// Whether a tool is on, for its tile on Overview and its sidebar row.
     private func enabled(_ section: AppSection) -> Bool {
         switch section {
         case .mouse: return mouse.config.enabled
@@ -55,7 +55,7 @@ struct MainView: View {
         // sidebar up into the title bar, leaving the bar two-toned.
         HStack(spacing: 0) {
             List(selection: $model.section) {
-                // Welcome and the app's own settings, then the tools.
+                // Overview and the app's own settings, then the tools.
                 SidebarRow(section: .welcome).tag(AppSection.welcome)
                 SidebarRow(section: .general).tag(AppSection.general)
                 Section("Tools") {

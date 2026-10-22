@@ -669,7 +669,7 @@ To update later: `git pull && ./scripts/build.sh --install`.
 
 ### First run
 
-The window opens on **Welcome**, with a tile for each tool and a warning while a permission one of
+The window opens on **Overview**, with a tile for each tool and a warning while a permission one of
 them needs is missing. **Settings**, under it, has the app's own settings. It opens there again after an update; otherwise on the page you left.
 
 - Every tool starts off. Click its tile, or its name in the sidebar, and turn it on with the switch
@@ -700,7 +700,7 @@ size and spacing and a hairline between them. While recording, Screen Capture's 
 stop button with the time and size. Each part opens its own menu or panel, and while one is open
 the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
 and other apps' icons can't end up between them. The toolkit menu opens the settings of each tool that's on,
-listed under a Tool Settings header; the others are turned on from Welcome. **Settings → Space between items** sets how far apart the parts sit.
+listed under a Tool Settings header; the others are turned on from Overview. **Settings → Space between items** sets how far apart the parts sit.
 
 ## Good to know
 

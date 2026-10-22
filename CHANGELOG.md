@@ -12,11 +12,12 @@ worked on; it gets its date when it's released.
 ### Changed
 
 - **Settings window:** a tool that's off is greyed in the sidebar, its tile without colour and its
-  name dimmed, as on Welcome.
+  name dimmed, as on Overview.
 - **System Stats:** the CPU panel shows each core's last minute as a small chart with what it's at
   now, grouped by kind of core with each group's average, in place of the row of small bars.
+- **Settings window:** Welcome is now called Overview, in the sidebar and in the toolkit menu.
 - **Settings window:** a new install says every tool starts off and where to turn one on. A tool
-  that's off says so under its header, and the header reads On or Off, as Welcome does.
+  that's off says so under its header, and the header reads On or Off, as Overview does.
 - **Settings window:** shorter descriptions in several places, and pop-up menus where a wide row of
   choices squeezed the text beside it. US spelling throughout.
 - **Settings window:** Permissions lists the Microphone too, and shows a permission granted in System

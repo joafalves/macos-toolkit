@@ -271,7 +271,7 @@ struct ToolHeader: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)
-                // On and Off, as on Welcome and in the menus.
+                // On and Off, as on Overview and in the menus.
                 Text(enabled ? "On" : "Off")
                     .font(.callout.weight(.medium))
                     .foregroundStyle(enabled ? Color.accentColor : .secondary)
