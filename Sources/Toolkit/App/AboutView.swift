@@ -5,12 +5,14 @@ import SwiftUI
 struct AboutView: View {
     static let repository = URL(string: "https://github.com/joafalves/macos-toolkit")!
 
+    /// With the short commit it was built from, which `build.sh` writes in;
+    /// a `--snapshot` run has none.
     private var version: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "dev"
-        // The build number only for a real build, not for `--snapshot`.
-        guard let build = info?["CFBundleVersion"] as? String, short != "dev" else { return "Version \(short)" }
-        return "Version \(short) (\(build))"
+        guard let commit = info?["ToolkitCommit"] as? String else { return "Version \(short)" }
+        let modified = info?["ToolkitModified"] as? Bool == true
+        return "Version \(short) (\(commit)\(modified ? ", modified" : ""))"
     }
 
     var body: some View {

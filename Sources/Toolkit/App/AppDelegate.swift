@@ -73,7 +73,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             awake.$minute.sink { _ in redraw() },
             stats.$config.sink { _ in redraw() },
             stats.live.$tick.sink { _ in redraw() },
-            model.$general.sink { [weak self] general in self?.menuBar.spacing = general.menuBarSpacing },
+            model.$general.sink { [weak self] general in
+                self?.menuBar.spacing = general.menuBarSpacing
+                redraw()
+            },
         ]
         updateMenuBar()
 
@@ -188,6 +191,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 break
             }
         }
+        // In the order set in Settings; each tool's own parts stay together.
+        let order = model.general.menuBarOrder
+        segments = order.flatMap { tool in segments.filter { $0.kind.tool == tool } }
         menuBar.show(segments)
         // A panel whose part was just turned off has nothing to hang from.
         if let kind = statsPanel?.kind, !segments.contains(where: { $0.kind == kind }) { statsPanel.close() }

@@ -16,6 +16,13 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Toolkit "$APP/Contents/MacOS/Toolkit"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# The commit it's built from, for About, and whether the tree had changes
+# on top of it: then the commit alone isn't what was built.
+if COMMIT="$(git rev-parse --short HEAD 2>/dev/null)"; then
+  /usr/libexec/PlistBuddy -c "Add :ToolkitCommit string $COMMIT" "$APP/Contents/Info.plist"
+  [ -n "$(git status --porcelain)" ] && MODIFIED=true || MODIFIED=false
+  /usr/libexec/PlistBuddy -c "Add :ToolkitModified bool $MODIFIED" "$APP/Contents/Info.plist"
+fi
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # The Finder extension, with the app's version so the two never disagree.

@@ -22,7 +22,7 @@
   <a href="#the-menu-bar">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-strip-dark.png">
-      <img src="docs/images/menu-bar-strip-light.png" width="600" alt="The toolkit in the menu bar: its menu, CPU and memory, Screen Capture, Keep Awake with the time left, and the Audio Mixer's volume badge side by side">
+      <img src="docs/images/menu-bar-strip-light.png" width="600" alt="The toolkit in the menu bar: its menu, CPU and memory, Screen Capture, Keep Awake with the time left, and the Audio Mixer's volume pill side by side">
     </picture>
   </a>
 </p>
@@ -163,7 +163,7 @@ every app that has sound gets its own slider.
   **Exclude** it: excluded apps are left out of the mixer and always play at the main volume.
 - A place in the **menu bar**, one click away, set in the mixer's settings: none, the mixer glyph,
   **Volume**, a speaker that follows the volume and shows when it's muted, **Volume and
-  percentage**, or **Volume badge**, a pill that fills with the volume like the battery, with the
+  percentage**, or **Volume pill**, a pill that fills with the volume like the battery, with the
   speaker and the number cut out of it.
 - **The volume keys** go through the mixer on every output while it's on, so they always behave the
   same: 5% a press (1% with ⇧⌥), mute toggles, and the toolkit's own on-screen bar in place of
@@ -703,7 +703,9 @@ size and spacing and a hairline between them. While recording, Screen Capture's 
 stop button with the time and size. Each part opens its own menu or panel, and while one is open
 the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
 and other apps' icons can't end up between them. The toolkit menu opens the settings of each tool that's on,
-listed under a Tool Settings header; the others are turned on from Overview. **Settings → Space between items** sets how far apart the parts sit.
+listed under a Tool Settings header; the others are turned on from Overview. **Settings → Space between items** sets how far apart the parts sit, and **Order** which comes
+first: drag the tools, the toolkit menu too, into the order you want, left to right. A switch on
+each puts it in the menu bar or takes it out; a tool that's off opens its page instead.
 
 ## Good to know
 

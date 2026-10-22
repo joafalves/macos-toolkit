@@ -50,7 +50,11 @@ struct MixerConfig: Codable, Equatable {
     /// The whole tool: when off, every app plays at the main volume, the keys
     /// are macOS's, and the menu has no mixer.
     var enabled = true
-    var menuBarIcon = MixerMenuBarIcon.none
+    var menuBarIcon = MixerMenuBarIcon.none {
+        didSet { if menuBarIcon != .none { shownIcon = menuBarIcon } }
+    }
+    /// The look it had when last in the menu bar, for when it's put back.
+    var shownIcon = MixerMenuBarIcon.volume
     /// For outputs with no volume control of their own (most monitors over
     /// HDMI or DisplayPort): the main slider and the volume keys lower the
     /// sound in software instead.
@@ -81,6 +85,9 @@ struct MixerConfig: Codable, Equatable {
             let legacy = try decoder.container(keyedBy: LegacyKeys.self)
             menuBarIcon = (try? legacy.decodeIfPresent(Bool.self, forKey: .standaloneIcon)) == true ? .mixer : .none
         }
+        // A file from before this was kept has the look in use, if any.
+        let shown = (try? c.decodeIfPresent(MixerMenuBarIcon.self, forKey: .shownIcon)) ?? nil
+        shownIcon = menuBarIcon != .none ? menuBarIcon : shown.flatMap { $0 == .none ? nil : $0 } ?? .volume
         softwareVolume = try c.decodeIfPresent(Bool.self, forKey: .softwareVolume) ?? true
         software = (try? c.decodeIfPresent([String: SoftwareVolume].self, forKey: .software)) ?? [:]
         equalizer = (try? c.decodeIfPresent(EqualizerConfig.self, forKey: .equalizer)) ?? EqualizerConfig()

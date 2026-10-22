@@ -42,7 +42,8 @@ struct MixerSettingsView: View {
                             Text("Mixer").tag(MixerMenuBarIcon.mixer)
                             Text("Volume").tag(MixerMenuBarIcon.volume)
                             Text("Volume and percentage").tag(MixerMenuBarIcon.volumePercent)
-                            Text("Volume badge").tag(MixerMenuBarIcon.volumeBadge)
+                            // "Pill", as Keep Awake and System Stats call this look.
+                            Text("Volume pill").tag(MixerMenuBarIcon.volumeBadge)
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()

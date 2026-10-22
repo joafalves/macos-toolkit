@@ -22,7 +22,11 @@ enum StayAvailableMethod: String, Codable, CaseIterable {
 
 struct AwakeConfig: Codable, Equatable {
     var enabled = true
-    var menuBarIcon = AwakeMenuBarIcon.pill
+    var menuBarIcon = AwakeMenuBarIcon.pill {
+        didSet { if menuBarIcon != .none { shownIcon = menuBarIcon } }
+    }
+    /// The look it had when last in the menu bar, for when it's put back.
+    var shownIcon = AwakeMenuBarIcon.pill
     /// With no end, the menu bar counts up how long it's been on.
     var showElapsed = false
     /// Turns it on or off, with no end. None until one is set.
@@ -52,6 +56,9 @@ struct AwakeConfig: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
         menuBarIcon = (try? c.decodeIfPresent(AwakeMenuBarIcon.self, forKey: .menuBarIcon)) ?? .pill
+        // A file from before this was kept has the look in use, if any.
+        let shown = (try? c.decodeIfPresent(AwakeMenuBarIcon.self, forKey: .shownIcon)) ?? nil
+        shownIcon = menuBarIcon != .none ? menuBarIcon : shown.flatMap { $0 == .none ? nil : $0 } ?? .pill
         showElapsed = try c.decodeIfPresent(Bool.self, forKey: .showElapsed) ?? false
         shortcut = try c.decodeIfPresent(Shortcut.self, forKey: .shortcut) ?? .none
         keepDisplayOn = try c.decodeIfPresent(Bool.self, forKey: .keepDisplayOn) ?? true

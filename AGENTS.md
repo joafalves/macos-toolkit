@@ -11,7 +11,8 @@ tool; keep it in step with the code.
   `FinderExtension` (a Finder Sync extension, linked with `NSExtensionMain` as its entry point).
 - Built with the Command Line Tools only (`swift build`), then wrapped into an app bundle by
   `scripts/build.sh`, which also puts the extension in `Contents/PlugIns` with the app's version and
-  signs it (sandboxed, with its entitlements) before the app. The app runs as an accessory (menu bar) app and only shows a Dock icon while its
+  signs it (sandboxed, with its entitlements) before the app. It also writes the short commit
+  (`ToolkitCommit`, and `ToolkitModified` if the tree had changes) into the app's Info.plist for About. The app runs as an accessory (menu bar) app and only shows a Dock icon while its
   main window is open.
 - Uses private APIs on purpose: SkyLight and others for the Window Switcher, TCC for the audio
   permission check, `responsibility_get_pid_responsible_for_pid` for grouping helper processes,
@@ -26,7 +27,8 @@ tool; keep it in step with the code.
 
 - `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (the menu
   bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
-  `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing),
+  `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing and order),
+  `MenuBarOrderView` (the order list on the Settings page),
   `SettingsTransfer` (export and import of all settings), `Snapshot`, and `WindowUnderPointer`
   (which app owns the window under a point, for tools that act on it).
 - `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`: one folder per tool. Screen

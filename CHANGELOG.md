@@ -3,6 +3,24 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.16.0 (unreleased)
+
+### Added
+
+- **Menu bar:** Settings → Order sets the order of the toolkit's parts in the menu bar, the toolkit
+  menu included: drag them into place. Default Order puts them back. Each tool there also has a
+  switch for its place in the menu bar, or an Open… button while the tool is off.
+
+### Changed
+
+- **About:** the version shows the commit it was built from in place of the build number.
+
+### Fixed
+
+- **Audio Mixer:** its menu bar look Volume badge is now Volume pill, as Keep Awake and System Stats
+  call the same look.
+- **Settings window:** the sidebar's names no longer sit right against their icons.
+
 ## 0.15.1 (2026-10-22)
 
 ### Added
