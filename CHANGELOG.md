@@ -28,6 +28,8 @@ worked on; it gets its date when it's released.
   for the file to be finished, so a stuck finish can't hold up logging out.
 - **System Stats:** a disk plugged in or ejected no longer shows as one absurd disk speed that
   flattened the chart for five minutes. Network speeds and the top apps are guarded the same way.
+- **Settings window:** starting to record a second shortcut stops the first, so tools don't react to
+  keys meant for a recorder.
 - **Window Layout:** quitting with one of the toolkit's own windows in a stack no longer crashes,
   which also skipped putting other things back as the app quit.
 

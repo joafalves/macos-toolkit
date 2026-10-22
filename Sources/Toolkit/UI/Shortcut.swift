@@ -179,9 +179,14 @@ final class ShortcutRecorderModel: ObservableObject {
     @Published private(set) var live = ""
     private var monitor: Any?
     private var resign: NSObjectProtocol?
+    /// One recorder at a time: a second one ending would otherwise give the
+    /// tools their shortcuts back while the first still records.
+    private static weak var current: ShortcutRecorderModel?
 
     /// `handle` gets each key press until `stop()`.
     func start(_ handle: @escaping (NSEvent) -> Void) {
+        if Self.current !== self { Self.current?.stop() }
+        Self.current = self
         stop()
         recording = true
         ShortcutRecording.set(true)
