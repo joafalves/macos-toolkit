@@ -607,7 +607,7 @@ set. A session carries on if the app is restarted or the Mac reboots, until its 
   <br><br>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/stats-cpu-dark.png">
-    <img src="docs/images/stats-cpu-light.png" width="300" alt="The CPU panel: a history chart, user and system time, each core, and the top apps">
+    <img src="docs/images/stats-cpu-light.png" width="300" alt="The CPU panel: a history chart, user and system time, a small chart for each core, and the top apps">
   </picture>
   &nbsp;&nbsp;
   <picture>
@@ -626,8 +626,8 @@ number with its icon, a pill that fills, or a chart of the last minute, or they 
   as an app needs room, so that figure always looks nearly full and says little. With **Color memory
   when it runs short** on (off by default), it turns yellow, then red, when macOS itself reports
   memory running short. Its panel shows where memory goes, swap, and the apps using the most.
-- **CPU** shows the share of all cores in use, and its panel each core, grouped by kind, and the
-  apps using the most, their helpers counted in.
+- **CPU** shows the share of all cores in use, and its panel each core's last minute as a small
+  chart, grouped by kind, and the apps using the most, their helpers counted in.
 - **Network** shows upload and download speed on the connection in use, **disk** the free space
   and how fast it's read and written, and **GPU** how busy it is.
 - **Power** shows what the Mac draws, from the battery's own readings, and in its panel the GPU's

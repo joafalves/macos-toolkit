@@ -116,20 +116,8 @@ struct StatsPanelView: View {
         if let cpu = stats.cpu {
             Row("User", StatsController.percent(cpu.user))
             Row("System", StatsController.percent(cpu.system))
-            let groups = cpu.groups.isEmpty ? [CoreGroup(name: "Cores", cores: 0..<cpu.cores.count)] : cpu.groups
-            ForEach(groups, id: \.name) { group in
-                HStack(spacing: 8) {
-                    Text(group.name)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 70, alignment: .leading)
-                    HStack(alignment: .bottom, spacing: 2) {
-                        ForEach(group.cores.filter { $0 < cpu.cores.count }, id: \.self) { core in
-                            CoreBar(share: cpu.cores[core])
-                        }
-                    }
-                }
-            }
+            CoreCharts(cpu: cpu, history: { stats.history[.core($0)] ?? [] }, slots: stats.chartReadings)
+                .padding(.top, 2)
             // Two readings apart before there's CPU to tell; not a list of zeros.
             if live.cpuOfAppsKnown {
                 TopList(apps: stats.apps.sorted { $0.cpu > $1.cpu }.prefix(5).map { ($0, "\(Int(($0.cpu * 100).rounded()))%") })
@@ -223,11 +211,15 @@ struct HistoryChart: View {
     let series: [([Double], Color)]
     /// The top of the chart, or nil for the highest reading.
     let ceiling: Double?
+    var height: CGFloat = 64
+    /// Readings across the whole width, so a short history fills from the
+    /// right at the same pace instead of stretching. Nil: as many as there are.
+    var slots: Int?
 
     var body: some View {
         Canvas { context, size in
             let top = max(ceiling ?? series.flatMap(\.0).max() ?? 0, 1e-9)
-            let count = max(series.map(\.0.count).max() ?? 0, 2)
+            let count = max(slots ?? series.map(\.0.count).max() ?? 0, 2)
             let step = size.width / CGFloat(max(count - 1, 1))
             for line in stride(from: 0.25, through: 0.75, by: 0.25) {
                 let y = size.height * (1 - line)
@@ -252,7 +244,7 @@ struct HistoryChart: View {
                 context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
             }
         }
-        .frame(height: 64)
+        .frame(height: height)
         .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
@@ -274,17 +266,51 @@ private struct ShareBar: View {
     }
 }
 
-/// One core's share, as a short bar.
-private struct CoreBar: View {
-    let share: Double
+/// Each core's last minute as a small chart, like Activity Monitor's CPU
+/// History, grouped by kind of core with the group's average, and each with
+/// what it's at now.
+private struct CoreCharts: View {
+    let cpu: CPUReading
+    let history: (Int) -> [Double]
+    let slots: Int
+
+    /// Three or four across, whichever fills the rows evenly: six cores as
+    /// two rows of three rather than four and two.
+    private static func columns(_ count: Int) -> Int {
+        count <= 4 ? max(count, 1) : count % 4 == 0 ? 4 : count % 3 == 0 ? 3 : 4
+    }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.08))
-            RoundedRectangle(cornerRadius: 2).fill(Color.blue.opacity(0.8))
-                .frame(height: max(1, 22 * share))
+        let groups = cpu.groups.isEmpty ? [CoreGroup(name: "Cores", cores: 0..<cpu.cores.count)] : cpu.groups
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(groups.enumerated()), id: \.element.name) { index, group in
+                let cores = group.cores.filter { $0 < cpu.cores.count }
+                // macOS lists the slower cores first; with more than one kind, those in teal.
+                let color: Color = groups.count > 1 && index == 0 ? .teal : .blue
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(group.name)
+                        Spacer()
+                        Text(StatsController.percent(cores.isEmpty ? 0 : cores.map { cpu.cores[$0] }.reduce(0, +) / Double(cores.count)))
+                            .monospacedDigit()
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: Self.columns(cores.count)), spacing: 6) {
+                        ForEach(cores, id: \.self) { core in
+                            HistoryChart(series: [(history(core), color)], ceiling: 1, height: 34, slots: slots)
+                                .overlay(alignment: .topTrailing) {
+                                    Text(StatsController.percent(cpu.cores[core]))
+                                        .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 4)
+                                        .padding(.top, 2)
+                                }
+                        }
+                    }
+                }
+            }
         }
-        .frame(width: 10, height: 22)
     }
 }
 

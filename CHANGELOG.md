@@ -9,6 +9,8 @@ worked on; it gets its date when it's released.
 
 - **Settings window:** a tool that's off is greyed in the sidebar, its tile without colour and its
   name dimmed, as on Welcome.
+- **System Stats:** the CPU panel shows each core's last minute as a small chart with what it's at
+  now, grouped by kind of core with each group's average, in place of the row of small bars.
 
 ### Fixed
 

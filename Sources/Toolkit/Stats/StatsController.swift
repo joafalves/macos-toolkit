@@ -37,6 +37,8 @@ final class StatsController: ObservableObject {
 
     enum Series: Hashable {
         case cpu, memory, up, down, read, write, gpu, power
+        /// One core, by its number, for the CPU panel's charts.
+        case core(Int)
     }
 
     /// False for the self-test and `--snapshot`: settings aren't saved.
@@ -90,6 +92,9 @@ final class StatsController: ObservableObject {
         stats.live.history = [.cpu: wave(150, 0.22, 0.12, 0), .memory: wave(150, 0.6, 0.03, 1), .gpu: wave(150, 0.16, 0.1, 2),
                          .power: wave(150, 7, 2.5, 3), .down: wave(150, 900_000, 600_000, 4), .up: wave(150, 60_000, 40_000, 5),
                          .read: wave(150, 2_000_000, 1_500_000, 6), .write: wave(150, 700_000, 500_000, 7)]
+        for (core, share) in (stats.live.cpu?.cores ?? []).enumerated() {
+            stats.live.history[.core(core)] = wave(30, share, share * 0.6, Double(core) * 1.3).map { max(0, $0) }
+        }
         // Apple's own apps, found by bundle: Safari's path is a link that shows as an alias.
         func icon(_ app: String) -> NSImage {
             let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.\(app)")
@@ -147,7 +152,11 @@ final class StatsController: ObservableObject {
         }
         // History only for what's read; a stat turned back on starts afresh.
         let kept: Set<Series> = Set(reading.flatMap(Self.series))
-        if live.history.keys.contains(where: { !kept.contains($0) }) { live.history = live.history.filter { kept.contains($0.key) } }
+        let keep = { (series: Series) in
+            if case .core = series { return self.reading.contains(.cpu) }
+            return kept.contains(series)
+        }
+        if live.history.keys.contains(where: { !keep($0) }) { live.history = live.history.filter { keep($0.key) } }
 
         let added = reading.subtracting(wasReading)
         wasReading = reading
@@ -184,6 +193,8 @@ final class StatsController: ObservableObject {
         if reading.contains(.cpu), let value = cpuReader?.read() {
             live.cpu = value
             record(.cpu, value.total)
+            // A minute each: the panel's charts per core are small.
+            for (core, share) in value.cores.enumerated() { record(.core(core), share, seconds: 60) }
         }
         if reading.contains(.memory), let value = StatsReadings.memory() {
             live.memory = value
@@ -226,8 +237,8 @@ final class StatsController: ObservableObject {
         live.tick += 1
     }
 
-    private func record(_ series: Series, _ value: Double) {
-        let keep = Int(300 / max(config.interval, 1))
+    private func record(_ series: Series, _ value: Double, seconds: Double = 300) {
+        let keep = Int(seconds / max(config.interval, 1))
         var values = live.history[series] ?? []
         values.append(value)
         if values.count > keep { values.removeFirst(values.count - keep) }
@@ -275,7 +286,8 @@ final class StatsController: ObservableObject {
     }
 
     /// The last minute, at whatever rate it's read.
-    private var chartReadings: Int { max(2, Int(60 / max(config.interval, 1))) }
+    /// Readings in a minute, which the menu bar's charts and the panel's per core show.
+    var chartReadings: Int { max(2, Int(60 / max(config.interval, 1))) }
 
     /// The widest each figure gets, which its part keeps as its width.
     static func widest(_ kind: StatKind) -> String {
