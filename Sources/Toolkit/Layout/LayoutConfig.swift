@@ -140,9 +140,9 @@ enum SuggestFrom: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .display: return "This Display"
-        case .fallback: return "If None Here"
-        case .all: return "Always"
+        case .display: return "Only this display's"
+        case .fallback: return "Others' if it has none"
+        case .all: return "Always, after its own"
         }
     }
 }

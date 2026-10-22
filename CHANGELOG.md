@@ -15,6 +15,15 @@ worked on; it gets its date when it's released.
   name dimmed, as on Welcome.
 - **System Stats:** the CPU panel shows each core's last minute as a small chart with what it's at
   now, grouped by kind of core with each group's average, in place of the row of small bars.
+- **Settings window:** a new install says every tool starts off and where to turn one on. A tool
+  that's off says so under its header, and the header reads On or Off, as Welcome does.
+- **Settings window:** shorter descriptions in several places, and pop-up menus where a wide row of
+  choices squeezed the text beside it. US spelling throughout.
+- **Settings window:** Permissions lists the Microphone too, and shows a permission granted in System
+  Settings as soon as you come back.
+- **Window Layout:** Stacks is marked as a preview, and its tab comes last.
+- **Audio Mixer:** its page has a button that opens the mixer. Never Touch is now Exclude, and the
+  list Excluded Apps.
 
 ### Fixed
 

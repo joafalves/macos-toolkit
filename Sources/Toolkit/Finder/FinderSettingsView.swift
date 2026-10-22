@@ -21,7 +21,7 @@ struct FinderSettingsView: View {
 
     var body: some View {
         Page {
-            ToolHeader(section: .finder, subtitle: "Small things Finder is missing.", enabled: $finder.config.enabled)
+            ToolHeader(section: .finder, subtitle: "Cut and paste files, swipe back and forward, and more in the right-click menu.", enabled: $finder.config.enabled)
 
             if finder.config.enabled, finder.config.cut || finder.config.swipe, !finder.isPreview {
                 if !mouse.accessibilityGranted {
@@ -68,7 +68,7 @@ struct FinderSettingsView: View {
                     if finder.config.openInTerminal {
                         RowDivider()
                         OptionRow(title: "Terminal", caption: "Automatic picks the first installed of Ghostty, iTerm and Terminal.",
-                                  selection: $finder.config.terminal, options: terminalOptions)
+                                  selection: $finder.config.terminal, options: terminalOptions, menu: true)
                     }
                 }
             }

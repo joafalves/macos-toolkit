@@ -18,7 +18,7 @@ struct MouseSettingsView: View {
                 }
 
                 Card(title: "All Mice") {
-                    ToggleRow(title: "Restore macOS behaviour on quit",
+                    ToggleRow(title: "Restore macOS behavior on quit",
                               caption: "When off, cursor settings stay applied after the app quits, until the mouse reconnects.",
                               isOn: $mouse.config.restoreOnQuit)
                     RowDivider()
@@ -200,7 +200,7 @@ private struct ProfileEditor: View {
             OptionRow(title: "Acceleration", caption: "How much further the cursor goes when you move quickly. Off is 1:1.",
                       selection: p.accelMode, options: [(.macOS, "macOS"), (.off, "Off"), (.custom, "Custom")]) {
                 if p.wrappedValue.accelMode == .custom {
-                    ValueSlider(value: p.accel, range: 0...3, step: 0.005, low: "Less", high: "More") { String(format: "%.3f", $0) }
+                    ValueSlider(value: p.accel, range: 0...3, step: 0.005, low: "Less", high: "More") { String(format: "%.2f", $0) }
                 }
             }
         }
@@ -221,7 +221,7 @@ private struct ProfileEditor: View {
             OptionRow(title: "Acceleration", caption: "How much further fast spins scroll. Off makes every notch equal.",
                       selection: p.scrollAccelMode, options: [(.macOS, "macOS"), (.off, "Off"), (.custom, "Custom")]) {
                 if p.wrappedValue.scrollAccelMode == .custom {
-                    ValueSlider(value: p.scrollAccel, range: 0...1.7, step: 0.0125, low: "Less", high: "More") { String(format: "%.3f", $0) }
+                    ValueSlider(value: p.scrollAccel, range: 0...1.7, step: 0.0125, low: "Less", high: "More") { String(format: "%.2f", $0) }
                 }
             }
             RowDivider()

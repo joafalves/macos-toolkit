@@ -36,7 +36,7 @@ struct LayoutSettingsView: View {
         switch action {
         case .firstThird, .centerThird, .lastThird, .firstTwoThirds, .lastTwoThirds:
             return action == .firstThird ? "Down the display instead of across on one that stands upright." : nil
-        case .almostMaximize: return "Nine tenths of the display, centred."
+        case .almostMaximize: return "Nine tenths of the display, centered."
         case .maximizeHeight: return "Full height, keeping the width."
         case .larger, .smaller: return "\(Int(LayoutGeometry.step)) points on every side."
         case .restore: return "Back to the size and place it had before it was snapped."
@@ -87,15 +87,15 @@ struct LayoutSettingsView: View {
                       selection: dragKey(\.dragGrid), options: DragModifier.allCases.map { ($0, $0.title) })
             RowDivider()
             OptionRow(title: "Suggest windows for the rest",
-                      caption: "After you drop a window into part of a display, other windows are offered for the part that's left; click one, or press its number. Previews need Screen Recording, and show the list until then.",
+                      caption: "After you drop a window into part of a display, the other windows are offered for the part that's left. Previews need Screen Recording.",
                       selection: $layout.config.suggest,
                       options: SuggestStyle.allCases.map { ($0, $0.title) })
             if layout.config.suggest != .off {
                 RowDivider()
                 OptionRow(title: "Windows from other displays",
-                          caption: "This Display offers only that display's windows. If None Here offers the others' when it has none. Always lists them after its own.",
+                          caption: "Whether windows on the other displays are offered too.",
                           selection: $layout.config.suggestFrom,
-                          options: SuggestFrom.allCases.map { ($0, $0.title) })
+                          options: SuggestFrom.allCases.map { ($0, $0.title) }, menu: true)
             }
             RowDivider()
             ToggleRow(title: "Stop at the edge between displays",
@@ -108,7 +108,7 @@ struct LayoutSettingsView: View {
         }
 
         Card(title: "Placement") {
-            SettingRow(title: "Gap", caption: "Space between windows and around the edges of the display. macOS's own margins follow it: off with no gap, otherwise its fixed 8 points. Up to 8, Maximize is macOS's own Fill, so the window counts as filled; above that it's placed with the gap.") {
+            SettingRow(title: "Gap", caption: "Space between windows and around the edges of the display. macOS's own window margins follow it.") {
                 EmptyView()
             } extra: {
                 ValueSlider(value: $layout.config.gap, range: 0...40, step: 2, low: "0", high: "40") {
@@ -127,10 +127,10 @@ struct LayoutSettingsView: View {
     }
 
     @ViewBuilder private var tabsPage: some View {
-        Card(title: "Stacks",
-             footnote: "The windows not shown wait behind the shown one, at the same size. One dragged out, resized so it no longer fits, closed or minimized leaves the stack; with one left, it gets the whole slot back.") {
+        Card(title: "Stacks", badge: "Preview",
+             footnote: "Still rough in places. The windows not shown wait behind the shown one, at the same size. One dragged out, resized so it no longer fits, closed or minimized leaves the stack; with one left, it gets the whole slot back.") {
             ToggleRow(title: "Stack windows",
-                      caption: "A preview, still rough in places, so off until you turn it on. Several windows in one slot, one shown at a time, with tabs to switch between them.",
+                      caption: "Several windows in one slot, one shown at a time, with tabs to switch between them.",
                       isOn: Binding(get: { layout.config.tabsJoin != .off }, set: { on in
                           var config = layout.config
                           config.tabsJoin = on ? .key : .off
@@ -257,14 +257,14 @@ struct LayoutSettingsView: View {
     }
 }
 
-/// The parts of the Window Layout page, most used first.
+/// The parts of the Window Layout page, most used first, the preview last.
 enum LayoutPage: CaseIterable {
-    case snapping, tabs, keyboard
+    case snapping, keyboard, tabs
 
     var title: String {
         switch self {
         case .snapping: return "Snapping"
-        case .tabs: return "Stacks"
+        case .tabs: return "Stacks (Preview)"
         case .keyboard: return "Keyboard"
         }
     }

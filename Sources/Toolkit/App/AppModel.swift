@@ -66,7 +66,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .welcome: return ""
         case .mouse: return "Cursor and wheel settings for each mouse."
         case .switcher: return "⌘Tab through windows instead of apps."
-        case .layout: return "Snap windows to halves, thirds or a grid."
+        case .layout: return "Snap windows to halves, quarters, thirds or a grid."
         case .mixer: return "A volume for each app, and an equalizer."
         case .finder: return "Cut and paste files, and more in the right-click menu."
         case .capture: return "Screenshots and small screen recordings."

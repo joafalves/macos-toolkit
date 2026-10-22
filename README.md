@@ -160,7 +160,7 @@ every app that has sound gets its own slider.
 - **Click an app's icon or row to mute** (0% counts as muted, and unmuting restores where it was).
 - **Reset** puts every app back to 100%, so they all follow the main volume again.
 - Volumes are remembered per app. Right-click an app to hide it until it plays again, or to
-  **Never Touch** it.
+  **Exclude** it: excluded apps are left out of the mixer and always play at the main volume.
 - A place in the **menu bar**, one click away, set in the mixer's settings: none, the mixer glyph,
   **Volume**, a speaker that follows the volume and shows when it's muted, **Volume and
   percentage**, or **Volume badge**, a pill that fills with the volume like the battery, with the
@@ -307,7 +307,7 @@ changes; each one can be changed or cleared in the settings.
 | ⌃⌥ U I J K | Top left, top right, bottom left, bottom right quarter |
 | ⌃⌥ D F G | First, center, last third (down the display on one that stands upright) |
 | ⌃⌥ E T | First, last two thirds |
-| ⌃⌥↩ | Maximize. With a gap of up to 8 points it's macOS's own Fill, so macOS treats the window as filled, as after a double-click on its title bar. Almost maximize (nine tenths, centred) is there too, without a key |
+| ⌃⌥↩ | Maximize. With a gap of up to 8 points it's macOS's own Fill, so macOS treats the window as filled, as after a double-click on its title bar. Almost maximize (nine tenths, centered) is there too, without a key |
 | ⌃⌥⇧↑ | Maximize the height, keeping the width |
 | ⌃⌥C | Center |
 | ⌃⌥= ⌃⌥- | Larger, smaller: 30 points on every side |
@@ -369,8 +369,8 @@ Dragging across the cells with the mouse works too.
 - **Suggest windows for the rest** (on, set to Previews): after a window is dropped on an edge or
   into a layout from the ⌥ bar, the part of the display that's left shows your other windows on
   the current Space, most recently used first, as Windows' Snap Assist does. **Windows from other
-  displays** sets whether yours elsewhere are offered: **This Display** only, **If None Here**
-  (the default: when that display has nothing else on it), or **Always**, after its own. Click one, or
+  displays** sets whether yours elsewhere are offered: **only this display's**, **others' if it has
+  none** (the default), or **always, after its own**. Click one, or
   press its number (arrows and ↩ work too), and it goes there; in a layout of three, the part after
   that is offered next. Esc, a click elsewhere or typing makes it go away. Nothing is offered for a
   part that already has a window in it, or after keyboard moves. It uses the Window Switcher's list

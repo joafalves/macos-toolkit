@@ -339,7 +339,7 @@ private struct AppRow: View {
             Divider()
             Button("Hide Until It Plays Again") { mixer.hide(app) }
                 .disabled(app.isPlaying)
-            Button("Never Touch \(app.name)") { mixer.ignore(bundleID: app.bundleID, name: app.name) }
+            Button("Exclude \(app.name)") { mixer.ignore(bundleID: app.bundleID, name: app.name) }
         }
     }
 }

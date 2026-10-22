@@ -41,15 +41,20 @@ struct Page<Content: View>: View {
 /// A titled group of rows on a rounded panel.
 struct Card<Content: View>: View {
     var title: String?
+    /// A word next to the title, like "Preview".
+    var badge: String?
     var footnote: String?
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
-                Text(title)
-                    .font(.headline)
-                    .padding(.leading, 2)
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.headline)
+                    if let badge { TagBadge(text: badge) }
+                }
+                .padding(.leading, 2)
             }
             VStack(spacing: 0) {
                 content()
@@ -79,6 +84,8 @@ struct SettingRow<Control: View, Extra: View>: View {
     let title: String
     var caption: String?
     var link: SettingLink?
+    /// A word next to the title, like "Preview".
+    var badge: String?
     @ViewBuilder var control: () -> Control
     @ViewBuilder var extra: () -> Extra
 
@@ -86,7 +93,10 @@ struct SettingRow<Control: View, Extra: View>: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    HStack(spacing: 8) {
+                        Text(title)
+                        if let badge { TagBadge(text: badge) }
+                    }
                     if let caption {
                         Text(caption)
                             .font(.subheadline)
@@ -110,27 +120,53 @@ struct SettingRow<Control: View, Extra: View>: View {
 }
 
 extension SettingRow where Extra == EmptyView {
-    init(title: String, caption: String? = nil, link: SettingLink? = nil, @ViewBuilder control: @escaping () -> Control) {
-        self.init(title: title, caption: caption, link: link, control: control, extra: { EmptyView() })
+    init(title: String, caption: String? = nil, link: SettingLink? = nil, badge: String? = nil, @ViewBuilder control: @escaping () -> Control) {
+        self.init(title: title, caption: caption, link: link, badge: badge, control: control, extra: { EmptyView() })
+    }
+}
+
+/// A small coloured word next to a title, for something not finished yet.
+struct TagBadge: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Color.orange.opacity(0.15), in: Capsule())
     }
 }
 
 /// A setting with a segmented choice and optional extra controls underneath.
+/// With `menu`, a pop-up instead: for long option names, or so many that the
+/// segments would squeeze the caption.
 struct OptionRow<Value: Hashable, Extra: View>: View {
     let title: String
     var caption: String?
     @Binding var selection: Value
     let options: [(Value, String)]
+    var menu = false
     @ViewBuilder var extra: () -> Extra
 
     var body: some View {
         SettingRow(title: title, caption: caption) {
-            Picker(title, selection: $selection) {
-                ForEach(options, id: \.0) { Text($0.1).tag($0.0) }
+            if menu {
+                Picker(title, selection: $selection) {
+                    ForEach(options, id: \.0) { Text($0.1).tag($0.0) }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+            } else {
+                Picker(title, selection: $selection) {
+                    ForEach(options, id: \.0) { Text($0.1).tag($0.0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
         } extra: {
             extra()
         }
@@ -138,8 +174,8 @@ struct OptionRow<Value: Hashable, Extra: View>: View {
 }
 
 extension OptionRow where Extra == EmptyView {
-    init(title: String, caption: String? = nil, selection: Binding<Value>, options: [(Value, String)]) {
-        self.init(title: title, caption: caption, selection: selection, options: options, extra: { EmptyView() })
+    init(title: String, caption: String? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false) {
+        self.init(title: title, caption: caption, selection: selection, options: options, menu: menu, extra: { EmptyView() })
     }
 }
 
@@ -148,9 +184,10 @@ struct ToggleRow: View {
     var caption: String?
     @Binding var isOn: Bool
     var link: SettingLink?
+    var badge: String?
 
     var body: some View {
-        SettingRow(title: title, caption: caption, link: link) {
+        SettingRow(title: title, caption: caption, link: link, badge: badge) {
             Toggle(title, isOn: $isOn)
                 .toggleStyle(.switch)
                 .labelsHidden()
@@ -202,6 +239,7 @@ struct Banner: View {
                 .font(.title3)
                 .foregroundStyle(.orange)
             Text(text)
+                .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             Button(button, action: action)
@@ -222,30 +260,40 @@ struct ToolHeader: View {
     @Binding var enabled: Bool
 
     var body: some View {
-        HStack(spacing: 14) {
-            IconTile(symbol: section.symbol, color: section.color, size: 46)
-                .saturation(enabled ? 1 : 0)
-                .opacity(enabled ? 1 : 0.55)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title ?? section.title).font(.title2.weight(.semibold))
-                Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                // Grey rather than `.saturation(0)`, a filter `--snapshot` leaves out.
+                IconTile(symbol: section.symbol, color: enabled ? section.color : .gray, size: 46)
+                    .opacity(enabled ? 1 : 0.6)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title ?? section.title).font(.title2.weight(.semibold))
+                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 12)
+                // On and Off, as on Welcome and in the menus.
+                Text(enabled ? "On" : "Off")
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(enabled ? Color.accentColor : .secondary)
+                Toggle(enabled ? "On" : "Off", isOn: $enabled)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .controlSize(.large)
             }
-            Spacer(minLength: 12)
-            Text(enabled ? "Enabled" : "Off")
-                .font(.callout.weight(.medium))
-                .foregroundStyle(enabled ? Color.accentColor : .secondary)
-            Toggle("Enabled", isOn: $enabled)
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .controlSize(.large)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(enabled ? section.color.opacity(0.09) : Color.primary.opacity(0.045),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(enabled ? section.color.opacity(0.28) : Color.primary.opacity(0.08)))
+            // What the faded settings below are waiting for.
+            if !enabled {
+                Text("Turn \(title ?? section.title) on to use these settings.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 2)
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(enabled ? section.color.opacity(0.09) : Color.primary.opacity(0.045),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(enabled ? section.color.opacity(0.28) : Color.primary.opacity(0.08)))
         .animation(.easeOut(duration: 0.15), value: enabled)
     }
 }

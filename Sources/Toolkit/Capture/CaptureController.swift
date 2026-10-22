@@ -127,6 +127,20 @@ final class CaptureController: ObservableObject {
         refreshPermissions()
     }
 
+    /// From the Permissions list: asks, or opens System Settings once it was refused.
+    func requestMicrophonePermission() {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { _ in
+                DispatchQueue.main.async { self.refreshPermissions() }
+            }
+        case .denied, .restricted:
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
+        default:
+            break
+        }
+    }
+
     func setMicrophone(_ on: Bool) {
         config.microphone = on
         guard on else { return }

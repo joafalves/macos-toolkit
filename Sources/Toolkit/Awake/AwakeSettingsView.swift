@@ -70,7 +70,7 @@ struct AwakeSettingsView: View {
                                   isOn: $awake.config.showElapsed)
                     }
                     RowDivider()
-                    ShortcutRow(title: "Shortcut", caption: "Turns it on until you turn it off, or off.",
+                    ShortcutRow(title: "Shortcut", caption: "Turns it on with no end, or off again.",
                                 shortcut: $awake.config.shortcut, defaultValue: .none)
                     if awake.shortcutFailed {
                         Text("macOS didn't accept this shortcut; another app may have it.")
@@ -107,7 +107,7 @@ struct AwakeSettingsView: View {
                     ToggleRow(title: "Sound", isOn: $awake.config.soundAtEnd)
                 }
 
-                Card(title: "Stay Available") {
+                Card(title: "Chat Apps") {
                     ToggleRow(title: "Stay available",
                               caption: "Keeps chat apps like Slack and Teams from switching you to away while the Mac is awake.",
                               isOn: $awake.config.stayAvailable,

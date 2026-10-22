@@ -69,7 +69,8 @@ struct MainView: View {
 
             Group {
                 switch model.section ?? .welcome {
-                case .welcome: WelcomeView(model: model, mouse: mouse, mixer: mixer, capture: capture, enabled: enabled)
+                case .welcome: WelcomeView(model: model, mouse: mouse, mixer: mixer, capture: capture, enabled: enabled,
+                                            switcherShortcut: switcher.config.shortcut.active?.display ?? "⌘Tab")
                 case .mouse: MouseSettingsView(mouse: mouse)
                 case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
                 case .layout: LayoutSettingsView(layout: layout, mouse: mouse)
@@ -127,7 +128,7 @@ private struct GeneralView: View {
             }
 
             Card(title: "Permissions") {
-                SettingRow(title: "Accessibility", caption: "Used by Mouse for the wheel direction, speed, smoothing and autoscroll, by the Window Switcher, by Window Layout to move windows, by Finder for Cut and swipes, by Screen Capture to find where a window's content starts, and by Keep Awake to stay available.") {
+                SettingRow(title: "Accessibility", caption: "Used by Mouse, the Window Switcher, Window Layout, Finder, Screen Capture and Keep Awake.") {
                     if mouse.accessibilityGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
@@ -143,15 +144,28 @@ private struct GeneralView: View {
                     }
                 }
                 RowDivider()
-                SettingRow(title: "Screen Recording", caption: "Used by Screen Capture for screenshots and recordings.") {
+                SettingRow(title: "Screen Recording", caption: "Used by Screen Capture, and for the pictures of windows in the Window Switcher and Window Layout.") {
                     if capture.screenPermission {
                         Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
                         Button("Grant Access…") { capture.requestScreenPermission() }
                     }
                 }
+                RowDivider()
+                SettingRow(title: "Microphone", caption: "Used by Screen Capture to record your voice. Only needed for that.") {
+                    if capture.micPermission == .authorized {
+                        Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else {
+                        Button(capture.micPermission == .notDetermined ? "Grant Access…" : "Open System Settings…") { capture.requestMicrophonePermission() }
+                    }
+                }
             }
             .settingAnchor(WelcomeView.permissionsAnchor)
+        }
+        // Granted in System Settings meanwhile: shown when coming back.
+        .onAppear { capture.refreshPermissions() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            capture.refreshPermissions()
         }
     }
 }

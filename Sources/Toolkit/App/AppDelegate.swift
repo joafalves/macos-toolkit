@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         layout = LayoutController()
         layout.start()
         mixer = MixerController()
+        mixer.openMixer = { [weak self] in self?.showMixer(from: .mixer) }
         mixer.start()
         finder = FinderController()
         finder.start()

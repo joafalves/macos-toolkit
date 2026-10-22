@@ -89,7 +89,8 @@ struct SwitcherSettingsView: View {
                     RowDivider()
                     OptionRow(title: "Show on", caption: "Which display the list opens on.",
                               selection: $switcher.config.placement,
-                              options: [(.mainScreen, "Main Display"), (.mouse, "Mouse"), (.activeWindow, "Active Window")])
+                              options: [(.mainScreen, "The main display"), (.mouse, "The one with the pointer"), (.activeWindow, "The one with the active window")],
+                              menu: true)
                     RowDivider()
                     ToggleRow(title: "Open on the previous window",
                               caption: "When the \(switcher.config.style == .previews ? "grid" : "list") appears, the window you were in before is selected, like macOS's own ⌘Tab. When off, the window you're in is. A quick \(shortcut.display) goes back to the previous window either way.",

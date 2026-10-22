@@ -365,6 +365,9 @@ final class MixerController: ObservableObject {
         if config.equalizer.isActive, permission == .unknown { requestPermission() }
     }
 
+    /// Opens the mixer from its part of the menu bar; set by the app.
+    var openMixer: (() -> Void)?
+
     func keysInstalledChanged(_ installed: Bool) {
         keysInstalled = installed
     }

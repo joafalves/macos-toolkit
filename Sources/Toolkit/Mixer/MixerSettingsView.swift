@@ -18,11 +18,22 @@ struct MixerSettingsView: View {
             }
 
             if mixer.config.enabled, !mixer.keysInstalled {
-                Banner(text: "The volume keys go through the mixer, with its own volume bar, once the toolkit has the Accessibility permission. Until then macOS handles them, and outputs with no volume control can't be changed from the keyboard.",
+                Banner(text: "The volume keys need Accessibility. Until it's granted, macOS handles them.",
                        button: "Grant Access…") { mixer.requestAccessibility() }
             }
 
             WhenEnabled(enabled: mixer.config.enabled) {
+                // The volumes and the equalizer live in the menu bar's mixer, not here.
+                Card {
+                    SettingRow(title: "Volumes and equalizer",
+                               caption: mixer.config.menuBarIcon == .none
+                                   ? "In the mixer, which opens from the menu bar. Choose how it shows there below."
+                                   : "In the mixer, which opens from its part of the toolkit's menu bar item.") {
+                        Button("Open the Mixer") { mixer.openMixer?() }
+                            .disabled(mixer.config.menuBarIcon == .none)
+                    }
+                }
+
                 Card(title: "Options") {
                     // A pop-up rather than segments: four choices don't fit beside a caption.
                     SettingRow(title: "In the menu bar", caption: "Shown in the toolkit's menu bar item; opens the mixer in one click.") {
@@ -43,7 +54,7 @@ struct MixerSettingsView: View {
                               isOn: $mixer.config.softwareVolume)
                 }
 
-                Card(title: "Never Touch",
+                Card(title: "Excluded Apps",
                      footnote: "These apps are hidden from the mixer and always play at the main volume.") {
                     let ignored = mixer.config.ignored.sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
                     ForEach(Array(ignored.enumerated()), id: \.element.key) { index, entry in

@@ -9,6 +9,8 @@ struct WelcomeView: View {
     @ObservedObject var mixer: MixerController
     @ObservedObject var capture: CaptureController
     let enabled: (AppSection) -> Bool
+    /// The switcher's real shortcut, which may not be ⌘Tab.
+    let switcherShortcut: String
 
     static let permissionsAnchor = "general.permissions"
 
@@ -49,14 +51,22 @@ struct WelcomeView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Tools").font(.headline).padding(.leading, 2)
+                // A new install has every tool off: say what to do about it.
+                if !AppSection.tools.contains(where: enabled) {
+                    Text("Every tool starts off. Open one to see what it does, and turn it on there.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 2)
+                        .padding(.bottom, 2)
+                }
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                     ForEach(AppSection.tools) { section in
-                        ToolTile(section: section, on: enabled(section)) { model.section = section }
+                        ToolTile(section: section, on: enabled(section), summary: summary(section)) { model.section = section }
                     }
                 }
             }
 
-            Text("Every tool's settings are also in the toolkit's menu in the menu bar, and each tool can be turned off on its page.")
+            Text("Each tool is turned on and off on its page. Tools that are on are also in the toolkit's menu in the menu bar.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.leading, 2)
@@ -64,19 +74,26 @@ struct WelcomeView: View {
     }
 }
 
+private extension WelcomeView {
+    func summary(_ section: AppSection) -> String {
+        section == .switcher ? "\(switcherShortcut) through windows instead of apps." : section.summary
+    }
+}
+
 /// A tool at a glance: its tile, name and what it does, and whether it's on.
 private struct ToolTile: View {
     let section: AppSection
     let on: Bool
+    let summary: String
     let open: () -> Void
     @StateObject private var hovered = ViewState(false)
 
     var body: some View {
         Button(action: open) {
             HStack(alignment: .top, spacing: 12) {
-                IconTile(symbol: section.symbol, color: section.color, size: 38)
-                    .saturation(on ? 1 : 0)
-                    .opacity(on ? 1 : 0.55)
+                // Grey rather than `.saturation(0)`, a filter `--snapshot` leaves out.
+                IconTile(symbol: section.symbol, color: on ? section.color : .gray, size: 38)
+                    .opacity(on ? 1 : 0.6)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(section.title).font(.body.weight(.semibold))
@@ -89,7 +106,7 @@ private struct ToolTile: View {
                             .padding(.vertical, 2)
                             .background((on ? Color.green : Color.secondary).opacity(0.14), in: Capsule())
                     }
-                    Text(section.summary)
+                    Text(summary)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
