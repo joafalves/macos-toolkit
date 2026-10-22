@@ -52,7 +52,8 @@ final class TopApps {
             guard status == 0 else { continue }
             let time = usage.ri_user_time + usage.ri_system_time
             times[pid] = time
-            let cpu = seconds > 0 ? lastTimes[pid].map { Double(time &- $0) * Self.timebase / 1e9 / seconds } ?? 0 : 0
+            // Less than before: the number went to a new process since.
+            let cpu = seconds > 0 ? lastTimes[pid].map { time >= $0 ? Double(time - $0) * Self.timebase / 1e9 / seconds : 0 } ?? 0 : 0
             let owner = AudioProcesses.responsiblePID(of: pid) ?? pid
             var entry = byOwner[owner] ?? described[owner] ?? {
                 let entry = Self.describe(owner)

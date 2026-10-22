@@ -201,7 +201,9 @@ enum StatsReadings {
             guard let counters = Self.counters(interface) else { return nil }
             let now = ProcessInfo.processInfo.systemUptime
             defer { last = (counters.up, counters.down, now, interface) }
-            guard let last, last.interface == interface, now > last.time else { return nil }
+            // Counters that went back (the interface was reset) say nothing.
+            guard let last, last.interface == interface, now > last.time,
+                  counters.up >= last.up, counters.down >= last.down else { return nil }
             let seconds = now - last.time
             return NetworkReading(up: Double(counters.up &- last.up) / seconds, down: Double(counters.down &- last.down) / seconds,
                                   interface: interface, address: Self.address(interface))
@@ -258,7 +260,7 @@ enum StatsReadings {
     // MARK: - Disk
 
     final class Disk {
-        private var last: (read: UInt64, write: UInt64, time: TimeInterval)?
+        private var last: (read: UInt64, write: UInt64, disks: Int, time: TimeInterval)?
         private var space: (total: Int64, free: Int64, time: TimeInterval)?
 
         func read() -> DiskReading? {
@@ -275,24 +277,29 @@ enum StatsReadings {
             guard let space else { return nil }
             var reading = DiskReading(total: space.total, free: space.free)
             if let bytes = Self.transferred() {
-                if let last, now > last.time {
-                    reading.read = Double(bytes.read &- last.read) / (now - last.time)
-                    reading.write = Double(bytes.write &- last.write) / (now - last.time)
+                // The same disks, and counters that only went up: a disk that
+                // comes or goes changes the sums by all it has ever moved,
+                // which read as one absurd speed and flattened the chart.
+                if let last, now > last.time, bytes.disks == last.disks, bytes.read >= last.read, bytes.write >= last.write {
+                    reading.read = Double(bytes.read - last.read) / (now - last.time)
+                    reading.write = Double(bytes.write - last.write) / (now - last.time)
                 }
-                last = (bytes.read, bytes.write, now)
+                last = (bytes.read, bytes.write, bytes.disks, now)
             }
             return reading
         }
 
-        /// Bytes read and written since startup, across every disk's driver.
-        private static func transferred() -> (read: UInt64, write: UInt64)? {
-            var read: UInt64 = 0, write: UInt64 = 0
+        /// Bytes read and written since startup, across every disk's driver,
+        /// and how many disks that is.
+        private static func transferred() -> (read: UInt64, write: UInt64, disks: Int)? {
+            var read: UInt64 = 0, write: UInt64 = 0, disks = 0
             let found = registry("IOBlockStorageDriver") { entry in
                 guard let statistics = property(entry, "Statistics") as? [String: Any] else { return }
-                read += (statistics["Bytes (Read)"] as? NSNumber)?.uint64Value ?? 0
-                write += (statistics["Bytes (Write)"] as? NSNumber)?.uint64Value ?? 0
+                disks += 1
+                read &+= (statistics["Bytes (Read)"] as? NSNumber)?.uint64Value ?? 0
+                write &+= (statistics["Bytes (Write)"] as? NSNumber)?.uint64Value ?? 0
             }
-            return found ? (read, write) : nil
+            return found ? (read, write, disks) : nil
         }
     }
 
