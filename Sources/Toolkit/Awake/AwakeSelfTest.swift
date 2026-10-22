@@ -67,7 +67,7 @@ extension AwakeController {
                 low.turnOn(for: 600)
                 let titles = low.menuItems(openSettings: {}).map(\.title)
                 check(low.batteryLow && low.session == nil && assertions().isEmpty, "below the stop level (\(config.batteryFloor)%): it won't start")
-                check(titles.contains { $0.hasPrefix("The battery is below") }, "and its menu says why")
+                check(titles.contains { $0.hasPrefix("Battery below") }, "and its menu says why")
                 low.config.batteryFloor = 0
                 check(!low.batteryLow, "with Never, it can start again")
                 low.stop()

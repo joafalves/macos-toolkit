@@ -47,7 +47,7 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
         case .network: return "arrow.up.arrow.down"
         case .disk: return "internaldrive"
         case .gpu: return "cube"
-        case .power: return "bolt.fill"
+        case .power: return "bolt"
         }
     }
 

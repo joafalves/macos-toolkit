@@ -157,7 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             segments.append(MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture"))
         }
         if awake.config.enabled, awake.config.menuBarIcon != .none {
-            let time = awake.menuBarTime
+            let time = awake.config.menuBarIcon == .cup ? nil : awake.menuBarTime
             let left = time?.text, widest = time?.widest
             let label = "Keep Awake, " + awake.status.prefix(1).lowercased() + awake.status.dropFirst()
             if awake.config.menuBarIcon == .pill, awake.isOn, let session = awake.session {
@@ -178,8 +178,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             case .volumePercent:
                 // The volume next to the speaker, like the battery's percentage.
                 // Muted keeps the number, greyed, so you can see what unmuting brings back.
+                // As wide as its number, unlike the stats: it changes only when you
+                // change it, and room for "100%" left a gap after "50%".
                 segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: muted),
-                                               text: "\(Int((volume * 100).rounded()))%", dimText: mixer.mainMuted, widthOf: "100%", label: label))
+                                               text: "\(Int((volume * 100).rounded()))%", dimText: mixer.mainMuted, label: label))
             case .volumeBadge:
                 segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: volume, muted: muted), label: label))
             case .none:
@@ -278,7 +280,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         // With no part of its own, its menu is a submenu here.
         if awake.config.enabled, awake.config.menuBarIcon == .none {
             let item = NSMenuItem(title: "Keep Awake", action: nil, keyEquivalent: "")
-            item.image = NSImage(systemSymbolName: awake.isOn ? "cup.and.heat.waves.fill" : "cup.and.saucer", accessibilityDescription: nil)
+            item.image = NSImage(systemSymbolName: awake.isOn ? "cup.and.saucer.fill" : "cup.and.saucer", accessibilityDescription: nil)
             item.state = awake.isOn ? .on : .off
             let submenu = NSMenu()
             awake.menuItems { [weak self] in self?.show(.awake) }.forEach(submenu.addItem)
@@ -435,7 +437,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         // then toggled it open again, and a quick click to reopen was lost.
         popover.behavior = .applicationDefined
         popover.delegate = self
-        let host = NSHostingController(rootView: MixerPopoverView(mixer: mixer) { [weak self] in
+        let host = NSHostingController(rootView: MixerPopoverView(mixer: mixer, close: { [weak self] in
+            self?.mixerPopover?.performClose(nil)
+        }) { [weak self] in
             self?.mixerPopover?.performClose(nil)
             self?.show(.mixer)
         })

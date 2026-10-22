@@ -577,13 +577,14 @@ quits or the tool is turned off.
   </picture>
 </p>
 
-A session keeps the Mac from sleeping until you turn it off, or for 5 minutes to 24 hours (picked from
-Minutes and Hours, as in Amphetamine), or until a time you pick. Start one from its menu in the menu bar, from its settings, or with a shortcut you
-set. A session carries on if the app is restarted or the Mac reboots, until its time is up.
+A session keeps the Mac from sleeping until you turn it off, or for 5 minutes to 24 hours, or until a
+time you pick. Start one from its menu in the menu bar, from its settings, or with a shortcut you
+set. The menu has the usual durations at the top and the rest under Other, and Keep the Display On
+and Stay Available as switches; while it's on, Turn Off says what's left. A session carries on if the app is restarted or the Mac reboots, until its time is up.
 
 - **In the menu bar** it's a cup. While a session is on it becomes a **pill that empties as the time
-  runs out**, with the time left in it (full, with no time, when it has no end), or the cup with the
-  time beside it. With neither, its menu is in the toolkit menu. **Count up with no end**, off by
+  runs out**, with the time left in it (full, with no time, when it has no end), the cup with the
+  time beside it, or only the cup, filled while it's on. With none, its menu is in the toolkit menu. **Count up with no end**, off by
   default, shows how long a session with no end has been on instead.
 - **Keep the display on** is the default. Turned off, only the Mac stays awake: the display sleeps,
   and downloads and long jobs go on.

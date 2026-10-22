@@ -112,7 +112,8 @@ final class MenuBarItem: NSObject {
     /// The item as wide as the row, the row in the middle of it. Only when the
     /// row's width changes: a part added or removed, or a number growing a digit.
     private func fit() {
-        item.length = row.frame.width + 4
+        // No margin of its own: macOS puts the same gap around every item.
+        item.length = row.frame.width
         guard let button else { return }
         button.layoutSubtreeIfNeeded()
         row.setFrameOrigin(NSPoint(x: ((button.bounds.width - row.frame.width) / 2).rounded(),
@@ -146,8 +147,10 @@ final class MenuBarRow: NSView {
     private var pressed: MenuBarSegment.Kind?
 
     static let height: CGFloat = 22
-    /// Space on each side of a part's content: by default a little less than
-    /// between the menu bar's items, so the group reads as one. Set in Settings.
+    /// Space on each side of a part's content, between two parts: by default a
+    /// little less than between the menu bar's items, so the group reads as
+    /// one. Set in Settings. Not at the item's two ends, where macOS already
+    /// leaves its own gap, as for any item.
     var padding: CGFloat = 6 {
         didSet {
             guard padding != oldValue else { return }
@@ -227,12 +230,17 @@ final class MenuBarRow: NSView {
         for (index, kind) in order.enumerated() {
             guard let part = parts[kind] else { continue }
             if index > 0 {
-                // Shorter between two stats: one tool's parts, apart from the other tools.
-                let height: CGFloat = Self.sameTool(order[index - 1], kind) ? 8 : 14
-                dividers[index - 1].frame = NSRect(x: x, y: (Self.height - height) / 2, width: 1, height: height)
-                x += 1
+                // A dot between two stats, as between a recording's time and
+                // size: one tool's parts, apart from the other tools.
+                let divider = dividers[index - 1]
+                divider.dot = Self.sameTool(order[index - 1], kind)
+                let size = divider.dot ? NSSize(width: 2, height: 2) : NSSize(width: 1, height: 12)
+                divider.frame = NSRect(x: x, y: (Self.height - size.height) / 2, width: size.width, height: size.height)
+                x += size.width
             }
-            let width = part.contentWidth + padding * 2
+            let insets = (leading: index == 0 ? 0 : padding, trailing: index == order.count - 1 ? 0 : padding)
+            if part.insets != insets { part.insets = insets }
+            let width = part.contentWidth + insets.leading + insets.trailing
             part.frame = NSRect(x: x, y: 0, width: width, height: Self.height)
             x += width
         }
@@ -252,6 +260,10 @@ final class MenuBarPartView: NSView {
     private var columns: [MenuBarText] = []
     private var shown: MenuBarSegment?
     private(set) var contentWidth: CGFloat = 0
+    /// Set by the row: its padding, but none at the item's ends.
+    var insets: (leading: CGFloat, trailing: CGFloat) = (6, 6) {
+        didSet { needsLayout = true }
+    }
 
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
     private static let labelInset: CGFloat = 2
@@ -354,8 +366,7 @@ final class MenuBarPartView: NSView {
 
     private func layoutContent() {
         guard let segment = shown else { return }
-        let padding = (superview as? MenuBarRow)?.padding ?? 6
-        var x = padding
+        var x = insets.leading
         let height = bounds.height
         if let image = segment.colored {
             dot.frame = NSRect(x: x, y: ((height - image.size.height) / 2).rounded(), width: image.size.width, height: image.size.height)
@@ -368,7 +379,7 @@ final class MenuBarPartView: NSView {
         if segment.text != nil {
             if segment.colored != nil || segment.glyph != nil { x += Self.textGap }
             let size = label.size
-            label.frame = NSRect(x: x, y: ((height - size.height) / 2).rounded(), width: bounds.width - x - padding, height: size.height)
+            label.frame = NSRect(x: x, y: ((height - size.height) / 2).rounded(), width: bounds.width - x - insets.trailing, height: size.height)
             x += size.width
         }
         if let texts = segment.columns, !texts.isEmpty {
@@ -433,9 +444,19 @@ final class MenuBarText: NSView {
 final class MenuBarDivider: NSView {
     override var allowsVibrancy: Bool { true }
 
+    var dot = false {
+        didSet { if dot != oldValue { needsDisplay = true } }
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.labelColor.withAlphaComponent(0.35).setFill()
-        bounds.fill()
+        if dot {
+            // In the text's colour, like the recording's " · ".
+            NSColor.labelColor.setFill()
+            NSBezierPath(ovalIn: bounds).fill()
+        } else {
+            NSColor.labelColor.withAlphaComponent(0.35).setFill()
+            bounds.fill()
+        }
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -525,14 +546,15 @@ enum MenuBarArt {
         return image
     }
 
-    static let volumeSymbols = ["speaker.slash.fill", "speaker.wave.1.fill", "speaker.wave.2.fill", "speaker.wave.3.fill"]
+    // Outline, as every icon in the item is unless it says something is on.
+    static let volumeSymbols = ["speaker.slash", "speaker.wave.1", "speaker.wave.2", "speaker.wave.3"]
 
     /// The speaker without waves, for beside the percentage, which already
     /// says how loud: as wide as its muted version, so neither leaves a gap.
     static func plainSpeaker(muted: Bool) -> NSImage? {
-        let symbol = muted ? "speaker.slash.fill" : "speaker.fill"
+        let symbol = muted ? "speaker.slash" : "speaker"
         // Against the number, whichever is shown.
-        return cached("plain speaker \(symbol)") { image(symbol, widthOf: ["speaker.fill", "speaker.slash.fill"], alignRight: true) }
+        return cached("plain speaker \(symbol)") { image(symbol, widthOf: ["speaker", "speaker.slash"], alignRight: true) }
     }
 
     /// The speaker macOS's own Sound item uses: more waves as the volume goes
@@ -540,9 +562,9 @@ enum MenuBarArt {
     static func speaker(volume: Float, muted: Bool) -> NSImage? {
         let symbol: String
         if muted || volume <= 0 {
-            symbol = "speaker.slash.fill"
+            symbol = "speaker.slash"
         } else {
-            symbol = volume < 0.34 ? "speaker.wave.1.fill" : volume < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill"
+            symbol = volume < 0.34 ? "speaker.wave.1" : volume < 0.67 ? "speaker.wave.2" : "speaker.wave.3"
         }
         return cached("speaker \(symbol)") { image(symbol, widthOf: volumeSymbols) }
     }
@@ -596,9 +618,10 @@ enum MenuBarArt {
         return image
     }
 
-    static let cupSymbols = ["cup.and.saucer", "cup.and.heat.waves.fill"]
+    /// The same cup, filled while it's on: only the fill changes, not the shape.
+    static let cupSymbols = ["cup.and.saucer", "cup.and.saucer.fill"]
 
-    /// Keep Awake's cup: empty while off, steaming while on. Against the
+    /// Keep Awake's cup: outline while off, filled while on. Against the
     /// time when there is one, which would otherwise sit after a gap.
     static func cup(on: Bool, beforeText: Bool = false) -> NSImage? {
         let symbol = on ? cupSymbols[1] : cupSymbols[0]
@@ -935,7 +958,7 @@ extension MenuBarRow {
         }
         widths("cpu", percent(.cpu, "cpu"))
         widths("memory", percent(.memory, "memorychip"))
-        widths("power", ["7.4 W", "12 W", "120 W"].map { MenuBarSegment(kind: .stat(.power), glyph: MenuBarArt.glyph("bolt.fill"), text: $0, widthOf: StatsController.widest(.power), label: "") })
+        widths("power", ["7.4 W", "12 W", "120 W"].map { MenuBarSegment(kind: .stat(.power), glyph: MenuBarArt.glyph("bolt"), text: $0, widthOf: StatsController.widest(.power), label: "") })
         widths("disk", ["9 GB", "312 GB", "1.2 TB"].map { MenuBarSegment(kind: .stat(.disk), glyph: MenuBarArt.glyph("internaldrive"), text: $0, widthOf: StatsController.widest(.disk), label: "") })
         widths("network", [("0 KB/s", "8 KB/s"), ("48 KB/s", "1.2 MB/s"), ("120 MB/s", "888 KB/s")].map { up, down in
             MenuBarSegment(kind: .stat(.network), columns: [MenuBarArt.column([.init(text: "↑ " + up, widthOf: "↑ 888 MB/s"), .init(text: "↓ " + down, widthOf: "↓ 888 MB/s")])], label: "")
@@ -949,7 +972,6 @@ extension MenuBarRow {
         let same = MenuBarArt.column([.init(text: "A 1", widthOf: "A 888"), .init(text: "A 2", widthOf: "A 888")])
         let alone = MenuBarArt.column([.init(text: "A 1", widthOf: "A 888")])
         widths("a column of two like lines", [MenuBarSegment(kind: .stats, columns: [same], label: ""), MenuBarSegment(kind: .stats, columns: [alone], label: "")])
-        widths("volume", ["5%", "60%", "100%"].map { MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: false), text: $0, widthOf: "100%", label: "") })
         widths("keep awake, 10 h", ["10:00", "9:59", "0:05"].map { MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: true, beforeText: true), text: $0, widthOf: "10:00", label: "") })
         widths("keep awake pill, 10 h", ["10:00", "9:59", "0:05"].map { MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.5, time: $0, widthOf: "10:00"), label: "") })
         print(failures == 0 ? "all ok" : "\(failures) failed")

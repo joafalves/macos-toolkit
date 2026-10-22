@@ -8,6 +8,8 @@ enum AwakeMenuBarIcon: String, Codable, CaseIterable {
     case pill
     /// The cup, with the time left beside it.
     case cupAndTime
+    /// Only the cup, filled while it's on: no time.
+    case cup
 }
 
 /// How Stay available keeps chat apps from marking you away.

@@ -95,6 +95,9 @@ tool; keep it in step with the code.
   - **Parts don't change width** as their figures change: a segment's `widthOf` (or a column line's)
     is the widest its text gets, and the part keeps that width with the text against its right edge
     (`--test-menu-bar-widths`). Keep templates as small as what's really shown (stats stop at 99%).
+    The volume is the exception: it changes only when you change it, and room for "100%" left a gap.
+  - The spacing setting goes between parts only, not at the item's two ends, where macOS leaves its
+    own gap as for any item.
   - An update costs about 8 ms (`--test-menu-bar`), most of it macOS taking a new picture of the
     item, so only when something shown changes; System Stats updates it every couple of seconds.
   - `MenuBarArt` keeps every image it draws by what's in it, so only a fixed set goes through

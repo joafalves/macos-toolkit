@@ -165,7 +165,7 @@ enum Snapshot {
         let toolkit = MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")
         let capture = MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture")
         let badge = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer")
-        let percent = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: false), text: "60%", widthOf: "100%", label: "Audio Mixer")
+        let percent = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: false), text: "60%", label: "Audio Mixer")
         let recording = MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: false), text: "0:42 · 3.1 MB", label: "Recording")
         let awake = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24", widthOf: "2:00"), label: "Keep Awake")
         let awakeOff = MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: false), label: "Keep Awake")

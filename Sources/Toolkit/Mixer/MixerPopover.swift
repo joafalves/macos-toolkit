@@ -4,6 +4,7 @@ import SwiftUI
 /// module: the output and main volume on top, one row per app underneath.
 struct MixerPopoverView: View {
     @ObservedObject var mixer: MixerController
+    var close: () -> Void = {}
     var openSettings: () -> Void = {}
 
     static let width: CGFloat = 340
@@ -13,8 +14,10 @@ struct MixerPopoverView: View {
     @StateObject private var showOutputs: ViewState<Bool>
     @StateObject private var showEqualizer: ViewState<Bool>
 
-    init(mixer: MixerController, showOutputs: Bool = false, showEqualizer: Bool = false, openSettings: @escaping () -> Void = {}) {
+    init(mixer: MixerController, showOutputs: Bool = false, showEqualizer: Bool = false,
+         close: @escaping () -> Void = {}, openSettings: @escaping () -> Void = {}) {
         self.mixer = mixer
+        self.close = close
         self.openSettings = openSettings
         _showOutputs = StateObject(wrappedValue: ViewState(showOutputs))
         _showEqualizer = StateObject(wrappedValue: ViewState(showEqualizer))
@@ -51,11 +54,11 @@ struct MixerPopoverView: View {
 
             Divider().padding(.horizontal, 4)
 
-            HStack(spacing: 0) {
-                FooterButton(title: "Mixer Settings…", symbol: "slider.horizontal.3", action: openSettings)
-                Spacer()
-                FooterButton(title: "Sound Settings…", symbol: "gearshape") { mixer.openSoundSettings() }
-            }
+            PanelFooter(app: "System Settings", openApp: {
+                close()
+                mixer.openSoundSettings()
+            }, openSettings: openSettings)
+            .padding(.horizontal, 4)
         }
         .padding(10)
         .frame(width: Self.width)
@@ -569,26 +572,6 @@ private struct PillButton: View {
         .buttonStyle(.plain)
         .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
         .opacity(isEnabled ? 1 : 0.6)
-        .onHover { hovering.value = $0 }
-    }
-}
-
-private struct FooterButton: View {
-    let title: String
-    let symbol: String
-    let action: () -> Void
-    @StateObject private var hovering = ViewState(false)
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: symbol)
-                .font(.system(size: 11.5))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(hovering.value ? 0.08 : 0)))
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(hovering.value ? .primary : .secondary)
         .onHover { hovering.value = $0 }
     }
 }

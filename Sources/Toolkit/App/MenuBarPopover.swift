@@ -6,6 +6,35 @@ import SwiftUI
 /// or switching apps. It doesn't activate the app, so the settings window
 /// stays where it is. The content is made each time it opens and let go of
 /// when it closes, so a closed panel costs nothing.
+/// The bottom of a panel from the menu bar, the same in each: on the left
+/// the macOS app it goes with, by name, with an arrow for leaving the
+/// toolkit; on the right the tool's own settings, under the toolkit's mark.
+struct PanelFooter: View {
+    let app: String
+    let openApp: () -> Void
+    let openSettings: () -> Void
+
+    var body: some View {
+        HStack {
+            Button(action: openApp) {
+                HStack(spacing: 3) {
+                    Text(app)
+                    Image(systemName: "arrow.up.forward").font(.caption2.weight(.semibold))
+                }
+            }
+            Spacer()
+            Button(action: openSettings) {
+                HStack(spacing: 5) {
+                    Image(nsImage: MenuBarArt.toolkit).resizable().frame(width: 12, height: 13.5)
+                    Text("Settings…")
+                }
+            }
+        }
+        .buttonStyle(.borderless)
+        .font(.callout)
+    }
+}
+
 final class MenuBarPopover: NSObject, NSPopoverDelegate {
     var onClose: (() -> Void)?
     private let menuBar: MenuBarItem

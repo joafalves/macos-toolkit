@@ -27,16 +27,10 @@ struct StatsPanelView: View {
                 section(kind)
             }
             Divider().padding(.top, 12).padding(.bottom, 8)
-            HStack {
-                Button("Activity Monitor") {
-                    close()
-                    NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
-                }
-                Spacer()
-                Button("Settings…", action: openSettings)
-            }
-            .buttonStyle(.borderless)
-            .font(.callout)
+            PanelFooter(app: "Activity Monitor", openApp: {
+                close()
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
+            }, openSettings: openSettings)
         }
         .padding(14)
         .frame(width: 320)

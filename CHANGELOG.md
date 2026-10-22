@@ -3,6 +3,32 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.15.1 (unreleased)
+
+### Added
+
+- **Keep Awake:** Cup in the menu bar: only the cup, filled while it's on, without the time.
+
+### Changed
+
+- **Menu bar:** System Stats' own parts are set apart by a dot, as a recording's time and size are,
+  rather than a short line; the lines between tools are back to their height before 0.15.0.
+- **Audio Mixer, System Stats:** their panels end the same way: on the left the macOS app they go
+  with, System Settings (at Sound) or Activity Monitor, with an arrow; on the right Settings…, with
+  the toolkit's mark, for the tool's page. Opening System Settings from the mixer now closes it.
+- **Keep Awake:** a clearer menu. The usual durations are one click away and every other one is
+  under Other; while it's on, Turn Off says what's left and when it ends; and Keep the Display On
+  and Stay Available are switches in it.
+- **Menu bar:** the item sits as far from its neighbours as macOS's own items do; the space
+  between parts no longer adds to the ends.
+- **Menu bar:** the icons are outlines unless they show something is on: the speaker and the power
+  bolt are outlines now, and Keep Awake's cup is the same cup, filled while it's on.
+
+### Fixed
+
+- **Audio Mixer:** the volume in the menu bar sits next to its speaker, rather than a digit's width
+  away from it, with no gap after it.
+
 ## 0.15.0 (2026-10-22)
 
 ### Added
