@@ -3,6 +3,39 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.17.0 (unreleased)
+
+### Added
+
+- **Mouse:** the wheel's distance is one setting: macOS's own, scaled; Fixed, every notch the same
+  number of lines, as on Windows; or Curve, a graph you drag, from how far a single notch scrolls to
+  how far a fast spin does, along a line or a curve. Saved speed and acceleration settings carry
+  over.
+- **System Stats:** the CPU panel's top apps say what their figures are out of: per core, as
+  Activity Monitor counts them, up to 100% for each core. A setting shows them as a share of the
+  whole CPU instead, up to 100%.
+
+### Changed
+
+- **Mouse:** a slow notch of the wheel scrolls a real distance with Fixed and Curve: with its own
+  acceleration off, macOS made it a tenth of a line, a single point, so a notch barely moved.
+- **Menu bar:** on a display that isn't active, the toolkit's item dims like macOS's own icons do.
+
+### Fixed
+
+- **System Stats:** the CPU panel's top apps no longer count the panel's own opening, which put the
+  toolkit near the top each time it opened: they're measured from a couple of seconds in, saying
+  Measuring… until then, and their CPU is an average of the last five seconds, so a moment's spike
+  doesn't top the list.
+- **Settings window:** the sidebar's Tools section can no longer be hidden by clicking its header.
+- **Menu bar:** the toolkit's item sits centred in the menu bar of the display you're working on,
+  like macOS's own icons, rather than a point high.
+- **Menu bar:** the item's icons and text are the colour of macOS's own, rather than taking a tint
+  from the desktop behind the menu bar.
+- **Menu bar:** the item's icons, pills and the toolkit's mark are sharp on a non-Retina display,
+  where some fell between pixels, and so is the copy macOS shows on your other displays, which was
+  blurry on a Retina display beside a non-Retina one.
+
 ## 0.16.0 (2026-10-22)
 
 ### Added

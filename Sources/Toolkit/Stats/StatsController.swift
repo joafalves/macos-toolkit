@@ -166,6 +166,13 @@ final class StatsController: ObservableObject {
             return
         }
         if !added.isEmpty || newApps { read(added, apps: newApps) }
+        // Counted afresh once the panel has settled: its opening is a one-off,
+        // not the toolkit's use, and would put it on top of its own list.
+        // Measured, the opening costs most in its first second and is done by
+        // two.
+        if newApps {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.topApps?.restart() }
+        }
         let interval = max(1, config.interval)
         if timer?.timeInterval != interval {
             timer?.invalidate()
@@ -378,6 +385,23 @@ final class StatsController: ObservableObject {
     /// Up to 99%: a load of 100% says no more than 99%, and two digits keep
     /// the menu bar narrower than room for a third that almost never shows.
     static func percent(_ share: Double) -> String { "\(min(99, Int((share * 100).rounded())))%" }
+
+    /// The cores an app's CPU is counted against: 100% per core.
+    static let cores = max(1, ProcessInfo.processInfo.activeProcessorCount)
+
+    /// An app's CPU (1 is one core's worth), per core or as a share of
+    /// `cores`, the panel's reading's: this Mac's, or a preview's own.
+    static func appCPU(_ used: Double, ofWhole: Bool, cores: Int) -> String {
+        guard ofWhole else { return "\(Int((used * 100).rounded()))%" }
+        let share = used / Double(max(cores, 1)) * 100
+        // Most apps are a fraction of a percent of every core: one decimal.
+        return share < 10 ? String(format: "%.1f%%", share) : "\(Int(share.rounded()))%"
+    }
+
+    /// What the figures are out of, for perspective.
+    static func appCPUScale(ofWhole: Bool, cores: Int) -> String {
+        ofWhole ? "Of the whole CPU, up to 100%" : "Per core, up to \(max(cores, 1) * 100)%"
+    }
 
     static func watts(_ watts: Double) -> String {
         watts < 10 ? String(format: "%.1f W", watts) : "\(Int(watts.rounded())) W"

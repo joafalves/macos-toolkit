@@ -173,6 +173,14 @@ private struct ProfileEditor: View {
         Binding(get: { mouse.profile(for: device) }, set: { mouse.setProfile($0, for: device) })
     }
 
+    private static func distanceCaption(_ mode: ScrollMode) -> String {
+        switch mode {
+        case .macOS: return "macOS's own: a slow notch barely moves, fast spins go further. The slider scales it."
+        case .fixed: return "Every notch the same distance, however fast the wheel turns, as on Windows."
+        case .curve: return "A single notch goes one distance and fast spins further, along the graph."
+        }
+    }
+
     var body: some View {
         let p = profile
 
@@ -205,23 +213,36 @@ private struct ProfileEditor: View {
             }
         }
 
-        Card(title: "Wheel", footnote: "Trackpad scrolling is never changed.") {
+        Card(title: "Wheel", footnote: "Trackpad scrolling is never changed. Fixed and Curve set how far the wheel scrolls up and down; sideways, a tilt scrolls a line at a time.") {
             OptionRow(title: "Vertical direction", selection: p.verticalInverted, options: [(false, "macOS"), (true, "Inverted")])
             RowDivider()
             OptionRow(title: "Horizontal direction", caption: "Tilt wheel or side scrolling.",
                       selection: p.horizontalInverted, options: [(false, "macOS"), (true, "Inverted")])
             RowDivider()
-            OptionRow(title: "Speed", caption: "Distance scrolled per notch.",
-                      selection: p.scrollSpeedMode, options: [(.macOS, "macOS"), (.custom, "Custom")]) {
-                if p.wrappedValue.scrollSpeedMode == .custom {
+            OptionRow(title: "Distance", caption: Self.distanceCaption(p.wrappedValue.scrollMode),
+                      selection: p.scrollMode, options: [(.macOS, "macOS"), (.fixed, "Fixed"), (.curve, "Curve")]) {
+                switch p.wrappedValue.scrollMode {
+                case .macOS:
                     ValueSlider(value: p.scrollSpeed, range: 0.25...5, step: 0.05, low: "Short", high: "Long") { String(format: "%.2f×", $0) }
-                }
-            }
-            RowDivider()
-            OptionRow(title: "Acceleration", caption: "How much further fast spins scroll. Off makes every notch equal.",
-                      selection: p.scrollAccelMode, options: [(.macOS, "macOS"), (.off, "Off"), (.custom, "Custom")]) {
-                if p.wrappedValue.scrollAccelMode == .custom {
-                    ValueSlider(value: p.scrollAccel, range: 0...1.7, step: 0.0125, low: "Less", high: "More") { String(format: "%.2f", $0) }
+                case .fixed:
+                    ValueSlider(value: p.scrollLines, range: Profile.scrollLinesRange, step: 1, low: "Short", high: "Long") {
+                        $0 == 1 ? "1 line" : "\(Int($0)) lines"
+                    }
+                case .curve:
+                    HStack {
+                        Text("Shape")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Picker("Shape", selection: p.scrollCurve) {
+                            Text("Linear").tag(ScrollCurve.linear)
+                            Text("Curve").tag(ScrollCurve.curve)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    WheelCurveEditor(start: p.scrollCurveStart, end: p.scrollCurveEnd, bend: p.scrollCurveBend,
+                                     curved: p.wrappedValue.scrollCurve == .curve)
                 }
             }
             RowDivider()

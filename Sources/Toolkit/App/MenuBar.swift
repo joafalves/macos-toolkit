@@ -45,16 +45,24 @@ struct MenuBarSegment: Equatable {
 
 /// The toolkit's one menu bar item. Every tool that wants a place in the menu
 /// bar gets a part of it, side by side, so they move together and can't be
-/// split up by other apps' icons. The parts are ordinary views in a row
-/// inside the item's button: a change touches only the view it changes, and
-/// macOS colours their icons and text like its own.
+/// split up by other apps' icons. The parts are laid out by a row of views,
+/// and the item shows them as one image, the button's own: macOS draws an
+/// item's image itself on every display, sharp at each one's resolution, and
+/// dims a template one on a display that isn't active, as it does its own
+/// icons. Views in the button were copied onto the other displays as a
+/// picture: never dimmed, and blurry on a Retina one beside a 1x one.
 final class MenuBarItem: NSObject {
     /// A part was clicked: which, where in the item's button, and whether it
     /// was a right-click (or a click with ⌃).
     var onClick: ((MenuBarSegment.Kind, NSRect, Bool) -> Void)?
 
     private let item: NSStatusItem
+    /// Not in the button: it lays the parts out, and says what to draw.
     private let row = MenuBarRow()
+    /// What the button's image shows now: a new image only when this changes.
+    private var drawn: MenuBarDrawing?
+    private var appearanceObservation: NSKeyValueObservation?
+    private var dark: Bool?
 
     override init() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -66,9 +74,21 @@ final class MenuBarItem: NSObject {
         button.action = #selector(clicked)
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.title = ""
-        button.image = nil
-        button.addSubview(row)
+        button.imagePosition = .imageOnly
+        button.imageScaling = .scaleNone
         row.onResize = { [weak self] in self?.fit() }
+        // An image in colours of its own has the label colour drawn into it:
+        // drawn again for a light or dark menu bar. A template one macOS colours.
+        // Only on a real change: setting the image tells observers too, and
+        // drawing again on that went round without end.
+        appearanceObservation = button.observe(\.effectiveAppearance) { [weak self] button, _ in
+            let dark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            DispatchQueue.main.async {
+                guard let self, dark != self.dark else { return }
+                self.dark = dark
+                self.render(again: true)
+            }
+        }
     }
 
     var button: NSStatusBarButton? { item.button }
@@ -87,6 +107,7 @@ final class MenuBarItem: NSObject {
 
     func show(_ segments: [MenuBarSegment]) {
         row.show(segments)
+        render()
         button?.setAccessibilityLabel(segments.map(\.label).joined(separator: ", "))
         button?.toolTip = segments.count == 1 ? segments[0].label : nil
     }
@@ -94,12 +115,16 @@ final class MenuBarItem: NSObject {
     /// Points between two parts; half of it on each side of every part.
     var spacing: CGFloat {
         get { row.padding * 2 }
-        set { row.padding = (newValue / 2).rounded() }
+        set {
+            row.padding = (newValue / 2).rounded()
+            render()
+        }
     }
 
     /// While a part's menu or panel is open, the other parts step back.
     func setPressed(_ kind: MenuBarSegment.Kind?) {
         row.setPressed(kind)
+        render()
     }
 
     /// A part's menu, opened as the item's own: macOS keeps the whole item
@@ -117,27 +142,48 @@ final class MenuBarItem: NSObject {
     /// Where a part is in the button, for a popover or menu to hang from.
     func rect(of kind: MenuBarSegment.Kind) -> NSRect? {
         guard let button, let frame = row.frame(of: kind) else { return nil }
-        return button.convert(frame, from: row)
+        return NSRect(x: rowX + frame.minX, y: 0, width: frame.width, height: button.bounds.height)
     }
 
-    /// The item as wide as the row, the row in the middle of it. Only when the
-    /// row's width changes: a part added or removed, or a number growing a digit.
+    /// Where the row's left edge is in the button: the image is centred in it.
+    private var rowX: CGFloat {
+        guard let button else { return 0 }
+        return ((button.bounds.width - row.frame.width) / 2).rounded()
+    }
+
+    /// The item as wide as the row. Only when the row's width changes: a part
+    /// added or removed, or a number growing a digit.
     private func fit() {
         // No margin of its own: macOS puts the same gap around every item.
         item.length = row.frame.width
-        guard let button else { return }
-        button.layoutSubtreeIfNeeded()
-        row.setFrameOrigin(NSPoint(x: ((button.bounds.width - row.frame.width) / 2).rounded(),
-                                   y: ((button.bounds.height - row.frame.height) / 2).rounded()))
+        render()
     }
+
+    /// A new image for the button, only if what it shows has changed: the
+    /// same drawing again (a reading that didn't move) costs nothing.
+    private func render(again: Bool = false) {
+        let drawing = row.drawing()
+        guard again || drawing != drawn else { return }
+        // Again only matters for colours of its own; macOS colours a template.
+        if again, drawing == drawn, drawing.isTemplate { return }
+        drawn = drawing
+        button?.image = drawing.image(lower: Self.lower)
+    }
+
+    /// macOS puts every app's item a point above the middle of the active
+    /// display's menu bar (measured on a plain item: 6 pt over a 16 pt square,
+    /// 8 under, where its own icons have 7 and 7), so the image is drawn a
+    /// point lower. The copies macOS shows on the other displays are centred,
+    /// and are drawn from the same image: there it's a point low.
+    private static let lower: CGFloat = 1
 
     @objc private func clicked() {
         guard let button, let window = button.window else { return }
         let event = NSApp.currentEvent
         // From the pointer's place on screen: macOS hands the button every
         // click as if it landed in its middle.
-        let point = row.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
-        guard let kind = row.kind(at: point.x), let rect = rect(of: kind) else { return }
+        let point = button.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        guard let kind = row.kind(at: point.x - rowX), let rect = rect(of: kind) else { return }
         // ⌃ from the keyboard as it is now: the click event macOS hands over
         // is made up, and its modifiers can't be trusted.
         let right = event?.type == .rightMouseUp || NSEvent.modifierFlags.contains(.control)
@@ -218,6 +264,19 @@ final class MenuBarRow: NSView {
 
     func frame(of kind: MenuBarSegment.Kind) -> NSRect? { parts[kind]?.frame }
 
+    /// Everything the row shows, where it is in the row, as the views draw it.
+    func drawing() -> MenuBarDrawing {
+        var elements: [MenuBarDrawing.Element] = []
+        for kind in order {
+            guard let part = parts[kind] else { continue }
+            elements += part.elements(offset: part.frame.origin, alpha: part.alphaValue)
+        }
+        for divider in dividers where divider.superview != nil {
+            elements.append(.divider(dot: divider.dot, rect: divider.frame))
+        }
+        return MenuBarDrawing(size: frame.size, elements: elements)
+    }
+
     /// The part under the point. On a divider or beside the row, the part
     /// whose edge is nearest: by centres, a wide part (the recording, with its
     /// time) lost clicks well inside it to a narrow neighbour.
@@ -265,15 +324,16 @@ final class MenuBarRow: NSView {
 /// One part: the coloured dot (recording), the icon, and the text, each a
 /// view of its own, changed only when what it shows changes.
 final class MenuBarPartView: NSView {
-    private let dot = NSImageView()
-    private let icon = NSImageView()
+    private let dot = MenuBarImage()
+    private let icon = MenuBarImage()
     private let label = MenuBarText()
     private var columns: [MenuBarText] = []
     private var shown: MenuBarSegment?
     private(set) var contentWidth: CGFloat = 0
     /// Set by the row: its padding, but none at the item's ends.
     var insets: (leading: CGFloat, trailing: CGFloat) = (6, 6) {
-        didSet { needsLayout = true }
+        // Straight away: the item's row isn't in a window to lay it out later.
+        didSet { layoutContent() }
     }
 
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
@@ -285,14 +345,8 @@ final class MenuBarPartView: NSView {
 
     init() {
         super.init(frame: .zero)
-        for view in [dot, icon] {
-            view.imageScaling = .scaleNone
-            view.isEditable = false
-            addSubview(view)
-        }
-        // Template icons in the text colour, as macOS's own are; left alone,
-        // an image view tints them fainter.
-        icon.contentTintColor = .labelColor
+        addSubview(dot)
+        addSubview(icon)
         addSubview(label)
     }
 
@@ -312,7 +366,7 @@ final class MenuBarPartView: NSView {
                 .paragraphStyle: style,
             ])
         }
-        if before?.tint != segment.tint { icon.contentTintColor = segment.tint ?? .labelColor }
+        if before?.tint != segment.tint { icon.tint = segment.tint }
         if before?.columns != segment.columns { showColumns(segment.columns ?? []) }
         dot.isHidden = segment.colored == nil
         icon.isHidden = segment.glyph == nil
@@ -375,6 +429,28 @@ final class MenuBarPartView: NSView {
         layoutContent()
     }
 
+    /// Laid out again straight away: the item's row isn't in a window, which
+    /// would otherwise do it on the next pass. Sized by the row after `show`,
+    /// its content was placed for a height of nothing, nine points low.
+    override func setFrameSize(_ newSize: NSSize) {
+        let changed = newSize != frame.size
+        super.setFrameSize(newSize)
+        if changed { layoutContent() }
+    }
+
+    /// What the part shows, moved by `offset`, at its opacity.
+    func elements(offset: NSPoint, alpha: CGFloat) -> [MenuBarDrawing.Element] {
+        func moved(_ rect: NSRect) -> NSRect { rect.offsetBy(dx: offset.x, dy: offset.y) }
+        var elements: [MenuBarDrawing.Element] = []
+        for view in [dot, icon] where !view.isHidden {
+            if let image = view.image { elements.append(.image(image, tint: view.tint, rect: moved(view.frame), alpha: alpha)) }
+        }
+        for text in [label] + columns where !text.isHidden && text.text.length > 0 {
+            elements.append(.text(text.text, rect: moved(text.frame), alpha: alpha))
+        }
+        return elements
+    }
+
     private func layoutContent() {
         guard let segment = shown else { return }
         var x = insets.leading
@@ -405,26 +481,61 @@ final class MenuBarPartView: NSView {
     }
 }
 
-/// Text in the menu bar, drawn by the view itself. A text field there (even a
-/// hidden one) kept macOS 27 redrawing the whole item without end, at most of
-/// a core; a view that draws its own text costs nothing until it changes.
-/// Vibrant, so its label colours follow the menu bar like the icons do.
+/// An image in the item, a template one in the text colour or a colour of its
+/// own. Drawn by `draw(_:tint:in:template:)`, for the item's image and for
+/// this view in a snapshot alike.
+final class MenuBarImage: NSView {
+    var image: NSImage? {
+        didSet { if image !== oldValue { needsDisplay = true } }
+    }
+    /// For a template image: a colour of its own, or nil for the text's.
+    var tint: NSColor? {
+        didSet { if tint != oldValue { needsDisplay = true } }
+    }
+
+    /// Not vibrant, as for the text.
+    override var allowsVibrancy: Bool { false }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let image else { return }
+        Self.draw(image, tint: tint, in: bounds, template: false)
+    }
+
+    /// In the middle of `bounds`, on whole points. Into a template drawing as
+    /// it is, black; otherwise a template image is filled with its colour.
+    static func draw(_ image: NSImage, tint: NSColor?, in bounds: NSRect, template: Bool) {
+        let rect = NSRect(x: bounds.minX + ((bounds.width - image.size.width) / 2).rounded(),
+                          y: bounds.minY + ((bounds.height - image.size.height) / 2).rounded(),
+                          width: image.size.width, height: image.size.height)
+        guard !template, image.isTemplate, let context = NSGraphicsContext.current?.cgContext else { return image.draw(in: rect) }
+        // The template's shape, filled with the colour at the colour's own
+        // opacity: the label colour lets a touch of the menu bar through, as
+        // macOS's icons do. Over the template's black (source-atop) it came
+        // out an opaque grey.
+        context.beginTransparencyLayer(auxiliaryInfo: nil)
+        image.draw(in: rect)
+        (tint ?? .labelColor).setFill()
+        rect.fill(using: .sourceIn)
+        context.endTransparencyLayer()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+}
+
+/// Text in the item. Drawn by `draw(_:size:template:)`, for the item's image
+/// and for this view in a snapshot alike. Never a text field: one in the
+/// item, even hidden, kept macOS 27 redrawing it without end.
 final class MenuBarText: NSView {
     var text = NSAttributedString() {
         didSet {
             guard text != oldValue else { return }
-            var colored = false
-            text.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: text.length)) { color, _, _ in
-                if let color = color as? NSColor, color != .labelColor, color != .secondaryLabelColor { colored = true }
-            }
-            vibrant = !colored
             needsDisplay = true
         }
     }
-
-    /// Off for a colour of its own: vibrancy blends it with what's behind the
-    /// menu bar, and red came out pink.
-    private var vibrant = true
 
     /// A couple of points of room on each side, as a text field has.
     static let inset: CGFloat = 2
@@ -435,13 +546,22 @@ final class MenuBarText: NSView {
         return NSSize(width: ceil(bounds.width) + Self.inset * 2, height: ceil(bounds.height))
     }
 
-    override var allowsVibrancy: Bool { vibrant }
+    /// Not vibrant: macOS draws template icons, its own and other apps', in
+    /// the plain label colour, and vibrancy blended ours with what's behind
+    /// the menu bar, a blue cast on a blue desktop (measured), and red pink.
+    override var allowsVibrancy: Bool { false }
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func draw(_ dirtyRect: NSRect) {
-        text.draw(with: NSRect(x: Self.inset, y: 0, width: bounds.width - Self.inset * 2, height: bounds.height),
-                  options: [.usesLineFragmentOrigin])
+        Self.draw(text, size: bounds.size, template: false)
+    }
+
+    /// From the top left of a flipped context `size` big. Into a template
+    /// drawing, the label colours become black at their opacity.
+    static func draw(_ text: NSAttributedString, size: NSSize, template: Bool) {
+        (template ? MenuBarDrawing.black(text) : text)
+            .draw(with: NSRect(x: inset, y: 0, width: size.width - inset * 2, height: size.height), options: [.usesLineFragmentOrigin])
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -450,29 +570,127 @@ final class MenuBarText: NSView {
     }
 }
 
-/// The hairline between parts, in the menu bar's text colour, faint. Vibrant
-/// like the icons and text, so it follows the menu bar the same way.
+/// The hairline between parts, in the menu bar's text colour, faint. Not
+/// vibrant, like the icons and text.
 final class MenuBarDivider: NSView {
-    override var allowsVibrancy: Bool { true }
+    override var allowsVibrancy: Bool { false }
 
     var dot = false {
         didSet { if dot != oldValue { needsDisplay = true } }
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        Self.draw(dot: dot, in: bounds, template: false)
+    }
+
+    static func draw(dot: Bool, in rect: NSRect, template: Bool) {
+        let color: NSColor = template ? .black : .labelColor
         if dot {
             // In the text's colour, like the recording's " · ".
-            NSColor.labelColor.setFill()
-            NSBezierPath(ovalIn: bounds).fill()
+            color.setFill()
+            NSBezierPath(ovalIn: rect).fill()
         } else {
-            NSColor.labelColor.withAlphaComponent(0.35).setFill()
-            bounds.fill()
+            color.withAlphaComponent(0.35).setFill()
+            rect.fill()
         }
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         needsDisplay = true
+    }
+}
+
+/// What the item shows, as plain data: the images, text and dividers, each
+/// where it is in the row. Compared with the last to skip an image that would
+/// be the same, and kept by the image, which macOS may draw again later for
+/// another display, so it can't read from views that have changed since.
+struct MenuBarDrawing: Equatable {
+    enum Element: Equatable {
+        case image(NSImage, tint: NSColor?, rect: NSRect, alpha: CGFloat)
+        case text(NSAttributedString, rect: NSRect, alpha: CGFloat)
+        case divider(dot: Bool, rect: NSRect)
+
+        static func == (a: Element, b: Element) -> Bool {
+            switch (a, b) {
+            case let (.image(i, t, r, o), .image(j, u, s, p)): return i === j && t == u && r == s && o == p
+            case let (.text(t, r, o), .text(u, s, p)): return t == u && r == s && o == p
+            case let (.divider(d, r), .divider(e, s)): return d == e && r == s
+            default: return false
+            }
+        }
+    }
+
+    var size: NSSize
+    var elements: [Element]
+
+    /// A template when everything is in the label colours: then macOS colours
+    /// it like its own icons, and dims it on a display that isn't active. A
+    /// colour of its own (the recording's dot, memory under pressure) can't
+    /// be a template, so then it's drawn in its colours.
+    var isTemplate: Bool {
+        elements.allSatisfy { element in
+            switch element {
+            case let .image(image, tint, _, _): return tint == nil && image.isTemplate
+            case let .text(text, _, _): return Self.plain(text)
+            case .divider: return true
+            }
+        }
+    }
+
+    /// `lower` moves everything down in the image.
+    func image(lower: CGFloat) -> NSImage {
+        let elements = self.elements, template = isTemplate
+        let image = NSImage(size: size, flipped: false) { _ in
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            context.translateBy(x: 0, y: -lower)
+            for element in elements {
+                context.saveGState()
+                switch element {
+                case let .image(image, tint, rect, alpha):
+                    context.setAlpha(alpha)
+                    MenuBarImage.draw(image, tint: tint, in: rect, template: template)
+                case let .text(text, rect, alpha):
+                    context.setAlpha(alpha)
+                    // Text is laid out from the top, as in its flipped view.
+                    context.translateBy(x: rect.minX, y: rect.maxY)
+                    context.scaleBy(x: 1, y: -1)
+                    let flipped = NSGraphicsContext(cgContext: context, flipped: true)
+                    NSGraphicsContext.saveGraphicsState()
+                    NSGraphicsContext.current = flipped
+                    MenuBarText.draw(text, size: rect.size, template: template)
+                    NSGraphicsContext.restoreGraphicsState()
+                case let .divider(dot, rect):
+                    MenuBarDivider.draw(dot: dot, in: rect, template: template)
+                }
+                context.restoreGState()
+            }
+            return true
+        }
+        image.isTemplate = template
+        image.accessibilityDescription = "MacOS Toolkit"
+        return image
+    }
+
+    private static func plain(_ text: NSAttributedString) -> Bool {
+        var plain = true
+        text.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: text.length)) { color, _, stop in
+            if let color = color as? NSColor, color != .labelColor, color != .secondaryLabelColor {
+                plain = false
+                stop.pointee = true
+            }
+        }
+        return plain
+    }
+
+    /// The text in black, as a template has it: the secondary colour at half.
+    static func black(_ text: NSAttributedString) -> NSAttributedString {
+        let black = NSMutableAttributedString(attributedString: text)
+        text.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: text.length)) { color, range, _ in
+            let secondary = (color as? NSColor) == .secondaryLabelColor
+            black.addAttribute(.foregroundColor, value: NSColor.black.withAlphaComponent(secondary ? 0.5 : 1), range: range)
+        }
+        return black
     }
 }
 
@@ -506,7 +724,9 @@ enum MenuBarArt {
     /// others outlined, so it still reads as a kit in one colour.
     static let toolkit: NSImage = {
         let image = NSImage(size: NSSize(width: 16, height: 18), flipped: false) { rect in
-            let side: CGFloat = 6.6, gap: CGFloat = 1.8
+            // Whole points, so every edge falls on a pixel of a 1x display too;
+            // the app icon's proportions, near enough.
+            let side: CGFloat = 7, gap: CGFloat = 2
             for i in 0..<4 {
                 let square = NSRect(x: rect.midX - side - gap / 2 + CGFloat(i % 2) * (side + gap),
                                     y: rect.midY - side - gap / 2 + CGFloat(1 - i / 2) * (side + gap),
@@ -515,8 +735,8 @@ enum MenuBarArt {
                 if i == 0 {
                     NSBezierPath(roundedRect: square, xRadius: 1.8, yRadius: 1.8).fill()
                 } else {
-                    let outline = NSBezierPath(roundedRect: square.insetBy(dx: 0.65, dy: 0.65), xRadius: 1.3, yRadius: 1.3)
-                    outline.lineWidth = 1.3
+                    let outline = NSBezierPath(roundedRect: square.insetBy(dx: 0.5, dy: 0.5), xRadius: 1.4, yRadius: 1.4)
+                    outline.lineWidth = 1
                     outline.stroke()
                 }
             }
@@ -549,7 +769,9 @@ enum MenuBarArt {
         let fit = min(1, height / glyph.size.height)
         let size = NSSize(width: glyph.size.width * fit, height: glyph.size.height * fit)
         let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
-            glyph.draw(in: NSRect(x: alignRight ? rect.maxX - size.width : 0, y: rect.midY - size.height / 2, width: size.width, height: size.height))
+            // On whole points, sharp on a 1x display as well.
+            glyph.draw(in: NSRect(x: alignRight ? (rect.maxX - size.width).rounded() : 0, y: (rect.midY - size.height / 2).rounded(),
+                                  width: size.width, height: size.height))
             return true
         }
         image.isTemplate = true
@@ -614,14 +836,14 @@ enum MenuBarArt {
                 NSGraphicsContext.restoreGraphicsState()
             }
             if let cone {
-                cone.draw(in: NSRect(x: 3, y: pill.midY - cone.size.height / 2, width: cone.size.width, height: cone.size.height),
+                cone.draw(in: NSRect(x: 3, y: (pill.midY - cone.size.height / 2).rounded(), width: cone.size.width, height: cone.size.height),
                           from: .zero, operation: .destinationOut, fraction: 1)
             }
             // The number is cut out too, centred in the space after the speaker.
             let size = text.size()
             let area = NSRect(x: 3 + coneWidth + 1, y: pill.minY, width: widest, height: pill.height)
             NSGraphicsContext.current?.compositingOperation = .destinationOut
-            text.draw(at: NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
+            text.draw(at: NSPoint(x: (area.midX - size.width / 2).rounded(), y: (area.midY - size.height / 2).rounded()))
             NSGraphicsContext.current?.compositingOperation = .sourceOver
             return true
         }
@@ -670,14 +892,14 @@ enum MenuBarArt {
             NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(fraction), height: pill.height).fill()
             NSGraphicsContext.restoreGraphicsState()
             if let cup {
-                cup.draw(in: NSRect(x: 4, y: pill.midY - cup.size.height / 2, width: cup.size.width, height: cup.size.height),
+                cup.draw(in: NSRect(x: 4, y: (pill.midY - cup.size.height / 2).rounded(), width: cup.size.width, height: cup.size.height),
                          from: .zero, operation: .destinationOut, fraction: 1)
             }
             if let text {
                 let size = text.size()
                 let area = NSRect(x: 4 + cupWidth + 2, y: pill.minY, width: widest, height: pill.height)
                 NSGraphicsContext.current?.compositingOperation = .destinationOut
-                text.draw(at: NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
+                text.draw(at: NSPoint(x: (area.midX - size.width / 2).rounded(), y: (area.midY - size.height / 2).rounded()))
                 NSGraphicsContext.current?.compositingOperation = .sourceOver
             }
             return true
@@ -742,13 +964,13 @@ enum MenuBarArt {
             NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(fraction), height: pill.height).fill()
             NSGraphicsContext.restoreGraphicsState()
             if let glyph {
-                glyph.draw(in: NSRect(x: 4, y: pill.midY - glyph.size.height / 2, width: glyph.size.width, height: glyph.size.height),
+                glyph.draw(in: NSRect(x: 4, y: (pill.midY - glyph.size.height / 2).rounded(), width: glyph.size.width, height: glyph.size.height),
                            from: .zero, operation: .destinationOut, fraction: 1)
             }
             let size = string.size()
             let area = NSRect(x: 4 + glyphWidth + 2, y: pill.minY, width: widest, height: pill.height)
             NSGraphicsContext.current?.compositingOperation = .destinationOut
-            string.draw(at: NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
+            string.draw(at: NSPoint(x: (area.midX - size.width / 2).rounded(), y: (area.midY - size.height / 2).rounded()))
             NSGraphicsContext.current?.compositingOperation = .sourceOver
             return true
         }
@@ -769,7 +991,7 @@ enum MenuBarArt {
         let top = max(ceiling ?? max(values.max() ?? 0, second?.max() ?? 0), 1e-9)
         let image = NSImage(size: size, flipped: false) { _ in
             if let mark {
-                mark.draw(in: NSRect(x: 0, y: (size.height - mark.size.height) / 2, width: mark.size.width, height: mark.size.height))
+                mark.draw(in: NSRect(x: 0, y: ((size.height - mark.size.height) / 2).rounded(), width: mark.size.width, height: mark.size.height))
             }
             let frame = NSRect(x: markWidth + 3.5, y: 2.5, width: 29, height: 13)
             // A baseline, so an idle chart still reads as one.

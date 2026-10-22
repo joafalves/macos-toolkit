@@ -112,9 +112,16 @@ struct StatsPanelView: View {
             Row("System", StatsController.percent(cpu.system))
             CoreCharts(cpu: cpu, history: { stats.history[.core($0)] ?? [] }, slots: stats.chartReadings)
                 .padding(.top, 2)
-            // Two readings apart before there's CPU to tell; not a list of zeros.
+            // A few seconds pass before there's CPU to tell: the list says so
+            // rather than showing zeros, at its full height so the panel
+            // doesn't grow when the apps come in.
+            let ofWhole = stats.config.topAppsOfWholeCPU
+            let scale = StatsController.appCPUScale(ofWhole: ofWhole, cores: cpu.cores.count)
             if live.cpuOfAppsKnown {
-                TopList(apps: stats.apps.sorted { $0.cpu > $1.cpu }.prefix(5).map { ($0, "\(Int(($0.cpu * 100).rounded()))%") })
+                TopList(apps: stats.apps.sorted { $0.cpu > $1.cpu }.prefix(5).map { ($0, StatsController.appCPU($0.cpu, ofWhole: ofWhole, cores: cpu.cores.count)) },
+                        scale: scale)
+            } else {
+                TopList(apps: [], measuring: true, scale: scale)
             }
         }
     }
@@ -374,31 +381,80 @@ private struct MemoryBar: View {
 }
 
 /// The apps using the most, with what each uses.
-private struct TopList: View {
-    let apps: [(AppUsage, String)]
+/// An app's row in outline, while there's nothing to show in it yet.
+private struct PlaceholderRow: View {
+    let width: CGFloat
 
     var body: some View {
-        if !apps.isEmpty {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 4, style: .continuous).frame(width: 16, height: 16)
+            // A line of text's height, so the row is as tall as an app's.
+            Text("Wg").hidden()
+                .overlay(alignment: .leading) { Capsule().frame(width: width, height: 8) }
+            Spacer()
+            Capsule().frame(width: 26, height: 8)
+        }
+        .font(.callout)
+        .foregroundStyle(Color.primary.opacity(0.07))
+    }
+}
+
+private struct TopList: View {
+    let apps: [(AppUsage, String)]
+    /// Rows in outline, as tall as the list will be, with "Measuring…" over
+    /// them. Still: an animation would cost the CPU being measured.
+    var measuring = false
+    /// What the figures are out of, for perspective: per core they pass 100%.
+    var scale: String?
+
+    /// Short enough to end before "Measuring…" in the middle.
+    private static let placeholderWidths: [CGFloat] = [84, 62, 76, 52, 70]
+
+    var body: some View {
+        if measuring || !apps.isEmpty {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Top apps").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach(apps, id: \.0.id) { app, value in
-                    HStack(spacing: 6) {
-                        Group {
-                            if let icon = app.icon {
-                                Image(nsImage: icon).resizable()
-                            } else {
-                                Image(systemName: "gearshape").foregroundStyle(.secondary)
-                            }
-                        }
-                        .frame(width: 16, height: 16)
-                        Text(app.name).lineLimit(1).truncationMode(.tail)
-                        Spacer()
-                        Text(value).monospacedDigit().foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Top apps").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Spacer()
+                    if let scale {
+                        Text(scale).font(.caption).foregroundStyle(.tertiary)
                     }
-                    .font(.callout)
+                }
+                if measuring {
+                    ZStack {
+                        VStack(alignment: .leading, spacing: 5) {
+                            ForEach(Self.placeholderWidths, id: \.self) { PlaceholderRow(width: $0) }
+                        }
+                        Text("Measuring…")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    rows
                 }
             }
             .padding(.top, 4)
+        }
+    }
+
+    private var rows: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(apps, id: \.0.id) { app, value in
+                HStack(spacing: 6) {
+                    Group {
+                        if let icon = app.icon {
+                            Image(nsImage: icon).resizable()
+                        } else {
+                            Image(systemName: "gearshape").foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(width: 16, height: 16)
+                    Text(app.name).lineLimit(1).truncationMode(.tail)
+                    Spacer()
+                    Text(value).monospacedDigit().foregroundStyle(.secondary)
+                }
+                .font(.callout)
+            }
         }
     }
 }

@@ -32,6 +32,12 @@ struct StatsSettingsView: View {
                               isOn: $stats.config.memoryColors)
                 }
 
+                Card(title: "Panels") {
+                    ToggleRow(title: "Top apps' CPU of the whole CPU",
+                              caption: "Off, as Activity Monitor counts it: 100% is one core, so an app can reach \(StatsController.cores * 100)% on this Mac. On, its share of every core, up to 100%, like the CPU figure itself.",
+                              isOn: $stats.config.topAppsOfWholeCPU)
+                }
+
                 Card(title: "Stats", footnote: "Only the stats in the menu bar are read, and nothing at all while none are.") {
                     ForEach(Array(StatKind.allCases.enumerated()), id: \.element) { index, kind in
                         if index > 0 { RowDivider() }

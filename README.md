@@ -451,14 +451,16 @@ soon as the same mouse is connected.
 | Cursor speed | macOS / custom multiplier | `HIDPointerResolution` on the device's HID service |
 | Cursor acceleration | macOS / off / custom (0–3) | `HIDMouseAcceleration` on the device's HID service |
 | Wheel direction (vertical, horizontal) | macOS / inverted | scroll event tap |
-| Wheel speed | macOS / custom multiplier | scroll event tap |
-| Wheel acceleration | macOS / off / custom | `HIDMouseScrollAcceleration` on the device's HID service |
+| Wheel distance | macOS (its own, scaled) / fixed (lines a notch, as on Windows) / curve (a notch one distance, fast spins further, along a graph you drag) | scroll event tap; fixed and curve also switch `HIDMouseScrollAcceleration` off on the device, so a slow notch isn't shrunk to a point |
 | Wheel smoothing | macOS / smooth | scroll event tap |
 | Back and forward buttons | macOS / navigate | event tap; sends a navigation swipe to Apple apps |
 | Wheel button | macOS / autoscroll, with a speed | event tap; posts scroll events while the button is held |
 
 Cursor settings need no permission. The wheel and button settings that go through the event tap need
-**Accessibility**. Trackpad scrolling is never modified.
+**Accessibility**. Trackpad scrolling is never modified. Fixed and curve set how far the wheel scrolls
+up and down; sideways, a tilt scrolls a line at a time. They count each wheel event as a notch, as an
+ordinary wheel sends them; a mouse whose own software (Logi Options+ and the like) makes its wheel
+send fractions of a notch is left to that software.
 
 **Autoscroll** is the Windows browser feature, in every app: hold the wheel button and move the mouse,
 and the window scrolls that way, faster the farther you move from where you pressed. A marker shows
@@ -628,7 +630,9 @@ number with its icon, a pill that fills, or a chart of the last minute, or they 
   when it runs short** on (off by default), it turns yellow, then red, when macOS itself reports
   memory running short. Its panel shows where memory goes, swap, and the apps using the most.
 - **CPU** shows the share of all cores in use, and its panel each core's last minute as a small
-  chart, grouped by kind, and the apps using the most, their helpers counted in.
+  chart, grouped by kind, and the apps using the most, their helpers counted in, over the last five
+  seconds: per core, as Activity Monitor counts them (100% is one core), or, with **Top apps' CPU of
+  the whole CPU**, as a share of every core.
 - **Network** shows upload and download speed on the connection in use, **disk** the free space
   and how fast it's read and written, and **GPU** how busy it is.
 - **Power** shows what the Mac draws, from the battery's own readings, and in its panel the GPU's

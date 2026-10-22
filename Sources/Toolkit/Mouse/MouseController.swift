@@ -230,10 +230,11 @@ final class MouseController: ObservableObject {
         set(service, keys: [HID.pointerResolution], to: resolution, system: HID.defaultResolution, force: force)
 
         let scrollAccel: Int32?
-        switch profile.scrollAccelMode {
+        switch profile.scrollMode {
         case .macOS: scrollAccel = nil
-        case .off: scrollAccel = HID.accelerationOff
-        case .custom: scrollAccel = HID.toFixed(profile.scrollAccel)
+        // The wheel tap sets the distance, and macOS's curve on top would
+        // shrink a slow notch to a point again.
+        case .fixed, .curve: scrollAccel = HID.accelerationOff
         }
         set(service, keys: [service.scrollAccelKey, HID.scrollAcceleration], to: scrollAccel,
             system: HID.toFixed(HID.globalDefault("com.apple.scrollwheel.scaling") ?? 0.3125), force: force)

@@ -28,4 +28,38 @@ enum WheelProbe {
         """
         try? report.write(toFile: path, atomically: true, encoding: .utf8)
     }
+
+    /// `--log-wheel <file> [seconds]`: every scroll event for a while, as
+    /// macOS hands it to the taps (its acceleration already in) and as apps
+    /// get it after the toolkit's: what a real notch of a real mouse becomes,
+    /// which a posted one can't show. Run the app bundle with `open -n`.
+    static func log(into path: String, seconds: Double) {
+        let start = ProcessInfo.processInfo.systemUptime
+        let lines = Locked<[String]>([])
+        func describe(_ where: String, _ event: CGEvent) -> String {
+            let ours = event.getIntegerValueField(.eventSourceUserData) == WheelEngine.marker
+            return String(format: "%7.3f %@ %@ continuous=%lld lines=%lld fixed=%.3f points=%lld phase=%lld momentum=%lld",
+                          ProcessInfo.processInfo.systemUptime - start, `where`, ours ? "toolkit" : "mouse  ",
+                          event.getIntegerValueField(.scrollWheelEventIsContinuous),
+                          event.getIntegerValueField(.scrollWheelEventDeltaAxis1),
+                          event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1),
+                          event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1),
+                          event.getIntegerValueField(.scrollWheelEventScrollPhase),
+                          event.getIntegerValueField(.scrollWheelEventMomentumPhase))
+        }
+        // Made after the toolkit's own tap, so first in line at the head.
+        let before = EventTap(name: "log-wheel-in", events: [.scrollWheel], listenOnly: true) { _, event in
+            lines.update { $0.append(describe("in ", event)) }
+            return Unmanaged.passUnretained(event)
+        }
+        let after = EventTap(name: "log-wheel-out", events: [.scrollWheel], place: .tailAppendEventTap, listenOnly: true) { _, event in
+            lines.update { $0.append(describe("out", event)) }
+            return Unmanaged.passUnretained(event)
+        }
+        Thread.sleep(forTimeInterval: seconds)
+        before?.stop()
+        after?.stop()
+        let report = (before == nil || after == nil ? "a tap couldn't start: Accessibility?\n" : "") + lines.value.joined(separator: "\n") + "\n"
+        try? report.write(toFile: path, atomically: true, encoding: .utf8)
+    }
 }

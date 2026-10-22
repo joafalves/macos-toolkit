@@ -84,24 +84,38 @@ tool; keep it in step with the code.
   `?? Unmanaged.passUnretained(event)` a result that is nil on purpose. The front app comes from
   `FrontApp` (start it on the main thread before any tap), not from `NSWorkspace` on the tap thread.
 - **The menu bar is one item** (`MenuBarItem` in `App/MenuBar.swift`): each tool that shows there
-  adds a `MenuBarSegment`, drawn as real views (`MenuBarPartView`), not a picture of them. Clicks
+  adds a `MenuBarSegment`. A `MenuBarRow` of views (`MenuBarPartView`, `MenuBarImage`,
+  `MenuBarText`, `MenuBarDivider`) lays the parts out but isn't in the button: the item shows them
+  as one image, the button's own, drawn from a `MenuBarDrawing` (plain data, compared with the last
+  so an unchanged reading makes no new image). macOS draws an item's image itself on every display,
+  sharp at each one's resolution, and dims a template one on a display that isn't active; views in
+  the button were copied there as a picture, never dimmed and blurry beside a 1x display. The image
+  is a template while everything is in the label colours, and drawn in its colours (the
+  recording's dot, memory under pressure) otherwise. The views draw through the same functions,
+  so a `--snapshot` matches the item. Clicks
   arrive as if at the button's centre, so the part is found from `NSEvent.mouseLocation`. macOS
   ignores the button's highlight and state, so menus open with `MenuBarItem.open` (it sets the
   item's menu and clicks it, which keeps the item lit); panels hang from a part with
   `MenuBarPopover`, which lights it and closes on a click elsewhere or Esc.
+  - A template image filled with a colour uses `.sourceIn`, keeping the colour's own opacity as
+    macOS does. macOS puts the item a point high on the active display and centres the copies;
+    the image is drawn a point low (`MenuBarItem.lower`), so the copies sit a point low.
+  - The row isn't in a window, so nothing lays it out later: a part lays its content out as soon
+    as its size or insets change.
   - **No `NSTextField` in it**, not even a hidden one: on macOS 27 a text field inside a status item
     keeps the whole item redrawing, at 25–90% of a core while nothing changes. Text is
-    `MenuBarText`, a view that draws its own; it's vibrant like the icons unless it has a colour of
-    its own, which vibrancy would wash out. `--test-menu-bar-idle` puts real items in the menu bar
-    and should read 0.0% for each kind of part.
+    `MenuBarText`, drawn by the item's image. Nothing is vibrant: macOS draws template icons in the
+    plain label colour, and vibrancy gave ours a cast of the desktop behind. `--test-menu-bar-idle`
+    puts real items in the menu bar and should read 0.0% for each kind of part; an observer of the
+    button's appearance that draws again on every notice (setting the image sends one) loops.
   - **Parts don't change width** as their figures change: a segment's `widthOf` (or a column line's)
     is the widest its text gets, and the part keeps that width with the text against its right edge
     (`--test-menu-bar-widths`). Keep templates as small as what's really shown (stats stop at 99%).
     The volume is the exception: it changes only when you change it, and room for "100%" left a gap.
   - The spacing setting goes between parts only, not at the item's two ends, where macOS leaves its
     own gap as for any item.
-  - An update costs about 8 ms (`--test-menu-bar`), most of it macOS taking a new picture of the
-    item, so only when something shown changes; System Stats updates it every couple of seconds.
+  - An update costs about 5 ms (`--test-menu-bar`, release build), most of it macOS's, so only
+    when something shown changes; System Stats updates it every couple of seconds.
   - `MenuBarArt` keeps every image it draws by what's in it, so only a fixed set goes through
     `cached`. An image with a changing time or figure in it goes through `latest`, which keeps the
     last one only: cached, the Keep Awake pill grew by ~80 MB a day.
@@ -152,6 +166,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-layout [report]  # geometry, then a helper's windows placed for real (run with open -n)
 .build/debug/Toolkit --measure-idle <file>   # memory idle, with the settings window, and after (run with open -n, app quit first)
 .build/debug/Toolkit --test-wheel <report>   # one scroll notch through the installed app's wheel tap: what comes out (open -n)
+.build/debug/Toolkit --log-wheel <file> [s]  # every scroll event for a while, as macOS hands it over and as apps get it (open -n)
 .build/debug/Toolkit --test-menu-bar         # CPU per update of a real menu bar item, minus the idle loop
 .build/debug/Toolkit --test-menu-bar-clicks  # every point across the item goes to the part it's over
 .build/debug/Toolkit --test-menu-bar-idle    # each kind of part, in a real menu bar item, costs nothing left alone

@@ -99,6 +99,9 @@ struct StatsConfig: Codable, Equatable {
     /// Memory in yellow, then red, as macOS reports it running short. Off by
     /// default: some find a coloured figure alarming, even at 99% used.
     var memoryColors = false
+    /// An app's CPU in the panels as a share of every core, up to 100%, like
+    /// the CPU figure itself; off, per core, as Activity Monitor counts it.
+    var topAppsOfWholeCPU = false
     /// By `StatKind.rawValue`.
     var stats: [String: StatSetting] = StatsConfig.defaultStats
 
@@ -130,6 +133,7 @@ struct StatsConfig: Codable, Equatable {
         let interval = try c.decodeIfPresent(Double.self, forKey: .interval) ?? 2
         self.interval = Self.intervals.contains(interval) ? interval : 2
         memoryColors = try c.decodeIfPresent(Bool.self, forKey: .memoryColors) ?? false
+        topAppsOfWholeCPU = try c.decodeIfPresent(Bool.self, forKey: .topAppsOfWholeCPU) ?? false
         // Stats added later get their defaults; unknown looks fall back to a number.
         var stats = Self.defaultStats
         if let saved = try? c.decodeIfPresent([String: StatSetting].self, forKey: .stats) {

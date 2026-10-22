@@ -127,6 +127,13 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-wheel"), CommandLine.
     WheelProbe.run(into: CommandLine.arguments[flag + 1])
     exit(0)
 }
+// Development aid: `--log-wheel <file> [seconds]`, every scroll event as macOS
+// hands it over and as apps get it. Run the app bundle with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--log-wheel"), CommandLine.arguments.count > flag + 1 {
+    let seconds = CommandLine.arguments.count > flag + 2 ? Double(CommandLine.arguments[flag + 2]) ?? 30 : 30
+    WheelProbe.log(into: CommandLine.arguments[flag + 1], seconds: seconds)
+    exit(0)
+}
 if let flag = CommandLine.arguments.firstIndex(of: "--test-menu-bar-tint"), CommandLine.arguments.count > flag + 1 {
     MenuBarRow.tintTest(into: CommandLine.arguments[flag + 1])
     exit(0)

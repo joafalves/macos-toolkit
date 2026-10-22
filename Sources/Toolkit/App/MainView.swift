@@ -60,9 +60,16 @@ struct MainView: View {
                 SidebarRow(section: .welcome).tag(AppSection.welcome)
                 SidebarRow(section: .general).tag(AppSection.general)
                 SidebarRow(section: .about).tag(AppSection.about)
-                Section("Tools") {
-                    ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0)).tag($0) }
-                }
+                // A header of its own rather than a section's: a sidebar section
+                // hides its rows on a click of its header and shows an arrow for
+                // it, and these are the tools themselves, nothing to tidy away.
+                Text("Tools")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 10)
+                    .padding(.leading, -2)
+                    .selectionDisabled()
+                ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0)).tag($0) }
             }
             .listStyle(.sidebar)
             .frame(width: 200)
