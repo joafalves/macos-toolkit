@@ -207,6 +207,8 @@ private struct Legend: View {
 }
 
 /// The last five minutes: the first series as a filled area, the rest as lines.
+/// Drawn with shapes, not a `Canvas`: a canvas redrawn with each reading made
+/// SwiftUI hold about 40 MB of graphics memory while the panel was open.
 struct HistoryChart: View {
     let series: [([Double], Color)]
     /// The top of the chart, or nil for the highest reading.
@@ -217,36 +219,60 @@ struct HistoryChart: View {
     var slots: Int?
 
     var body: some View {
-        Canvas { context, size in
-            let top = max(ceiling ?? series.flatMap(\.0).max() ?? 0, 1e-9)
-            let count = max(slots ?? series.map(\.0.count).max() ?? 0, 2)
-            let step = size.width / CGFloat(max(count - 1, 1))
-            for line in stride(from: 0.25, through: 0.75, by: 0.25) {
-                let y = size.height * (1 - line)
-                context.stroke(Path { $0.move(to: CGPoint(x: 0, y: y)); $0.addLine(to: CGPoint(x: size.width, y: y)) },
-                               with: .color(.primary.opacity(0.07)), lineWidth: 1)
-            }
-            for (index, (values, color)) in series.enumerated() where values.count > 1 {
-                let start = size.width - step * CGFloat(values.count - 1)
-                let points = values.enumerated().map { offset, value in
-                    CGPoint(x: start + step * CGFloat(offset), y: size.height * (1 - CGFloat(min(1, max(0, value / top)))))
-                }
-                var line = Path()
-                line.addLines(points)
+        let top = max(ceiling ?? series.flatMap(\.0).max() ?? 0, 1e-9)
+        let count = max(slots ?? series.map(\.0.count).max() ?? 0, 2)
+        ZStack {
+            ChartGrid().stroke(Color.primary.opacity(0.07), lineWidth: 1)
+            ForEach(Array(series.enumerated()), id: \.offset) { index, line in
+                let values = line.0.map { $0 / top }
                 if index == 0 {
-                    var area = line
-                    area.addLine(to: CGPoint(x: size.width, y: size.height))
-                    area.addLine(to: CGPoint(x: start, y: size.height))
-                    area.closeSubpath()
-                    context.fill(area, with: .linearGradient(Gradient(colors: [color.opacity(0.35), color.opacity(0.05)]),
-                                                            startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
+                    ChartLine(values: values, slots: count, closed: true)
+                        .fill(LinearGradient(colors: [line.1.opacity(0.35), line.1.opacity(0.05)], startPoint: .top, endPoint: .bottom))
                 }
-                context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
+                ChartLine(values: values, slots: count, closed: false)
+                    .stroke(line.1, style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
             }
         }
         .frame(height: height)
         .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+}
+
+/// Lines across at a quarter, half and three quarters.
+private struct ChartGrid: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        for share in [0.25, 0.5, 0.75] {
+            let y = rect.height * (1 - share)
+            path.move(to: CGPoint(x: rect.minX, y: y))
+            path.addLine(to: CGPoint(x: rect.maxX, y: y))
+        }
+        return path
+    }
+}
+
+/// Readings from 0 to 1 as a line against the right edge, one slot apart;
+/// `closed` takes it down to the bottom, for the filled area under it.
+private struct ChartLine: Shape {
+    let values: [Double]
+    let slots: Int
+    let closed: Bool
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard values.count > 1 else { return path }
+        let step = rect.width / CGFloat(max(slots - 1, 1))
+        let start = rect.width - step * CGFloat(values.count - 1)
+        path.addLines(values.enumerated().map { offset, value in
+            CGPoint(x: start + step * CGFloat(offset), y: rect.height * (1 - CGFloat(min(1, max(0, value)))))
+        })
+        if closed {
+            path.addLine(to: CGPoint(x: rect.width, y: rect.height))
+            path.addLine(to: CGPoint(x: start, y: rect.height))
+            path.closeSubpath()
+        }
+        return path
     }
 }
 

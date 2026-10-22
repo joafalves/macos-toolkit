@@ -43,6 +43,8 @@ worked on; it gets its date when it's released.
 - **Screen Capture:** a recording stopped as it was starting no longer carries on recording in the
   background with nothing to stop it. And quitting during a recording waits at most ten seconds
   for the file to be finished, so a stuck finish can't hold up logging out.
+- **System Stats:** an open panel no longer holds about 40 MB of graphics memory: its charts are
+  drawn as shapes, which also brings the panel itself from about 60 MB to about 20.
 - **System Stats:** a disk plugged in or ejected no longer shows as one absurd disk speed that
   flattened the chart for five minutes. Network speeds and the top apps are guarded the same way.
 - **Settings window:** a settings file with numbers out of range, edited by hand or imported, is kept

@@ -303,6 +303,26 @@ private struct GridRow: View {
     }
 }
 
+/// The cells of a grid, two points apart and from the edges.
+private struct GridCells: Shape {
+    let size: GridSize
+
+    func path(in area: CGRect) -> Path {
+        var path = Path()
+        let gap: CGFloat = 2
+        let width = (area.width - gap * CGFloat(size.columns + 1)) / CGFloat(size.columns)
+        let cellHeight = (area.height - gap * CGFloat(size.rows + 1)) / CGFloat(size.rows)
+        for row in 0..<size.rows {
+            for column in 0..<size.columns {
+                let rect = CGRect(x: gap + CGFloat(column) * (width + gap), y: gap + CGFloat(row) * (cellHeight + gap),
+                                  width: width, height: cellHeight)
+                path.addRoundedRect(in: rect, cornerSize: CGSize(width: 2, height: 2))
+            }
+        }
+        return path
+    }
+}
+
 /// A display drawn small, at its shape, with its cells.
 private struct GridThumbnail: View {
     let size: GridSize
@@ -310,19 +330,11 @@ private struct GridThumbnail: View {
 
     var body: some View {
         let height: CGFloat = 34
-        Canvas { context, area in
-            let gap: CGFloat = 2
-            let width = (area.width - gap * CGFloat(size.columns + 1)) / CGFloat(size.columns)
-            let cellHeight = (area.height - gap * CGFloat(size.rows + 1)) / CGFloat(size.rows)
-            for row in 0..<size.rows {
-                for column in 0..<size.columns {
-                    let rect = CGRect(x: gap + CGFloat(column) * (width + gap), y: gap + CGFloat(row) * (cellHeight + gap),
-                                      width: width, height: cellHeight)
-                    context.fill(Path(roundedRect: rect, cornerRadius: 2), with: .color(.accentColor.opacity(0.45)))
-                }
-            }
-        }
-        .frame(width: min(max(height * aspect, 24), 92), height: height)
+        // A shape rather than a `Canvas`, which holds tens of MB of graphics
+        // memory once it's redrawn.
+        GridCells(size: size)
+            .fill(Color.accentColor.opacity(0.45))
+            .frame(width: min(max(height * aspect, 24), 92), height: height)
         .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Color.primary.opacity(0.2)))
     }
