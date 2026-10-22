@@ -217,12 +217,19 @@ final class MenuBarRow: NSView {
     }
 
     /// Positions the parts; tells the item only if the width changed.
+    private static func sameTool(_ a: MenuBarSegment.Kind, _ b: MenuBarSegment.Kind) -> Bool {
+        if case .stat = a, case .stat = b { return true }
+        return false
+    }
+
     func layoutParts() {
         var x: CGFloat = 0
         for (index, kind) in order.enumerated() {
             guard let part = parts[kind] else { continue }
             if index > 0 {
-                dividers[index - 1].frame = NSRect(x: x, y: (Self.height - 12) / 2, width: 1, height: 12)
+                // Shorter between two stats: one tool's parts, apart from the other tools.
+                let height: CGFloat = Self.sameTool(order[index - 1], kind) ? 8 : 14
+                dividers[index - 1].frame = NSRect(x: x, y: (Self.height - height) / 2, width: 1, height: height)
                 x += 1
             }
             let width = part.contentWidth + padding * 2

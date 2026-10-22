@@ -16,6 +16,8 @@ worked on; it gets its date when it's released.
 - **System Stats:** the CPU panel shows each core's last minute as a small chart with what it's at
   now, grouped by kind of core with each group's average, in place of the row of small bars.
 - **Settings window:** Welcome is now called Overview, in the sidebar and in the toolkit menu.
+- **Menu bar:** the lines between parts are a little taller, and shorter between System Stats' own
+  parts, so the stats read as one group.
 - **Settings window:** a new install says every tool starts off and where to turn one on. A tool
   that's off says so under its header, and the header reads On or Off, as Overview does.
 - **Settings window:** shorter descriptions in several places, and pop-up menus where a wide row of
