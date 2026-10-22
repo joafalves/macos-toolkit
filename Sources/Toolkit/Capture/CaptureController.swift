@@ -37,6 +37,8 @@ final class CaptureController: ObservableObject {
     private var recordingScreen: NSScreen?
     private var frame: CapturePanel?
     private var countdown: CapturePanel?
+    /// Ends the countdown in progress without capturing.
+    private var cancelCountdown: (() -> Void)?
     private var ticker: Timer?
     private var flagMonitors: [Any] = []
     private var recordingObserver: NSObjectProtocol?
@@ -151,6 +153,9 @@ final class CaptureController: ObservableObject {
     // MARK: - Shortcuts
 
     private func handle(_ action: CaptureKeys.Action) {
+        // During the timer, a shortcut stops it: otherwise both the new
+        // capture and the timed one would happen.
+        if let cancel = cancelCountdown { return cancel() }
         switch action {
         case .screen(let copy):
             guard recorder == nil else { return }
@@ -225,6 +230,7 @@ final class CaptureController: ObservableObject {
     }
 
     func toggleToolbar() {
+        if let cancel = cancelCountdown { return cancel() }
         if recorder != nil { stopRecording() } else if toolbar.isVisible { closeToolbar() } else { openToolbar() }
     }
 
@@ -267,13 +273,18 @@ final class CaptureController: ObservableObject {
         panel.contentView = box
         var remaining = seconds
         var cancelled = false
-        panel.onKey = { [weak self, weak panel] event in
-            guard event.keyCode == 53 else { return false }
+        let cancel = { [weak self, weak panel] in
             cancelled = true
             panel?.orderOut(nil)
             self?.countdown = nil
+            self?.cancelCountdown = nil
+        }
+        panel.onKey = { event in
+            guard event.keyCode == 53 else { return false }
+            cancel()
             return true
         }
+        cancelCountdown = cancel
         label.stringValue = "\(remaining)"
         panel.orderFrontRegardless()
         panel.makeKey()
@@ -288,6 +299,7 @@ final class CaptureController: ObservableObject {
                 } else {
                     panel.orderOut(nil)
                     self?.countdown = nil
+                    self?.cancelCountdown = nil
                     action()
                 }
             }
@@ -380,8 +392,12 @@ final class CaptureController: ObservableObject {
             let excluded = self.ownWindows
             do {
                 try await recorder.start(target, options: options, excluding: excluded)
+                // Stopped while it was starting: no clock for it.
+                guard self.recorder === recorder else { return }
                 self.startTicker()
             } catch {
+                // Stopped while starting: nothing to report.
+                guard self.recorder === recorder else { return }
                 self.recorder = nil
                 self.recording = nil
                 self.hideFrame()

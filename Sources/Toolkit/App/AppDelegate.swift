@@ -100,9 +100,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     }
 
     /// A recording in progress is finished first, or the file would be unplayable.
+    /// Waited for ten seconds at most: a finish that hangs mustn't keep the
+    /// toolkit, and with it logging out or shutting down, from ever ending.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard capture.isRecording else { return .terminateNow }
-        capture.finishBeforeQuit { NSApp.reply(toApplicationShouldTerminate: true) }
+        var replied = false
+        let reply = {
+            guard !replied else { return }
+            replied = true
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        capture.finishBeforeQuit(reply)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: reply)
         return .terminateLater
     }
 

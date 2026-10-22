@@ -21,6 +21,11 @@ worked on; it gets its date when it's released.
 - **Keep Awake:** the pill in the menu bar no longer keeps a picture of every minute it has shown,
   which grew the toolkit by about 80 MB a day. The same for the volume and System Stats pills.
 - **Mouse:** with the tool off, scrolling and middle clicks no longer pass through the toolkit.
+- **Screen Capture:** a capture shortcut pressed while the timer counts down stops the timer,
+  instead of capturing now and again when the timer ends.
+- **Screen Capture:** a recording stopped as it was starting no longer carries on recording in the
+  background with nothing to stop it. And quitting during a recording waits at most ten seconds
+  for the file to be finished, so a stuck finish can't hold up logging out.
 - **Window Layout:** quitting with one of the toolkit's own windows in a stack no longer crashes,
   which also skipped putting other things back as the app quit.
 

@@ -37,6 +37,9 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     /// The last timestamp written per output. Buffers captured just before a
     /// pause can arrive after it, and must not go back in time.
     private var last: [SCStreamOutputType: CMTime] = [:]
+    /// Set by `stop`, which can come while `start` is still on its way: the
+    /// stream it then starts would otherwise run on, with nobody to stop it.
+    private let stopRequested = Locked(false)
 
     init(url: URL) {
         self.url = url
@@ -142,6 +145,13 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         if options.microphone { try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue) }
         try await stream.startCapture()
         self.stream = stream
+        if stopRequested.value {
+            try? await stream.stopCapture()
+            self.stream = nil
+            // Nothing was kept: the file `stop` may have missed goes too.
+            writer.cancelWriting()
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     /// Sized for screen content, which is mostly flat and sharp: enough that
@@ -180,6 +190,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     /// Ends the file. Returns false when nothing was recorded, and the file is
     /// removed then.
     func stop() async -> Bool {
+        stopRequested.value = true
         try? await stream?.stopCapture()
         stream = nil
         let writer: AVAssetWriter? = await withCheckedContinuation { continuation in
