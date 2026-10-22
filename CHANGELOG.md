@@ -5,6 +5,10 @@ worked on; it gets its date when it's released.
 
 ## 0.15.0 (unreleased)
 
+### Added
+
+- **Keep Awake:** 50 and 55 minutes among the times to turn it on for.
+
 ### Changed
 
 - **Settings window:** a tool that's off is greyed in the sidebar, its tile without colour and its

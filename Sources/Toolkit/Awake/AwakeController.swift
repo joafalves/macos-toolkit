@@ -27,7 +27,7 @@ final class AwakeController: ObservableObject {
     @Published private(set) var batteryLow = false
 
     /// The lengths offered, grouped into minutes and hours as Amphetamine does.
-    static let minutes = [5, 10, 15, 20, 30, 45]
+    static let minutes = [5, 10, 15, 20, 30, 45, 50, 55]
     static let hours = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24]
 
     static func title(minutes: Int) -> String { "\(minutes) Minutes" }
