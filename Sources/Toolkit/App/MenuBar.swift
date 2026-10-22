@@ -443,6 +443,19 @@ enum MenuBarArt {
         return image
     }
 
+    /// For images whose text keeps changing, a time or a reading: only the
+    /// last one of each is kept. Kept them all, a countdown left one behind
+    /// every minute, without end when it counts up. The same reading again is
+    /// still the same image, so it has nothing to redraw.
+    private static var latest: [String: (key: String, image: NSImage)] = [:]
+
+    private static func latest(_ slot: String, _ key: String, _ make: () -> NSImage?) -> NSImage? {
+        if let last = latest[slot], last.key == key { return last.image }
+        let image = make()
+        latest[slot] = image.map { (key, $0) }
+        return image
+    }
+
     /// The toolkit's own glyph, the app icon's four tools: one filled, the
     /// others outlined, so it still reads as a kit in one colour.
     static let toolkit: NSImage = {
@@ -526,7 +539,7 @@ enum MenuBarArt {
     static func volumeBadge(volume: Float, muted: Bool) -> NSImage {
         // By whole percent, which is all it shows.
         let percent = Int((min(1, max(0, volume)) * 100).rounded())
-        return cached("badge \(percent) \(muted)") { makeBadge(volume: Float(percent) / 100, muted: muted) } ?? NSImage()
+        return latest("volume", "\(percent) \(muted)") { makeBadge(volume: Float(percent) / 100, muted: muted) } ?? NSImage()
     }
 
     private static func makeBadge(volume: Float, muted: Bool) -> NSImage {
@@ -585,7 +598,7 @@ enum MenuBarArt {
     static func awakeBadge(fraction: Double, time: String?, widthOf: String? = nil) -> NSImage {
         // By whole percent: finer than the minutes it changes with.
         let percent = Int((min(1, max(0, fraction)) * 100).rounded())
-        return cached("awake \(percent) \(time ?? "") \(widthOf ?? "")") {
+        return latest("awake", "\(percent) \(time ?? "") \(widthOf ?? "")") {
             makeAwakeBadge(fraction: Double(percent) / 100, time: time, widthOf: widthOf)
         } ?? NSImage()
     }
@@ -659,7 +672,7 @@ enum MenuBarArt {
     /// stop at, so it doesn't shift.
     static func fillBadge(symbol: String, fraction: Double, text: String) -> NSImage {
         let percent = Int((min(1, max(0, fraction)) * 100).rounded())
-        return cached("fill \(symbol) \(percent) \(text)") { makeFillBadge(symbol: symbol, fraction: Double(percent) / 100, text: text) } ?? NSImage()
+        return latest("fill \(symbol)", "\(percent) \(text)") { makeFillBadge(symbol: symbol, fraction: Double(percent) / 100, text: text) } ?? NSImage()
     }
 
     private static func makeFillBadge(symbol: String, fraction: Double, text: String) -> NSImage {
@@ -773,15 +786,14 @@ enum MenuBarArt {
 }
 
 extension MenuBarRow {
-    /// `--test-menu-bar`: what an update costs. A row on screen (off to the
-    /// side, in a window of its own) gets a new recording time and volume ten
-    /// times a second for ten seconds; the CPU time spent is reported.
+    /// `--test-menu-bar`: what an update costs. A real item in the menu bar
+    /// gets a new recording time and volume ten times a second for ten
+    /// seconds; the CPU time spent is reported. Real, because most of the cost
+    /// is macOS taking a new picture of the item for the menu bar: a row in a
+    /// window of its own came to a quarter of it.
     static func selfTest() {
         _ = NSApplication.shared
-        let row = MenuBarRow()
-        let window = NSWindow(contentRect: NSRect(x: -2000, y: -2000, width: 400, height: 30), styleMask: [.borderless], backing: .buffered, defer: false)
-        window.contentView?.addSubview(row)
-        window.orderFrontRegardless()
+        let item = MenuBarItem()
         func segments(_ tick: Int) -> [MenuBarSegment] {
             let volume = Float(tick % 100) / 100
             return [
@@ -796,7 +808,7 @@ extension MenuBarRow {
             getrusage(RUSAGE_SELF, &usage)
             return Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1_000_000
         }
-        row.show(segments(0))
+        item.show(segments(0))
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         // The same loop with nothing changing, to take out what waking up costs.
         func measure(_ update: (Int) -> Void) -> Double {
@@ -808,7 +820,8 @@ extension MenuBarRow {
             return cpu() - start
         }
         let idle = measure { _ in }
-        let busy = measure { row.show(segments($0)) }
+        let busy = measure { item.show(segments($0)) }
+        item.remove()
         let each = (busy - idle) * 10
         print(String(format: "an update: %.2f ms of CPU (%.1f ms for 100, %.1f ms of that the loop itself); once a second that's %.3f%% of one core",
                      each, busy * 1000, idle * 1000, each / 10))

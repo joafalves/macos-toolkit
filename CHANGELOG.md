@@ -18,6 +18,8 @@ worked on; it gets its date when it's released.
   few seconds later, rather than leaving that app at full volume until its sound output changes.
 - **Audio Mixer:** the bars next to a playing app no longer use CPU; with the mixer open they took
   about 10% of a core. With Reduce Motion on they stand still.
+- **Keep Awake:** the pill in the menu bar no longer keeps a picture of every minute it has shown,
+  which grew the toolkit by about 80 MB a day. The same for the volume and System Stats pills.
 - **Window Layout:** quitting with one of the toolkit's own windows in a stack no longer crashes,
   which also skipped putting other things back as the app quit.
 

@@ -94,7 +94,11 @@ tool; keep it in step with the code.
   - **Parts don't change width** as their figures change: a segment's `widthOf` (or a column line's)
     is the widest its text gets, and the part keeps that width with the text against its right edge
     (`--test-menu-bar-widths`). Keep templates as small as what's really shown (stats stop at 99%).
-  - An update costs about 2 ms (`--test-menu-bar`); System Stats updates it every couple of seconds.
+  - An update costs about 8 ms (`--test-menu-bar`), most of it macOS taking a new picture of the
+    item, so only when something shown changes; System Stats updates it every couple of seconds.
+  - `MenuBarArt` keeps every image it draws by what's in it, so only a fixed set goes through
+    `cached`. An image with a changing time or figure in it goes through `latest`, which keeps the
+    last one only: cached, the Keep Awake pill grew by ~80 MB a day.
 - **Overlays are layers.** Full-screen overlays build `CALayer`s, not `draw(_:)`, which keeps a
   bitmap the size of each display (about 100 MB on large displays). Panels that call back into
   their owner hold it, or themselves, weakly; a cycle there kept every overlay alive.
@@ -142,7 +146,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-layout [report]  # geometry, then a helper's windows placed for real (run with open -n)
 .build/debug/Toolkit --measure-idle <file>   # memory idle, with the settings window, and after (run with open -n, app quit first)
 .build/debug/Toolkit --test-wheel <report>   # one scroll notch through the installed app's wheel tap: what comes out (open -n)
-.build/debug/Toolkit --test-menu-bar         # CPU per menu bar item update, minus the idle loop
+.build/debug/Toolkit --test-menu-bar         # CPU per update of a real menu bar item, minus the idle loop
 .build/debug/Toolkit --test-menu-bar-clicks  # every point across the item goes to the part it's over
 .build/debug/Toolkit --test-menu-bar-idle    # each kind of part, in a real menu bar item, costs nothing left alone
 .build/debug/Toolkit --test-menu-bar-widths  # each part keeps its width as its figure changes
