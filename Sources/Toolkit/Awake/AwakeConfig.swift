@@ -21,6 +21,8 @@ enum StayAvailableMethod: String, Codable, CaseIterable {
 struct AwakeConfig: Codable, Equatable {
     var enabled = true
     var menuBarIcon = AwakeMenuBarIcon.pill
+    /// With no end, the menu bar counts up how long it's been on.
+    var showElapsed = false
     /// Turns it on or off, with no end. None until one is set.
     var shortcut = Shortcut.none
     /// Off keeps only the system awake: the display may sleep while
@@ -48,6 +50,7 @@ struct AwakeConfig: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
         menuBarIcon = (try? c.decodeIfPresent(AwakeMenuBarIcon.self, forKey: .menuBarIcon)) ?? .pill
+        showElapsed = try c.decodeIfPresent(Bool.self, forKey: .showElapsed) ?? false
         shortcut = try c.decodeIfPresent(Shortcut.self, forKey: .shortcut) ?? .none
         keepDisplayOn = try c.decodeIfPresent(Bool.self, forKey: .keepDisplayOn) ?? true
         lidClosed = try c.decodeIfPresent(Bool.self, forKey: .lidClosed) ?? false

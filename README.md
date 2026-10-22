@@ -583,7 +583,8 @@ set. A session carries on if the app is restarted or the Mac reboots, until its 
 
 - **In the menu bar** it's a cup. While a session is on it becomes a **pill that empties as the time
   runs out**, with the time left in it (full, with no time, when it has no end), or the cup with the
-  time beside it. With neither, its menu is in the toolkit menu.
+  time beside it. With neither, its menu is in the toolkit menu. **Count up with no end**, off by
+  default, shows how long a session with no end has been on instead.
 - **Keep the display on** is the default. Turned off, only the Mac stays awake: the display sleeps,
   and downloads and long jobs go on.
 - **Stay awake with the lid closed**, on battery too, is off by default. macOS only allows that to an
@@ -622,9 +623,9 @@ number with its icon, a pill that fills, or a chart of the last minute, or they 
 
 - **Memory** shows what apps need: their memory, the kernel's, and what's compressed. Most monitors
   count everything that isn't free, but macOS fills spare memory with cached files it drops as soon
-  as an app needs room, so that figure always looks nearly full and says little. This one turns
-  yellow, then red, when macOS itself reports memory running short. Its panel shows where memory
-  goes, swap, and the apps using the most.
+  as an app needs room, so that figure always looks nearly full and says little. With **Color memory
+  when it runs short** on (off by default), it turns yellow, then red, when macOS itself reports
+  memory running short. Its panel shows where memory goes, swap, and the apps using the most.
 - **CPU** shows the share of all cores in use, and its panel each core, grouped by kind, and the
   apps using the most, their helpers counted in.
 - **Network** shows upload and download speed on the connection in use, **disk** the free space
@@ -671,6 +672,8 @@ To update later: `git pull && ./scripts/build.sh --install`.
 The window opens on **Welcome**, with a tile for each tool and a warning while a permission one of
 them needs is missing. **Settings**, under it, has the app's own settings. It opens there again after an update; otherwise on the page you left.
 
+- Every tool starts off. Click its tile, or its name in the sidebar, and turn it on with the switch
+  at the top of its page.
 - **Settings → Grant Access…** and enable *MacOS Toolkit* under System Settings → Privacy & Security →
   Accessibility. This is for the window switcher, Window Layout, the Finder cut and swipes, and the mouse wheel and button settings.
 - System Audio Recording is asked for later, the first time you turn an app down in the mixer, and
@@ -696,8 +699,8 @@ Awake and the Audio Mixer join it when their settings put them in the menu bar, 
 size and spacing and a hairline between them. While recording, Screen Capture's place shows a red
 stop button with the time and size. Each part opens its own menu or panel, and while one is open
 the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
-and other apps' icons can't end up between them. The toolkit menu opens each tool's settings, listed
-under a Tool Settings header. **Settings → Space between items** sets how far apart the parts sit.
+and other apps' icons can't end up between them. The toolkit menu opens the settings of each tool that's on,
+listed under a Tool Settings header; the others are turned on from Welcome. **Settings → Space between items** sets how far apart the parts sit.
 
 ## Good to know
 

@@ -89,6 +89,7 @@ struct StatsPanelView: View {
     }
 
     private var pressureColor: Color {
+        guard stats.config.memoryColors else { return .green }
         switch stats.memory?.pressure {
         case .warning: return .yellow
         case .critical: return .red

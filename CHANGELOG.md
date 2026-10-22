@@ -3,6 +3,21 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.14.0 (unreleased)
+
+### Added
+
+- **Keep Awake:** with no end set, the menu bar can show how long it's been on, counting up the
+  minutes. Off by default.
+
+### Changed
+
+- **Settings window:** on a new install every tool starts off, to be turned on from its page as
+  you want it. An update keeps your tools as they are.
+- **Toolkit menu:** Tool Settings lists only the tools that are on; Welcome has them all.
+- **System Stats:** memory turning yellow, then red, as it runs short is now a setting, off by
+  default: the figure keeps the menu bar's color.
+
 ## 0.13.0 (2026-10-22)
 
 ### Added

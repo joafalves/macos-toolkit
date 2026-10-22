@@ -32,7 +32,7 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
     var caption: String {
         switch self {
         case .cpu: return "How busy the processor is."
-        case .memory: return "What apps need, without the files macOS keeps cached. Yellow or red when memory runs short."
+        case .memory: return "What apps need, without the files macOS keeps cached."
         case .network: return "Upload and download speed."
         case .disk: return "Free space on the startup disk."
         case .gpu: return "How busy the graphics processor is."
@@ -96,6 +96,9 @@ struct StatsConfig: Codable, Equatable {
     var layout = StatsLayout.separate
     /// Seconds between readings.
     var interval: Double = 2
+    /// Memory in yellow, then red, as macOS reports it running short. Off by
+    /// default: some find a coloured figure alarming, even at 99% used.
+    var memoryColors = false
     /// By `StatKind.rawValue`.
     var stats: [String: StatSetting] = StatsConfig.defaultStats
 
@@ -126,6 +129,7 @@ struct StatsConfig: Codable, Equatable {
         // One of the offered rates; a file saying 0 would read without pause.
         let interval = try c.decodeIfPresent(Double.self, forKey: .interval) ?? 2
         self.interval = Self.intervals.contains(interval) ? interval : 2
+        memoryColors = try c.decodeIfPresent(Bool.self, forKey: .memoryColors) ?? false
         // Stats added later get their defaults; unknown looks fall back to a number.
         var stats = Self.defaultStats
         if let saved = try? c.decodeIfPresent([String: StatSetting].self, forKey: .stats) {

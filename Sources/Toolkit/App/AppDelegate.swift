@@ -143,9 +143,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             segments.append(MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture"))
         }
         if awake.config.enabled, awake.config.menuBarIcon != .none {
-            let left = awake.isOn ? awake.session?.until.map { AwakeController.left($0.timeIntervalSinceNow) } : nil
-            // As wide as the session's longest time, so it doesn't shift as it counts down.
-            let widest = awake.session.flatMap { session in session.until.map { AwakeController.left($0.timeIntervalSince(session.started)) } }
+            let time = awake.menuBarTime
+            let left = time?.text, widest = time?.widest
             let label = "Keep Awake, " + awake.status.prefix(1).lowercased() + awake.status.dropFirst()
             if awake.config.menuBarIcon == .pill, awake.isOn, let session = awake.session {
                 segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: session.fractionLeft(), time: left, widthOf: widest), label: label))
@@ -273,12 +272,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             menu.addItem(item)
             menu.addItem(.separator())
         }
-        // Under a header, so the tools' own names don't read like the tools themselves.
-        menu.addItem(.sectionHeader(title: "Tool Settings"))
-        for section in AppSection.tools {
-            menu.addItem(sectionItem(section, title: section.title))
+        // The tools that are on, under a header, so their names don't read
+        // like the tools themselves. The others are turned on from Welcome.
+        let on = AppSection.tools.filter(isOn)
+        if !on.isEmpty {
+            menu.addItem(.sectionHeader(title: "Tool Settings"))
+            for section in on { menu.addItem(sectionItem(section, title: section.title)) }
+            menu.addItem(.separator())
         }
-        menu.addItem(.separator())
         let welcome = sectionItem(.welcome, title: "Welcome")
         welcome.image = MenuBarArt.toolkit
         menu.addItem(welcome)
@@ -294,6 +295,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
     @objc private func stopRecording() {
         capture.stopRecording()
+    }
+
+    private func isOn(_ section: AppSection) -> Bool {
+        switch section {
+        case .mouse: return mouse.config.enabled
+        case .switcher: return switcher.config.enabled
+        case .layout: return layout.config.enabled
+        case .mixer: return mixer.config.enabled
+        case .finder: return finder.config.enabled
+        case .capture: return capture.config.enabled
+        case .awake: return awake.config.enabled
+        case .stats: return stats.config.enabled
+        case .welcome, .general: return true
+        }
     }
 
     private func sectionItem(_ section: AppSection, title: String) -> NSMenuItem {

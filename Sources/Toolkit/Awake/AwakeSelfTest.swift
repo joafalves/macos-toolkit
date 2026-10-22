@@ -47,6 +47,9 @@ extension AwakeController {
         awake.stop()
 
         check(left(84 * 60) == "1:24" && left(5 * 60 - 10) == "0:05" && left(1) == "0:01" && left(0) == "0:00", "time left: \(left(84 * 60)), \(left(5 * 60 - 10)), \(left(1))")
+        let elapsed = AwakeController.elapsed
+        check(elapsed(0) == "0:00" && elapsed(59) == "0:00" && elapsed(60) == "0:01" && elapsed(84 * 60 + 30) == "1:24",
+              "time on: \(elapsed(0)), \(elapsed(60)), \(elapsed(84 * 60 + 30))")
         let now = Date()
         let half = AwakeSession(started: now.addingTimeInterval(-600), until: now.addingTimeInterval(600))
         check(abs(half.fractionLeft(at: now) - 0.5) < 0.001 && AwakeSession(started: now, until: nil).fractionLeft() == 1, "fill: half way is half")

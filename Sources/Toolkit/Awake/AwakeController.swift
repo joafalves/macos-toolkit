@@ -17,7 +17,7 @@ final class AwakeController: ObservableObject {
     }
 
     @Published private(set) var session: AwakeSession?
-    /// Goes up as the minutes left change, for what the menu bar shows.
+    /// Goes up as the minutes left (or, with no end, on) change, for what the menu bar shows.
     @Published private(set) var minute = 0
     /// The rule for the lid-closed option is installed.
     @Published private(set) var lidReady = false
@@ -241,13 +241,20 @@ final class AwakeController: ObservableObject {
 
     // MARK: - Time left
 
-    /// At the next change of the minutes left, or the end.
+    /// At the next change of the minutes left, or the end. With no end, at
+    /// the next minute it's been on, if that's shown.
     private func scheduleTick() {
         tick?.invalidate()
         tick = nil
-        guard isOn, let until = session?.until else { return }
-        let left = until.timeIntervalSinceNow
-        let step = left.truncatingRemainder(dividingBy: 60)
+        guard isOn, let session else { return }
+        let step: TimeInterval
+        if let until = session.until {
+            step = until.timeIntervalSinceNow.truncatingRemainder(dividingBy: 60)
+        } else if config.showElapsed {
+            step = 60 - Date().timeIntervalSince(session.started).truncatingRemainder(dividingBy: 60)
+        } else {
+            return
+        }
         let timer = Timer(timeInterval: max(0.5, step), repeats: false) { [weak self] _ in
             guard let self else { return }
             self.minute += 1
@@ -264,10 +271,32 @@ final class AwakeController: ObservableObject {
         return String(format: "%d:%02d", minutes / 60, minutes % 60)
     }
 
+    /// Minutes it's been on, whole ones: 0:00 for the first.
+    static func elapsed(_ seconds: TimeInterval) -> String {
+        let minutes = Int(max(0, seconds) / 60)
+        return String(format: "%d:%02d", minutes / 60, minutes % 60)
+    }
+
+    /// What the menu bar shows beside the cup: the time left, or with no end
+    /// and that turned on, how long it's been on. Nil for nothing.
+    var menuBarTime: (text: String, widest: String)? {
+        guard isOn, let session else { return nil }
+        if let until = session.until {
+            // As wide as the session's longest time, so it doesn't shift as it counts down.
+            return (Self.left(until.timeIntervalSinceNow), Self.left(until.timeIntervalSince(session.started)))
+        }
+        guard config.showElapsed else { return nil }
+        // Up to 99 hours without shifting as it counts up.
+        return (Self.elapsed(Date().timeIntervalSince(session.started)), "88:88")
+    }
+
     /// For the menu and the settings page.
     var status: String {
         guard isOn, let session else { return "Off" }
-        guard let until = session.until else { return "On until you turn it off" }
+        guard let until = session.until else {
+            return config.showElapsed ? "On until you turn it off, on for \(Self.elapsed(Date().timeIntervalSince(session.started)))"
+                                      : "On until you turn it off"
+        }
         return "On until \(until.formatted(date: Calendar.current.isDateInToday(until) ? .omitted : .abbreviated, time: .shortened)), \(Self.left(until.timeIntervalSinceNow)) left"
     }
 

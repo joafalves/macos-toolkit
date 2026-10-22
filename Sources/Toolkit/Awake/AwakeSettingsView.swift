@@ -63,6 +63,12 @@ struct AwakeSettingsView: View {
                         .labelsHidden()
                         .fixedSize()
                     }
+                    if awake.config.menuBarIcon != .none {
+                        RowDivider()
+                        ToggleRow(title: "Count up with no end",
+                                  caption: "When it's on until you turn it off, the menu bar shows how long it's been on.",
+                                  isOn: $awake.config.showElapsed)
+                    }
                     RowDivider()
                     ShortcutRow(title: "Shortcut", caption: "Turns it on until you turn it off, or off.",
                                 shortcut: $awake.config.shortcut, defaultValue: .none)

@@ -343,9 +343,10 @@ final class StatsController: ObservableObject {
         return MenuBarArt.Line(text: kind.short + " " + value, tint: tint(kind), widthOf: kind.short + " " + widest)
     }
 
-    /// Memory turns yellow, then red, as macOS reports it running short.
+    /// Memory turns yellow, then red, as macOS reports it running short, if
+    /// that's turned on.
     func tint(_ kind: StatKind) -> NSColor? {
-        guard kind == .memory, let pressure = memory?.pressure else { return nil }
+        guard kind == .memory, config.memoryColors, let pressure = memory?.pressure else { return nil }
         switch pressure {
         case .normal: return nil
         case .warning: return .systemYellow

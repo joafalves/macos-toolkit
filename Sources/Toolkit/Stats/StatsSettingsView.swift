@@ -26,6 +26,10 @@ struct StatsSettingsView: View {
                         .labelsHidden()
                         .fixedSize()
                     }
+                    RowDivider()
+                    ToggleRow(title: "Color memory when it runs short",
+                              caption: "Yellow, then red, as macOS reports memory running short. Off, it keeps the menu bar's color.",
+                              isOn: $stats.config.memoryColors)
                 }
 
                 Card(title: "Stats", footnote: "Only the stats in the menu bar are read, and nothing at all while none are.") {

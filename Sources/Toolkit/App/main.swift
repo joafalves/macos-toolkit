@@ -208,6 +208,23 @@ let measureIdlePath: String? = CommandLine.arguments.firstIndex(of: "--measure-i
     CommandLine.arguments.count > $0 + 1 ? CommandLine.arguments[$0 + 1] : nil
 }
 
+// A fresh install starts with every tool off, to be turned on as wanted.
+// Saved straight away, so it holds later; a Mac that has run the toolkit
+// before has a settings file for at least one tool and is left as it is
+// (its tools without a file stay on, as they were).
+let toolFiles = [MouseConfig.fileURL, SwitcherConfig.fileURL, LayoutConfig.fileURL, MixerConfig.fileURL,
+                 FinderConfig.fileURL, CaptureConfig.fileURL, AwakeConfig.fileURL, StatsConfig.fileURL, GeneralConfig.fileURL]
+if !toolFiles.contains(where: { FileManager.default.fileExists(atPath: $0.path) }) {
+    var mouse = MouseConfig(); mouse.enabled = false; mouse.save()
+    var switcher = SwitcherConfig(); switcher.enabled = false; switcher.save()
+    var layout = LayoutConfig(); layout.enabled = false; layout.save()
+    var mixer = MixerConfig(); mixer.enabled = false; mixer.save()
+    var finder = FinderConfig(); finder.enabled = false; finder.save()
+    var capture = CaptureConfig(); capture.enabled = false; capture.save()
+    var awake = AwakeConfig(); awake.enabled = false; awake.save()
+    var stats = StatsConfig(); stats.enabled = false; stats.save()
+}
+
 // Two instances would fight over the same device properties.
 let bundleID = Bundle.main.bundleIdentifier ?? "dev.jalves.macos-toolkit"
 let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
