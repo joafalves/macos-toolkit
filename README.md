@@ -671,7 +671,8 @@ To update later: `git pull && ./scripts/build.sh --install`.
 
 The window opens on **Overview**, with a tile for each tool and a warning while a permission one of
 them needs is missing. It opens there again after an update; otherwise on the page you left.
-**Settings**, under it, has the app's own settings.
+**Settings**, under it, has the app's own settings, and **About** the version, who made it, and links
+to the project on GitHub.
 
 - Every tool starts off. Click its tile, or its name in the sidebar, and turn it on with the switch
   at the top of its page.

@@ -2,15 +2,15 @@ import AppKit
 import SwiftUI
 import ServiceManagement
 
-/// The pages of the main window: Overview, Settings (the app's own), and the tools.
+/// The pages of the main window: Overview, Settings (the app's own), About, and the tools.
 enum AppSection: String, CaseIterable, Identifiable {
-    case welcome, mouse, switcher, layout, mixer, finder, capture, awake, stats, general
+    case welcome, mouse, switcher, layout, mixer, finder, capture, awake, stats, general, about
 
     var id: String { rawValue }
 
     /// The tools by name, as the sidebar and the toolkit menu list them.
     static var tools: [AppSection] {
-        allCases.filter { $0 != .welcome && $0 != .general }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        allCases.filter { ![.welcome, .general, .about].contains($0) }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     var title: String {
@@ -26,6 +26,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .stats: return "System Stats"
         // Stored as "general", as it was called before.
         case .general: return "Settings"
+        case .about: return "About"
         }
     }
 
@@ -42,6 +43,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .awake: return .brown
         case .stats: return .green
         case .general: return .gray
+        case .about: return .gray
         }
     }
 
@@ -57,6 +59,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .awake: return "cup.and.saucer.fill"
         case .stats: return "gauge.with.dots.needle.50percent"
         case .general: return "gearshape"
+        case .about: return "info.circle"
         }
     }
 
@@ -72,7 +75,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .capture: return "Screenshots and small screen recordings."
         case .awake: return "Keeps the Mac awake for as long as you need."
         case .stats: return "CPU, memory and more in the menu bar."
-        case .general: return ""
+        case .general, .about: return ""
         }
     }
 }

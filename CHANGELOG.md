@@ -7,6 +7,8 @@ worked on; it gets its date when it's released.
 
 ### Added
 
+- **Settings window:** an About page, with the version, who made it, the license, and links to the
+  contributors, the source, what's new and where to report a problem. Also in the toolkit menu.
 - **License:** the toolkit is open source, under the Apache License 2.0.
 - **Keep Awake:** 50 and 55 minutes among the times to turn it on for.
 

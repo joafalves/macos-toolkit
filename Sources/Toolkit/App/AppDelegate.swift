@@ -298,8 +298,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         welcome.image = MenuBarArt.toolkit
         menu.addItem(welcome)
         menu.addItem(sectionItem(.general, title: "Settings…"))
+        menu.addItem(sectionItem(.about, title: "About"))
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit MacOS Toolkit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
 
     /// After the menu has closed, so the toolbar gets the keyboard.
@@ -321,7 +322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         case .capture: return capture.config.enabled
         case .awake: return awake.config.enabled
         case .stats: return stats.config.enabled
-        case .welcome, .general: return true
+        case .welcome, .general, .about: return true
         }
     }
 
@@ -448,11 +449,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         show(.general)
     }
 
+    @objc private func openAbout() {
+        show(.about)
+    }
+
     /// Menu bar shown while the main window is open.
     private func makeMainMenu() -> NSMenu {
         let main = NSMenu()
 
         let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "About MacOS Toolkit", action: #selector(openAbout), keyEquivalent: "").target = self
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide MacOS Toolkit", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")

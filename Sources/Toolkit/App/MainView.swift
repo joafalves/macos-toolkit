@@ -46,7 +46,7 @@ struct MainView: View {
         case .capture: return capture.config.enabled
         case .awake: return awake.config.enabled
         case .stats: return stats.config.enabled
-        case .welcome, .general: return true
+        case .welcome, .general, .about: return true
         }
     }
 
@@ -58,6 +58,7 @@ struct MainView: View {
                 // Overview and the app's own settings, then the tools.
                 SidebarRow(section: .welcome).tag(AppSection.welcome)
                 SidebarRow(section: .general).tag(AppSection.general)
+                SidebarRow(section: .about).tag(AppSection.about)
                 Section("Tools") {
                     ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0)).tag($0) }
                 }
@@ -79,6 +80,7 @@ struct MainView: View {
                 case .capture: CaptureSettingsView(capture: capture)
                 case .awake: AwakeSettingsView(awake: awake, mouse: mouse)
                 case .stats: StatsSettingsView(stats: stats)
+                case .about: AboutView()
                 case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)
                 }
             }
