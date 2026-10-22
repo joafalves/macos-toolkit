@@ -140,8 +140,10 @@ struct CaptureConfig: Codable, Equatable {
         windowStyle = (try? c.decodeIfPresent(WindowStyle.self, forKey: .windowStyle)) ?? .plain
         backdrop = (try? c.decodeIfPresent(Backdrop.self, forKey: .backdrop)) ?? .wallpaper
         backdropColor = try c.decodeIfPresent(String.self, forKey: .backdropColor) ?? "#5B7FD6"
-        padding = try c.decodeIfPresent(Double.self, forKey: .padding) ?? 48
-        shadow = try c.decodeIfPresent(Double.self, forKey: .shadow) ?? 0.6
+        // Within what the settings offer: a file edited by hand can say
+        // anything, and these become pixel sizes and a time scale.
+        padding = min(max(try c.decodeIfPresent(Double.self, forKey: .padding) ?? 48, 0), 120)
+        shadow = min(max(try c.decodeIfPresent(Double.self, forKey: .shadow) ?? 0.6, 0), 1)
         format = (try? c.decodeIfPresent(ImageFormat.self, forKey: .format)) ?? .png
         saveWhenCopying = try c.decodeIfPresent(Bool.self, forKey: .saveWhenCopying) ?? false
         shutterSound = try c.decodeIfPresent(Bool.self, forKey: .shutterSound) ?? true
@@ -149,7 +151,8 @@ struct CaptureConfig: Codable, Equatable {
         // Before quality, there was only a native resolution switch.
         let native = try legacy.decodeIfPresent(Bool.self, forKey: .nativeResolution) ?? false
         quality = (try? c.decodeIfPresent(RecordingQuality.self, forKey: .quality)) ?? (native ? .high : .standard)
-        frameRate = try c.decodeIfPresent(Int.self, forKey: .frameRate) ?? 30
+        let rate = try c.decodeIfPresent(Int.self, forKey: .frameRate) ?? 30
+        frameRate = [15, 30, 60].contains(rate) ? rate : 30
         showCursor = try c.decodeIfPresent(Bool.self, forKey: .showCursor) ?? true
         showClicks = try c.decodeIfPresent(Bool.self, forKey: .showClicks) ?? false
         systemAudio = try c.decodeIfPresent(Bool.self, forKey: .systemAudio) ?? false

@@ -76,19 +76,25 @@ struct Profile: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Mouse"
         cursorSpeedMode = try c.decodeIfPresent(ValueMode.self, forKey: .cursorSpeedMode) ?? .macOS
-        cursorSpeed = try c.decodeIfPresent(Double.self, forKey: .cursorSpeed) ?? 1.0
+        // Kept to what the sliders offer: a value from a file edited by hand
+        // or another version reaches the mouse's own settings.
+        func within(_ value: Double?, _ range: ClosedRange<Double>, _ fallback: Double) -> Double {
+            guard let value, value.isFinite else { return fallback }
+            return min(max(value, range.lowerBound), range.upperBound)
+        }
+        cursorSpeed = within(try c.decodeIfPresent(Double.self, forKey: .cursorSpeed), 0.2...3, 1.0)
         accelMode = try c.decodeIfPresent(AccelMode.self, forKey: .accelMode) ?? .macOS
-        accel = try c.decodeIfPresent(Double.self, forKey: .accel) ?? 0.6875
+        accel = within(try c.decodeIfPresent(Double.self, forKey: .accel), 0...3, 0.6875)
         verticalInverted = try c.decodeIfPresent(Bool.self, forKey: .verticalInverted) ?? false
         horizontalInverted = try c.decodeIfPresent(Bool.self, forKey: .horizontalInverted) ?? false
         scrollSpeedMode = try c.decodeIfPresent(ValueMode.self, forKey: .scrollSpeedMode) ?? .macOS
-        scrollSpeed = try c.decodeIfPresent(Double.self, forKey: .scrollSpeed) ?? 1.0
+        scrollSpeed = within(try c.decodeIfPresent(Double.self, forKey: .scrollSpeed), 0.25...5, 1.0)
         scrollAccelMode = try c.decodeIfPresent(AccelMode.self, forKey: .scrollAccelMode) ?? .macOS
-        scrollAccel = try c.decodeIfPresent(Double.self, forKey: .scrollAccel) ?? 0.3125
+        scrollAccel = within(try c.decodeIfPresent(Double.self, forKey: .scrollAccel), 0...1.7, 0.3125)
         smoothScrolling = try c.decodeIfPresent(Bool.self, forKey: .smoothScrolling) ?? false
         navigationButtons = try c.decodeIfPresent(Bool.self, forKey: .navigationButtons) ?? false
         autoscroll = try c.decodeIfPresent(Bool.self, forKey: .autoscroll) ?? false
-        autoscrollSpeed = try c.decodeIfPresent(Double.self, forKey: .autoscrollSpeed) ?? 1.0
+        autoscrollSpeed = within(try c.decodeIfPresent(Double.self, forKey: .autoscrollSpeed), 0.25...3, 1.0)
     }
 
     /// True when any setting needs the event tap (and so Accessibility).

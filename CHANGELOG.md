@@ -32,6 +32,8 @@ worked on; it gets its date when it's released.
   for the file to be finished, so a stuck finish can't hold up logging out.
 - **System Stats:** a disk plugged in or ejected no longer shows as one absurd disk speed that
   flattened the chart for five minutes. Network speeds and the top apps are guarded the same way.
+- **Settings window:** a settings file with numbers out of range, edited by hand or imported, is kept
+  to what the settings offer instead of crashing the toolkit at launch.
 - **Settings window:** starting to record a second shortcut stops the first, so tools don't react to
   keys meant for a recorder.
 - **Window Switcher:** windows an app keeps out of sight (hidden, see-through, or a few points

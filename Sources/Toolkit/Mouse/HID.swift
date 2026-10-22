@@ -54,8 +54,10 @@ enum HID {
     /// A negative acceleration tells macOS to skip the curve (1:1 movement).
     static let accelerationOff: Int32 = -1 << 16
 
+    /// Clamped: `Int32(_:)` traps on a value too big for it, or on NaN.
     static func toFixed(_ value: Double) -> Int32 {
-        Int32((value * 65536).rounded())
+        let fixed = (value * 65536).rounded()
+        return fixed.isFinite ? Int32(clamping: Int64(max(-1e15, min(1e15, fixed)))) : 0
     }
 
     // The client must outlive the services copied from it.

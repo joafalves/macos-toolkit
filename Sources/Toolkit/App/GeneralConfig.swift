@@ -12,7 +12,9 @@ struct GeneralConfig: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        menuBarSpacing = try c.decodeIfPresent(Double.self, forKey: .menuBarSpacing) ?? 12
+        // Within the slider's range: a file edited by hand can say anything.
+        let spacing = try c.decodeIfPresent(Double.self, forKey: .menuBarSpacing) ?? 12
+        menuBarSpacing = min(max(spacing, Self.menuBarSpacings.lowerBound), Self.menuBarSpacings.upperBound)
     }
 
     static var fileURL: URL {
