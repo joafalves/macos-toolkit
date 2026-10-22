@@ -1,17 +1,23 @@
 import SwiftUI
 
-/// A sidebar row as System Settings has them: a small coloured tile, then the name.
+/// A sidebar row as System Settings has them: a small coloured tile, then the
+/// name. A tool that's off is greyed, as on Welcome.
 private struct SidebarRow: View {
     let section: AppSection
+    var on = true
 
     var body: some View {
         Label {
             Text(section.title)
+                .foregroundStyle(on ? .primary : .secondary)
         } icon: {
             if section == .welcome {
                 KitIcon(size: 22)
             } else {
-                IconTile(symbol: section.symbol, color: section.color, size: 22)
+                // Grey rather than `.saturation(0)`, a filter that `--snapshot`
+                // images leave out.
+                IconTile(symbol: section.symbol, color: on ? section.color : .gray, size: 22)
+                    .opacity(on ? 1 : 0.6)
             }
         }
         .padding(.vertical, 2)
@@ -29,7 +35,7 @@ struct MainView: View {
     @ObservedObject var awake: AwakeController
     @ObservedObject var stats: StatsController
 
-    /// Whether a tool is on, for its tile on Welcome.
+    /// Whether a tool is on, for its tile on Welcome and its sidebar row.
     private func enabled(_ section: AppSection) -> Bool {
         switch section {
         case .mouse: return mouse.config.enabled
@@ -53,7 +59,7 @@ struct MainView: View {
                 SidebarRow(section: .welcome).tag(AppSection.welcome)
                 SidebarRow(section: .general).tag(AppSection.general)
                 Section("Tools") {
-                    ForEach(AppSection.tools) { SidebarRow(section: $0).tag($0) }
+                    ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0)).tag($0) }
                 }
             }
             .listStyle(.sidebar)

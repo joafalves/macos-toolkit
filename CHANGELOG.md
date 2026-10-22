@@ -3,6 +3,13 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.15.0 (unreleased)
+
+### Changed
+
+- **Settings window:** a tool that's off is greyed in the sidebar, its tile without colour and its
+  name dimmed, as on Welcome.
+
 ## 0.14.0 (2026-10-22)
 
 ### Added
