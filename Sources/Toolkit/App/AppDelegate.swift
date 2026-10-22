@@ -13,7 +13,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private var awake: AwakeController!
     private var stats: StatsController!
     private var statsPanel: MenuBarPopover!
+    /// The mixer while it's open; nil from the moment it starts closing, so
+    /// a click during its fade opens a new one rather than closing it again.
     private var mixerPopover: NSPopover?
+    /// One fading out, until it has closed.
+    private var closingMixer: NSPopover?
     private var popoverMonitors: [Any] = []
     private var resignObserver: NSObjectProtocol?
     /// The toolkit's one menu bar item, with a segment for each tool that has
@@ -220,7 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             awake.menuItems { [weak self] in self?.show(.awake) }.forEach(menu.addItem)
             popUp(menu, from: .awake, at: rect)
         case .mixer:
-            if mixerPopover?.isShown == true {
+            if mixerPopover != nil {
                 mixerPopover?.performClose(nil)
             } else {
                 showMixer(from: .mixer)
@@ -344,6 +348,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             guard let button = menuBar.button, let rect = menuBar.rect(of: kind) else { return }
             // Before the panel, which takes a moment to build.
             menuBar.setPressed(kind)
+            // One still closing (a quick second click) isn't reused: it's on its
+            // way out, and a new one opens beside it.
             let popover = mixerPopover ?? makeMixerPopover()
             mixerPopover = popover
             mixer.refreshPermission()
@@ -362,7 +368,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private func watchForDismissal() {
         guard popoverMonitors.isEmpty else { return }
         let close: () -> Void = { [weak self] in self?.mixerPopover?.performClose(nil) }
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { _ in close() }) {
+        // Not a click on the menu bar item, which toggles the mixer itself:
+        // closing here too made that click close it and open it again.
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { [weak self] _ in
+            if self?.menuBar.contains(screenPoint: NSEvent.mouseLocation) != true { close() }
+        }) {
             popoverMonitors.append(monitor)
         }
         // Esc while another app has the keyboard, which is the usual case now
@@ -392,16 +402,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                                                                 object: nil, queue: .main) { _ in close() }
     }
 
-    /// As it starts closing, not once its fade is over.
+    /// As it starts closing, not once its fade is over, it's no longer the
+    /// open one: the next click opens.
     func popoverWillClose(_ notification: Notification) {
+        guard let popover = notification.object as? NSPopover, popover === mixerPopover else { return }
+        closingMixer = popover
+        mixerPopover = nil
         menuBar.setPressed(nil)
     }
 
+    /// Done closing. If a new one opened meanwhile, it keeps the listening
+    /// and the watching for clicks elsewhere.
     func popoverDidClose(_ notification: Notification) {
-        mixer.panelOpen = false
-        // Dropped rather than kept for next time: a closed popover keeps its
+        guard notification.object as? NSPopover === closingMixer else { return }
+        // Let go of rather than kept for next time: a closed popover keeps its
         // SwiftUI view alive, and the playing bars went on animating unseen.
-        mixerPopover = nil
+        closingMixer = nil
+        guard mixerPopover == nil else { return }
+        mixer.panelOpen = false
         popoverMonitors.forEach(NSEvent.removeMonitor)
         popoverMonitors.removeAll()
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
@@ -410,7 +428,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
     private func makeMixerPopover() -> NSPopover {
         let popover = NSPopover()
-        popover.behavior = .transient
+        // Closed by us (clicks elsewhere, Esc, switching apps), not by AppKit:
+        // its transient closing took the click on the menu bar item too, which
+        // then toggled it open again, and a quick click to reopen was lost.
+        popover.behavior = .applicationDefined
         popover.delegate = self
         let host = NSHostingController(rootView: MixerPopoverView(mixer: mixer) { [weak self] in
             self?.mixerPopover?.performClose(nil)

@@ -62,6 +62,13 @@ final class MenuBarItem: NSObject {
 
     var button: NSStatusBarButton? { item.button }
 
+    /// Whether a point on screen (AppKit coordinates) is on the item. A click
+    /// there also reaches global monitors, as macOS draws the item outside
+    /// the app; panels that close on clicks elsewhere leave it to the item.
+    func contains(screenPoint point: NSPoint) -> Bool {
+        button?.window?.frame.contains(point) ?? false
+    }
+
     /// Out of the menu bar, for tests.
     func remove() {
         NSStatusBar.system.removeStatusItem(item)

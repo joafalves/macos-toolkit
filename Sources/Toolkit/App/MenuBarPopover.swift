@@ -18,7 +18,9 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
         self.menuBar = menuBar
     }
 
-    var isShown: Bool { popover?.isShown == true }
+    /// Open, and not on its way out: from the moment it starts closing, a
+    /// click on its part opens it again rather than closing it once more.
+    var isShown: Bool { popover != nil && shownFor != nil }
     var kind: MenuBarSegment.Kind? { isShown ? shownFor : nil }
 
     /// On the next pass of the run loop, once any menu has closed.
@@ -35,7 +37,9 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
             forget()
             menuBar.setPressed(kind)
             let popover = NSPopover()
-            popover.behavior = .transient
+            // Closed by us, not by AppKit, whose transient closing also took
+            // the click on the item's part and so opened it again.
+            popover.behavior = .applicationDefined
             popover.delegate = self
             host.sizingOptions = .preferredContentSize
             popover.contentViewController = host
@@ -53,7 +57,10 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
     private func watch() {
         guard monitors.isEmpty else { return }
         let close: () -> Void = { [weak self] in self?.close() }
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { _ in close() }) {
+        // Not a click on the menu bar item, which decides for itself what to do.
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { [weak self] _ in
+            if self?.menuBar.contains(screenPoint: NSEvent.mouseLocation) != true { close() }
+        }) {
             monitors.append(monitor)
         }
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown], handler: { event in
@@ -84,6 +91,7 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
     /// on another part) mustn't put out or forget the new one.
     func popoverWillClose(_ notification: Notification) {
         guard notification.object as? NSPopover === popover else { return }
+        shownFor = nil
         menuBar.setPressed(nil)
     }
 
