@@ -101,10 +101,16 @@ final class MixerController: ObservableObject {
     private lazy var volumeKeys = VolumeKeys(mixer: self)
     /// Taps macOS refused, so they're not retried on every slider move.
     private var failed: Set<String> = []
+    /// When to try the refused taps again. Never retried, a tap refused once
+    /// left a muted app playing until its output changed. Soon at first, at
+    /// the permission check's next round, then each miss waits twice as
+    /// long, up to five minutes: making a tap can hold up the main thread.
+    private var retryAt: Date?
+    private var retryDelay: TimeInterval = 2
 
     private var systemListeners: [AudioListener] = []
     private var deviceListeners: [AudioListener] = []
-    private var processListeners: [AudioObjectID: AudioListener] = [:]
+    private var processListeners: [AudioObjectID: [AudioListener]] = [:]
     private var observers: [NSObjectProtocol] = []
     private var permissionTimer: Timer?
     private var pendingRefresh = false
@@ -135,7 +141,10 @@ final class MixerController: ObservableObject {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.scheduleRefresh() })
         }
         // The permission can be granted in System Settings at any time.
-        let timer = Timer(timeInterval: 3, repeats: true) { [weak self] _ in self?.refreshPermission() }
+        let timer = Timer(timeInterval: 3, repeats: true) { [weak self] _ in
+            self?.refreshPermission()
+            self?.retryFailed()
+        }
         RunLoop.main.add(timer, forMode: .common)
         permissionTimer = timer
         let levels = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in self?.updateLevels() }
@@ -444,11 +453,15 @@ final class MixerController: ObservableObject {
         groups = AudioProcesses.groups()
 
         // Starting and stopping playback doesn't change the process list, so
-        // each process is watched too.
+        // each process is watched too. macOS 27 never announces a change of
+        // running output, only of running at all, so both: a playing app went
+        // unnoticed until some other change came along, often for many seconds.
         let objects = Set(groups.values.flatMap(\.objects))
         processListeners = processListeners.filter { objects.contains($0.key) }
         for object in objects where processListeners[object] == nil {
-            processListeners[object] = AudioListener(object, kAudioProcessPropertyIsRunningOutput) { [weak self] in self?.scheduleRefresh() }
+            processListeners[object] = [kAudioProcessPropertyIsRunningOutput, kAudioProcessPropertyIsRunning].map {
+                AudioListener(object, $0) { [weak self] in self?.scheduleRefresh() }
+            }
         }
         applyTaps()
         updateList()
@@ -539,6 +552,21 @@ final class MixerController: ObservableObject {
         }
     }
 
+    private func scheduleRetry() {
+        guard retryAt == nil else { return }
+        retryAt = Date().addingTimeInterval(retryDelay)
+        retryDelay = min(retryDelay * 2, 300)
+    }
+
+    private func retryFailed() {
+        guard running, let retryAt, retryAt <= Date() else { return }
+        self.retryAt = nil
+        failed.removeAll()
+        applyTaps()
+        // Every tap made this time: the next miss starts the waits over.
+        if failed.isEmpty { retryDelay = 2 }
+    }
+
     private func rebuildTaps() {
         taps.removeAll()
         masterTap = nil
@@ -595,6 +623,7 @@ final class MixerController: ObservableObject {
             } else {
                 taps[pid] = nil
                 failed.insert(signature)
+                scheduleRetry()
             }
         }
         // Before the taps that are no longer wanted go: an app they hand back
@@ -643,6 +672,7 @@ final class MixerController: ObservableObject {
         } else {
             masterTap = nil
             failed.insert(signature)
+            scheduleRetry()
         }
     }
 

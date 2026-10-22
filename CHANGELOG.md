@@ -12,6 +12,10 @@ worked on; it gets its date when it's released.
 
 ### Fixed
 
+- **Audio Mixer:** an app that starts or stops playing shows as such right away. macOS doesn't
+  announce it the way the mixer listened for, so it could take many seconds to catch up.
+- **Audio Mixer:** if macOS refuses the tap for an app you muted or turned down, it's tried again a
+  few seconds later, rather than leaving that app at full volume until its sound output changes.
 - **Window Layout:** quitting with one of the toolkit's own windows in a stack no longer crashes,
   which also skipped putting other things back as the app quit.
 
