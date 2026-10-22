@@ -30,6 +30,8 @@ worked on; it gets its date when it's released.
   flattened the chart for five minutes. Network speeds and the top apps are guarded the same way.
 - **Settings window:** starting to record a second shortcut stops the first, so tools don't react to
   keys meant for a recorder.
+- **Window Switcher:** windows an app keeps out of sight (hidden, see-through, or a few points
+  across) are no longer listed as rows that switch to nothing. Window Layout's suggestions too.
 - **Window Layout:** quitting with one of the toolkit's own windows in a stack no longer crashes,
   which also skipped putting other things back as the app quit.
 

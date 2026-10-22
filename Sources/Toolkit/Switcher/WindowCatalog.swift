@@ -347,6 +347,8 @@ final class WindowCatalog {
             guard let app = watches[entry.pid]?.app, listed(app), !app.isHidden else { return false }
             return onSpaces.isEmpty || onSpaces.contains(entry.id)
         }
+        let unseen = Self.invisible(windows.filter { !$0.minimized }.map(\.id))
+        windows.removeAll { unseen.contains($0.id) }
         // Until a window has been seen in use, its place in the stack is the best guess.
         let stack = windows.contains { $0.lastUsed == 0 } ? Self.stackingOrder() : [:]
         windows.sort { a, b in
@@ -417,6 +419,44 @@ final class WindowCatalog {
         // 7: also windows that are minimized or belong to all Spaces.
         let ids = CGSCopyWindowsWithOptionsAndTags(connection, 0, spaces as CFArray, 7, &setTags, &clearTags)
         return Set(ids as? [CGWindowID] ?? [])
+    }
+
+    /// Windows an app reports that nobody can see: fully transparent, a few
+    /// points across, or hidden without being minimized. Some apps (Electron
+    /// and Java ones among them) keep such windows for themselves, and listed
+    /// they're rows that switch to nothing. Pass only windows that aren't minimized.
+    private static func invisible(_ ids: [CGWindowID]) -> Set<CGWindowID> {
+        guard !ids.isEmpty else { return [] }
+        let pointers = ids.map { UnsafeRawPointer(bitPattern: UInt($0)) }
+        let array = pointers.withUnsafeBufferPointer { CFArrayCreate(nil, UnsafeMutablePointer(mutating: $0.baseAddress), $0.count, nil) }
+        let descriptions = CGWindowListCreateDescriptionFromArray(array) as? [[String: Any]] ?? []
+
+        // Hidden: on a Space shown now, yet not drawn. A window on another
+        // Space isn't on a current one, so it stays. Stage Manager keeps the
+        // windows of other stages out of sight in its own way, so not there.
+        var hiddenOnCurrent: Set<CGWindowID> = []
+        if !(UserDefaults(suiteName: "com.apple.WindowManager")?.bool(forKey: "GloballyEnabled") ?? false) {
+            let connection = CGSMainConnectionID()
+            let displays = CGSCopyManagedDisplaySpaces(connection) as? [[String: Any]] ?? []
+            let current = displays.compactMap { ($0["Current Space"] as? [String: Any])?["id64"] as? Int }
+            if !current.isEmpty {
+                var setTags = 0, clearTags = 0
+                // 1: minimized and hidden windows too; 0: only those drawn.
+                let all = CGSCopyWindowsWithOptionsAndTags(connection, 0, current as CFArray, 1, &setTags, &clearTags) as? [CGWindowID] ?? []
+                let drawn = CGSCopyWindowsWithOptionsAndTags(connection, 0, current as CFArray, 0, &setTags, &clearTags) as? [CGWindowID] ?? []
+                if !drawn.isEmpty { hiddenOnCurrent = Set(all).subtracting(drawn) }
+            }
+        }
+
+        var unseen: Set<CGWindowID> = []
+        for description in descriptions {
+            guard let id = description[kCGWindowNumber as String] as? CGWindowID else { continue }
+            let alpha = description[kCGWindowAlpha as String] as? Double ?? 1
+            let bounds = description[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+            let tiny = (bounds["Width"] ?? 100) < 24 || (bounds["Height"] ?? 100) < 24
+            if alpha == 0 || tiny || hiddenOnCurrent.contains(id) { unseen.insert(id) }
+        }
+        return unseen
     }
 
     /// Front-to-back position of the windows on screen.
