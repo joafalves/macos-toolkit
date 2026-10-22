@@ -77,6 +77,8 @@ final class SnapAssist {
     func next() {
         let onScreen = Self.onScreen()
         let all = WindowCatalog.shared.snapshot().items
+        // Pictures of windows that have closed would otherwise stay for good.
+        previews.keep(only: Set(all.compactMap(\.window)))
         while !pending.isEmpty {
             let slot = pending.removeFirst()
             if taken(slot.frame) || Self.filled(slot.frame, by: onScreen, except: used) { continue }

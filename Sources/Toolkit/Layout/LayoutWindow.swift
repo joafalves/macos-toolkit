@@ -24,13 +24,21 @@ enum LayoutWindow {
         }
     }
 
+    /// Our own windows are AppKit's, so on the main thread. Run in place when
+    /// already there: a `sync` to the work queue from the main thread (tabs
+    /// put back on quit) runs its block on the main thread, and `main.sync`
+    /// from there crashes.
+    private static func onMain<T>(_ body: () -> T) -> T {
+        Thread.isMainThread ? body() : DispatchQueue.main.sync(execute: body)
+    }
+
     // MARK: - Finding windows
 
     /// The window with the keyboard in the frontmost app, if it's one that
     /// can be placed: a standard window, not minimized or in full screen.
     static func focused(pid: pid_t) -> LayoutWindow? {
         if pid == ProcessInfo.processInfo.processIdentifier {
-            return DispatchQueue.main.sync {
+            return Self.onMain {
                 let window = [NSApp.keyWindow, NSApp.mainWindow].compactMap { $0 }.first(where: ownCandidate)
                     ?? NSApp.windows.first(where: ownCandidate)
                 return window.flatMap { w in w.windowID.map { .own(w, id: $0) } }
@@ -44,7 +52,7 @@ enum LayoutWindow {
     /// The window with this window server ID, from the app that owns it.
     static func find(id: CGWindowID, pid: pid_t) -> LayoutWindow? {
         if pid == ProcessInfo.processInfo.processIdentifier {
-            return DispatchQueue.main.sync {
+            return Self.onMain {
                 NSApp.windows.first { $0.windowID == id && ownCandidate($0) }.map { .own($0, id: id) }
             }
         }
@@ -82,7 +90,7 @@ enum LayoutWindow {
             let name: String = Self.attribute(app, kAXTitleAttribute) ?? ""
             return [name, title].filter { !$0.isEmpty }.joined(separator: " — ")
         case .own(let window, _):
-            return DispatchQueue.main.sync { window.title }
+            return Self.onMain { window.title }
         }
     }
 
@@ -96,7 +104,7 @@ enum LayoutWindow {
             else { return nil }
             return CGRect(origin: position, size: size)
         case .own(let window, _):
-            return DispatchQueue.main.sync { Coordinates.toCG(window.frame) }
+            return Self.onMain { Coordinates.toCG(window.frame) }
         }
     }
 
@@ -174,7 +182,7 @@ enum LayoutWindow {
             set(position: Self.centred(actual.size, on: target, within: area), of: window)
             return frame ?? actual
         case .own(let window, _):
-            return DispatchQueue.main.sync {
+            return Self.onMain {
                 let min = window.minSize
                 var size = target.size
                 size.width = max(size.width, min.width)
@@ -215,7 +223,7 @@ enum LayoutWindow {
             set(size: size, of: window)
             set(position: origin, of: window)
         case .own(let window, _):
-            DispatchQueue.main.sync {
+            Self.onMain {
                 window.setFrame(Coordinates.toAppKit(CGRect(origin: origin, size: size)), display: true)
             }
         }
@@ -226,7 +234,7 @@ enum LayoutWindow {
         case .other(let window, _, _, _):
             set(position: origin, of: window)
         case .own(let window, _):
-            DispatchQueue.main.sync {
+            Self.onMain {
                 window.setFrameOrigin(Coordinates.toAppKit(CGRect(origin: origin, size: window.frame.size)).origin)
             }
         }

@@ -10,6 +10,11 @@ worked on; it gets its date when it's released.
 - **Settings window:** a tool that's off is greyed in the sidebar, its tile without colour and its
   name dimmed, as on Welcome.
 
+### Fixed
+
+- **Window Layout:** quitting with one of the toolkit's own windows in a stack no longer crashes,
+  which also skipped putting other things back as the app quit.
+
 ## 0.14.0 (2026-10-22)
 
 ### Added

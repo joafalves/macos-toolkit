@@ -240,8 +240,11 @@ struct CellRange: Equatable {
     }
 
     /// The cell a point falls in, for a point given as a fraction of the display.
+    /// Kept to 0...1 first: a display with no size gives no fraction (NaN),
+    /// and NaN or a huge value would crash `Int(_:)`. NaN counts as the first cell.
     static func cell(at unit: CGPoint, in grid: GridSize) -> Cell {
-        Cell(column: Int(unit.x * CGFloat(grid.columns)), row: Int(unit.y * CGFloat(grid.rows))).clamped(to: grid)
+        let x = unit.x.isFinite ? min(max(unit.x, 0), 1) : 0, y = unit.y.isFinite ? min(max(unit.y, 0), 1) : 0
+        return Cell(column: Int(x * CGFloat(grid.columns)), row: Int(y * CGFloat(grid.rows))).clamped(to: grid)
     }
 }
 
