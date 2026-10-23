@@ -27,11 +27,10 @@ worked on; it gets its date when it's released.
 - **Keep Awake:** its menu in the menu bar is now a panel like the mixer's: the session with its
   switch and a bar of the time left, the lengths as buttons with the one running lit, an end time
   set with − and +, and Keep the display on and Stay available as switches.
-
 - **Menu bar:** the toolkit's mark opens a panel instead of a menu. Every tool is listed with a
   switch to turn it on or off, which leaves the panel open, and its name opens its settings. Screen
   Capture, the Audio Mixer and Keep Awake, when they have no part of their own in the menu bar, are
-  tiles at the top: Keep Awake's turns it on or off in one click, with its menu a click away.
+  tiles at the top: Keep Awake's turns it on or off in one click, with its panel a click away.
 - **Window Layout:** the suggestions for the rest of a display fill it with a frosted surface, the
   windows straight on it, instead of a coloured block with a panel on top.
 - **Mouse:** shorter wording for the wheel's Fixed distance.
@@ -40,7 +39,6 @@ worked on; it gets its date when it's released.
 
 - **Settings:** the Restart buttons (after granting a permission, or changing the language)
   sometimes only quit the app: it now opens again once it has fully quit.
-
 - **Menu bar:** the toolkit's item is centred on a laptop's own display, beside the notch, where it
   sat a point low. With several displays it's centred on the main one and no longer moves as you
   switch between displays.
@@ -62,8 +60,6 @@ worked on; it gets its date when it's released.
   off the display; it goes back where it was before you picked it up.
 - **Window Layout:** a window nearly as tall as its display, made a few points shorter (a bigger gap,
   say), kept its height when there's another display below; it takes it now.
-- **Window Layout:** the toolkit's own settings window, maximized by a drag to the top, is filled by
-  macOS as after a double-click on its title bar, menu bar and all, like any other window.
 
 ## 0.17.0 (2026-10-23)
 

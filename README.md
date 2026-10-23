@@ -22,7 +22,7 @@
   <a href="#the-menu-bar">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-strip-dark.png">
-      <img src="docs/images/menu-bar-strip-light.png" width="600" alt="The toolkit in the menu bar: its menu, CPU and memory, Screen Capture, Keep Awake with the time left, and the Audio Mixer's volume pill side by side">
+      <img src="docs/images/menu-bar-strip-light.png" width="600" alt="The toolkit in the menu bar: its mark, CPU and memory, Screen Capture, Keep Awake with the time left, and the Audio Mixer's volume pill side by side">
     </picture>
   </a>
 </p>
@@ -740,7 +740,7 @@ each puts it in the menu bar or takes it out; a tool that's off opens its page i
 
 The toolkit's mark opens its panel. At the top are the tools that have no part of their own in the
 menu bar: Screen Capture opens its toolbar (or stops a recording), the Audio Mixer opens the mixer,
-and Keep Awake's cup turns it on with no end, or off, while its name opens its menu for a set time.
+and Keep Awake's cup turns it on with no end, or off, while its name opens its panel for a set time.
 Then every tool, with a switch that turns it on or off and leaves the panel open, so you can set
 several at once; a tool's name opens its settings. Quit and Settings are at the bottom.
 
