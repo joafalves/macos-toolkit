@@ -675,7 +675,8 @@ extension LayoutController {
     /// minimum size larger than a quarter of most displays.
     static func runTestWindows() {
         let app = NSApplication.shared
-        app.setActivationPolicy(.accessory)
+        // A regular app, with a Dock icon, for the switcher to list it.
+        app.setActivationPolicy(CommandLine.arguments.contains("--regular") ? .regular : .accessory)
         // A Window menu, which macOS fills with its tiling commands, as every app has.
         let main = NSMenu()
         main.addItem(withTitle: "Helper", action: nil, keyEquivalent: "").submenu = NSMenu()
@@ -702,11 +703,11 @@ extension LayoutController {
         app.run()
     }
 
-    private static func launchHelper() -> Process? {
+    private static func launchHelper(regular: Bool = false) -> Process? {
         guard let path = Bundle.main.executablePath else { return nil }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = ["--layout-test-window"]
+        process.arguments = ["--layout-test-window"] + (regular ? ["--regular"] : [])
         guard (try? process.run()) != nil else { return nil }
         let deadline = Date().addingTimeInterval(5)
         while Date() < deadline {
@@ -784,5 +785,723 @@ extension LayoutController {
         let output = lines.joined(separator: "\n") + "\n"
         print(output, terminator: "")
         if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
+    }
+}
+
+extension LayoutController {
+    /// `--test-drag [report]`: real drags, posted as mouse events, on the
+    /// title bar of a helper's window that macOS filled, which macOS gives its
+    /// old size back as the drag starts, and resizes by an edge and a corner.
+    /// Says whether the drag watcher took each for a window being moved. The
+    /// pointer moves on its own for a while: leave the mouse alone.
+    static func dragTest(report path: String?) {
+        var lines: [String] = []
+        var failures = 0
+        func check(_ name: String, _ ok: Bool, _ detail: String = "") {
+            if !ok { failures += 1 }
+            lines.append("\(ok ? "ok  " : "FAIL") \(name)\(detail.isEmpty ? "" : "  (\(detail))")")
+        }
+        func text(_ r: CGRect?) -> String { r.map { "\(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))×\(Int($0.height))" } ?? "nil" }
+        func finish() {
+            lines.append(failures == 0 ? "all passed" : "\(failures) failed")
+            let output = lines.joined(separator: "\n") + "\n"
+            print(output, terminator: "")
+            if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
+        }
+        guard AXIsProcessTrusted() else {
+            lines.append("skip: Accessibility is not granted to this process (run the app bundle with `open -n`)")
+            return finish()
+        }
+        guard let helper = launchHelper() else { return finish() }
+        defer { helper.terminate() }
+        let pid = helper.processIdentifier
+        guard let window = helperWindows(pid: pid).first(where: { $0.1 == "Layout Test" }).flatMap({ LayoutWindow.find(id: $0.0, pid: pid) }),
+              let start = window.frame, let display = LayoutGeometry.display(of: start, in: LayoutDisplay.all())
+        else {
+            check("helper window found", false)
+            return finish()
+        }
+        let watcher = DragWatcher()
+        var started: [CGRect] = []
+        var moves = 0
+        watcher.onStart = { started.append($0.frame) }
+        watcher.onMove = { _, _ in moves += 1 }
+        guard watcher.start(active: false) else {
+            check("the drag watcher starts", false)
+            return finish()
+        }
+        defer { watcher.stop() }
+        let front = NSWorkspace.shared.frontmostApplication
+        let home = CGEvent(source: nil)?.location
+        defer {
+            if let home { CGWarpMouseCursorPosition(home) }
+            front?.activate()
+        }
+        var mouse = PostedMouse()
+        func wait(_ seconds: TimeInterval) { PostedMouse.wait(seconds) }
+        /// Presses at `from`, moves `steps` events of `step` each, and lets
+        /// go. Returns whether the watcher saw a window move.
+        func drag(from: CGPoint, step: CGVector, steps: Int = 30) -> Bool {
+            started = []
+            moves = 0
+            mouse.drag(from: from, through: (1...steps).map { CGPoint(x: from.x + step.dx * CGFloat($0), y: from.y + step.dy * CGFloat($0)) })
+            return !started.isEmpty
+        }
+        func fill() -> CGRect? {
+            NSRunningApplication(processIdentifier: pid)?.activate()
+            for _ in 0..<20 where !window.isFocusedInApp { wait(0.05) }
+            wait(0.2)
+            for _ in 0..<20 where !window.perform(.fill) { wait(0.1) }
+            wait(0.6)
+            return window.frame
+        }
+
+        lines.append("     helper window on \(display.name), usable \(text(display.usable))")
+        // Filled by macOS, then put somewhere smaller: still in macOS's
+        // tiling, so as a drag starts macOS gives it back the size it had
+        // before the Fill, over a few frames, while it moves. (A window left
+        // filled doesn't move for posted events at all; one placed after the
+        // Fill does, and is what a window snapped after a maximize is.)
+        // Dragged by the title bar, held at a few places across it and at a
+        // few speeds: each must be seen as a move.
+        let before = CGRect(x: display.usable.minX + 150, y: display.usable.minY + 100, width: 1000, height: 700)
+        let placedAt = CGRect(x: display.usable.minX + 300, y: display.usable.minY + 300, width: 600, height: 420)
+        let speeds: [(String, CGVector)] = [("slow", CGVector(dx: 1, dy: 1)), ("steady", CGVector(dx: 4, dy: 3)), ("fast", CGVector(dx: 15, dy: 10))]
+        var seenCount = 0, total = 0
+        for across in [0.5, 0.2, 0.8] {
+            for (name, step) in speeds {
+                for attempt in 1...3 {
+                    window.setFrame(before, within: display.usable)
+                    wait(0.3)
+                    guard fill() != nil else { continue }
+                    window.setFrame(placedAt, within: display.usable)
+                    wait(0.4)
+                    guard let placed = window.frame else { continue }
+                    let grab = CGPoint(x: (placed.minX + placed.width * across).rounded(), y: placed.minY + 14)
+                    let seen = drag(from: grab, step: step)
+                    let after = window.frame
+                    let restored = after.map { !LayoutWindow.close($0.size, placed.size) } ?? false
+                    total += 1
+                    if seen { seenCount += 1 }
+                    check("tiled, dragged \(name) at \(Int(across * 100))% across (\(attempt)): seen as a move", seen,
+                          "\(text(placed)) → \(text(after)), macOS gave its size back: \(restored), started at \(text(started.first))")
+                }
+            }
+        }
+        lines.append("     tiled windows seen moving: \(seenCount) of \(total)")
+        // Not filled: a plain window, dragged, then resized by its edges.
+        let plain = CGRect(x: display.usable.minX + 200, y: display.usable.minY + 150, width: 600, height: 420)
+        func reset() {
+            window.setFrame(plain, within: display.usable)
+            wait(0.3)
+        }
+        reset()
+        if let f = window.frame {
+            check("a plain window dragged by its title bar: a move", drag(from: CGPoint(x: f.midX, y: f.minY + 14), step: CGVector(dx: 4, dy: 3)))
+        }
+        let resizes: [(String, (CGRect) -> CGPoint, CGVector, CGEventFlags)] = [
+            ("right edge", { CGPoint(x: $0.maxX - 2, y: $0.midY) }, CGVector(dx: 4, dy: 0), []),
+            ("left edge", { CGPoint(x: $0.minX + 1, y: $0.midY) }, CGVector(dx: -4, dy: 0), []),
+            ("bottom edge", { CGPoint(x: $0.midX, y: $0.maxY - 2) }, CGVector(dx: 0, dy: 4), []),
+            ("bottom right corner", { CGPoint(x: $0.maxX - 2, y: $0.maxY - 2) }, CGVector(dx: 4, dy: 4), []),
+            ("top left corner", { CGPoint(x: $0.minX + 1, y: $0.minY + 1) }, CGVector(dx: -4, dy: -3), []),
+            // Both sides at once, about the middle.
+            ("right edge with ⌥", { CGPoint(x: $0.maxX - 2, y: $0.midY) }, CGVector(dx: 4, dy: 0), .maskAlternate),
+            ("bottom right corner with ⌥", { CGPoint(x: $0.maxX - 2, y: $0.maxY - 2) }, CGVector(dx: 4, dy: 4), .maskAlternate),
+        ]
+        for (name, point, step, held) in resizes {
+            reset()
+            mouse.flags = held
+            defer { mouse.flags = [] }
+            guard let f = window.frame else { continue }
+            let seen = drag(from: point(f), step: step)
+            let after = window.frame
+            let resized = after.map { !LayoutWindow.close($0.size, f.size) } ?? false
+            check("resized by the \(name): not a move", resized && !seen, "resized \(resized), \(text(f)) → \(text(after))")
+        }
+        window.setFrame(start, within: display.usable)
+        finish()
+    }
+}
+
+/// Real mouse events, for the live drag tests: they move the pointer.
+private struct PostedMouse {
+    private let source = CGEventSource(stateID: .hidSystemState)
+    var flags: CGEventFlags = []
+
+    static func wait(_ seconds: TimeInterval) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
+
+    func post(_ type: CGEventType, _ point: CGPoint, delta: CGVector = .zero) {
+        guard let event = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: .left) else { return }
+        event.setDoubleValueField(.mouseEventDeltaX, value: delta.dx)
+        event.setDoubleValueField(.mouseEventDeltaY, value: delta.dy)
+        event.setIntegerValueField(.mouseEventClickState, value: 1)
+        event.flags = flags
+        event.post(tap: .cghidEventTap)
+    }
+
+    /// Presses at `from`, moves through `points`, `interval` apart, stays a
+    /// moment at the last if asked, and lets go there.
+    func drag(from: CGPoint, through points: [CGPoint], interval: TimeInterval = 0.008, linger: TimeInterval = 0) {
+        post(.leftMouseDown, from)
+        Self.wait(0.05)
+        var last = from
+        for point in points {
+            post(.leftMouseDragged, point, delta: CGVector(dx: point.x - last.x, dy: point.y - last.y))
+            last = point
+            Self.wait(interval)
+        }
+        if linger > 0 {
+            post(.leftMouseDragged, last)
+            Self.wait(linger)
+        }
+        post(.leftMouseUp, last)
+        Self.wait(0.3)
+    }
+
+    /// A straight line to `to`, `step` points at a time.
+    static func line(from: CGPoint, to: CGPoint, step: CGFloat = 15) -> [CGPoint] {
+        let count = max(Int((hypot(to.x - from.x, to.y - from.y) / step).rounded(.up)), 1)
+        return (1...count).map { i in
+            let t = CGFloat(i) / CGFloat(count)
+            return CGPoint(x: (from.x + (to.x - from.x) * t).rounded(), y: (from.y + (to.y - from.y) * t).rounded())
+        }
+    }
+}
+
+extension LayoutController {
+    /// `--test-snap [report]`: the installed app's Window Layout, with the
+    /// settings saved here, on a helper's windows dragged for real: one
+    /// maximized at the top edge, another snapped to the right, their gaps
+    /// compared, the right one taken out and snapped again, every corner,
+    /// halves side by side, a maximized window into a corner, and the other
+    /// displays. Install the build first. Leave the mouse alone.
+    static func snapTest(report path: String?) {
+        var lines: [String] = []
+        var failures = 0
+        func check(_ name: String, _ ok: Bool, _ detail: String = "") {
+            if !ok { failures += 1 }
+            lines.append("\(ok ? "ok  " : "FAIL") \(name)\(detail.isEmpty ? "" : "  (\(detail))")")
+        }
+        func text(_ r: CGRect?) -> String { r.map { "\(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))×\(Int($0.height))" } ?? "nil" }
+        func finish() {
+            lines.append(failures == 0 ? "all passed" : "\(failures) failed")
+            let output = lines.joined(separator: "\n") + "\n"
+            print(output, terminator: "")
+            if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
+        }
+        guard AXIsProcessTrusted() else {
+            lines.append("skip: Accessibility is not granted to this process (run the app bundle with `open -n`)")
+            return finish()
+        }
+        guard let helper = launchHelper() else { return finish() }
+        defer { helper.terminate() }
+        let pid = helper.processIdentifier
+        let found = helperWindows(pid: pid)
+        func helperWindow(_ title: String) -> LayoutWindow? {
+            found.first { $0.1 == title }.flatMap { LayoutWindow.find(id: $0.0, pid: pid) }
+        }
+        guard let a = helperWindow("Layout Test"), let b = helperWindow("Layout Test Three"), let start = a.frame,
+              let display = LayoutGeometry.display(of: start, in: LayoutDisplay.all())
+        else {
+            check("helper windows found", false)
+            return finish()
+        }
+        // The installed app does the snapping, as it does for any window:
+        // this only drags and looks.
+        guard NSWorkspace.shared.runningApplications.contains(where: {
+            $0.bundleIdentifier == Bundle.main.bundleIdentifier && $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        }) else {
+            check("the installed app is running, to do the snapping", false)
+            return finish()
+        }
+        let config = LayoutConfig.load()
+        let displays = LayoutDisplay.all()
+        let gap = CGFloat(config.gap)
+        lines.append("     on \(display.name), usable \(text(display.usable)); gap \(Int(gap)), suggest \(config.suggest), restore on drag out \(config.restoreOnDragOut)")
+        let front = NSWorkspace.shared.frontmostApplication
+        let home = CGEvent(source: nil)?.location
+        defer {
+            if let home { CGWarpMouseCursorPosition(home) }
+            front?.activate()
+        }
+        let mouse = PostedMouse()
+        /// By the title bar to `to`, by way of `via`, where it stays a moment,
+        /// and dropped. `settle` is how long it's left before looking, and
+        /// before the next drag.
+        func drag(_ window: LayoutWindow, to: CGPoint, via: [CGPoint] = [], settle: TimeInterval = 0.9) -> CGRect? {
+            // In front, as a window you can see to grab is.
+            window.raise()
+            PostedMouse.wait(settle < 0.5 ? 0.05 : 0.3)
+            guard let f = window.frame else { return nil }
+            let from = CGPoint(x: f.midX.rounded(), y: f.minY + 14)
+            var path: [CGPoint] = []
+            for point in via + [to] { path += PostedMouse.line(from: path.last ?? from, to: point) }
+            mouse.drag(from: from, through: path, interval: 0.012, linger: 0.25)
+            PostedMouse.wait(settle)
+            return window.frame
+        }
+        func unit(_ action: LayoutAction, on d: LayoutDisplay? = nil) -> CGRect {
+            let d = d ?? display
+            return LayoutGeometry.place(LayoutGeometry.unit(for: action, portrait: d.portrait)!, in: d.usable, gap: gap)
+        }
+        func expect(_ name: String, _ got: CGRect?, _ action: LayoutAction, on d: LayoutDisplay? = nil) {
+            let wanted = unit(action, on: d)
+            check(name, got.map { LayoutWindow.close($0, wanted) } ?? false, "wanted \(text(wanted)), got \(text(got))")
+        }
+        let f = display.frame, u = display.usable
+        a.setFrame(CGRect(x: u.minX + 100, y: u.minY + 120, width: 700, height: 500), within: u)
+        b.setFrame(CGRect(x: u.midX, y: u.minY + 200, width: 600, height: 420), within: u)
+        PostedMouse.wait(0.5)
+
+        let middle = CGPoint(x: u.midX - 150, y: u.midY)
+        let maximized = drag(a, to: CGPoint(x: u.minX + 500, y: f.minY + 1))
+        expect("A to the top edge: maximized, with the gap", maximized, .maximize)
+        let right = drag(b, to: CGPoint(x: f.maxX - 1, y: u.midY))
+        expect("B to the right edge: the right half", right, .rightHalf)
+        if let m = maximized, let r = right {
+            check("the same gap at the right and top of both", abs((u.maxX - m.maxX) - (u.maxX - r.maxX)) <= 1 && abs((m.minY - u.minY) - (r.minY - u.minY)) <= 1,
+                  "maximized: right \(Int(u.maxX - m.maxX)), top \(Int(m.minY - u.minY)); right half: right \(Int(u.maxX - r.maxX)), top \(Int(r.minY - u.minY))")
+        }
+        // Out and back, as when you change your mind: each time it snaps, and
+        // out of it, it has the size it had before.
+        for round in 1...5 {
+            let out = drag(b, to: middle)
+            check("round \(round): B taken out has its size from before", out.map { abs($0.width - 600) <= 2 && abs($0.height - 420) <= 2 } ?? false, "got \(text(out))")
+            expect("round \(round): B back at the right edge snaps again", drag(b, to: CGPoint(x: f.maxX - 1, y: u.midY + CGFloat(round * 37 - 100))), .rightHalf)
+        }
+        // Side by side: the gap between the halves is the gap.
+        let left = drag(b, to: CGPoint(x: f.minX, y: u.midY))
+        expect("B to the left edge: the left half", left, .leftHalf)
+        let aRight = drag(a, to: CGPoint(x: f.maxX - 1, y: u.midY - 80))
+        expect("A, maximized, to the right edge: the right half", aRight, .rightHalf)
+        if let l = left, let r = aRight {
+            check("the gap between the halves is the gap", abs((r.minX - l.maxX) - gap) <= 1, "\(Int(r.minX - l.maxX)) between")
+        }
+        // Every corner, from the middle.
+        let corners: [(String, CGPoint, LayoutAction)] = [("top left", CGPoint(x: f.minX, y: f.minY + 1), .topLeft),
+                                                          ("top right", CGPoint(x: f.maxX - 1, y: f.minY + 1), .topRight),
+                                                          ("bottom left", CGPoint(x: f.minX, y: f.maxY - 1), .bottomLeft),
+                                                          ("bottom right", CGPoint(x: f.maxX - 1, y: f.maxY - 1), .bottomRight)]
+        for (name, corner, action) in corners {
+            _ = drag(b, to: middle)
+            expect("B from the middle into the \(name) corner: a quarter", drag(b, to: corner), action)
+        }
+        // Straight from one snap to another, without a stop in between.
+        for (name, corner, action) in corners.reversed() {
+            expect("B straight on into the \(name) corner", drag(b, to: corner), action)
+        }
+        // Grabbed again straight after a snap, while the suggestions for the
+        // rest of the display are coming up.
+        for round in 1...4 {
+            let first = drag(b, to: round % 2 == 1 ? CGPoint(x: f.maxX - 1, y: u.midY) : CGPoint(x: f.minX, y: u.midY), settle: 0.15)
+            _ = first
+            let next = drag(b, to: round % 2 == 1 ? CGPoint(x: f.minX, y: u.midY) : CGPoint(x: f.maxX - 1, y: u.midY))
+            expect("quick round \(round): grabbed again at once, snaps to the other side", next, round % 2 == 1 ? .leftHalf : .rightHalf)
+        }
+        // A maximized window, taken by its title bar straight into a corner.
+        for (name, corner, action) in corners {
+            _ = drag(b, to: CGPoint(x: u.midX, y: f.minY + 1))
+            expect("B maximized, then into the \(name) corner", drag(b, to: corner, via: [CGPoint(x: u.midX, y: u.midY)]), action)
+        }
+        // The other displays: each outer side, and the top edge.
+        for other in displays where other.id != display.id {
+            let o = other.frame, ou = other.usable
+            let centre = CGPoint(x: o.midX, y: o.midY)
+            func outer(_ x: CGFloat) -> Bool { !displays.contains { $0.id != other.id && $0.frame.contains(CGPoint(x: x, y: o.midY)) } }
+            let there = drag(b, to: centre, via: [CGPoint(x: u.midX, y: u.midY)])
+            check("B onto \(other.name)", there.map { LayoutGeometry.display(of: $0, in: displays)?.id == other.id } ?? false, "got \(text(there))")
+            if outer(o.minX - 2) { expect("on \(other.name): the left edge, the left half", drag(b, to: CGPoint(x: o.minX, y: ou.midY)), .leftHalf, on: other) }
+            if outer(o.maxX + 1) { expect("on \(other.name): the right edge, the right half", drag(b, to: CGPoint(x: o.maxX - 1, y: ou.midY)), .rightHalf, on: other) }
+            expect("on \(other.name): the top edge, maximized", drag(b, to: CGPoint(x: o.midX, y: o.minY + 1), via: [centre]), .maximize, on: other)
+            _ = drag(b, to: CGPoint(x: u.midX, y: u.midY), via: [centre])
+        }
+        a.setFrame(start, within: u)
+        finish()
+    }
+}
+
+extension LayoutController {
+    /// `--test-gap [report]`: a window maximized with macOS's Fill and one in
+    /// the left half, both by the controller, then the gap changed both ways
+    /// with the helper in the background, as from the settings page: each
+    /// must move to the new gap. Uses macOS's margins as they're set now.
+    static func gapTest(report path: String?) {
+        var lines: [String] = []
+        var failures = 0
+        func check(_ name: String, _ ok: Bool, _ detail: String = "") {
+            if !ok { failures += 1 }
+            lines.append("\(ok ? "ok  " : "FAIL") \(name)\(detail.isEmpty ? "" : "  (\(detail))")")
+        }
+        func text(_ r: CGRect?) -> String { r.map { "\(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))×\(Int($0.height))" } ?? "nil" }
+        func finish() {
+            lines.append(failures == 0 ? "all passed" : "\(failures) failed")
+            let output = lines.joined(separator: "\n") + "\n"
+            print(output, terminator: "")
+            if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
+        }
+        guard AXIsProcessTrusted() else {
+            lines.append("skip: Accessibility is not granted to this process (run the app bundle with `open -n`)")
+            return finish()
+        }
+        guard let helper = launchHelper() else { return finish() }
+        defer { helper.terminate() }
+        let pid = helper.processIdentifier
+        let found = helperWindows(pid: pid)
+        func helperWindow(_ title: String) -> LayoutWindow? {
+            found.first { $0.1 == title }.flatMap { LayoutWindow.find(id: $0.0, pid: pid) }
+        }
+        guard let a = helperWindow("Layout Test"), let b = helperWindow("Layout Test Three"), let start = a.frame,
+              let display = LayoutGeometry.display(of: start, in: LayoutDisplay.all())
+        else {
+            check("helper windows found", false)
+            return finish()
+        }
+        let front = NSWorkspace.shared.frontmostApplication
+        defer { front?.activate() }
+        let layout = LayoutController.testing()
+        let displays = LayoutDisplay.all()
+        let margins = SystemTiling.value(SystemTiling.marginsKey) ?? true
+        lines.append("     on \(display.name), usable \(text(display.usable)); macOS's margins \(margins ? "on" : "off")")
+        func wait(_ seconds: TimeInterval) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
+        func unit(_ action: LayoutAction, _ gap: CGFloat) -> CGRect {
+            LayoutGeometry.place(LayoutGeometry.unit(for: action, portrait: display.portrait)!, in: display.usable, gap: gap)
+        }
+        func gapTo(_ gap: Double) {
+            layout.config.gap = gap
+            layout.applyGap()
+            // Moved on the controller's queue, and macOS may hold a tiled one a moment.
+            wait(2)
+        }
+        // No gap is macOS's Fill only with its margins off, as the app sets
+        // them for no gap; with them on, this can't show it.
+        let gaps: [(Double, Double)] = [(8, 2), (2, 8), (8, 4), (4, 8), (8, 2)] + (margins ? [] : [(2, 0), (0, 8)])
+        for (first, then) in gaps {
+            layout.config.gap = first
+            // From somewhere else each time: a second left half is the next display's.
+            b.setFrame(CGRect(x: display.usable.midX, y: display.usable.minY + 200, width: 600, height: 420), within: display.usable, tiled: true)
+            // In front for the Fill, which acts on the app's focused window.
+            NSRunningApplication(processIdentifier: pid)?.activate()
+            for _ in 0..<20 where !a.isFocusedInApp { wait(0.05) }
+            wait(0.3)
+            layout.place(a, .action(.maximize), displays: displays, gap: CGFloat(first), cycle: false)
+            layout.place(b, .action(.leftHalf), displays: displays, gap: CGFloat(first), cycle: false)
+            wait(0.6)
+            let filled = a.isTiledByMacOS
+            check("gap \(Int(first)): maximized", a.frame.map { LayoutWindow.close($0, unit(.maximize, CGFloat(first))) } ?? false,
+                  "wanted \(text(unit(.maximize, CGFloat(first)))), got \(text(a.frame)), macOS's tiling \(filled)")
+            // In the background, as while the settings page is in front.
+            front?.activate()
+            wait(1.5)
+            gapTo(then)
+            check("gap \(Int(first)) → \(Int(then)): the maximized window takes it", a.frame.map { LayoutWindow.close($0, unit(.maximize, CGFloat(then))) } ?? false,
+                  "wanted \(text(unit(.maximize, CGFloat(then)))), got \(text(a.frame))")
+            check("gap \(Int(first)) → \(Int(then)): so does the left half", b.frame.map { LayoutWindow.close($0, unit(.leftHalf, CGFloat(then))) } ?? false,
+                  "wanted \(text(unit(.leftHalf, CGFloat(then)))), got \(text(b.frame))")
+        }
+        a.setFrame(start, within: display.usable)
+        // One of our own, like the settings window: macOS's Fill too, as a
+        // double-click on its title bar gives it, when the gap is its margin.
+        if margins {
+            let app = NSApplication.shared
+            app.setActivationPolicy(.regular)
+            let own = NSWindow(contentRect: CGRect(x: 300, y: 300, width: 640, height: 420), styleMask: [.titled, .resizable, .closable], backing: .buffered, defer: false)
+            own.title = "Own Test"
+            own.isReleasedWhenClosed = false
+            app.activate(ignoringOtherApps: true)
+            own.makeKeyAndOrderFront(nil)
+            for _ in 0..<20 where !own.isKeyWindow { wait(0.05) }
+            wait(0.4)
+            if let window = LayoutWindow.find(id: CGWindowID(own.windowNumber), pid: ProcessInfo.processInfo.processIdentifier),
+               let ownDisplay = window.frame.flatMap({ LayoutGeometry.display(of: $0, in: displays) }) {
+                func ownUnit(_ gap: CGFloat) -> CGRect {
+                    LayoutGeometry.place(CGRect(x: 0, y: 0, width: 1, height: 1), in: ownDisplay.usable, gap: gap)
+                }
+                layout.config.gap = 8
+                // Off the work queue's main-thread hops, as the controller does it.
+                let done = DispatchSemaphore(value: 0)
+                DispatchQueue.global().async {
+                    layout.place(window, .action(.maximize), displays: displays, gap: 8, cycle: false)
+                    done.signal()
+                }
+                while done.wait(timeout: .now()) == .timedOut { wait(0.05) }
+                wait(0.6)
+                check("our own window, gap 8: maximized by macOS's Fill", window.isTiledByMacOS && (window.frame.map { LayoutWindow.close($0, ownUnit(8)) } ?? false),
+                      "wanted \(text(ownUnit(8))), got \(text(window.frame)), macOS's tiling \(window.isTiledByMacOS)")
+                gapTo(2)
+                check("our own window, gap 8 → 2: takes it", window.frame.map { LayoutWindow.close($0, ownUnit(2)) } ?? false,
+                      "wanted \(text(ownUnit(2))), got \(text(window.frame))")
+            } else {
+                check("our own window found", false)
+            }
+            own.close()
+        }
+        finish()
+    }
+}
+
+extension LayoutController {
+    /// `--test-show-desktop [report]`: macOS's Show Desktop on and off again
+    /// with a helper's windows out: they go aside, then come back exactly
+    /// where they were. Every window on screen moves for a moment.
+    static func showDesktopTest(report path: String?) {
+        var lines: [String] = []
+        var failures = 0
+        func check(_ name: String, _ ok: Bool, _ detail: String = "") {
+            if !ok { failures += 1 }
+            lines.append("\(ok ? "ok  " : "FAIL") \(name)\(detail.isEmpty ? "" : "  (\(detail))")")
+        }
+        func text(_ r: CGRect?) -> String { r.map { "\(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))×\(Int($0.height))" } ?? "nil" }
+        func finish() {
+            lines.append(failures == 0 ? "all passed" : "\(failures) failed")
+            let output = lines.joined(separator: "\n") + "\n"
+            print(output, terminator: "")
+            if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
+        }
+        guard let helper = launchHelper() else { return finish() }
+        defer { helper.terminate() }
+        let ids = helperWindows(pid: helper.processIdentifier).map(\.0)
+        func frames() -> [CGWindowID: CGRect] { WindowCatalog.frames(of: ids) }
+        func wait(_ seconds: TimeInterval) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
+        let before = frames()
+        check("helper windows found", before.count == ids.count && !ids.isEmpty, "\(before.count) of \(ids.count)")
+        let start = Date()
+        check("Show Desktop can be asked for", ShowDesktop.toggle())
+        wait(1.2)
+        let aside = frames()
+        let moved = before.filter { id, frame in aside[id].map { !LayoutWindow.close($0, frame) } ?? false }
+        let displays = LayoutDisplay.all()
+        let offScreen = aside.values.filter { frame in !displays.contains { $0.frame.insetBy(dx: 40, dy: 40).intersects(frame) } }
+        lines.append("     aside: \(aside.values.map { text($0) }.joined(separator: "; "))")
+        check("with it on, every helper window has gone aside", moved.count == before.count, "\(moved.count) of \(before.count) moved, \(offScreen.count) all but off the displays")
+        check("Show Desktop asked off", ShowDesktop.toggle())
+        wait(1.2)
+        let back = frames()
+        let same = before.filter { id, frame in back[id].map { LayoutWindow.close($0, frame) } ?? false }
+        check("off again, each is back exactly where it was", same.count == before.count,
+              before.map { "\(text($0.value)) → \(text(back[$0.key]))" }.joined(separator: "; "))
+        lines.append(String(format: "     both ways in %.1f s, the waits included", Date().timeIntervalSince(start)))
+
+        // The same through its shortcut, which the installed app takes.
+        let shortcut = LayoutAction.showDesktop.defaultShortcut
+        let source = CGEventSource(stateID: .hidSystemState)
+        func press() {
+            for down in [true, false] {
+                let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(shortcut.keyCode), keyDown: down)
+                event?.flags = [.maskControl, .maskAlternate, .maskCommand]
+                event?.post(tap: .cghidEventTap)
+            }
+        }
+        press()
+        wait(1.2)
+        let byKeys = frames()
+        check("\(shortcut.display), pressed: every helper window has gone aside",
+              before.allSatisfy { id, frame in byKeys[id].map { !LayoutWindow.close($0, frame) } ?? false },
+              "the installed app runs this build and takes the shortcut")
+        press()
+        wait(1.2)
+        let again = frames()
+        check("\(shortcut.display) again: each is back exactly where it was",
+              before.allSatisfy { id, frame in again[id].map { LayoutWindow.close($0, frame) } ?? false })
+        finish()
+    }
+}
+
+extension LayoutController {
+    /// `--test-persist <step> <helper pid> [report]`, a step of
+    /// `scripts/test-persist.sh`: the installed app snaps a helper's windows,
+    /// is quit or killed and started again, and still knows them.
+    /// `snap`: A to the left half and B to the right, by dragging.
+    /// `check`: B dragged out gets its size from before, and ⌃⌥⌫ puts A back.
+    /// `move`: A moved, while the app isn't running.
+    /// `moved`: ⌃⌥⌫ leaves A where it is: it was moved since, so forgotten.
+    static func persistTest(step: String, helper pid: pid_t, report path: String?) {
+        var lines: [String] = []
+        var failures = 0
+        func check(_ name: String, _ ok: Bool, _ detail: String = "") {
+            if !ok { failures += 1 }
+            lines.append("\(ok ? "ok  " : "FAIL") \(step): \(name)\(detail.isEmpty ? "" : "  (\(detail))")")
+        }
+        func text(_ r: CGRect?) -> String { r.map { "\(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))×\(Int($0.height))" } ?? "nil" }
+        func finish() {
+            lines.append(failures == 0 ? "all passed" : "\(failures) failed")
+            let output = lines.joined(separator: "\n") + "\n"
+            print(output, terminator: "")
+            if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
+        }
+        let found = helperWindows(pid: pid)
+        func helperWindow(_ title: String) -> LayoutWindow? {
+            found.first { $0.1 == title }.flatMap { LayoutWindow.find(id: $0.0, pid: pid) }
+        }
+        guard let a = helperWindow("Layout Test"), let b = helperWindow("Layout Test Three"),
+              let display = a.frame.flatMap({ LayoutGeometry.display(of: $0, in: LayoutDisplay.all()) })
+        else {
+            check("helper windows found", false)
+            return finish()
+        }
+        let f = display.frame, u = display.usable, gap = CGFloat(LayoutConfig.load().gap)
+        let aStart = CGRect(x: u.minX + 100, y: u.minY + 120, width: 700, height: 500)
+        let bStart = CGRect(x: u.midX, y: u.minY + 200, width: 600, height: 420)
+        func unit(_ action: LayoutAction) -> CGRect {
+            LayoutGeometry.place(LayoutGeometry.unit(for: action, portrait: display.portrait)!, in: u, gap: gap)
+        }
+        let mouse = PostedMouse()
+        func drag(_ window: LayoutWindow, to: CGPoint) -> CGRect? {
+            window.raise()
+            PostedMouse.wait(0.3)
+            guard let frame = window.frame else { return nil }
+            let from = CGPoint(x: frame.midX.rounded(), y: frame.minY + 14)
+            mouse.drag(from: from, through: PostedMouse.line(from: from, to: to), interval: 0.012, linger: 0.25)
+            PostedMouse.wait(0.9)
+            return window.frame
+        }
+        /// ⌃⌥⌫ to the window, in front with its app.
+        func restore(_ window: LayoutWindow) -> CGRect? {
+            window.raise()
+            PostedMouse.wait(0.5)
+            let source = CGEventSource(stateID: .hidSystemState)
+            for down in [true, false] {
+                let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Delete), keyDown: down)
+                event?.flags = [.maskControl, .maskAlternate]
+                event?.post(tap: .cghidEventTap)
+            }
+            PostedMouse.wait(1.2)
+            return window.frame
+        }
+        switch step {
+        case "snap":
+            a.setFrame(aStart, within: u)
+            b.setFrame(bStart, within: u)
+            PostedMouse.wait(0.5)
+            let left = drag(a, to: CGPoint(x: f.minX, y: u.midY))
+            check("A to the left half", left.map { LayoutWindow.close($0, unit(.leftHalf)) } ?? false, "wanted \(text(unit(.leftHalf))), got \(text(left)), gap \(Int(gap))")
+            // The suggestions for the rest of the display may be over B: not wanted.
+            let source = CGEventSource(stateID: .hidSystemState)
+            for down in [true, false] { CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Escape), keyDown: down)?.post(tap: .cghidEventTap) }
+            PostedMouse.wait(0.4)
+            let right = drag(b, to: CGPoint(x: f.maxX - 1, y: u.midY))
+            check("B to the right half", right.map { LayoutWindow.close($0, unit(.rightHalf)) } ?? false, "wanted \(text(unit(.rightHalf))), got \(text(right))")
+        case "check":
+            let out = drag(b, to: CGPoint(x: u.midX - 150, y: u.midY))
+            check("B dragged out has its size from before the snap", out.map { abs($0.width - bStart.width) <= 2 && abs($0.height - bStart.height) <= 2 } ?? false, text(out))
+            let back = restore(a)
+            check("⌃⌥⌫ puts A back where it was before the snap", back.map { LayoutWindow.close($0, aStart) } ?? false, "wanted \(text(aStart)), got \(text(back))")
+        case "move":
+            a.setFrame(aStart.offsetBy(dx: 0, dy: 60), within: u)
+            PostedMouse.wait(0.5)
+            check("A moved by hand", a.frame.map { LayoutWindow.close($0, aStart.offsetBy(dx: 0, dy: 60)) } ?? false, text(a.frame))
+        case "moved":
+            let before = a.frame
+            let after = restore(a)
+            check("⌃⌥⌫ leaves A where it is: forgotten, as moved since", before.flatMap { b in after.map { LayoutWindow.close($0, b) } } ?? false,
+                  "\(text(before)) → \(text(after))")
+            let out = drag(b, to: CGPoint(x: u.midX - 150, y: u.midY))
+            check("B, untouched, still gets its size back", out.map { abs($0.width - bStart.width) <= 2 && abs($0.height - bStart.height) <= 2 } ?? false, text(out))
+        default:
+            check("a known step", false)
+        }
+        finish()
+    }
+}
+
+extension LayoutController {
+    /// `--test-displays [report]`: the installed app's snaps following a
+    /// display that goes and comes back. Two of a helper's windows snapped
+    /// left and right on the display they're on, which is then made a mirror
+    /// of another, so it's no longer a display of its own (as if unplugged),
+    /// and then not. Undone by macOS when this ends, whatever happens.
+    /// The displays flicker; leave the mouse alone.
+    static func displaysTest(report path: String?) {
+        var lines: [String] = []
+        var failures = 0
+        func check(_ name: String, _ ok: Bool, _ detail: String = "") {
+            if !ok { failures += 1 }
+            lines.append("\(ok ? "ok  " : "FAIL") \(name)\(detail.isEmpty ? "" : "  (\(detail))")")
+        }
+        func text(_ r: CGRect?) -> String { r.map { "\(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))×\(Int($0.height))" } ?? "nil" }
+        func finish() {
+            lines.append(failures == 0 ? "all passed" : "\(failures) failed")
+            let output = lines.joined(separator: "\n") + "\n"
+            print(output, terminator: "")
+            if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
+        }
+        guard AXIsProcessTrusted() else {
+            lines.append("skip: Accessibility is not granted to this process (run the app bundle with `open -n`)")
+            return finish()
+        }
+        guard let helper = launchHelper() else { return finish() }
+        defer { helper.terminate() }
+        let pid = helper.processIdentifier
+        let found = helperWindows(pid: pid)
+        func helperWindow(_ title: String) -> LayoutWindow? {
+            found.first { $0.1 == title }.flatMap { LayoutWindow.find(id: $0.0, pid: pid) }
+        }
+        let before = LayoutDisplay.all()
+        guard let a = helperWindow("Layout Test"), let b = helperWindow("Layout Test Three"),
+              let leaving = a.frame.flatMap({ LayoutGeometry.display(of: $0, in: before) }),
+              let staying = before.first(where: { $0.id != leaving.id })
+        else {
+            check("helper windows found, and a second display", false, "\(before.count) displays")
+            return finish()
+        }
+        let gap = CGFloat(LayoutConfig.load().gap)
+        lines.append("     \(leaving.name) goes, \(staying.name) stays; gap \(Int(gap))")
+        func unit(_ action: LayoutAction, on d: LayoutDisplay) -> CGRect {
+            LayoutGeometry.place(LayoutGeometry.unit(for: action, portrait: d.portrait)!, in: d.usable, gap: gap)
+        }
+        func wait(_ seconds: TimeInterval) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
+        let mouse = PostedMouse()
+        func drag(_ window: LayoutWindow, to: CGPoint) {
+            window.raise()
+            wait(0.3)
+            guard let frame = window.frame else { return }
+            let from = CGPoint(x: frame.midX.rounded(), y: frame.minY + 14)
+            mouse.drag(from: from, through: PostedMouse.line(from: from, to: to), interval: 0.012, linger: 0.25)
+            wait(0.9)
+        }
+        let f = leaving.frame, u = leaving.usable
+        a.setFrame(CGRect(x: u.minX + 100, y: u.minY + 120, width: 700, height: 500), within: u)
+        b.setFrame(CGRect(x: u.midX, y: u.minY + 200, width: 600, height: 420), within: u)
+        wait(0.5)
+        // Away from an edge shared with the other display, so it snaps here.
+        let outerLeft = !before.contains { $0.id != leaving.id && $0.frame.contains(CGPoint(x: f.minX - 2, y: u.midY)) }
+        let outerRight = !before.contains { $0.id != leaving.id && $0.frame.contains(CGPoint(x: f.maxX + 1, y: u.midY)) }
+        drag(a, to: CGPoint(x: outerLeft ? f.minX : f.minX + 10, y: u.midY))
+        drag(b, to: CGPoint(x: outerRight ? f.maxX - 1 : f.maxX - 10, y: u.midY))
+        check("snapped left and right on \(leaving.name)",
+              (a.frame.map { LayoutWindow.close($0, unit(.leftHalf, on: leaving)) } ?? false) && (b.frame.map { LayoutWindow.close($0, unit(.rightHalf, on: leaving)) } ?? false),
+              "\(text(a.frame)), \(text(b.frame))")
+
+        func mirror(_ on: Bool) -> Bool {
+            var config: CGDisplayConfigRef?
+            guard CGBeginDisplayConfiguration(&config) == .success else { return false }
+            CGConfigureDisplayMirrorOfDisplay(config, leaving.id, on ? staying.id : kCGNullDirectDisplay)
+            return CGCompleteDisplayConfiguration(config, .forAppOnly) == .success
+        }
+        check("\(leaving.name) made a mirror of \(staying.name)", mirror(true))
+        wait(6)
+        let alone = LayoutDisplay.all()
+        guard let remaining = alone.first(where: { $0.uuid == staying.uuid }) else {
+            check("\(staying.name) still there", false)
+            _ = mirror(false)
+            return finish()
+        }
+        check("\(leaving.name) is no longer a display of its own", !alone.contains { $0.uuid == leaving.uuid }, "\(alone.map(\.name))")
+        check("A, snapped left, is the left half of \(staying.name)", a.frame.map { LayoutWindow.close($0, unit(.leftHalf, on: remaining)) } ?? false,
+              "wanted \(text(unit(.leftHalf, on: remaining))), got \(text(a.frame))")
+        check("B, snapped right, is the right half of \(staying.name)", b.frame.map { LayoutWindow.close($0, unit(.rightHalf, on: remaining)) } ?? false,
+              "wanted \(text(unit(.rightHalf, on: remaining))), got \(text(b.frame))")
+
+        check("the mirror undone", mirror(false))
+        wait(6)
+        guard let returned = LayoutDisplay.all().first(where: { $0.uuid == leaving.uuid }) else {
+            check("\(leaving.name) back", false)
+            return finish()
+        }
+        check("A is back in the left half of \(leaving.name)", a.frame.map { LayoutWindow.close($0, unit(.leftHalf, on: returned)) } ?? false,
+              "wanted \(text(unit(.leftHalf, on: returned))), got \(text(a.frame))")
+        check("B is back in the right half of \(leaving.name)", b.frame.map { LayoutWindow.close($0, unit(.rightHalf, on: returned)) } ?? false,
+              "wanted \(text(unit(.rightHalf, on: returned))), got \(text(b.frame))")
+        finish()
     }
 }

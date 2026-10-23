@@ -10,6 +10,14 @@ enum SwitcherPlacement: String, Codable, CaseIterable {
     case activeWindow
 }
 
+/// Which windows the switcher lists.
+enum SwitcherWindows: String, Codable, CaseIterable {
+    case all
+    /// Only those on the display it opens on, by where most of each is.
+    /// The main display shows them all: it's the same display every time.
+    case display
+}
+
 /// A list of rows, or a grid of window previews.
 enum SwitcherStyle: String, Codable, CaseIterable {
     case list, previews
@@ -66,6 +74,9 @@ struct SwitcherConfig: Codable, Equatable {
     /// ⌘Tab is only switched off while this is ⌘Tab.
     var shortcut = Shortcut.commandTab
     var placement = SwitcherPlacement.mainScreen
+    var windows = SwitcherWindows.all
+    /// What's listed, all told: on the main display, every window.
+    var shownWindows: SwitcherWindows { placement == .mainScreen ? .all : windows }
     /// When the list or grid appears, the window before the current one is
     /// selected, as in macOS's own ⌘Tab. When off, the current one is. A quick
     /// ⌘Tab that never shows them goes back to the previous window either way.
@@ -81,6 +92,7 @@ struct SwitcherConfig: Codable, Equatable {
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
         shortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .shortcut)) ?? .commandTab
         placement = (try? c.decodeIfPresent(SwitcherPlacement.self, forKey: .placement)) ?? .mainScreen
+        windows = (try? c.decodeIfPresent(SwitcherWindows.self, forKey: .windows)) ?? .all
         startOnPrevious = try c.decodeIfPresent(Bool.self, forKey: .startOnPrevious) ?? true
         style = (try? c.decodeIfPresent(SwitcherStyle.self, forKey: .style)) ?? .list
         previewSize = (try? c.decodeIfPresent(PreviewSize.self, forKey: .previewSize)) ?? .medium

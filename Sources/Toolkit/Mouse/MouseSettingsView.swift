@@ -176,7 +176,7 @@ private struct ProfileEditor: View {
     private static func distanceCaption(_ mode: ScrollMode) -> String {
         switch mode {
         case .macOS: return "macOS's own: a slow notch barely moves, fast spins go further. The slider scales it."
-        case .fixed: return "Every notch the same distance, however fast the wheel turns, as on Windows."
+        case .fixed: return "Every notch the same distance, however fast the wheel turns."
         case .curve: return "A single notch goes one distance and fast spins further, along the graph."
         }
     }

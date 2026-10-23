@@ -127,6 +127,20 @@ struct SwitcherGridView: View {
     }
 }
 
+/// How a preview tile looks: being chosen between (`--snapshot … look-…`).
+enum PreviewTileLook: String, CaseIterable {
+    /// The picture, the title in a dark bar across the bottom of the tile.
+    case bar
+    /// The window alone with its shadow, the title in plain text under it.
+    case expose
+    /// The picture across the top of a card, the title on the card under it.
+    case card
+    /// The picture, the title in a small frosted tag on its lower edge.
+    case tag
+
+    static var current = PreviewTileLook.bar
+}
+
 private struct PreviewTile: View {
     let item: SwitcherItem
     let image: CGImage?
@@ -134,67 +148,155 @@ private struct PreviewTile: View {
     let selected: Bool
 
     var body: some View {
+        switch PreviewTileLook.current {
+        case .bar: bar
+        case .expose: expose
+        case .card: card
+        case .tag: tag
+        }
+    }
+
+    // MARK: Pieces
+
+    /// The window, or the app's icon when there's no picture.
+    @ViewBuilder
+    private func picture(corner: CGFloat = 6, shadow: Bool = true) -> some View {
+        if let image {
+            Image(decorative: image, scale: 1)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+                .shadow(color: .black.opacity(shadow ? 0.3 : 0), radius: shadow ? 6 : 0, y: shadow ? 2 : 0)
+        } else if let icon = item.icon {
+            // Nothing to show of the window itself (minimized, hidden,
+            // or not seen yet): its app instead.
+            Image(nsImage: icon)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 64, height: 64)
+        }
+    }
+
+    private var icons: some View {
+        Group {
+            if let icon = item.icon {
+                Image(nsImage: icon).resizable().interpolation(.high).frame(width: 16, height: 16)
+            }
+        }
+    }
+
+    private var titleRow: some View {
+        HStack(spacing: 6) {
+            icons
+            Text(item.title)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if let symbol = item.stateSymbol {
+                Image(systemName: symbol).font(.system(size: 10)).opacity(0.7)
+            }
+        }
+        .font(.system(size: 12, weight: .medium))
+    }
+
+    private func numberBadge(dark: Bool) -> some View {
+        Group {
+            if let number {
+                Text(String(number))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(dark ? Color.white : Color.secondary)
+                    .frame(minWidth: 18, minHeight: 18)
+                    .background(dark ? Color.black.opacity(0.45) : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            }
+        }
+    }
+
+    // MARK: Looks
+
+    private var bar: some View {
         ZStack(alignment: .bottom) {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(selected ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.07))
-            Group {
-                if let image {
-                    Image(decorative: image, scale: 1)
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
-                        .padding(8)
-                        .padding(.bottom, 22)
-                } else if let icon = item.icon {
-                    // Nothing to show of the window itself (minimized, hidden,
-                    // or not seen yet): its app instead.
-                    Image(nsImage: icon)
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: 64, height: 64)
-                        .padding(.bottom, 22)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            label
+            picture()
+                .padding(8)
+                .padding(.bottom, 22)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            titleRow
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .frame(height: 26)
+                .background(Color.black.opacity(0.55))
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10, style: .continuous))
         }
-        .overlay(alignment: .topLeading) {
-            if let number {
-                Text(String(number))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.white)
-                    .frame(width: 20, height: 20)
-                    .background(Color.black.opacity(selected ? 0.55 : 0.4), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    .padding(6)
-            }
-        }
+        .overlay(alignment: .topLeading) { numberBadge(dark: true).padding(6) }
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
             .strokeBorder(selected ? Color.accentColor : Color.clear, lineWidth: 3))
         .opacity(item.dimmed ? 0.55 : 1)
     }
 
-    /// The app and the title, across the bottom of the tile.
-    private var label: some View {
-        HStack(spacing: 6) {
-            if let icon = item.icon {
-                Image(nsImage: icon).resizable().interpolation(.high).frame(width: 16, height: 16)
+    private var expose: some View {
+        VStack(spacing: 7) {
+            picture(corner: 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: 6) {
+                numberBadge(dark: false)
+                titleRow
             }
-            Text(item.title)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 0)
-            if let symbol = item.stateSymbol {
-                Image(systemName: symbol).font(.system(size: 10))
-            }
+            .foregroundStyle(selected ? Color.primary : Color.primary.opacity(0.8))
+            .frame(height: 20)
         }
-        .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(.white)
-        .padding(.horizontal, 8)
-        .frame(height: 26)
-        .background(Color.black.opacity(0.55))
-        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10, style: .continuous))
+        .padding(10)
+        .background(selected ? Color.accentColor.opacity(0.22) : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(selected ? Color.accentColor.opacity(0.9) : Color.clear, lineWidth: 1.5))
+        .opacity(item.dimmed ? 0.5 : 1)
+    }
+
+    private var card: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Color.primary.opacity(0.04)
+                picture(corner: 5, shadow: false).padding(8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: 6) {
+                titleRow
+                Spacer(minLength: 4)
+                numberBadge(dark: false)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+        }
+        .background(selected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.07))
+        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous)
+            .strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: selected ? 2.5 : 1))
+        .opacity(item.dimmed ? 0.5 : 1)
+    }
+
+    private var tag: some View {
+        ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(selected ? Color.accentColor.opacity(0.2) : Color.primary.opacity(0.05))
+            picture(corner: 7)
+                .padding(10)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            titleRow
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 9)
+                .frame(height: 24)
+                .background(.regularMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 8)
+        }
+        .overlay(alignment: .topLeading) { numberBadge(dark: true).padding(8) }
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(selected ? Color.accentColor : Color.clear, lineWidth: 2.5))
+        .opacity(item.dimmed ? 0.5 : 1)
     }
 }
 
@@ -336,7 +438,8 @@ final class SwitcherPanel {
         return panel
     }
 
-    func show(_ items: [SwitcherItem], selection: Int, on placement: SwitcherPlacement) {
+    /// The display the switcher opens on.
+    static func screen(for placement: SwitcherPlacement) -> NSScreen? {
         let screens = NSScreen.screens
         let chosen: NSScreen?
         switch placement {
@@ -344,8 +447,13 @@ final class SwitcherPanel {
         case .mouse: chosen = screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }
         case .activeWindow: chosen = NSScreen.main
         }
-        screen = (chosen ?? screens.first)?.visibleFrame ?? .zero
-        scale = (chosen ?? screens.first)?.backingScaleFactor ?? 2
+        return chosen ?? screens.first
+    }
+
+    func show(_ items: [SwitcherItem], selection: Int, on placement: SwitcherPlacement) {
+        let chosen = Self.screen(for: placement)
+        screen = chosen?.visibleFrame ?? .zero
+        scale = chosen?.backingScaleFactor ?? 2
         fills = false
         isVisible = true
         update(items, selection: selection)

@@ -61,6 +61,8 @@ final class MenuBarItem: NSObject {
     private let row = MenuBarRow()
     /// What the button's image shows now: a new image only when this changes.
     private var drawn: MenuBarDrawing?
+    private var drawnLower: CGFloat?
+    private var placeObservers: [NSObjectProtocol] = []
     private var appearanceObservation: NSKeyValueObservation?
     private var dark: Bool?
 
@@ -89,6 +91,22 @@ final class MenuBarItem: NSObject {
                 self.render(again: true)
             }
         }
+        // Placed, moved to another display, or the displays changed: the
+        // middle of the menu bar is worked out again (`lower`).
+        let center = NotificationCenter.default
+        let placed: (Notification) -> Void = { [weak self] note in
+            guard let self, note.object as? NSWindow === self.button?.window else { return }
+            self.render()
+        }
+        placeObservers = [
+            center.addObserver(forName: NSWindow.didMoveNotification, object: nil, queue: .main, using: placed),
+            center.addObserver(forName: NSWindow.didChangeScreenNotification, object: nil, queue: .main, using: placed),
+            // Displays connected, removed or changed: measured again.
+            center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.measured = [:]
+                self?.render()
+            },
+        ]
     }
 
     var button: NSStatusBarButton? { item.button }
@@ -162,20 +180,47 @@ final class MenuBarItem: NSObject {
     /// A new image for the button, only if what it shows has changed: the
     /// same drawing again (a reading that didn't move) costs nothing.
     private func render(again: Bool = false) {
-        let drawing = row.drawing()
-        guard again || drawing != drawn else { return }
+        let drawing = row.drawing(), lower = lower()
+        guard again || drawing != drawn || lower != drawnLower else { return }
         // Again only matters for colours of its own; macOS colours a template.
-        if again, drawing == drawn, drawing.isTemplate { return }
+        if again, drawing == drawn, lower == drawnLower, drawing.isTemplate { return }
         drawn = drawing
-        button?.image = drawing.image(lower: Self.lower)
+        drawnLower = lower
+        button?.image = drawing.image(lower: lower)
     }
 
-    /// macOS puts every app's item a point above the middle of the active
-    /// display's menu bar (measured on a plain item: 6 pt over a 16 pt square,
-    /// 8 under, where its own icons have 7 and 7), so the image is drawn a
-    /// point lower. The copies macOS shows on the other displays are centred,
-    /// and are drawn from the same image: there it's a point low.
-    private static let lower: CGFloat = 1
+    /// How far below the middle of its place the image is drawn, so it's in
+    /// the middle of the menu bar. macOS puts an item's 22 pt place in the
+    /// middle of some menu bars and not others (a point high in a 30 pt one,
+    /// measured: 6 pt over a part, 8 under; centred in a 33 pt one beside a
+    /// notch), and the place's frame says which: it matched both.
+    ///
+    /// Each display needs its own, whether it shows the item or macOS's copy
+    /// of it (measured: the copy on the 30 pt bar was a point high too), and
+    /// they all share the one image. With several displays, the main one's
+    /// is kept, so nothing moves as the active display changes: the main
+    /// display is always right, another can be a point off. It's known once
+    /// the item has been on the main display; until then, the display it's on.
+    /// Whole points, so it's sharp on a 1x display too.
+    private func lower() -> CGFloat {
+        guard let button, let place = button.superview, let window = button.window, let screen = window.screen else { return 0 }
+        let bar = screen.frame.maxY - screen.visibleFrame.maxY
+        // No menu bar showing (hidden, or full screen), or not placed yet.
+        guard bar > 0, window.frame.height >= place.frame.height else { return 0 }
+        let middle = window.convertToScreen(place.convert(place.bounds, to: nil)).midY
+        let here = (middle - (screen.frame.maxY - bar / 2)).rounded()
+        guard let number = Self.number(of: screen) else { return here }
+        measured[number] = here
+        guard NSScreen.screens.count > 1, let main = NSScreen.screens.first.flatMap(Self.number) else { return here }
+        return measured[main] ?? here
+    }
+
+    /// What each display needs (`lower`), as measured while the item was on it.
+    private var measured: [CGDirectDisplayID: CGFloat] = [:]
+
+    private static func number(of screen: NSScreen) -> CGDirectDisplayID? {
+        screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+    }
 
     @objc private func clicked() {
         guard let button, let window = button.window else { return }

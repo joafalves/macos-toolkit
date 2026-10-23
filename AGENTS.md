@@ -16,7 +16,8 @@ tool; keep it in step with the code.
   main window is open.
 - Uses private APIs on purpose: SkyLight and others for the Window Switcher, TCC for the audio
   permission check, `responsibility_get_pid_responsible_for_pid` for grouping helper processes,
-  `CGSSetSymbolicHotKeyEnabled` to take ⌘Tab and ⇧⌘3/4/5 from macOS, `SetsCursorInBackground`
+  `CGSSetSymbolicHotKeyEnabled` to take ⌘Tab and ⇧⌘3/4/5 from macOS, the Dock's
+  `CoreDockSendNotification` (through `dlsym`) for Window Layout's Show the desktop, `SetsCursorInBackground`
   so the capture overlay can set the cursor without activating the app, and IOReport (through
   `dlopen`) for System Stats' CPU and GPU watts, subscribed to only while the power stat is read.
 - Root only through one narrow rule: Keep Awake's lid-closed option asks for the admin password once
@@ -28,7 +29,7 @@ tool; keep it in step with the code.
 - `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (the menu
   bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing and order),
-  `MenuBarOrderView` (the order list on the Settings page),
+  `MenuBarOrderView` (the order list on the Settings page), `ToolkitPanel` (the panel the toolkit's mark opens: every tool with its switch),
   `SettingsTransfer` (export and import of all settings), `Snapshot`, and `WindowUnderPointer`
   (which app owns the window under a point, for tools that act on it).
 - `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`: one folder per tool. Screen
@@ -40,9 +41,21 @@ tool; keep it in step with the code.
 - `Sources/Toolkit/UI/Components.swift`: shared settings-page building blocks (`Page`, `Card`,
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
 - `Resources`: `Info.plist` (the only place the version lives), app icon.
+- Window Layout's placements (what's snapped where, and where each window was before) are saved
+  to `layout-placements.json` a second after they change and on quit, with the boot time; windows
+  closed since are dropped then. At launch only those still true are kept: the same window number,
+  owned by the same process, still at the frame it was put at, on a display that's there (by UUID:
+  a display's number can change), since the same boot. When a display goes, its snapped windows are
+  snapped again where macOS moved them and remember it (`home`); when it's back, they return.
+- `App/Updater.swift`: updates from GitHub's `releases/latest`. It looks at launch and once a day
+  and only says so; installing is a click. A download is installed only if it's the app at the
+  release's version and passes `SecStaticCodeCheckValidity` against the running app's designated
+  requirement (same certificate, Finder extension included), then swapped in with
+  `replaceItemAt` and relaunched by a small shell that waits for this process to end.
 - `CHANGELOG.md`: what each version adds, changes and fixes (see Versions and releases).
 - `LICENSE`: the Apache License 2.0, unchanged; the copyright line is in the README and on About.
-- `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `make-icon.swift` (the app icon;
+- `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `test-update.sh` (the updater
+  against made-up releases), `test-persist.sh` (snaps kept across restarts), `make-icon.swift` (the app icon;
   `KitIcon` in `Components.swift` and `MenuBarArt.toolkit` draw it too, keep them in step).
 - `docs/images`: the README's screenshots. **None of them is a screenshot of the desktop**: every
   one is rendered from the app's own views with `--snapshot`, through the tools' `preview()`
@@ -98,8 +111,13 @@ tool; keep it in step with the code.
   item's menu and clicks it, which keeps the item lit); panels hang from a part with
   `MenuBarPopover`, which lights it and closes on a click elsewhere or Esc.
   - A template image filled with a colour uses `.sourceIn`, keeping the colour's own opacity as
-    macOS does. macOS puts the item a point high on the active display and centres the copies;
-    the image is drawn a point low (`MenuBarItem.lower`), so the copies sit a point low.
+    macOS does. macOS puts the item's 22 pt place off the middle of some menu bars (a point high
+    in a 30 pt one) and in the middle of others (33 pt, beside a notch); `MenuBarItem.lower` works
+    it out from that place's frame (the button's superview, not the button, which is taller), and
+    again when the item moves or changes display. Each display needs its own, for the item and
+    macOS's copy of it alike (measured), and they share the image: with several displays the main
+    one's is kept, measured while the item was on it, so nothing moves as the active display
+    changes, and another display can be a point off.
   - The row isn't in a window, so nothing lays it out later: a part lays its content out as soon
     as its size or insets change.
   - **No `NSTextField` in it**, not even a hidden one: on macOS 27 a text field inside a status item
@@ -155,6 +173,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
 .build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power ...] [light]
+.build/debug/Toolkit --snapshot out.png toolkit-panel [light]   # the panel the toolkit's mark opens, from the tools' previews
 .build/debug/Toolkit --snapshot out.png menu-bar-strip [light]  # the item in a drawn menu bar, for the top of the README
 .build/debug/Toolkit --snapshot out.png layout-grid [light]     # the Window Layout grid over a drawn desktop
 .build/debug/Toolkit --snapshot out.png layout-slots [light]    # its layouts bar while dragging
@@ -164,6 +183,11 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-capture <folder> [app]   # each screenshot kind and short recordings, with a report
 .build/debug/Toolkit --test-recording        # the app's recording path: start, stop button, discard
 .build/debug/Toolkit --test-layout [report]  # geometry, then a helper's windows placed for real (run with open -n)
+.build/debug/Toolkit --test-snap [report]   # the installed app's snaps, for real, on a helper's windows: edges, corners, gaps, out and back, every display (install first; open -n; leave the mouse alone)
+.build/debug/Toolkit --test-show-desktop [report]   # Show Desktop on and off, called and by its keys through the installed app (open -n; every window moves a moment)
+.build/debug/Toolkit --test-displays [report]   # snaps follow a display that goes and comes back: one made a mirror for a moment (two displays; open -n; they flicker)
+.build/debug/Toolkit --test-gap [report]    # a maximized (macOS's Fill) and a half window follow each change of gap (open -n)
+.build/debug/Toolkit --test-drag [report]   # real drags on a helper's window macOS tiled, and resizes: which the drag watcher takes for a move (open -n; leave the mouse alone)
 .build/debug/Toolkit --measure-idle <file>   # memory idle, with the settings window, and after (run with open -n, app quit first)
 .build/debug/Toolkit --test-wheel <report>   # one scroll notch through the installed app's wheel tap: what comes out (open -n)
 .build/debug/Toolkit --log-wheel <file> [s]  # every scroll event for a while, as macOS hands it over and as apps get it (open -n)
@@ -182,6 +206,9 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-toolbar          # the capture toolbar's panel against its content
 .build/debug/Toolkit --test-overlay [png]    # what the capture overlay costs in memory; with open -n, a picture of it
 .build/debug/Toolkit --test-highlight        # the window highlight sits right above its window
+./scripts/test-update.sh                     # the updater against made-up releases served from this Mac (build first)
+./scripts/test-persist.sh                    # snaps kept across a quit, a kill and a crash of the installed app, which it restarts (install first; leave the mouse alone)
+.build/debug/Toolkit --test-switcher-displays [report]   # the list for each display, with the windows open now: each where most of it is (open -n)
 .build/debug/Toolkit --test-switcher-previews   # times the grid's pictures of real windows; keeps none
 .build/debug/Toolkit --list-windows [--counts <file>]   # what the Window Switcher would list; with --counts, how many and the lookups it took
 .build/debug/Toolkit --list-suggestions [file]  # per display, what Window Layout would offer for the rest
@@ -189,6 +216,11 @@ swift build                                  # compile check
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
 ```
+
+`defaults write dev.jalves.macos-toolkit layoutTrace <file>` (read at launch, `defaults delete`
+to stop) makes the app write each decision of Window Layout's drag path to that file: the window
+under the press, why a drag was ignored, the target, what was placed. Use it when a snap doesn't
+happen, with `--test-snap` or by hand.
 
 There is no test suite. Check UI changes by rendering `--snapshot` images in both light and dark and
 looking at them, and check behaviour by running the installed app. Keep idle CPU near zero: a hidden
@@ -244,6 +276,11 @@ ditto -c -k --keepParent --norsrc "build/MacOS Toolkit.app" "MacOS-Toolkit-X.Y.Z
 git push origin main vX.Y.Z
 gh release create vX.Y.Z "MacOS-Toolkit-X.Y.Z.zip" --title "X.Y.Z" --notes-file notes.md
 ```
+
+The installed apps update themselves from this: the zip must be named `MacOS-Toolkit-X.Y.Z.zip`,
+hold `MacOS Toolkit.app` at its top, and be built by `build.sh` with the `MacOS Toolkit Dev`
+identity. Check `codesign -dv` on the built app first: `build.sh` falls back to ad-hoc signing when
+the identity is missing, and an ad-hoc build is refused by every installed copy.
 
 The release is named `X.Y.Z` with tag `vX.Y.Z`. Its notes are the version's `CHANGELOG.md` entry
 (without the heading), then the install block from the previous release (unzip into

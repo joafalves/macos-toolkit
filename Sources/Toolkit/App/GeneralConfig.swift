@@ -28,6 +28,8 @@ struct GeneralConfig: Codable, Equatable {
     static let menuBarSpacings: ClosedRange<Double> = 4...24
     /// Left to right. Always every tool, shown or not, so each keeps its place.
     var menuBarOrder = MenuBarTool.defaultOrder
+    /// Looks for a new version at launch and once a day; it only says so.
+    var checkForUpdates = true
 
     init() {}
 
@@ -38,6 +40,7 @@ struct GeneralConfig: Codable, Equatable {
         menuBarSpacing = min(max(spacing, Self.menuBarSpacings.lowerBound), Self.menuBarSpacings.upperBound)
         let order = (try? c.decodeIfPresent([String].self, forKey: .menuBarOrder)) ?? nil
         menuBarOrder = MenuBarTool.complete((order ?? []).compactMap(MenuBarTool.init(rawValue:)))
+        checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? true
     }
 
     static var fileURL: URL {

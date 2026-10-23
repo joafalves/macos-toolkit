@@ -12,7 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private var capture: CaptureController!
     private var awake: AwakeController!
     private var stats: StatsController!
-    private var statsPanel: MenuBarPopover!
+    /// The panel hanging from a part: the toolkit's, or System Stats'.
+    private var panel: MenuBarPopover!
     /// The mixer while it's open; nil from the moment it starts closing, so
     /// a click during its fade opens a new one rather than closing it again.
     private var mixerPopover: NSPopover?
@@ -56,9 +57,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
         menuBar = MenuBarItem()
         menuBar.onClick = { [weak self] kind, rect, right in self?.menuBarClicked(kind, at: rect, right: right) }
-        statsPanel = MenuBarPopover(menuBar: menuBar)
+        panel = MenuBarPopover(menuBar: menuBar)
         // Back to reading only what the menu bar shows.
-        statsPanel.onClose = { [weak self] in self?.stats.panel = [] }
+        panel.onClose = { [weak self] in self?.stats.panel = [] }
         // Published values arrive before they're stored, so the item is drawn
         // again on the next pass, from the stored ones.
         let redraw: () -> Void = { [weak self] in DispatchQueue.main.async { self?.updateMenuBar() } }
@@ -75,6 +76,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             stats.live.$tick.sink { _ in redraw() },
             model.$general.sink { [weak self] general in
                 self?.menuBar.spacing = general.menuBarSpacing
+                // Not for a `--measure-idle` run, which should do nothing.
+                Updater.shared.automatic = general.checkForUpdates && measureIdlePath == nil
                 redraw()
             },
         ]
@@ -196,15 +199,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         segments = order.flatMap { tool in segments.filter { $0.kind.tool == tool } }
         menuBar.show(segments)
         // A panel whose part was just turned off has nothing to hang from.
-        if let kind = statsPanel?.kind, !segments.contains(where: { $0.kind == kind }) { statsPanel.close() }
+        if let kind = panel?.kind, !segments.contains(where: { $0.kind == kind }) { panel.close() }
+        panel?.follow()
     }
 
     private func menuBarClicked(_ kind: MenuBarSegment.Kind, at rect: NSRect, right: Bool) {
         if kind != .mixer { mixerPopover?.performClose(nil) }
         // A second click on the same part closes its panel.
-        if statsPanel.isShown {
-            let same = statsPanel.kind == kind
-            statsPanel.close()
+        if panel.isShown {
+            let same = panel.kind == kind
+            panel.close()
             if same { return }
         }
         switch kind {
@@ -213,9 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         case .stats:
             showStats(stats.config.shown, from: kind)
         case .toolkit:
-            let menu = NSMenu()
-            fillMenu(menu)
-            popUp(menu, from: .toolkit, at: rect)
+            showToolkitPanel()
         case .capture:
             // After this click is done, so the toolbar gets the keyboard.
             DispatchQueue.main.async { self.capture.toggleToolbar() }
@@ -244,9 +246,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     /// Its panel reads everything it shows while it's open, from now.
     private func showStats(_ kinds: [StatKind], from kind: MenuBarSegment.Kind) {
         stats.panel = kinds
-        statsPanel.show(from: kind) {
-            StatsPanelView(stats: stats, kinds: kinds, close: { [weak self] in self?.statsPanel.close() }) { [weak self] in
-                self?.statsPanel.close()
+        panel.show(from: kind) {
+            StatsPanelView(stats: stats, kinds: kinds, close: { [weak self] in self?.panel.close() }) { [weak self] in
+                self?.panel.close()
                 self?.show(.stats)
             }
         }
@@ -260,95 +262,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     @objc private func pauseRecording() { capture.togglePause() }
     @objc private func discardRecording() { capture.discardRecording() }
 
-    private func fillMenu(_ menu: NSMenu) {
-        menu.removeAllItems()
-        // With an icon of its own, the mixer opens from there instead.
-        if mixer.config.enabled, mixer.config.menuBarIcon == .none {
-            let item = NSMenuItem(title: "Audio Mixer", action: #selector(openMixerFromMenu), keyEquivalent: "")
-            item.image = NSImage(systemSymbolName: AppSection.mixer.symbol, accessibilityDescription: nil)
-            item.target = self
-            menu.addItem(item)
-            menu.addItem(.separator())
+    private func showToolkitPanel() {
+        let actions = ToolkitPanelActions(
+            open: { [weak self] section in
+                self?.panel.close()
+                self?.show(section)
+            },
+            openCapture: { [weak self] in
+                self?.panel.close()
+                self?.openCaptureToolbar()
+            },
+            stopRecording: { [weak self] in self?.capture.stopRecording() },
+            openMixer: { [weak self] in
+                self?.panel.close()
+                self?.showMixer(from: .toolkit)
+            },
+            awakeMenu: { [weak self] in
+                self?.panel.close()
+                // Once the panel has let go of the part.
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    let menu = NSMenu()
+                    self.awake.menuItems { [weak self] in self?.show(.awake) }.forEach(menu.addItem)
+                    self.popUp(menu, from: .toolkit, at: .zero)
+                }
+            })
+        panel.show(from: .toolkit) {
+            ToolkitPanelView(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder,
+                             capture: capture, awake: awake, stats: stats, actions: actions)
         }
-        if capture.isRecording {
-            let item = NSMenuItem(title: "Stop Recording", action: #selector(stopRecording), keyEquivalent: "")
-            item.image = NSImage(systemSymbolName: "stop.circle", accessibilityDescription: nil)
-            item.target = self
-            menu.addItem(item)
-            menu.addItem(.separator())
-        } else if capture.config.enabled, !capture.config.standaloneIcon {
-            let item = NSMenuItem(title: "Screen Capture", action: #selector(openCaptureToolbar), keyEquivalent: "")
-            item.image = NSImage(systemSymbolName: AppSection.capture.symbol, accessibilityDescription: nil)
-            item.target = self
-            menu.addItem(item)
-            menu.addItem(.separator())
-        }
-        // With no part of its own, its menu is a submenu here.
-        if awake.config.enabled, awake.config.menuBarIcon == .none {
-            let item = NSMenuItem(title: "Keep Awake", action: nil, keyEquivalent: "")
-            item.image = NSImage(systemSymbolName: awake.isOn ? "cup.and.saucer.fill" : "cup.and.saucer", accessibilityDescription: nil)
-            item.state = awake.isOn ? .on : .off
-            let submenu = NSMenu()
-            awake.menuItems { [weak self] in self?.show(.awake) }.forEach(submenu.addItem)
-            item.submenu = submenu
-            menu.addItem(item)
-            menu.addItem(.separator())
-        }
-        // The tools that are on, under a header, so their names don't read
-        // like the tools themselves. The others are turned on from Overview.
-        let on = AppSection.tools.filter(isOn)
-        if !on.isEmpty {
-            menu.addItem(.sectionHeader(title: "Tool Settings"))
-            for section in on { menu.addItem(sectionItem(section, title: section.title)) }
-            menu.addItem(.separator())
-        }
-        let welcome = sectionItem(.welcome, title: "Overview")
-        welcome.image = MenuBarArt.toolkit
-        menu.addItem(welcome)
-        menu.addItem(sectionItem(.general, title: "Settings…"))
-        menu.addItem(sectionItem(.about, title: "About"))
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
 
-    /// After the menu has closed, so the toolbar gets the keyboard.
-    @objc private func openCaptureToolbar() {
+    /// After the panel has closed, so the toolbar gets the keyboard.
+    private func openCaptureToolbar() {
         DispatchQueue.main.async { self.capture.openToolbar() }
     }
 
     @objc private func stopRecording() {
         capture.stopRecording()
-    }
-
-    private func isOn(_ section: AppSection) -> Bool {
-        switch section {
-        case .mouse: return mouse.config.enabled
-        case .switcher: return switcher.config.enabled
-        case .layout: return layout.config.enabled
-        case .mixer: return mixer.config.enabled
-        case .finder: return finder.config.enabled
-        case .capture: return capture.config.enabled
-        case .awake: return awake.config.enabled
-        case .stats: return stats.config.enabled
-        case .welcome, .general, .about: return true
-        }
-    }
-
-    private func sectionItem(_ section: AppSection, title: String) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: #selector(openSection(_:)), keyEquivalent: "")
-        item.image = NSImage(systemSymbolName: section.symbol, accessibilityDescription: nil)
-        item.representedObject = section.rawValue
-        item.target = self
-        return item
-    }
-
-    @objc private func openSection(_ sender: NSMenuItem) {
-        show((sender.representedObject as? String).flatMap(AppSection.init) ?? .mouse)
-    }
-
-    /// From the toolkit's menu, when the mixer has no segment of its own.
-    @objc private func openMixerFromMenu() {
-        showMixer(from: .toolkit)
     }
 
     /// Opens on the next pass of the run loop, once any menu has closed,

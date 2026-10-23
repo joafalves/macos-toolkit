@@ -17,6 +17,7 @@ struct LayoutSettingsView: View {
         ("Thirds", [.firstThird, .centerThird, .lastThird, .firstTwoThirds, .lastTwoThirds]),
         ("Size and Position", [.maximize, .almostMaximize, .maximizeHeight, .center, .larger, .smaller, .restore]),
         ("Displays", [.previousDisplay, .nextDisplay]),
+        ("Desktop", [.showDesktop]),
     ]
 
     private static let halvesNote = "They go by where the window is, however it got there. Left or right again moves the window on to the next display that way. Up again maximizes it, and once more moves it, maximized, to the display above. Down again moves it to the top half of the display below."
@@ -41,6 +42,7 @@ struct LayoutSettingsView: View {
         case .larger, .smaller: return "\(Int(LayoutGeometry.step)) points on every side."
         case .restore: return "Back to the size and place it had before it was snapped."
         case .previousDisplay, .nextDisplay: return action == .nextDisplay ? "A snapped window stays snapped the same way." : nil
+        case .showDesktop: return "Every window slides aside, as with macOS's own gesture, and the same keys bring them back where they were, snapped ones still snapped. So does a click on one."
         case .joinTabs: return "The window you're in joins the window under it."
         case .takeOutOfTabs: return "It stays where it is, on its own."
         default: return nil

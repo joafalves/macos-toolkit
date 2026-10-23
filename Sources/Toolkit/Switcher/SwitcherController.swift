@@ -48,6 +48,8 @@ final class SwitcherController: ObservableObject {
     // The switcher is "active" from Cmd-Tab until Cmd is released.
     private var active = false
     private var items: [SwitcherItem] = []
+    /// The display whose windows are listed, while only one's are.
+    private var shownOn: NSScreen?
     private var selection = 0
     private var reveal: DispatchWorkItem?
 
@@ -257,7 +259,14 @@ final class SwitcherController: ObservableObject {
     // MARK: - Session
 
     private func begin(backwards: Bool) {
-        let (list, currentFirst) = catalog.snapshot()
+        var (list, currentFirst) = catalog.snapshot()
+        // Which display's, from now until it closes.
+        shownOn = config.shownWindows == .display ? SwitcherPanel.screen(for: config.placement) : nil
+        if let shownOn {
+            let current = currentFirst ? list.first?.id : nil
+            list = Self.windows(list, on: shownOn)
+            currentFirst = current != nil && list.first?.id == current
+        }
         items = list
         active = true
         if backwards {
@@ -284,6 +293,18 @@ final class SwitcherController: ObservableObject {
         }
         self.reveal = reveal
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.revealDelay, execute: reveal)
+    }
+
+    /// The rows for windows on `screen`, by where most of each is: rows for
+    /// whole apps (hidden, or with no window) are on no display.
+    static func windows(_ items: [SwitcherItem], on screen: NSScreen) -> [SwitcherItem] {
+        let displays = LayoutDisplay.all()
+        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else { return items }
+        let frames = WindowCatalog.frames(of: items.compactMap(\.window))
+        return items.filter { item in
+            guard item.state == .window || item.state == .minimized, let id = item.window, let frame = frames[id] else { return false }
+            return LayoutGeometry.display(of: frame, in: displays)?.id == number
+        }
     }
 
     private func move(by step: Int) {
@@ -316,6 +337,7 @@ final class SwitcherController: ObservableObject {
         stopPreviews()
         panel.hide()
         items = []
+        shownOn = nil
     }
 
     private var grid: Bool { panel.isVisible && panel.style == .previews }
@@ -355,7 +377,8 @@ final class SwitcherController: ObservableObject {
     /// say) without reshuffling it: rows keep their place, new ones go last.
     private func refresh() {
         guard active else { return }
-        let fresh = catalog.snapshot().items
+        var fresh = catalog.snapshot().items
+        if let shownOn { fresh = Self.windows(fresh, on: shownOn) }
         let byID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let kept = items.compactMap { byID[$0.id] }
         let keptIDs = Set(kept.map(\.id))
@@ -365,6 +388,50 @@ final class SwitcherController: ObservableObject {
     }
 
     // MARK: - Development
+
+    /// `--test-switcher-displays [report]`: the windows open now, listed for
+    /// each display as the switcher lists them with That display: each on
+    /// the display with most of it, every window on one display only, and
+    /// no row for a whole app. Counts only, no titles.
+    static func displaysTest(report path: String?) {
+        _ = NSApplication.shared
+        var lines: [String] = []
+        var failures = 0
+        func check(_ name: String, _ ok: Bool, _ detail: String = "") {
+            if !ok { failures += 1 }
+            lines.append("\(ok ? "ok  " : "FAIL") \(name)\(detail.isEmpty ? "" : "  (\(detail))")")
+        }
+        if AXIsProcessTrusted() {
+            let catalog = WindowCatalog()
+            catalog.start()
+            RunLoop.main.run(until: Date().addingTimeInterval(3))
+            let items = catalog.snapshot().items
+            let windows = items.filter { $0.state == .window || $0.state == .minimized }
+            let frames = WindowCatalog.frames(of: windows.compactMap(\.window))
+            let displays = LayoutDisplay.all()
+            lines.append("     \(items.count) rows, \(windows.count) of them windows, \(frames.count) with a frame, on \(NSScreen.screens.count) displays")
+            var seen: [String: Int] = [:]
+            for screen in NSScreen.screens {
+                let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+                let listed = Self.windows(items, on: screen)
+                listed.forEach { seen[$0.id, default: 0] += 1 }
+                let elsewhere = listed.filter { item in
+                    item.window.flatMap { frames[$0] }.flatMap { LayoutGeometry.display(of: $0, in: displays) }?.id != number
+                }
+                check("\(screen.localizedName): \(listed.count) windows, each mostly on it", elsewhere.isEmpty, "\(elsewhere.count) elsewhere")
+                check("\(screen.localizedName): no rows for whole apps", !listed.contains { $0.window == nil || $0.state == .hiddenApp || $0.state == .noWindows })
+            }
+            let withFrames = windows.filter { $0.window.map { frames[$0] != nil } ?? false }
+            check("every window with a frame is on one display's list", withFrames.allSatisfy { seen[$0.id] == 1 },
+                  "\(withFrames.filter { seen[$0.id] != 1 }.count) on none or more than one")
+        } else {
+            lines.append("skip: Accessibility is not granted to this process (run the app bundle with `open -n`)")
+        }
+        lines.append(failures == 0 ? "all passed" : "\(failures) failed")
+        let output = lines.joined(separator: "\n") + "\n"
+        print(output, terminator: "")
+        if let path { try? output.write(toFile: path, atomically: true, encoding: .utf8) }
+    }
 
     /// Prints what the switcher would list, for checking window discovery from the terminal.
     static func dumpWindows() {

@@ -88,7 +88,7 @@ struct MainView: View {
                 case .capture: CaptureSettingsView(capture: capture)
                 case .awake: AwakeSettingsView(awake: awake, mouse: mouse)
                 case .stats: StatsSettingsView(stats: stats)
-                case .about: AboutView()
+                case .about: AboutView(model: model)
                 case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)
                 }
             }

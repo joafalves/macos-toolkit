@@ -249,7 +249,10 @@ a window come last, dimmed.
 | X | Quit every app that only has dimmed rows (hidden, no windows, or all minimized), except Finder |
 
 The list opens on the main display, the display with the pointer, or the one with the active window,
-as you choose in the settings. ⌘\` is left alone.
+as you choose in the settings. **Windows** lists every window, or only those on the display the list
+opens on, each counted on the display with most of it; hidden apps and apps with no window are on no
+display, so they're left out then. On the main display it always lists every window: it's the same
+display wherever you work, so only its own would hide the rest. ⌘\` is left alone.
 
 ### Previews
 
@@ -307,12 +310,13 @@ changes; each one can be changed or cleared in the settings.
 | ⌃⌥ U I J K | Top left, top right, bottom left, bottom right quarter |
 | ⌃⌥ D F G | First, center, last third (down the display on one that stands upright) |
 | ⌃⌥ E T | First, last two thirds |
-| ⌃⌥↩ | Maximize. With a gap of up to 8 points it's macOS's own Fill, so macOS treats the window as filled, as after a double-click on its title bar. Almost maximize (nine tenths, centered) is there too, without a key |
+| ⌃⌥↩ | Maximize. With no gap, or a gap of 8 points (macOS's own margin), it's macOS's own Fill, so macOS treats the window as filled, as after a double-click on its title bar; with another gap the toolkit places it, so it lines up with the halves beside it. Almost maximize (nine tenths, centered) is there too, without a key |
 | ⌃⌥⇧↑ | Maximize the height, keeping the width |
 | ⌃⌥C | Center |
 | ⌃⌥= ⌃⌥- | Larger, smaller: 30 points on every side |
 | ⌃⌥⌫ | Restore the size and place it had before it was snapped |
 | ⌃⌥⌘ ← → | Previous, next display. A snapped window stays snapped the same way |
+| ⌃⌥⌘D | Show the desktop, as with macOS's own gesture: every window slides aside, and the same keys (or a click on one) bring them back where they were, snapped ones still snapped |
 
 The arrows go by where the window is, however it got there: a window you maximized yourself goes
 straight to the display above with ⌃⌥↑, and one already at the left half moves on to the display on
@@ -365,7 +369,13 @@ Dragging across the cells with the mouse works too.
   fast flick is held as long as a steady push. Only while dragging; the pointer moves between
   displays as usual otherwise.
 - A snapped window you drag away gets back the size it had before, with the pointer at the same
-  place on it.
+  place on it. ⌃⌥⌫ puts a window snapped by a drag back where it was before you picked it up.
+- What's snapped where is kept across a restart of the app, an update, or a crash: Restore, a drag
+  out and a new gap go on working for those windows. A window you moved
+  while the app wasn't running is left as it is; after the Mac restarts, it starts afresh.
+- When a display goes (unplugged, or the lid closed), the windows snapped on it are snapped the same
+  way on the display macOS moves them to, so a left and right pair stays a pair. When the display
+  is back, they go back to it as they were, unless you've moved them since.
 - **Suggest windows for the rest** (on, set to Previews): after a window is dropped on an edge or
   into a layout from the ⌥ bar, the part of the display that's left shows your other windows on
   the current Space, most recently used first, as Windows' Snap Assist does. **Windows from other
@@ -451,7 +461,7 @@ soon as the same mouse is connected.
 | Cursor speed | macOS / custom multiplier | `HIDPointerResolution` on the device's HID service |
 | Cursor acceleration | macOS / off / custom (0–3) | `HIDMouseAcceleration` on the device's HID service |
 | Wheel direction (vertical, horizontal) | macOS / inverted | scroll event tap |
-| Wheel distance | macOS (its own, scaled) / fixed (lines a notch, as on Windows) / curve (a notch one distance, fast spins further, along a graph you drag) | scroll event tap; fixed and curve also switch `HIDMouseScrollAcceleration` off on the device, so a slow notch isn't shrunk to a point |
+| Wheel distance | macOS (its own, scaled) / fixed (lines a notch) / curve (a notch one distance, fast spins further, along a graph you drag) | scroll event tap; fixed and curve also switch `HIDMouseScrollAcceleration` off on the device, so a slow notch isn't shrunk to a point |
 | Wheel smoothing | macOS / smooth | scroll event tap |
 | Back and forward buttons | macOS / navigate | event tap; sends a navigation swipe to Apple apps |
 | Wheel button | macOS / autoscroll, with a speed | event tap; posts scroll events while the button is held |
@@ -586,7 +596,7 @@ and Stay Available as switches; while it's on, Turn Off says what's left. A sess
 
 - **In the menu bar** it's a cup. While a session is on it becomes a **pill that empties as the time
   runs out**, with the time left in it (full, with no time, when it has no end), the cup with the
-  time beside it, or only the cup, filled while it's on. With none, its menu is in the toolkit menu. **Count up with no end**, off by
+  time beside it, or only the cup, filled while it's on. With none, it sits in the toolkit panel: the cup turns it on or off, its name opens its menu. **Count up with no end**, off by
   default, shows how long a session with no end has been on instead.
 - **Keep the display on** is the default. Turned off, only the Mac stays awake: the display sleeps,
   and downloads and long jobs go on.
@@ -659,6 +669,16 @@ Needs **macOS 15 or later**. The released app is built for Apple silicon.
    open "/Applications/MacOS Toolkit.app"
    ```
 
+### Updates
+
+The app looks for a new release on GitHub when it starts and once a day (**About → Check
+automatically**), and **Check Now** looks at once. A new version shows on About, with what's in it,
+and at the top of the toolkit panel; nothing is installed until you press **Install and Relaunch**.
+The download is only installed if it's signed with the same certificate as the app you have, which
+is also what keeps the permissions you gave it; then the app restarts, and Finder too while the
+Finder extension is on. No quarantine flag to remove. If you build the app yourself, it's signed with
+your own certificate, so releases from GitHub won't install over it: update with `git pull` instead.
+
 ### Build it yourself
 
 You only need the Xcode Command Line Tools (`xcode-select --install`, skip if `swift --version`
@@ -676,8 +696,8 @@ To update later: `git pull && ./scripts/build.sh --install`.
 
 The window opens on **Overview**, with a tile for each tool and a warning while a permission one of
 them needs is missing. It opens there again after an update; otherwise on the page you left.
-**Settings**, under it, has the app's own settings, and **About** the version, who made it, and links
-to the project on GitHub.
+**Settings**, under it, has the app's own settings, and **About** the version, updates, who made it,
+and links to the project on GitHub.
 
 - Every tool starts off. Click its tile, or its name in the sidebar, and turn it on with the switch
   at the top of its page.
@@ -697,19 +717,31 @@ To remove it, quit the app, delete it from `/Applications`, and delete
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-dark.png">
-    <img src="docs/images/menu-bar-light.png" width="360" alt="The toolkit's menu bar item: the toolkit menu, Screen Capture, Keep Awake and the mixer side by side with hairlines between them; with the mixer open and the others dimmed; while recording, with Keep Awake's cup and time; Keep Awake off; and on with no end">
+    <img src="docs/images/menu-bar-light.png" width="360" alt="The toolkit's menu bar item: the toolkit's mark, Screen Capture, Keep Awake and the mixer side by side with hairlines between them; with the mixer open and the others dimmed; while recording, with Keep Awake's cup and time; Keep Awake off; and on with no end">
   </picture>
 </p>
 
-The toolkit has one item in the menu bar. The toolkit menu is always there, and Screen Capture, Keep
+The toolkit has one item in the menu bar. The toolkit's mark is always there, and Screen Capture, Keep
 Awake and the Audio Mixer join it when their settings put them in the menu bar, side by side with the same
 size and spacing and a hairline between them. While recording, Screen Capture's place shows a red
 stop button with the time and size. Each part opens its own menu or panel, and while one is open
 the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
-and other apps' icons can't end up between them. The toolkit menu opens the settings of each tool that's on,
-listed under a Tool Settings header; the others are turned on from Overview. **Settings → Space between items** sets how far apart the parts sit, and **Order** which comes
-first: drag the tools, the toolkit menu too, into the order you want, left to right. A switch on
+and other apps' icons can't end up between them. **Settings → Space between items** sets how far apart the parts sit, and **Order** which comes
+first: drag the tools, the toolkit's mark too, into the order you want, left to right. A switch on
 each puts it in the menu bar or takes it out; a tool that's off opens its page instead.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/toolkit-panel-dark.png">
+    <img src="docs/images/toolkit-panel-light.png" width="300" alt="The toolkit panel: Screen Capture, Audio Mixer and Keep Awake as tiles at the top, then every tool with a switch, two of them off, then Quit and Settings">
+  </picture>
+</p>
+
+The toolkit's mark opens its panel. At the top are the tools that have no part of their own in the
+menu bar: Screen Capture opens its toolbar (or stops a recording), the Audio Mixer opens the mixer,
+and Keep Awake's cup turns it on with no end, or off, while its name opens its menu for a set time.
+Then every tool, with a switch that turns it on or off and leaves the panel open, so you can set
+several at once; a tool's name opens its settings. Quit and Settings are at the bottom.
 
 ## Good to know
 
@@ -725,7 +757,7 @@ each puts it in the menu bar or takes it out; a tool that's off opens its page i
 
 ```
 Sources/Toolkit
-├── App        menu bar items, main window, general settings, settings export
+├── App        menu bar items, main window, general settings, settings export, updates
 ├── Mouse      the Mouse tool
 ├── Switcher   the Window Switcher tool
 ├── Layout     the Window Layout tool
@@ -736,7 +768,7 @@ Sources/Toolkit
 ├── Stats      the System Stats tool
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu
-scripts        build.sh, make-cert.sh, make-icon.swift
+scripts        build.sh, make-cert.sh, make-icon.swift, test-update.sh, test-persist.sh
 docs/images    the screenshots above
 ```
 

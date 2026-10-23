@@ -147,6 +147,18 @@ enum LayoutWindow {
                   tries < 2 || (afterDrag && (before.map { Self.near(actual, $0) } ?? false) && Date() < deadline) {
                 tries += 1
                 usleep(60_000)
+                // A window a little shorter than its display, made a few
+                // points shorter still, can be held at the height it had
+                // (seen with another display below): from a good deal
+                // smaller, the size is taken. Only for a side that didn't
+                // move at all, not one an app rounds (a terminal's).
+                let held = before.map { b in
+                    (abs(actual.width - b.width) <= 2 && abs(target.width - b.width) > 2)
+                        || (abs(actual.height - b.height) <= 2 && abs(target.height - b.height) > 2)
+                } ?? false
+                if tries == 1, held, !Self.close(actual.size, target.size) {
+                    set(size: CGSize(width: target.width - min(80, target.width / 10), height: target.height - min(80, target.height / 10)), of: window)
+                }
                 send()
                 actual = frame ?? actual
             }
@@ -158,6 +170,7 @@ enum LayoutWindow {
             // held it: on the target, or as close as a window with a minimum
             // size gets. Right after a drag too: macOS may finish the drag
             // a moment after our move and put the window back.
+            LayoutTrace.log("window: sent \(LayoutTrace.text(target)) from \(LayoutTrace.text(before)): \(LayoutTrace.text(actual)), tiled \(tiled), after drag \(afterDrag)")
             if tiled || afterDrag {
                 var stayed = 0
                 var last = actual
@@ -165,7 +178,11 @@ enum LayoutWindow {
                 while stayed < (tiled ? 3 : 2), Date() < until {
                     usleep(120_000)
                     guard let now = frame else { break }
-                    let putBack = before.map { Self.near(now, $0) && !Self.near(target, $0) } ?? false
+                    // Back where it was, or near there when sent far: a gap
+                    // changed by a few points is a move of a few points.
+                    let putBack = before.map {
+                        (Self.close(now, $0) && !Self.close(target, $0)) || (Self.near(now, $0) && !Self.near(target, $0))
+                    } ?? false
                     if putBack {
                         stayed = 0
                         send()
@@ -174,6 +191,7 @@ enum LayoutWindow {
                     } else {
                         stayed = 0
                     }
+                    LayoutTrace.log("window:   then \(LayoutTrace.text(now)), put back \(putBack), stayed \(stayed)")
                     last = now
                     actual = frame ?? now
                 }
@@ -262,25 +280,52 @@ enum LayoutWindow {
     /// Whether this is the window with the keyboard in its app: the Window
     /// menu's commands act on that one.
     var isFocusedInApp: Bool {
-        guard case .other(_, let app, let id, _) = self,
-              let focused: AXUIElement = Self.attribute(app, kAXFocusedWindowAttribute) else { return false }
-        var found: CGWindowID = 0
-        return _AXUIElementGetWindow(focused, &found) == .success && found == id
+        switch self {
+        case .other(_, let app, let id, _):
+            guard let focused: AXUIElement = Self.attribute(app, kAXFocusedWindowAttribute) else { return false }
+            var found: CGWindowID = 0
+            return _AXUIElementGetWindow(focused, &found) == .success && found == id
+        case .own(let window, _):
+            return Self.onMain { window.isKeyWindow }
+        }
+    }
+
+    /// Whether macOS's Fill and Return to Previous Size can be sent to it now:
+    /// through its app's Window menu, which acts on the app's focused window;
+    /// to one of ours, straight to the window.
+    var takesTilingCommands: Bool {
+        if case .own = self { return true }
+        return isFocusedInApp
     }
 
     /// macOS has tiled it (filled it, or put it in a half): its Return to
     /// Previous Size is there to press, which it is for no other window.
     var isTiledByMacOS: Bool {
-        guard case .other(_, let app, _, let pid) = self, isFocusedInApp,
-              let item = Self.menuItem(TilingCommand.untile.rawValue, in: app, pid: pid),
-              let enabled: Bool = Self.attribute(item, kAXEnabledAttribute) else { return false }
-        return enabled
+        switch self {
+        case .other(_, let app, _, let pid):
+            guard isFocusedInApp, let item = Self.menuItem(TilingCommand.untile.rawValue, in: app, pid: pid),
+                  let enabled: Bool = Self.attribute(item, kAXEnabledAttribute) else { return false }
+            return enabled
+        case .own(let window, _):
+            return Self.onMain { Self.can(window, .untile) }
+        }
+    }
+
+    /// For our own windows the command goes to the window itself, which
+    /// answers for it as it does for its item in the Window menu.
+    private static func can(_ window: NSWindow, _ command: TilingCommand) -> Bool {
+        let action = Selector(command.rawValue)
+        return window.responds(to: action) && window.validateUserInterfaceItem(NSMenuItem(title: "", action: action, keyEquivalent: ""))
     }
 
     /// Has the app run one of macOS's tiling commands on this window, so
     /// macOS treats it as tiled (and draws it so). False if the app has no
     /// such command, or this isn't its focused window.
     func perform(_ command: TilingCommand) -> Bool {
+        if case .own(let window, _) = self {
+            // Our own settings window: as a double-click on its title bar does.
+            return Self.onMain { Self.can(window, command) && NSApp.sendAction(Selector(command.rawValue), to: window, from: nil) }
+        }
         guard case .other(_, let app, _, let pid) = self, isFocusedInApp,
               let item = Self.menuItem(command.rawValue, in: app, pid: pid) else { return false }
         if let enabled: Bool = Self.attribute(item, kAXEnabledAttribute), !enabled { return false }

@@ -14,6 +14,8 @@ final class DragWatcher {
         /// Where the pointer was at that same moment, so it can be kept at the
         /// same place on the window.
         var pointer: CGPoint?
+        /// Where it was when it was pressed on, before it moved at all.
+        var start: CGRect?
     }
 
     // Called on the main thread.
@@ -105,6 +107,7 @@ final class DragWatcher {
             dragged(event)
         case .leftMouseUp:
             releaseCursor()
+            LayoutTrace.log("watcher: up at \(event.location), \(state)")
             if case .moving = state {
                 let (location, flags) = (event.location, event.flags)
                 main { $0.onDrop?(location, flags) }
@@ -124,9 +127,11 @@ final class DragWatcher {
         switch state {
         case .pressed(let point):
             guard let grab = Self.window(at: point) else {
+                LayoutTrace.log("watcher: no ordinary window under \(point), ignored")
                 state = .ignored
                 return
             }
+            LayoutTrace.log("watcher: pressed on window \(grab.id) pid \(grab.pid) \(LayoutTrace.text(grab.frame))")
             state = .watching(grab, lastCheck: ProcessInfo.processInfo.systemUptime)
         case .watching(let grab, let lastCheck):
             // A window server lookup per check: a few a second is plenty to
@@ -134,14 +139,19 @@ final class DragWatcher {
             let now = ProcessInfo.processInfo.systemUptime
             guard now - lastCheck >= 0.03 else { return }
             guard let frame = Self.bounds(of: grab.id) else {
+                LayoutTrace.log("watcher: window \(grab.id) gone, ignored")
                 state = .ignored
                 return
             }
-            if !LayoutWindow.close(frame.size, grab.frame.size) {
-                state = .ignored
-            } else if abs(frame.minX - grab.frame.minX) > 2 || abs(frame.minY - grab.frame.minY) > 2 {
+            if Self.resizing(grab.frame, to: frame) {
+                LayoutTrace.log("watcher: resizing? \(LayoutTrace.text(grab.frame)) → \(LayoutTrace.text(frame))")
+                // Watched on: a resize looks like one until it ends.
+                state = .watching(grab, lastCheck: now)
+            } else if abs(frame.minX - grab.frame.minX) > 2 || abs(frame.minY - grab.frame.minY) > 2
+                        || !LayoutWindow.close(frame.size, grab.frame.size) {
                 state = .moving
-                let moved = Grab(id: grab.id, pid: grab.pid, frame: frame, pointer: event.location)
+                LayoutTrace.log("watcher: moving, \(LayoutTrace.text(grab.frame)) → \(LayoutTrace.text(frame))")
+                let moved = Grab(id: grab.id, pid: grab.pid, frame: frame, pointer: event.location, start: grab.frame)
                 let (location, flags) = (event.location, event.flags)
                 main {
                     $0.onStart?(moved)
@@ -231,10 +241,25 @@ final class DragWatcher {
             guard layer == 0,
                   let id = info[kCGWindowNumber as String] as? CGWindowID,
                   let pid = info[kCGWindowOwnerPID as String] as? pid_t
-            else { return nil }
+            else {
+                LayoutTrace.log("watcher: on top at \(point): \(info[kCGWindowOwnerName as String] ?? "?") pid \(info[kCGWindowOwnerPID as String] ?? "?"), layer \(layer), \(LayoutTrace.text(rect)), alpha \(info[kCGWindowAlpha as String] ?? "?"), name \(info[kCGWindowName as String] ?? "")")
+                return nil
+            }
             return Grab(id: id, pid: pid, frame: rect)
         }
         return nil
+    }
+
+    /// Whether a window that changed size is being resized: something stays
+    /// put across and down, the edge opposite the one pulled (or the middle,
+    /// with ⌥). A window macOS tiled also changes size as a drag starts, as
+    /// macOS gives it back the size it had, over a few frames, but it follows
+    /// the pointer, so across or down nothing stays.
+    static func resizing(_ from: CGRect, to frame: CGRect) -> Bool {
+        guard !LayoutWindow.close(frame.size, from.size) else { return false }
+        func held(_ a: [CGFloat], _ b: [CGFloat]) -> Bool { zip(a, b).contains { abs($0 - $1) <= 2 } }
+        return held([from.minX, from.maxX, from.midX], [frame.minX, frame.maxX, frame.midX])
+            && held([from.minY, from.maxY, from.midY], [frame.minY, frame.maxY, frame.midY])
     }
 
     private static func activeDisplayBounds() -> [CGRect] {

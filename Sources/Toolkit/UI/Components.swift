@@ -148,10 +148,11 @@ struct OptionRow<Value: Hashable, Extra: View>: View {
     @Binding var selection: Value
     let options: [(Value, String)]
     var menu = false
+    var link: SettingLink?
     @ViewBuilder var extra: () -> Extra
 
     var body: some View {
-        SettingRow(title: title, caption: caption) {
+        SettingRow(title: title, caption: caption, link: link) {
             if menu {
                 Picker(title, selection: $selection) {
                     ForEach(options, id: \.0) { Text($0.1).tag($0.0) }
@@ -174,8 +175,8 @@ struct OptionRow<Value: Hashable, Extra: View>: View {
 }
 
 extension OptionRow where Extra == EmptyView {
-    init(title: String, caption: String? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false) {
-        self.init(title: title, caption: caption, selection: selection, options: options, menu: menu, extra: { EmptyView() })
+    init(title: String, caption: String? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false, link: SettingLink? = nil) {
+        self.init(title: title, caption: caption, selection: selection, options: options, menu: menu, link: link, extra: { EmptyView() })
     }
 }
 

@@ -20,6 +20,12 @@ if CommandLine.arguments.contains("--register-login-item") {
 // `layout-suggest` the windows it offers for the rest of a display.
 if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.arguments.count > flag + 1 {
     let rest = Array(CommandLine.arguments[(flag + 1)...])
+    // `look-expose`, `look-card`, `look-tag`: another look for the preview tiles.
+    if let look = rest.compactMap({ $0.hasPrefix("look-") ? PreviewTileLook(rawValue: String($0.dropFirst(5))) : nil }).first {
+        PreviewTileLook.current = look
+    }
+    // `available`: a new version on offer, for About and the toolkit panel.
+    if rest.contains("available") { Updater.shared.preview() }
     if rest.contains("switcher-list") || rest.contains("switcher-grid") {
         Snapshot.writeSwitcher(to: rest[0], light: rest.contains("light"), grid: rest.contains("switcher-grid"))
         exit(0)
@@ -37,6 +43,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeStatsPanel(to: rest[0], light: rest.contains("light"), kinds: kinds.isEmpty ? StatKind.allCases : kinds)
         exit(0)
     }
+    if rest.contains("toolkit-panel") {
+        Snapshot.writeToolkitPanel(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
     if rest.contains("menu-bar-strip") {
         Snapshot.writeMenuBarStrip(to: rest[0], light: rest.contains("light"))
         exit(0)
@@ -50,7 +60,8 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         exit(0)
     }
     if rest.contains("layout-suggest") {
-        Snapshot.writeLayoutSuggest(to: rest[0], light: rest.contains("light"))
+        let style = ["frosted", "outline", "quiet"].first(where: rest.contains) ?? "current"
+        Snapshot.writeLayoutSuggest(to: rest[0], light: rest.contains("light"), style: style)
         exit(0)
     }
     if rest.contains("layout-grid") || rest.contains("layout-slots") {
@@ -70,6 +81,22 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
 // Development aid: `--list-windows` prints the rows the window switcher would show.
 if CommandLine.arguments.contains("--list-windows") {
     SwitcherController.dumpWindows()
+    exit(0)
+}
+
+// Development aid: `--test-switcher-displays [report]` checks the switcher's
+// list for each display, with the windows open now (open -n).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-switcher-displays") {
+    SwitcherController.displaysTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+
+// Development aid: `--test-update <feeds> <copy> [report]` checks and installs
+// made-up releases over a copy of the app (run the app bundle).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-update"), CommandLine.arguments.count > flag + 2,
+   let feeds = URL(string: CommandLine.arguments[flag + 1]) {
+    Updater.selfTest(feeds: feeds, copy: URL(fileURLWithPath: CommandLine.arguments[flag + 2]),
+                     report: CommandLine.arguments.count > flag + 3 ? CommandLine.arguments[flag + 3] : nil)
     exit(0)
 }
 
@@ -97,6 +124,44 @@ if CommandLine.arguments.contains("--test-switcher-previews") {
 // Accessibility is the app's own.
 if let flag = CommandLine.arguments.firstIndex(of: "--test-layout") {
     LayoutController.selfTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+// Development aid: `--test-drag [report]` drags a helper's window for real,
+// filled by macOS and not, and resizes it, through the drag watcher (open -n).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-drag") {
+    LayoutController.dragTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+// Development aid: `--test-snap [report]` drags a helper's windows into
+// snaps for real, which the installed app's Window Layout makes (open -n).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-snap") {
+    LayoutController.snapTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+// Development aid: `--test-gap [report]` changes the gap under a helper's
+// maximized and half windows (open -n).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-gap") {
+    LayoutController.gapTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+// Development aid: `--test-show-desktop [report]` turns macOS's Show Desktop
+// on and off with a helper's windows out (every window moves for a moment).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-show-desktop") {
+    LayoutController.showDesktopTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+// Development aid: `--test-persist <step> <helper pid> [report]`, one step of
+// scripts/test-persist.sh (the installed app restarted in between).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-persist"), CommandLine.arguments.count > flag + 2,
+   let pid = pid_t(CommandLine.arguments[flag + 2]) {
+    LayoutController.persistTest(step: CommandLine.arguments[flag + 1], helper: pid,
+                                 report: CommandLine.arguments.count > flag + 3 ? CommandLine.arguments[flag + 3] : nil)
+    exit(0)
+}
+// Development aid: `--test-displays [report]` makes a display a mirror for a
+// moment, as if unplugged, with a helper's windows snapped on it (open -n).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-displays") {
+    LayoutController.displaysTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
     exit(0)
 }
 if let flag = CommandLine.arguments.firstIndex(of: "--list-suggestions") {

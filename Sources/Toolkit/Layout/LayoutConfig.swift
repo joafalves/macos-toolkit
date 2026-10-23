@@ -9,6 +9,8 @@ enum LayoutAction: String, Codable, CaseIterable {
     case firstThird, centerThird, lastThird, firstTwoThirds, lastTwoThirds
     case maximize, almostMaximize, maximizeHeight, center, larger, smaller, restore
     case previousDisplay, nextDisplay
+    /// macOS's Show Desktop, on and off: no one window.
+    case showDesktop
     /// For windows sharing a slot as tabs.
     case nextTab, previousTab, takeOutOfTabs, joinTabs
 
@@ -39,6 +41,7 @@ enum LayoutAction: String, Codable, CaseIterable {
         case .restore: return "Restore"
         case .previousDisplay: return "Previous display"
         case .nextDisplay: return "Next display"
+        case .showDesktop: return "Show the desktop"
         case .nextTab: return "Next window in the stack"
         case .previousTab: return "Previous window in the stack"
         case .takeOutOfTabs: return "Take the window out of its stack"
@@ -74,6 +77,8 @@ enum LayoutAction: String, Codable, CaseIterable {
         case .restore: return key(kVK_Delete)
         case .previousDisplay: return key(kVK_LeftArrow, nil, co.union(.command))
         case .nextDisplay: return key(kVK_RightArrow, nil, co.union(.command))
+        // As Windows' ⊞D; ⌃⌥D is the first third.
+        case .showDesktop: return key(kVK_ANSI_D, "D", co.union(.command))
         case .nextTab: return key(kVK_Tab)
         case .previousTab: return key(kVK_Tab, nil, co.union(.shift))
         case .takeOutOfTabs: return key(kVK_Delete, nil, co.union(.shift))

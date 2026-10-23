@@ -38,6 +38,14 @@ struct SwitcherSettingsView: View {
         }
     }
 
+    /// Rows that linked settings go to.
+    private enum Anchor {
+        static let showOn = "switcher.showOn"
+        static let windows = "switcher.windows"
+    }
+
+    private var mainHolds: Bool { switcher.config.placement == .mainScreen }
+
     var body: some View {
         Page {
             ToolHeader(section: .switcher, subtitle: "\(shortcut.display) through windows instead of apps.", enabled: $switcher.config.enabled)
@@ -90,7 +98,18 @@ struct SwitcherSettingsView: View {
                     OptionRow(title: "Show on", caption: "Which display the list opens on.",
                               selection: $switcher.config.placement,
                               options: [(.mainScreen, "The main display"), (.mouse, "The one with the pointer"), (.activeWindow, "The one with the active window")],
-                              menu: true)
+                              menu: true,
+                              link: mainHolds ? .holds("Lists the windows of every display", anchor: Anchor.windows) : nil)
+                        .settingAnchor(Anchor.showOn)
+                    RowDivider()
+                    // Held at every display while it opens on the main one, which
+                    // is the same display wherever you are: its own windows only
+                    // would hide the rest for good.
+                    OptionRow(title: "Windows", caption: "Every window, or only those on the display the list opens on.",
+                              selection: Binding(get: { switcher.config.shownWindows }, set: { switcher.config.windows = $0 }),
+                              options: [(.all, "Every display"), (.display, "That display")],
+                              link: mainHolds ? .heldBy("Every display while it shows on the main display", anchor: Anchor.showOn) : nil)
+                        .settingAnchor(Anchor.windows)
                     RowDivider()
                     ToggleRow(title: "Open on the previous window",
                               caption: "When the \(switcher.config.style == .previews ? "grid" : "list") appears, the window you were in before is selected, like macOS's own ⌘Tab. When off, the window you're in is. A quick \(shortcut.display) goes back to the previous window either way.",
@@ -98,7 +117,9 @@ struct SwitcherSettingsView: View {
                 }
 
                 Card(title: "While \(held) Is Held",
-                     footnote: "Windows are listed most recently used first, across all Spaces. Minimized windows, hidden apps and apps without a window come last.") {
+                     footnote: switcher.config.shownWindows == .display
+                        ? "Windows are listed most recently used first, across all Spaces. Minimized windows come last. Hidden apps and apps without a window are on no display, so they aren't listed."
+                        : "Windows are listed most recently used first, across all Spaces. Minimized windows, hidden apps and apps without a window come last.") {
                     ForEach(Array(keys.enumerated()), id: \.offset) { index, key in
                         if index > 0 { RowDivider() }
                         SettingRow(title: key.0) {

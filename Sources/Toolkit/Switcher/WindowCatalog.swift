@@ -15,7 +15,6 @@ struct SwitcherItem: Identifiable {
     var appName: String
     var icon: NSImage?
     var state: State
-
     var dimmed: Bool { state != .window }
 }
 
@@ -333,6 +332,24 @@ final class WindowCatalog {
     }
 
     // MARK: - The list
+
+    /// Where these windows are, as the window server has them: on any Space,
+    /// and where a minimized one was.
+    static func frames(of ids: [CGWindowID]) -> [CGWindowID: CGRect] {
+        guard !ids.isEmpty else { return [:] }
+        var values = ids.map { UnsafeRawPointer(bitPattern: UInt($0)) }
+        guard let array = CFArrayCreate(nil, &values, values.count, nil),
+              let list = CGWindowListCreateDescriptionFromArray(array) as? [[String: Any]]
+        else { return [:] }
+        var frames: [CGWindowID: CGRect] = [:]
+        for info in list {
+            guard let id = info[kCGWindowNumber as String] as? CGWindowID,
+                  let bounds = info[kCGWindowBounds as String] as? NSDictionary,
+                  let rect = CGRect(dictionaryRepresentation: bounds) else { continue }
+            frames[id] = rect
+        }
+        return frames
+    }
 
     /// Every row for the switcher: windows in most recently used order, then
     /// minimized windows, then apps that are hidden or have no window.

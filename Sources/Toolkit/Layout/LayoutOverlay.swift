@@ -54,6 +54,10 @@ final class LayoutOverlay {
         self.display = display
         self.interactive = interactive
         let panel = LayoutPanel(frame: screen.frame, level: .statusBar)
+        // macOS's zoom in and out would leave it smaller than the display for
+        // a moment, when a drag looks through it only while it covers the
+        // whole display: a drag started then went unseen.
+        panel.animationBehavior = .none
         let view = LayoutOverlayView(display: display)
         view.content = content
         view.overlay = self

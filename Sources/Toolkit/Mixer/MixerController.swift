@@ -700,7 +700,7 @@ extension MixerController {
     }
 
     /// Made-up rows for `--snapshot`, without touching Core Audio or the saved settings.
-    static func preview(software: Bool = false, equalizer: Bool = false) -> MixerController {
+    static func preview(software: Bool = false, equalizer: Bool = false, menuBarIcon: MixerMenuBarIcon? = nil) -> MixerController {
         let mixer = MixerController()
         mixer.persists = false
         func icon(_ bundleID: String) -> NSImage? {
@@ -727,6 +727,8 @@ extension MixerController {
             OutputDevice(id: 3, uid: "c", name: "LG UltraFine", transport: kAudioDeviceTransportTypeDisplayPort),
         ]
         mixer.output = 1
+        // Before the volume, which a change to the settings reads again.
+        if let menuBarIcon { mixer.config.menuBarIcon = menuBarIcon }
         mixer.mainVolume = 0.62
         mixer.hasMainVolume = true
         mixer.softwareActive = software

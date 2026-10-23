@@ -3,6 +3,55 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.18.0 (unreleased)
+
+### Added
+
+- **Window Switcher:** Windows lists every window, or only those on the display the list opens on.
+  While the list opens on the main display it lists every window, and the setting says so.
+- **Window Layout:** ⌃⌥⌘D shows the desktop, as macOS's own gesture does, and brings every window
+  back where it was the next time; snapped windows stay snapped.
+- **Window Layout:** when a display goes (unplugged, or the lid closed), the windows snapped on it
+  are snapped the same way on the display macOS moves them to, so halves stay halves; when it's
+  back, they go back to it, unless you've moved them since.
+- **Updates:** the app looks for a new release on GitHub when it starts and once a day, or when you
+  press Check Now on About. A new version shows there and at the top of the toolkit panel, and is
+  installed only when you ask, if it's signed with the same certificate as the app you have; then
+  the app restarts.
+
+### Changed
+
+- **Menu bar:** the toolkit's mark opens a panel instead of a menu. Every tool is listed with a
+  switch to turn it on or off, which leaves the panel open, and its name opens its settings. Screen
+  Capture, the Audio Mixer and Keep Awake, when they have no part of their own in the menu bar, are
+  tiles at the top: Keep Awake's turns it on or off in one click, with its menu a click away.
+- **Mouse:** shorter wording for the wheel's Fixed distance.
+
+### Fixed
+
+- **Menu bar:** the toolkit's item is centred on a laptop's own display, beside the notch, where it
+  sat a point low. With several displays it's centred on the main one and no longer moves as you
+  switch between displays.
+- **Window Layout:** a window just snapped often couldn't be snapped again, or put back to its old
+  size, when dragged straight away: the outline of the suggestions coming up for the rest of the
+  display was taken for a window in the way, and the drag went unseen.
+- **Window Layout:** dragging a window that was maximized, or snapped after a maximize, sometimes
+  showed no snap for the whole drag: macOS gives it back its old size as the drag starts, and that
+  was taken for a resize.
+- **Window Layout:** a maximized window had macOS's own margin of 8 points rather than the gap, so
+  it didn't line up with the halves beside it. macOS's Fill is used only when its margin is the gap
+  (0 or 8); otherwise the toolkit places the window itself.
+- **Window Layout:** a new gap now reaches a maximized window too, and any window still in macOS's
+  tiling; they kept the old one.
+- **Window Layout:** what's snapped where is no longer lost when the app restarts, updates or
+  crashes: Restore, a drag out and a new gap keep working for those windows.
+- **Window Layout:** Restore after a snap by dragging put the window back where it was let go, half
+  off the display; it goes back where it was before you picked it up.
+- **Window Layout:** a window nearly as tall as its display, made a few points shorter (a bigger gap,
+  say), kept its height when there's another display below; it takes it now.
+- **Window Layout:** the toolkit's own settings window, maximized by a drag to the top, is filled by
+  macOS as after a double-click on its title bar, menu bar and all, like any other window.
+
 ## 0.17.0 (2026-10-23)
 
 ### Added

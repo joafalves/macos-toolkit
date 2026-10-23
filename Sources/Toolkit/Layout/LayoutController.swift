@@ -39,7 +39,10 @@ final class LayoutController: ObservableObject {
     /// one at a time and in order.
     private let work = DispatchQueue(label: "dev.jalves.macos-toolkit.layout", qos: .userInitiated)
     /// What we did to each window, for cycling and Restore. Only touched on `work`.
-    private var placements: [CGWindowID: Placement] = [:]
+    private var placements: [CGWindowID: Placement] = [:] {
+        didSet { savePlacementsSoon() }
+    }
+    private var placementsSave: DispatchWorkItem?
     private var accessTimer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var grid: GridSession?
@@ -52,7 +55,7 @@ final class LayoutController: ObservableObject {
     /// For `--snapshot … layout tabs|keyboard`: the page's tab to show.
     static var previewPage: LayoutPage?
 
-    private struct Placement {
+    private struct Placement: Codable {
         /// Before the first snap, for Restore and for dragging out.
         var original: CGRect
         /// Where the window ended up, which may not be where it was sent: a
@@ -68,6 +71,17 @@ final class LayoutController: ObservableObject {
         /// To find the window again, and where its `unit` is, when the gap changes.
         var pid: pid_t = 0
         var display: CGDirectDisplayID?
+        /// The same display for good: its number can change when it's
+        /// plugged in again, or into another port.
+        var displayUUID: String?
+        /// Where it was snapped on a display that has gone since, to go back
+        /// to when that display comes back.
+        var home: Home?
+
+        struct Home: Codable {
+            let uuid: String
+            let unit: CGRect
+        }
     }
 
     enum Target: Equatable {
@@ -102,6 +116,10 @@ final class LayoutController: ObservableObject {
         var cancelled = false
         /// A window dragged out of its tabs: back in if it's dropped on its slot.
         var leaving: CGWindowID?
+        /// Where it was before the drag, or before the snap it was dragged
+        /// out of: what Restore goes back to after the drop, not where it
+        /// was let go.
+        var original: CGRect?
         /// The window it would join as a tab if dropped now.
         var joining: WindowTabs.Member?
         /// The windows it can be stacked with, while the key is held, and the
@@ -173,11 +191,137 @@ final class LayoutController: ObservableObject {
             })
         }
         refreshRectangle()
+        // Before the first shortcut or drag can act on them.
+        let displays = self.displays
+        work.async { self.restorePlacements(displays: displays) }
         apply()
+    }
+
+    // MARK: - Kept across launches
+
+    /// What's snapped where, in a file, so a restart, an update or a crash
+    /// doesn't lose it: Restore, a drag out and a new gap go on working for
+    /// windows snapped before.
+    private struct SavedPlacements: Codable {
+        /// When the Mac started up: a window's number means nothing after a restart.
+        let boot: TimeInterval
+        let placements: [String: Placement]
+    }
+
+    private static var placementsURL: URL {
+        MouseConfig.fileURL.deletingLastPathComponent().appendingPathComponent("layout-placements.json")
+    }
+
+    private static var bootTime: TimeInterval {
+        var boot = timeval()
+        var size = MemoryLayout<timeval>.size
+        var mib: [Int32] = [CTL_KERN, KERN_BOOTTIME]
+        guard sysctl(&mib, 2, &boot, &size, nil, 0) == 0 else { return 0 }
+        return TimeInterval(boot.tv_sec)
+    }
+
+    /// A second after the last change, on `work`, where `placements` changes.
+    private func savePlacementsSoon() {
+        guard !isPreview else { return }
+        placementsSave?.cancel()
+        let save = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            // Windows closed since have nothing left to keep.
+            let open = Self.windows(Array(self.placements.keys))
+            let closed = self.placements.keys.filter { open[$0]?.pid != self.placements[$0]?.pid }
+            if !closed.isEmpty { closed.forEach { self.placements[$0] = nil } }
+            let saved = SavedPlacements(boot: Self.bootTime, placements: Dictionary(uniqueKeysWithValues: self.placements.map { (String($0.key), $0.value) }))
+            let url = Self.placementsURL
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if let data = try? JSONEncoder().encode(saved) { try? data.write(to: url, options: .atomic) }
+        }
+        placementsSave = save
+        work.asyncAfter(deadline: .now() + 1, execute: save)
+    }
+
+    /// Those still true: the same window, of the same app, where it was put,
+    /// on a display that's still there. One moved meanwhile was moved by
+    /// hand, and is left out as it would have been. On `work`.
+    private func restorePlacements(displays: [LayoutDisplay]) {
+        guard !isPreview, let data = try? Data(contentsOf: Self.placementsURL),
+              let saved = try? JSONDecoder().decode(SavedPlacements.self, from: data) else { return }
+        guard abs(saved.boot - Self.bootTime) < 2 else {
+            LayoutTrace.log("layout: placements from before a restart, left out")
+            return
+        }
+        let found = Self.windows(saved.placements.keys.compactMap { CGWindowID($0) })
+        var kept: [CGWindowID: Placement] = [:]
+        for (key, var record) in saved.placements {
+            guard let id = CGWindowID(key), let window = found[id], window.pid == record.pid, LayoutWindow.close(window.frame, record.applied)
+            else { continue }
+            // Its display by UUID, in case its number changed; one gone is left out.
+            if let uuid = record.displayUUID {
+                guard let display = displays.first(where: { $0.uuid == uuid }) else { continue }
+                record.display = display.id
+            } else if let id = record.display, !displays.contains(where: { $0.id == id }) {
+                continue
+            }
+            kept[id] = record
+        }
+        // Anything placed since launch is newer.
+        placements.merge(kept) { now, _ in now }
+        LayoutTrace.log("layout: \(kept.count) of \(saved.placements.count) placements kept from before")
+    }
+
+    /// The window server's owner and frame for each of these windows that
+    /// still exists.
+    private static func windows(_ ids: [CGWindowID]) -> [CGWindowID: (pid: pid_t, frame: CGRect)] {
+        guard !ids.isEmpty else { return [:] }
+        var values = ids.map { UnsafeRawPointer(bitPattern: UInt($0)) }
+        let list = CFArrayCreate(nil, &values, values.count, nil).flatMap { CGWindowListCreateDescriptionFromArray($0) as? [[String: Any]] } ?? []
+        var found: [CGWindowID: (pid: pid_t, frame: CGRect)] = [:]
+        for info in list {
+            guard let id = info[kCGWindowNumber as String] as? CGWindowID, let pid = info[kCGWindowOwnerPID as String] as? pid_t,
+                  let bounds = info[kCGWindowBounds as String] as? NSDictionary, let frame = CGRect(dictionaryRepresentation: bounds) else { continue }
+            found[id] = (pid, frame)
+        }
+        return found
+    }
+
+    /// Displays that went and came. macOS moves a gone display's windows to
+    /// the others: the snapped ones are snapped the same way again where
+    /// they went, so a left and right pair stays one, and remember where they came
+    /// from. When that display is back, they go back to it, if they're still
+    /// where they were put (or macOS has put them back there itself). A
+    /// display that only got a new number is followed. After a moment, for
+    /// macOS to finish moving the windows.
+    private func followDisplays(gone: [LayoutDisplay], back: [LayoutDisplay], displays: [LayoutDisplay]) {
+        let gap = CGFloat(config.gap)
+        let goneUUIDs = Set(gone.map(\.uuid))
+        work.asyncAfter(deadline: .now() + 1.5) {
+            for (id, record) in self.placements {
+                if let uuid = record.displayUUID, let now = displays.first(where: { $0.uuid == uuid }), now.id != record.display {
+                    self.placements[id]?.display = now.id
+                }
+                // Only those with somewhere to go: asking each window costs.
+                let leaving = record.displayUUID.map(goneUUIDs.contains) == true && record.unit != nil
+                let returning = record.home.map { home in back.contains { $0.uuid == home.uuid } } == true
+                guard leaving || returning, let window = LayoutWindow.find(id: id, pid: record.pid), let frame = window.frame else { continue }
+                if leaving, let uuid = record.displayUUID, let unit = record.unit,
+                   let target = LayoutGeometry.display(of: frame, in: displays) {
+                    self.place(window, .unit(unit, target), displays: displays, gap: gap, cycle: false, original: record.original)
+                    // The first display it came from, if it has moved on more than once.
+                    self.placements[id]?.home = record.home ?? Placement.Home(uuid: uuid, unit: unit)
+                    LayoutTrace.log("layout: \(id) followed its display's going, to \(target.name)")
+                } else if let home = record.home, let display = back.first(where: { $0.uuid == home.uuid }) {
+                    let there = LayoutGeometry.place(home.unit, in: display.usable, gap: gap)
+                    guard LayoutWindow.close(frame, record.applied) || LayoutWindow.near(frame, there) else { continue }
+                    self.place(window, .unit(home.unit, display), displays: displays, gap: gap, cycle: false, original: record.original)
+                    LayoutTrace.log("layout: \(id) back to \(display.name)")
+                }
+            }
+        }
     }
 
     /// Hands everything back to macOS.
     func stop() {
+        // What's waiting to be saved, now: this may be a quit.
+        work.sync { placementsSave?.perform() }
         accessTimer?.invalidate()
         accessTimer = nil
         keys.stop()
@@ -276,7 +420,14 @@ final class LayoutController: ObservableObject {
 
     private func refreshDisplays() {
         let fresh = LayoutDisplay.all()
+        let old = displays
         if fresh != displays { displays = fresh }
+        // By UUID: a display's number can change while it's the same display.
+        let gone = old.filter { display in !fresh.contains { $0.uuid == display.uuid } }
+        let back = fresh.filter { display in !old.contains { $0.uuid == display.uuid } }
+        if !isPreview, !old.isEmpty, !gone.isEmpty || !back.isEmpty || fresh != old {
+            followDisplays(gone: gone, back: back, displays: fresh)
+        }
         // A grid on a display that went away has nothing left to stand on.
         if let grid, !fresh.contains(grid.display) { closeGrid() }
         tabs.displaysChanged(fresh)
@@ -322,6 +473,10 @@ final class LayoutController: ObservableObject {
             closeGrid()
             assist.dismiss()
             runTabs(action)
+        case .action(.showDesktop):
+            closeGrid()
+            assist.dismiss()
+            if !ShowDesktop.toggle() { Self.beep() }
         case .action(let action):
             closeGrid()
             assist.dismiss()
@@ -485,12 +640,14 @@ final class LayoutController: ObservableObject {
     // MARK: - Placing (on `work`, or the main thread in the self-test)
 
     /// `cycle`: at the outer edge, left and right go on through ⅔ and ⅓.
-    func place(_ window: LayoutWindow, _ target: Target, displays: [LayoutDisplay], gap: CGFloat, cycle: Bool, afterDrag: Bool = false) {
+    /// `original`: where it was before, when that isn't where it is now:
+    /// before the drag that brought it here.
+    func place(_ window: LayoutWindow, _ target: Target, displays: [LayoutDisplay], gap: CGFloat, cycle: Bool, afterDrag: Bool = false,
+               original: CGRect? = nil) {
         guard let frame = window.frame, let current = LayoutGeometry.display(of: frame, in: displays) else { return Self.beep() }
-        if placements.count > 500 { placements.removeAll() }
         // Only counts if the window is still where we put it.
         let record = placements[window.id].flatMap { LayoutWindow.close($0.applied, frame) ? $0 : nil }
-        var placement = Placement(original: record?.original ?? frame, applied: frame, pid: window.pid)
+        var placement = Placement(original: record?.original ?? original ?? frame, applied: frame, pid: window.pid)
         var display = current
         let rect: CGRect
 
@@ -607,17 +764,21 @@ final class LayoutController: ObservableObject {
                 rect = fill(unit, on: current)
             }
         }
-        // The whole display is macOS's own Fill, with a gap macOS can come
-        // close to (its margin, on above 0, is 8): the app is asked to do it,
-        // so macOS treats the window as filled, title bar and all. Onto
-        // another display, it goes there first.
-        if gap <= LayoutGeometry.macOSMargin, placement.unit == CGRect(x: 0, y: 0, width: 1, height: 1), window.isFocusedInApp {
+        // The whole display is macOS's own Fill when its margin is the gap
+        // (none at 0, 8 above that): the app is asked to do it, so macOS
+        // treats the window as filled, title bar and all. With another gap
+        // it's our frame, like the halves beside it: a window macOS filled
+        // can't be moved to fit the gap, macOS puts it back. Onto another
+        // display, it goes there first.
+        if gap == 0 || gap == LayoutGeometry.macOSMargin, placement.unit == CGRect(x: 0, y: 0, width: 1, height: 1), window.takesTilingCommands {
             if display.id != current.id { window.setFrame(rect, within: display.usable) }
             // Only if it really filled: an app can take the command and do nothing.
             if window.perform(.fill), let filled = Self.settled(window, near: rect), LayoutWindow.near(filled, rect) {
+                LayoutTrace.log("layout: filled \(window.id) at \(LayoutTrace.text(filled))")
                 placement.applied = filled
                 placement.tiledByMacOS = true
                 placement.display = display.id
+                placement.displayUUID = display.uuid
                 placements[window.id] = placement
                 return
             }
@@ -628,7 +789,9 @@ final class LayoutController: ObservableObject {
         // back by itself when it's dragged away.
         placement.tiledByMacOS = window.isTiledByMacOS
         placement.display = display.id
+        placement.displayUUID = display.uuid
         placements[window.id] = placement
+        LayoutTrace.log("layout: placed \(window.id) at \(LayoutTrace.text(rect)): \(LayoutTrace.text(actual)), tiled by macOS \(placement.tiledByMacOS)")
     }
 
     // MARK: - Gap changes
@@ -653,12 +816,15 @@ final class LayoutController: ObservableObject {
             tabs.layoutAll()
         }
         work.async {
+            // Those in macOS's tiling too, a window it filled among them:
+            // sent until macOS lets go of them.
             for (id, record) in self.placements {
-                guard let unit = record.unit, !record.tiledByMacOS, let displayID = record.display,
+                guard let unit = record.unit, let displayID = record.display,
                       let display = displays.first(where: { $0.id == displayID }),
                       let window = LayoutWindow.find(id: id, pid: record.pid), let frame = window.frame,
                       LayoutWindow.close(frame, record.applied),
-                      let actual = window.setFrame(LayoutGeometry.place(unit, in: display.usable, gap: gap), within: display.usable)
+                      let actual = window.setFrame(LayoutGeometry.place(unit, in: display.usable, gap: gap), within: display.usable,
+                                                   tiled: record.tiledByMacOS)
                 else { continue }
                 self.placements[id]?.applied = actual
             }
@@ -666,13 +832,22 @@ final class LayoutController: ObservableObject {
     }
 
     /// Where a window ends up once macOS has finished moving it, which it
-    /// may animate: read until it stops changing, for a moment at most.
+    /// animates: read until it hasn't moved for a few reads, for half a
+    /// second at most. The end of the animation is slow, so two reads alike
+    /// came a few points short of where it stopped, and the window then
+    /// looked moved by hand since: a new gap left it alone.
     private static func settled(_ window: LayoutWindow, near target: CGRect) -> CGRect? {
         var last = window.frame
-        for _ in 0..<12 {
+        var still = 0
+        for _ in 0..<20 {
             usleep(25_000)
             let now = window.frame
-            if let now, let previous = last, LayoutWindow.close(now, previous), LayoutWindow.near(now, target) { return now }
+            if let now, let previous = last, now == previous, LayoutWindow.near(now, target) {
+                still += 1
+                if still >= 3 { return now }
+            } else {
+                still = 0
+            }
             last = now
         }
         return last
@@ -809,7 +984,16 @@ final class LayoutController: ObservableObject {
         watchEscape()
         let restore = config.restoreOnDragOut
         work.async {
+            // Snapped when the drag began: where it was when pressed on, before
+            // it moved (or macOS, for one it filled, changed its size).
+            let before = grab.start ?? grab.frame
+            let snappedBefore = self.placements[grab.id].flatMap { LayoutWindow.close($0.applied, before) ? $0.original : nil }
+            let original = snappedBefore ?? before
+            DispatchQueue.main.async {
+                if self.drag?.grab.id == grab.id { self.drag?.original = original }
+            }
             guard let window = LayoutWindow.find(id: grab.id, pid: grab.pid) else {
+                LayoutTrace.log("layout: window \(grab.id) not one to place")
                 DispatchQueue.main.async {
                     guard self.drag?.grab.id == grab.id else { return }
                     self.drag?.eligible = false
@@ -824,6 +1008,7 @@ final class LayoutController: ObservableObject {
             // A snapped window dragged away gets its old size back, with the
             // pointer at the same place across it, as Rectangle does.
             // A window macOS filled is put back by macOS.
+            LayoutTrace.log("layout: drag of \(grab.id), record \(self.placements[grab.id].map { "applied \(LayoutTrace.text($0.applied)), original \(LayoutTrace.text($0.original)), tiled by macOS \($0.tiledByMacOS)" } ?? "none")")
             guard restore, let record = self.placements[grab.id], !record.tiledByMacOS, LayoutWindow.close(record.applied.size, grab.frame.size),
                   let frame = window.frame, let pointer = CGEvent(source: nil)?.location
             else { return }
@@ -948,6 +1133,7 @@ final class LayoutController: ObservableObject {
         dragOverlay.hide()
         stopWatchingEscape()
         drags.holdDisplays.value = nil
+        LayoutTrace.log("layout: dropped at \(point), session \(drag.map { "eligible \(String(describing: $0.eligible)), cancelled \($0.cancelled), target \(String(describing: $0.target))" } ?? "none")")
         guard let session = drag else { return }
         drag = nil
         tabs.dragging = nil
@@ -969,9 +1155,10 @@ final class LayoutController: ObservableObject {
         let suggest = config.suggest, from = config.suggestFrom
         // A moment for the app to finish with the drag, or it may put the
         // window back where the mouse left it.
+        let original = session.original
         work.asyncAfter(deadline: .now() + 0.03) {
             guard let window = LayoutWindow.find(id: grab.id, pid: grab.pid) else { return }
-            self.place(window, target, displays: displays, gap: gap, cycle: false, afterDrag: true)
+            self.place(window, target, displays: displays, gap: gap, cycle: false, afterDrag: true, original: original)
         }
         // At once, not after the window has finished moving: the part that's
         // left is known now, and the dropped window isn't offered anyway.

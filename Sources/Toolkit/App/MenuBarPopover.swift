@@ -83,6 +83,13 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
         popover?.performClose(nil)
     }
 
+    /// Still hanging from its part, which moves as parts before it come or
+    /// go: a switch in the toolkit panel adds or takes away a tool's part.
+    func follow() {
+        guard let popover, let kind = shownFor, let rect = menuBar.rect(of: kind), popover.positioningRect != rect else { return }
+        popover.positioningRect = rect
+    }
+
     private func watch() {
         guard monitors.isEmpty else { return }
         let close: () -> Void = { [weak self] in self?.close() }
