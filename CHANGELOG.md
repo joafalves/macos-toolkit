@@ -3,7 +3,7 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
-## 0.19.0 (unreleased)
+## 0.19.0 (2026-10-24)
 
 ### Added
 
@@ -19,8 +19,8 @@ worked on; it gets its date when it's released.
 ### Changed
 
 - **Audio Mixer:** the volume keys go 16 presses from silent to full, as macOS's own do, rather than
-  20. The on-screen bar has 16 segments, one a press, and fills part
-  of one for smaller steps.
+  20 (Round keeps 5% a press). The on-screen bar has 16 segments, one a press, and fills part of
+  one for smaller steps.
 - **Audio Mixer:** software volume, for outputs with no volume of their own, is even in decibels from
   top to bottom, like macOS's own outputs: low down, a press no longer jumps the sound a lot, nor
   does nothing near the top. Volumes already set sound the same, though the number shown changes.
