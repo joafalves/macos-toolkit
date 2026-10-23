@@ -99,7 +99,7 @@ final class WheelEngine {
             // With its curve off, macOS makes a slow notch a tenth of a line,
             // a single point (measured on an MX Anywhere 2S, which reports an
             // ordinary wheel): barely a move. Each notch, one event, goes a set
-            // distance instead, as a wheel scrolls on Windows, or one along the
+            // distance instead, or one along the
             // graph. Only up and down: a tilt sends events for as long as it's
             // held, not notches, so sideways each is a line.
             if fixedY != 0 {

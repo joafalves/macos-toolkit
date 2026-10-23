@@ -43,6 +43,10 @@ final class SelectionOverlay {
     /// keeps the area on screen to adjust, until Capture is pressed.
     private(set) var quick = true
     private(set) var mode = Mode.area
+    /// The quick kind copies the text in what's picked rather than taking a
+    /// screenshot. T switches it either way, while `allowsText`.
+    private(set) var readsText = false
+    private(set) var allowsText = false
     /// In AppKit global coordinates.
     var selection: NSRect? {
         didSet { redraw() }
@@ -70,10 +74,12 @@ final class SelectionOverlay {
     var isVisible: Bool { !windows.isEmpty }
     var windowNumbers: Set<CGWindowID> { Set(windows.compactMap(\.windowID)) }
 
-    func show(mode: Mode, quick: Bool, area: NSRect? = nil) {
+    func show(mode: Mode, quick: Bool, area: NSRect? = nil, text: Bool = false, allowsText: Bool = false) {
         hide()
         self.quick = quick
         self.mode = mode
+        self.allowsText = quick && allowsText
+        readsText = self.allowsText && text
         selection = quick ? nil : area
         mouse = NSEvent.mouseLocation
         loadCandidates()
@@ -181,7 +187,7 @@ final class SelectionOverlay {
     /// Over an area kept on screen: a resize cursor on its knobs, a hand
     /// inside it (closed while moving it), the crosshair elsewhere.
     private func areaCursor() -> NSCursor {
-        guard mode == .area else { return mode == .window ? CaptureCursor.camera : .crosshair }
+        guard mode == .area else { return mode == .window ? (readsText ? CaptureCursor.text : CaptureCursor.camera) : .crosshair }
         switch drag {
         case .resize(let handle, _): return handle.cursor
         case .move: return .closedHand
@@ -213,7 +219,14 @@ final class SelectionOverlay {
             onConfirm?(event)
             return true
         default:
-            return false
+            // By the letter typed, not the key's place: it stands for Text.
+            guard allowsText, event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
+                  event.charactersIgnoringModifiers?.lowercased() == "t"
+            else { return false }
+            readsText.toggle()
+            redraw()
+            cursorUpdate()
+            return true
         }
     }
 
@@ -483,7 +496,7 @@ private final class OverlayView: NSView {
             if !overlay.quick {
                 for handle in Handle.allCases { knob(handle, at: handle.point(in: hole)) }
             }
-            size("\(Int(selection.width)) × \(Int(selection.height))", under: hole)
+            size(tagged("\(Int(selection.width)) × \(Int(selection.height))"), under: hole)
         case .window:
             // The highlight is a window of its own, in among the others.
             break
@@ -554,7 +567,12 @@ private final class OverlayView: NSView {
         guard overlay.drag == nil, screen.frame.contains(overlay.mouse) else { return }
         let p = NSPoint(x: overlay.mouse.x - screen.frame.minX, y: overlay.mouse.y - screen.frame.minY)
         // Points from the top left of this display.
-        label("\(Int(p.x)), \(Int(bounds.height - p.y))", at: NSPoint(x: p.x + 14, y: p.y - 14), below: true)
+        label(tagged("\(Int(p.x)), \(Int(bounds.height - p.y))"), at: NSPoint(x: p.x + 14, y: p.y - 14), below: true)
+    }
+
+    /// Says so while the text is what will be copied.
+    private func tagged(_ figures: String) -> String {
+        overlay.readsText ? String(localized: "Text · \(figures)") : figures
     }
 
     private func label(_ text: String, at point: NSPoint, below: Bool, centered: Bool = false) {
@@ -576,10 +594,13 @@ private final class OverlayView: NSView {
 /// Cursors for the overlay, and permission to set them while the toolkit is
 /// not the active app.
 enum CaptureCursor {
-    static let camera: NSCursor = {
+    static let camera = symbol("camera.fill")
+    static let text = symbol("text.viewfinder")
+
+    private static func symbol(_ name: String) -> NSCursor {
         let config = NSImage.SymbolConfiguration(pointSize: 18, weight: .regular).applying(.init(paletteColors: [.white]))
         let image = NSImage(size: NSSize(width: 28, height: 24), flipped: false) { rect in
-            guard let symbol = NSImage(systemSymbolName: "camera.fill", accessibilityDescription: nil)?.withSymbolConfiguration(config) else { return false }
+            guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) else { return false }
             let r = NSRect(x: (rect.width - symbol.size.width) / 2, y: (rect.height - symbol.size.height) / 2,
                            width: symbol.size.width, height: symbol.size.height)
             // A dark outline so it shows on light and dark windows.
@@ -588,7 +609,7 @@ enum CaptureCursor {
             return true
         }
         return NSCursor(image: image, hotSpot: NSPoint(x: 14, y: 12))
-    }()
+    }
 
     static func allowInBackground() {
         let connection = CGSMainConnectionID()

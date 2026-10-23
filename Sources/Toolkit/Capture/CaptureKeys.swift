@@ -8,12 +8,14 @@ final class CaptureKeys {
     enum Action: Equatable {
         case screen(copy: Bool)
         case area(copy: Bool)
+        case text
         case toolbar
     }
 
     struct Bindings: Equatable {
         var screen: Shortcut?
         var area: Shortcut?
+        var text: Shortcut?
         var toolbar: Shortcut?
     }
 
@@ -78,7 +80,8 @@ final class CaptureKeys {
 
     // MARK: - Registration
 
-    /// Each shortcut with its action, plus ⌃ versions that copy.
+    /// Each shortcut with its action, plus ⌃ versions that copy. Text is
+    /// always copied, so it has none.
     private static func combos(_ b: Bindings) -> [(Shortcut, Action)] {
         var list: [(Shortcut, Action)] = []
         func add(_ shortcut: Shortcut?, _ action: (Bool) -> Action) {
@@ -88,6 +91,7 @@ final class CaptureKeys {
         }
         add(b.screen) { .screen(copy: $0) }
         add(b.area) { .area(copy: $0) }
+        if let text = b.text { list.append((text, .text)) }
         if let toolbar = b.toolbar { list.append((toolbar, .toolbar)) }
         // The same keys twice would register only once anyway.
         var seen: [Shortcut] = []

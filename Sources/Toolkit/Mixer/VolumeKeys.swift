@@ -129,6 +129,14 @@ final class VolumeHUD {
         _ = hud
     }
 
+    /// For `--snapshot volume-hud`: the bar at each volume, without showing it.
+    static func view(volume: Float, muted: Bool) -> some View {
+        let model = HUDModel()
+        model.volume = volume
+        model.muted = muted
+        return VolumeHUDView(model: model)
+    }
+
     func show(volume: Float, muted: Bool) {
         model.volume = volume
         model.muted = muted
@@ -212,7 +220,8 @@ final class VolumeHUD {
 
 private struct VolumeHUDView: View {
     @ObservedObject var model: HUDModel
-    private static let segments = 20
+    /// One a press at the Standard step, as macOS's own bar.
+    private static let segments = 16
 
     private var symbol: String {
         if model.muted || model.volume <= 0 { return "speaker.slash.fill" }
@@ -220,15 +229,22 @@ private struct VolumeHUDView: View {
     }
 
     var body: some View {
-        let filled = model.muted ? 0 : Int((model.volume * Float(Self.segments)).rounded())
+        // Smaller steps fill part of a segment, so every press shows.
+        let filled = model.muted ? 0 : Double(model.volume) * Double(Self.segments)
         HStack(spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
                 .frame(width: 26)
             HStack(spacing: 2.5) {
                 ForEach(0..<Self.segments, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(index < filled ? Color.primary : Color.primary.opacity(0.2))
+                    let part = min(max(filled - Double(index), 0), 1)
+                    Color.primary.opacity(0.2)
+                        .overlay(alignment: .leading) {
+                            GeometryReader { box in
+                                Color.primary.frame(width: box.size.width * part)
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
                         .frame(height: 9)
                 }
             }

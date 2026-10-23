@@ -216,9 +216,9 @@ struct LayoutSettingsView: View {
                     Banner(text: "Accessibility is granted, but the app has to restart before snapping by dragging takes effect.",
                            button: "Restart") { Relaunch.now() }
                 }
-                if layout.rectangleRunning {
-                    Banner(text: "Rectangle is running. It has the same shortcuts and snaps windows too, so the two get in each other's way.",
-                           button: "Quit Rectangle") { layout.quitRectangle() }
+                if let rival = layout.rivalRunning {
+                    Banner(text: "\(rival) is running. It has the same shortcuts and snaps windows too, so the two get in each other's way.",
+                           button: "Quit \(rival)") { layout.quitRival() }
                 }
                 if config.suggest == .previews, !recording.value, !layout.isPreview {
                     Banner(text: "Suggestions show pictures of your windows with the Screen Recording permission. Until then they show the list.",

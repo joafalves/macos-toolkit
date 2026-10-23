@@ -7,7 +7,7 @@
   <b>The little things macOS never shipped, in one menu bar app.</b><br>
   A volume slider for every app. A ⌘Tab that lists windows. Windows snapped to halves or a grid,
   from the keyboard or by dragging. Mouse settings that stick, per mouse.
-  ⌘X, swipe back and forward, and a better right-click menu in Finder. Screenshots and small screen recordings on ⇧⌘3/4/5.
+  ⌘X, swipe back and forward, and a better right-click menu in Finder. Screenshots and small screen recordings on ⇧⌘3/4/5, and the text on screen with ⇧⌘2 if you like.
   A Mac that stays awake for as long as you need. CPU, memory and more in the menu bar, with memory that
   means something.
 </p>
@@ -114,20 +114,21 @@
   </tr>
 </table>
 
-I missed a few things from Windows and from third-party apps, and I didn't want three more apps
-running to get them. So this is one small app, written in Swift with no dependencies, where each
-tool is a section in the sidebar and (where it makes sense) an entry in the menu bar.
+Years of using Windows, and Mac apps like AltTab, Rectangle, SteerMouse, CleanShot X, Stats and
+Amphetamine, left me with habits I didn't want to give up, and I didn't want six more apps running
+to keep them. So this is one small app, written in Swift with no dependencies, where each tool is a
+section in the sidebar and (where it makes sense) an entry in the menu bar.
 
 | Tool | What it does |
 | --- | --- |
-| 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, like the Windows volume mixer, plus an equalizer and volume control for outputs that have none. |
-| 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps (AltTab-style), across all Spaces. |
-| 🔲 **[Window Layout](#window-layout)** | Rectangle's shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, snapping by dragging, and stacks of windows sharing a slot (a preview). |
-| 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse (SteerMouse-style), autoscroll on the wheel button, plus battery level. |
+| 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, plus an equalizer and volume control for outputs that have none. |
+| 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps, across all Spaces. |
+| 🔲 **[Window Layout](#window-layout)** | Shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, snapping by dragging, and stacks of windows sharing a slot (a preview). |
+| 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse, autoscroll on the wheel button, plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
-| 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings (CleanShot-style), with window backdrops and small H.264 files. |
-| 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar (Stats-style), with a memory figure that leaves out what macOS only caches. |
-| ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off (Amphetamine-style), with the lid closed if you like. |
+| 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings, with window backdrops and small H.264 files, and ⇧⌘2 to copy the text on screen. |
+| 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar, with a memory figure that leaves out what macOS only caches. |
+| ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off, with the lid closed if you like. |
 
 Each tool can be turned off or left on its macOS defaults, and anything the app changes outside
 itself is put back when it quits. No accounts, no telemetry, no network code. Settings are plain JSON in
@@ -166,8 +167,9 @@ every app that has sound gets its own slider.
   percentage**, or **Volume pill**, a pill that fills with the volume like the battery, with the
   speaker and the number cut out of it.
 - **The volume keys** go through the mixer on every output while it's on, so they always behave the
-  same: 5% a press (1% with ⇧⌥), mute toggles, and the toolkit's own on-screen bar in place of
-  macOS's. On outputs with a volume of their own that volume is set directly; on the rest it's the
+  same: 16 presses from silent to full, as macOS's own keys (**Each press** in the settings makes it
+  32, 20 at 5% a press, or 10), ⇧⌥ for small changes (1 point of the volume, or up to 5 as set), mute toggles, and the
+  toolkit's own on-screen bar in place of macOS's. On outputs with a volume of their own that volume is set directly; on the rest it's the
   software volume. ⌥ with a volume key still opens Sound settings. Needs **Accessibility**.
 - **Software volume** for outputs that have no volume control of their own (see below).
 - An **equalizer** under the main volume: five bands (60 Hz to 12 kHz, ±12 dB) with presets such as
@@ -189,6 +191,8 @@ Many monitors over HDMI or DisplayPort show up in macOS with no volume at all: t
 out and the volume keys show a "not allowed" icon. For those outputs the mixer takes over:
 
 - The **main slider** works there too, marked with a small chip icon.
+- Its scale is even in decibels from top to bottom, like macOS's own outputs, so each press of a
+  volume key sounds the same change at any level.
 - It lowers the sound in software: one tap on everything that plays to that output, scaled down and
   played again. Per-app volumes keep working on top. Each output remembers its own volume.
 - The tap stays up at 100%, passing the sound through untouched, because taking it down there would
@@ -299,8 +303,7 @@ switched back on when the toolkit quits or the tool is turned off.
   </picture>
 </p>
 
-Snaps the focused window to part of its display. The keys are Rectangle's, so coming from it nothing
-changes; each one can be changed or cleared in the settings.
+Snaps the focused window to part of its display. Each key can be changed or cleared in the settings.
 
 | Key | Action |
 | --- | --- |
@@ -378,7 +381,7 @@ Dragging across the cells with the mouse works too.
   is back, they go back to it as they were, unless you've moved them since.
 - **Suggest windows for the rest** (on, set to Previews): after a window is dropped on an edge or
   into a layout from the ⌥ bar, the part of the display that's left shows your other windows on
-  the current Space, most recently used first, as Windows' Snap Assist does. **Windows from other
+  the current Space, most recently used first. **Windows from other
   displays** sets whether yours elsewhere are offered: **only this display's**, **others' if it has
   none** (the default), or **always, after its own**. Click one, or
   press its number (arrows and ↩ work too), and it goes there; in a layout of three, the part after
@@ -469,10 +472,10 @@ soon as the same mouse is connected.
 Cursor settings need no permission. The wheel and button settings that go through the event tap need
 **Accessibility**. Trackpad scrolling is never modified. Fixed and curve set how far the wheel scrolls
 up and down; sideways, a tilt scrolls a line at a time. They count each wheel event as a notch, as an
-ordinary wheel sends them; a mouse whose own software (Logi Options+ and the like) makes its wheel
+ordinary wheel sends them; a mouse whose own software makes its wheel
 send fractions of a notch is left to that software.
 
-**Autoscroll** is the Windows browser feature, in every app: hold the wheel button and move the mouse,
+**Autoscroll** works in every app: hold the wheel button and move the mouse,
 and the window scrolls that way, faster the farther you move from where you pressed. A marker shows
 that spot, and letting go stops. A wheel click without moving is still a normal middle click, so
 links still open in new tabs. Hold **⌥** (or the key picked in the settings) while pressing the wheel
@@ -499,8 +502,8 @@ in the destination. This does it with ⌘X and ⌘V:
 
 Only keys pressed while Finder is in front are touched, and not while a name or the search field is
 being edited, where ⌘X and ⌘V keep their text meaning. Copying anything else in between cancels the
-cut, and a ⌘V somewhere other than Finder just pastes a copy. Finder can't dim the cut files the way
-Windows does, so a short sound says the cut worked instead. Cut needs **Accessibility**.
+cut, and a ⌘V somewhere other than Finder just pastes a copy. Finder can't dim the cut files, so a
+short sound says the cut worked instead. Cut needs **Accessibility**.
 
 Finder also doesn't go back and forward on a two-finger swipe, which browsers do. With **Swipe back
 and forward** on, swiping two fingers to the right on the trackpad goes back and to the left goes
@@ -548,7 +551,8 @@ changed or cleared in the settings, and ⌃ added to the display or area shortcu
 | Key | Action |
 | --- | --- |
 | ⇧⌘3 | Screenshot of the display under the pointer |
-| ⇧⌘4 | Drag out an area. **Space** switches to clicking a window |
+| ⇧⌘4 | Drag out an area. **Space** switches to clicking a window, and **T** to copying its text, with **Copy text from the screen** on |
+| ⇧⌘2 | Copy the text in an area, with **Copy text from the screen** on (see below). **Space** switches to clicking a window, **T** to a screenshot |
 | ⇧⌘5 | The toolbar: display, window or area, screenshot or recording, timer and options. Stops a recording |
 | hold ⌃ | Copy to the clipboard instead of saving a file. It counts if it's held when the capture happens, so it can be pressed mid-drag |
 | esc | Cancel |
@@ -574,6 +578,19 @@ changed or cleared in the settings, and ⌃ added to the display or area shortcu
 - The toolbar remembers the last area. The toolkit's own toolbar, outline and thumbnails never show
   up in a capture.
 - Optionally gets a **camera in the menu bar**, which opens the toolbar.
+- **Text** (off until **Copy text from the screen** is turned on): ⇧⌘2 copies the text in the area
+  you drag out, or in the window you click, to the clipboard. A sentence that wraps on screen comes
+  out whole, a gap between paragraphs becomes a blank line, lists and lines of code keep their
+  breaks, and things side by side (columns, a table) are split by a tab. If the area is mostly a QR
+  code or barcode, what it holds is copied instead. It's read on this Mac by macOS's own text
+  recognition, nothing is sent anywhere, and no file is saved. A card in the corner shows the first
+  lines; drag it into an app for the text again. When there's no text, the clipboard is left as it
+  was.
+- The reading is done by a copy of the app that quits as soon as the text is copied, about a tenth
+  of a second, so the memory it takes is given back each time; turning the setting off stops a
+  reading under way. With the setting off, ⇧⌘2 and T aren't there and nothing is loaded. A new version
+  of the app needs macOS to get its recognition ready once, about half a minute; the toolkit has
+  that done in the background, a little after it starts, so a restart costs nothing.
 
 It needs the **Screen Recording** permission (and the microphone one, if you turn the mic on). macOS
 asks again every so often to confirm it for apps that aren't Apple's. macOS's own screenshot

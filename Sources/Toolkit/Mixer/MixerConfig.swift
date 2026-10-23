@@ -28,8 +28,54 @@ struct SoftwareVolume: Codable, Equatable {
 
     var isDefault: Bool { volume >= 1 && !muted }
 
-    /// Squared like the app volumes, so the middle of the scale sounds about half as loud.
-    var gain: Float { muted ? 0 : Float(volume * volume) }
+    /// Even in decibels from top to bottom, as macOS has the outputs with a
+    /// volume of their own (the built-in speakers: 63.5 dB, about 4 a
+    /// sixteenth), so each press of a key sounds the same change on any output.
+    var gain: Float { muted || volume <= 0 ? 0 : Float(pow(10, Self.range * (volume - 1) / 20)) }
+
+    static let range = 63.5
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        muted = try c.decodeIfPresent(Bool.self, forKey: .muted) ?? false
+        if let level = try c.decodeIfPresent(Double.self, forKey: .level) {
+            volume = min(max(level, 0), 1)
+        } else {
+            // Before 0.19 the gain was the volume squared: the level that
+            // sounds the same on the even scale.
+            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+            let old = min(max(try legacy.decodeIfPresent(Double.self, forKey: .volume) ?? 1, 0), 1)
+            volume = old <= 0 ? 0 : max(0.01, 1 + 40 * log10(old) / Self.range)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(volume, forKey: .level)
+        try c.encode(muted, forKey: .muted)
+    }
+
+    /// `level`, not `volume`, so a file says which scale it's on.
+    private enum CodingKeys: String, CodingKey { case level, muted }
+    private enum LegacyKeys: String, CodingKey { case volume }
+}
+
+/// How far a press of a volume key goes.
+enum VolumeKeyStep: String, Codable, CaseIterable {
+    case fine, round, standard, large
+
+    /// From silent to full. Standard is macOS's own; Round, 5% a press, keeps
+    /// the volume on round numbers.
+    var presses: Int {
+        switch self {
+        case .fine: return 32
+        case .round: return 20
+        case .standard: return 16
+        case .large: return 10
+        }
+    }
 }
 
 /// What the mixer shows in the menu bar besides the toolkit's own icon.
@@ -61,6 +107,11 @@ struct MixerConfig: Codable, Equatable {
     var softwareVolume = true
     /// Keyed by the output device's UID.
     var software: [String: SoftwareVolume] = [:]
+    var keyStep = VolumeKeyStep.standard
+    /// A press with ⇧⌥ held, in points of the volume as shown (1 takes 35 to
+    /// 36): for small changes.
+    var fineStep = 1
+    static let fineStepRange = 1...5
     /// When on and not flat, all sound goes through the toolkit to be equalized.
     var equalizer = EqualizerConfig()
     /// Keyed by bundle ID.
@@ -90,6 +141,8 @@ struct MixerConfig: Codable, Equatable {
         shownIcon = menuBarIcon != .none ? menuBarIcon : shown.flatMap { $0 == .none ? nil : $0 } ?? .volume
         softwareVolume = try c.decodeIfPresent(Bool.self, forKey: .softwareVolume) ?? true
         software = (try? c.decodeIfPresent([String: SoftwareVolume].self, forKey: .software)) ?? [:]
+        keyStep = (try? c.decodeIfPresent(VolumeKeyStep.self, forKey: .keyStep)) ?? .standard
+        fineStep = min(max(try c.decodeIfPresent(Int.self, forKey: .fineStep) ?? 1, Self.fineStepRange.lowerBound), Self.fineStepRange.upperBound)
         equalizer = (try? c.decodeIfPresent(EqualizerConfig.self, forKey: .equalizer)) ?? EqualizerConfig()
         apps = (try? c.decodeIfPresent([String: AppVolume].self, forKey: .apps)) ?? [:]
         ignored = (try? c.decodeIfPresent([String: String].self, forKey: .ignored)) ?? [:]

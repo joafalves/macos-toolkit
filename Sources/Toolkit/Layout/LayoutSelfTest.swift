@@ -169,27 +169,27 @@ extension LayoutController {
         check("beside a quarter: nothing clean", LayoutGeometry.complement(of: CGRect(x: 0, y: 0, width: 0.5, height: 0.5)) == nil)
         check("beside the whole display: nothing", LayoutGeometry.complement(of: CGRect(x: 0, y: 0, width: 1, height: 1)) == nil)
         let rightHalf = LayoutGeometry.place(CGRect(x: 0.5, y: 0, width: 0.5, height: 1), in: laptop.usable, gap: 8)
-        let shown = [SnapAssist.OnScreen(id: 1, frame: LayoutGeometry.place(left, in: laptop.usable, gap: 8)),
-                     SnapAssist.OnScreen(id: 2, frame: CGRect(x: 300, y: 200, width: 600, height: 400)),
-                     SnapAssist.OnScreen(id: 3, frame: CGRect(x: 2000, y: 200, width: 600, height: 400)),
-                     SnapAssist.OnScreen(id: 4, frame: rightHalf.insetBy(dx: 3, dy: 3))]
-        check("a slot with a window in it is filled", SnapAssist.filled(rightHalf, by: shown, except: [1]))
-        check("not by the window just dropped", !SnapAssist.filled(rightHalf, by: Array(shown.prefix(3)), except: [1]))
-        let maximized = SnapAssist.OnScreen(id: 9, frame: LayoutGeometry.place(CGRect(x: 0, y: 0, width: 1, height: 1), in: laptop.usable, gap: 8))
-        check("nor by one in the slot but under a maximized window", !SnapAssist.filled(rightHalf, by: [shown[0], maximized, shown[3]], except: [1]))
-        check("but by one in front of it", SnapAssist.filled(rightHalf, by: [shown[0], shown[3], maximized], except: [1]))
+        let shown = [WindowSuggestions.OnScreen(id: 1, frame: LayoutGeometry.place(left, in: laptop.usable, gap: 8)),
+                     WindowSuggestions.OnScreen(id: 2, frame: CGRect(x: 300, y: 200, width: 600, height: 400)),
+                     WindowSuggestions.OnScreen(id: 3, frame: CGRect(x: 2000, y: 200, width: 600, height: 400)),
+                     WindowSuggestions.OnScreen(id: 4, frame: rightHalf.insetBy(dx: 3, dy: 3))]
+        check("a slot with a window in it is filled", WindowSuggestions.filled(rightHalf, by: shown, except: [1]))
+        check("not by the window just dropped", !WindowSuggestions.filled(rightHalf, by: Array(shown.prefix(3)), except: [1]))
+        let maximized = WindowSuggestions.OnScreen(id: 9, frame: LayoutGeometry.place(CGRect(x: 0, y: 0, width: 1, height: 1), in: laptop.usable, gap: 8))
+        check("nor by one in the slot but under a maximized window", !WindowSuggestions.filled(rightHalf, by: [shown[0], maximized, shown[3]], except: [1]))
+        check("but by one in front of it", WindowSuggestions.filled(rightHalf, by: [shown[0], shown[3], maximized], except: [1]))
         func row(_ id: CGWindowID, _ state: SwitcherItem.State = .window) -> SwitcherItem {
             SwitcherItem(id: "w\(id)", window: id, pid: 1, title: "\(id)", appName: "App", icon: nil, state: state)
         }
-        let offered = SnapAssist.candidates([row(4), row(2), row(3), row(1), row(5, .minimized), row(6)],
+        let offered = WindowSuggestions.candidates([row(4), row(2), row(3), row(1), row(5, .minimized), row(6)],
                                             onScreen: shown, on: laptop, in: pair, excluding: [1])
         check("offered, always: this display's open windows first, then the other display's, not the dropped one",
               offered.compactMap(\.window) == [4, 2, 3], "\(offered.compactMap(\.window))")
-        let only = SnapAssist.candidates([row(4), row(2), row(3)], onScreen: shown, on: laptop, in: pair, excluding: [1], from: .display)
+        let only = WindowSuggestions.candidates([row(4), row(2), row(3)], onScreen: shown, on: laptop, in: pair, excluding: [1], from: .display)
         check("this display only: not the other display's", only.compactMap(\.window) == [4, 2])
-        let fallback = SnapAssist.candidates([row(4), row(2), row(3)], onScreen: shown, on: laptop, in: pair, excluding: [1], from: .fallback)
+        let fallback = WindowSuggestions.candidates([row(4), row(2), row(3)], onScreen: shown, on: laptop, in: pair, excluding: [1], from: .fallback)
         check("if none here, with some here: just this display's", fallback.compactMap(\.window) == [4, 2])
-        let elsewhere = SnapAssist.candidates([row(4), row(2), row(3)], onScreen: shown, on: wide, in: pair, excluding: [1, 3], from: .fallback)
+        let elsewhere = WindowSuggestions.candidates([row(4), row(2), row(3)], onScreen: shown, on: wide, in: pair, excluding: [1, 3], from: .fallback)
         check("if none here, with none here: the other display's", elsewhere.compactMap(\.window) == [4, 2], "\(elsewhere.compactMap(\.window))")
         let picker = SlotPicker(display: laptop, pointer: CGPoint(x: 700, y: 500))
         check("layouts bar sits above the pointer", picker.frame.maxY <= 500 - 20 && picker.frame.contains(CGPoint(x: 700, y: picker.frame.midY)))
@@ -555,7 +555,7 @@ extension LayoutController {
                 for window in [a, b] { layout.place(window, .unit(right, display), displays: displays, gap: 0, cycle: false) }
                 func member(_ w: LayoutWindow) -> WindowTabs.Member { WindowTabs.Member(id: w.id, pid: w.pid) }
                 func wait(_ seconds: TimeInterval) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
-                func order() -> [CGWindowID] { SnapAssist.onScreen().map(\.id) }
+                func order() -> [CGWindowID] { WindowSuggestions.onScreen().map(\.id) }
                 tabs.join(member(b), unit: right, display: display, with: member(a))
                 wait(1.2)
                 let stack = tabs.stack(containing: a.id)
@@ -775,11 +775,11 @@ extension LayoutController {
         WindowCatalog.shared.start()
         RunLoop.main.run(until: Date().addingTimeInterval(3))
         let displays = LayoutDisplay.all()
-        let onScreen = SnapAssist.onScreen()
+        let onScreen = WindowSuggestions.onScreen()
         let items = WindowCatalog.shared.snapshot().items
         var lines = ["\(onScreen.count) windows on screen, \(items.filter { $0.state == .window }.count) open in the list"]
         for display in displays {
-            let offered = SnapAssist.candidates(items, onScreen: onScreen, on: display, in: displays, excluding: [])
+            let offered = WindowSuggestions.candidates(items, onScreen: onScreen, on: display, in: displays, excluding: [])
             lines.append("\(display.name): \(offered.count) — " + offered.map { "\($0.appName): \($0.title)" }.joined(separator: " | "))
         }
         let output = lines.joined(separator: "\n") + "\n"

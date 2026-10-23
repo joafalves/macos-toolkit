@@ -34,7 +34,7 @@ tool; keep it in step with the code.
   (which app owns the window under a point, for tools that act on it).
 - `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
-  ⇧⌘3/4/5, and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
+  ⇧⌘2/3/4/5, Vision for the text in an area (`TextReader`), and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
 - `Sources/FinderExtension`: the Finder extension. It is sandboxed, so it only builds the right-click
   menu (reading `finder.json`, which its entitlements allow) and opens a `macos-toolkit://` URL that
   `FinderController.handle` acts on. Its `Info.plist` and entitlements are in `Resources/FinderExtension`.
@@ -189,8 +189,11 @@ swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
 .build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general] [light]
+.build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
+.build/debug/Toolkit --snapshot out.png capture-text [light] [none|reading]   # the card after ⇧⌘2, with made-up text
+.build/debug/Toolkit --snapshot out.png volume-hud [light]      # the volume keys' bar: whole steps, part of one, muted
 .build/debug/Toolkit --snapshot out.png switcher-grid [light]   # drawn stand-ins, no real windows
 .build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
@@ -226,6 +229,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-nudge <report>   # which posted input resets the idle time chat apps read (open -n; leave the mouse alone)
 .build/debug/Toolkit --test-settings        # export leaves out local-only settings; import merges and keeps the rest
 .build/debug/Toolkit --test-shortcuts        # config migration, and which macOS screenshot shortcuts clash
+.build/debug/Toolkit --test-text             # drawn text and QR codes through the text reader, against what went in; the helper's time and our memory
 .build/debug/Toolkit --test-toolbar          # the capture toolbar's panel against its content
 .build/debug/Toolkit --test-overlay [png]    # what the capture overlay costs in memory; with open -n, a picture of it
 .build/debug/Toolkit --test-highlight        # the window highlight sits right above its window
@@ -237,6 +241,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --list-suggestions [file]  # per display, what Window Layout would offer for the rest
 .build/debug/Toolkit --dump-menus <app> [file]  # an app's menu items with key equivalents and identifiers
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
+.build/debug/Toolkit --test-volume           # the volume keys' steps, and saved software volumes on the even scale
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
 ```
 

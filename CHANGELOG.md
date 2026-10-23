@@ -3,6 +3,28 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.19.0 (unreleased)
+
+### Added
+
+- **Screen Capture:** Copy text from the screen, off until turned on in its settings: ⇧⌘2 copies the
+  text in an area, or what a QR code or barcode there holds, read on this Mac. A sentence that wraps
+  on screen comes out whole; lists and code keep their lines. Space switches to clicking a window,
+  and T in the ⇧⌘4 overlay switches to text (and back). A card in the corner shows what was copied,
+  or that there was no text. The reading runs in a process of its own that quits right after, so
+  the app's memory stays as it was.
+- **Audio Mixer:** Each press, under Volume Keys: Fine, Round, Standard or Large, 32, 20, 16 or 10
+  presses from silent to full, and how much a press with ⇧⌥ moves the volume, 1 to 5.
+
+### Changed
+
+- **Audio Mixer:** the volume keys go 16 presses from silent to full, as macOS's own do, rather than
+  20. The on-screen bar has 16 segments, one a press, and fills part
+  of one for smaller steps.
+- **Audio Mixer:** software volume, for outputs with no volume of their own, is even in decibels from
+  top to bottom, like macOS's own outputs: low down, a press no longer jumps the sound a lot, nor
+  does nothing near the top. Volumes already set sound the same, though the number shown changes.
+
 ## 0.18.3 (2026-10-23)
 
 ### Changed
@@ -96,7 +118,7 @@ worked on; it gets its date when it's released.
 ### Added
 
 - **Mouse:** the wheel's distance is one setting: macOS's own, scaled; Fixed, every notch the same
-  number of lines, as on Windows; or Curve, a graph you drag, from how far a single notch scrolls to
+  number of lines; or Curve, a graph you drag, from how far a single notch scrolls to
   how far a fast spin does, along a line or a curve. Saved speed and acceleration settings carry
   over.
 - **System Stats:** the CPU panel's top apps say what their figures are out of: per core, as
@@ -249,7 +271,7 @@ worked on; it gets its date when it's released.
 - **Finder:** swipe two fingers right on the trackpad to go back and left to go forward, as in a
   browser, in Finder and System Settings. A swipe over something that can still scroll sideways,
   like the column view, scrolls it until it reaches the edge.
-- **Mouse:** autoscroll on the wheel button, as in Windows browsers, in every app: hold it and move
+- **Mouse:** autoscroll on the wheel button, in every app: hold it and move
   the mouse to scroll, faster the farther you move, with a speed setting. A wheel click without
   moving is still a middle click. Hold ⌥ while pressing to give the app its own wheel button, or
   list apps that should always get it.
@@ -279,7 +301,7 @@ worked on; it gets its date when it's released.
 - **System Stats:** memory shows what apps need, leaving out the files macOS only caches, and turns
   yellow or red when macOS reports memory running short.
 - **Window Layout:** after a window snaps to an edge or into a layout from the ⌥ bar, the rest of the
-  display offers your other windows to fill it, as Windows' Snap Assist does: click one or press
+  display offers your other windows to fill it: click one or press
   its number. Windows from other displays can be offered too, only when there's none left here (the
   default), or always.
 - **Settings window:** a Welcome page, with a tile for each tool and whether it's on, and a warning
@@ -307,7 +329,7 @@ worked on; it gets its date when it's released.
 
 ### Added
 
-- **Keep Awake:** a new tool, in place of Amphetamine. Keeps the Mac awake until you turn it off, for
+- **Keep Awake:** a new tool. Keeps the Mac awake until you turn it off, for
   5 minutes to 24 hours, or until a time, from the menu bar, its settings or a shortcut. Sessions
   carry on after a restart. The display can stay on or sleep.
 - **Keep Awake:** in the menu bar, a pill that empties as the time runs out, or the cup with the
@@ -338,7 +360,7 @@ worked on; it gets its date when it's released.
 
 ### Added
 
-- **Window Layout:** a new tool, in place of Rectangle. Rectangle's shortcuts for halves, quarters,
+- **Window Layout:** a new tool. Shortcuts for halves, quarters,
   thirds, maximize, almost maximize, maximize height, center, larger, smaller, restore, and the
   previous and next display. The arrows go by where the window is: ⌃⌥← → move it on across the
   displays half by half, ⌃⌥↑ maximizes and then moves it up a display, ⌃⌥↓ takes it down.

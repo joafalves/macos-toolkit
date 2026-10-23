@@ -55,6 +55,20 @@ struct MixerSettingsView: View {
                               isOn: $mixer.config.softwareVolume)
                 }
 
+                Card(title: "Volume Keys") {
+                    OptionRow(title: "Each press", caption: "• Fine: 32 presses from silent to full, about 3% each.\n• Round: 20 presses, 5% each, so the volume stays on round numbers.\n• Standard: 16 presses, about 6% each, as macOS's own keys.\n• Large: 10 presses, 10% each.",
+                              selection: $mixer.config.keyStep,
+                              options: [(.fine, "Fine"), (.round, "Round"), (.standard, "Standard"), (.large, "Large")])
+                    RowDivider()
+                    SettingRow(title: "With ⇧⌥", caption: "How much a press moves the volume while Shift and Option are held.") { EmptyView() } extra: {
+                        let range = MixerConfig.fineStepRange
+                        ValueSlider(value: Binding(get: { Double(mixer.config.fineStep) }, set: { mixer.config.fineStep = Int($0.rounded()) }),
+                                    range: Double(range.lowerBound)...Double(range.upperBound), step: 1, low: "Smaller", high: "Larger") {
+                            "\(Int($0))"
+                        }
+                    }
+                }
+
                 Card(title: "Excluded Apps",
                      footnote: "These apps are hidden from the mixer and always play at the main volume.") {
                     let ignored = mixer.config.ignored.sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }

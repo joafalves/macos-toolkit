@@ -26,7 +26,7 @@ final class AwakeController: ObservableObject {
     /// On battery below the stop level: a session can't start.
     @Published private(set) var batteryLow = false
 
-    /// The lengths offered, grouped into minutes and hours as Amphetamine does.
+    /// The lengths offered, grouped into minutes and hours.
     static let minutes = [5, 10, 15, 20, 30, 45, 50, 55]
     static let hours = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24]
 

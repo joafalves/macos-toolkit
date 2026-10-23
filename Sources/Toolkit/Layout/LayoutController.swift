@@ -2,7 +2,7 @@ import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
 
-/// Places windows: Rectangle-style shortcuts, a grid picked with the keyboard
+/// Places windows: shortcuts for halves, quarters and thirds, a grid picked with the keyboard
 /// (or the mouse), and snapping when a window is dragged to an edge or, with
 /// a modifier held, onto the grid.
 final class LayoutController: ObservableObject {
@@ -23,8 +23,9 @@ final class LayoutController: ObservableObject {
     @Published private(set) var tapFailed = false
     /// Shortcuts macOS refused, usually because another app has them.
     @Published private(set) var failedShortcuts: [String] = []
-    /// Rectangle has the same default shortcuts and its own snapping.
-    @Published private(set) var rectangleRunning = false
+    /// The name of a running app with the same default shortcuts and its own
+    /// snapping, as macOS gives it.
+    @Published private(set) var rivalRunning: String?
     /// Left to right. Made-up ones in a preview.
     @Published private(set) var displays: [LayoutDisplay] = []
 
@@ -32,7 +33,7 @@ final class LayoutController: ObservableObject {
     private let drags = DragWatcher()
     private let gridOverlay = LayoutOverlay()
     private let dragOverlay = LayoutOverlay()
-    private let assist = SnapAssist()
+    private let assist = WindowSuggestions()
     /// Windows sharing a slot as tabs.
     private(set) lazy var tabs = WindowTabs(work: work)
     /// Accessibility calls wait for the other app, so they all happen here,
@@ -187,10 +188,10 @@ final class LayoutController: ObservableObject {
         let workspace = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
             observers.append(workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                self?.refreshRectangle()
+                self?.refreshRival()
             })
         }
-        refreshRectangle()
+        refreshRival()
         // Before the first shortcut or drag can act on them.
         let displays = self.displays
         work.async { self.restorePlacements(displays: displays) }
@@ -433,11 +434,12 @@ final class LayoutController: ObservableObject {
         tabs.displaysChanged(fresh)
     }
 
-    private static let rectangleIDs = ["com.knollsoft.Rectangle", "com.knollsoft.Hookshot"]
+    private static let rivalIDs = ["com.knollsoft.Rectangle", "com.knollsoft.Hookshot"]
 
-    private func refreshRectangle() {
-        let running = NSWorkspace.shared.runningApplications.contains { Self.rectangleIDs.contains($0.bundleIdentifier ?? "") }
-        if running != rectangleRunning { rectangleRunning = running }
+    private func refreshRival() {
+        let rival = NSWorkspace.shared.runningApplications.first { Self.rivalIDs.contains($0.bundleIdentifier ?? "") }
+        let name = rival.map { $0.localizedName ?? $0.bundleURL?.deletingPathExtension().lastPathComponent ?? "" }
+        if name != rivalRunning { rivalRunning = name }
     }
 
     /// Registers the shortcuts afresh, for after another app let go of them.
@@ -446,8 +448,8 @@ final class LayoutController: ObservableObject {
         apply()
     }
 
-    func quitRectangle() {
-        for app in NSWorkspace.shared.runningApplications where Self.rectangleIDs.contains(app.bundleIdentifier ?? "") {
+    func quitRival() {
+        for app in NSWorkspace.shared.runningApplications where Self.rivalIDs.contains(app.bundleIdentifier ?? "") {
             app.terminate()
         }
     }
@@ -524,7 +526,7 @@ final class LayoutController: ObservableObject {
         work.async {
             guard let window = LayoutWindow.focused(pid: pid), let frame = window.frame else { return Self.beep() }
             let center = CGPoint(x: frame.midX, y: frame.midY)
-            let below = SnapAssist.onScreen().drop { $0.id != window.id }.dropFirst().filter { $0.frame.contains(center) }
+            let below = WindowSuggestions.onScreen().drop { $0.id != window.id }.dropFirst().filter { $0.frame.contains(center) }
             let placed: [CGWindowID: (CGRect, CGDirectDisplayID)] = Dictionary(uniqueKeysWithValues: below.compactMap { other in
                 guard let record = self.placements[other.id], let unit = record.unit, let display = record.display,
                       LayoutWindow.close(record.applied, other.frame) else { return nil }
@@ -575,7 +577,7 @@ final class LayoutController: ObservableObject {
         var targets: [StackTarget] = []
         let own = ProcessInfo.processInfo.processIdentifier
         // Every window counts for covering one, the ones in stacks too.
-        let windows = SnapAssist.onScreen().filter { $0.pid != own && $0.id != dragged }
+        let windows = WindowSuggestions.onScreen().filter { $0.pid != own && $0.id != dragged }
         for stack in tabs.stacks where stack.display.id == display.id {
             // Shown by another of its windows if the shown one is being dragged out.
             guard let occupant = stack.members.first(where: { $0.id == stack.shown && $0.id != dragged }) ?? stack.members.first(where: { $0.id != dragged })
@@ -591,7 +593,7 @@ final class LayoutController: ObservableObject {
         let stacked = Set(tabs.stacks.flatMap(\.members).map(\.id))
         for unit in Self.slotUnits(on: display, grid: gridSize(for: display)) {
             let slot = LayoutGeometry.place(unit, in: display.usable, gap: gap)
-            guard let window = SnapAssist.occupant(of: slot, by: windows, except: []), !stacked.contains(window.id),
+            guard let window = WindowSuggestions.occupant(of: slot, by: windows, except: []), !stacked.contains(window.id),
                   !targets.contains(where: { $0.occupant.id == window.id }) else { continue }
             targets.append(StackTarget(unit: unit, display: display, frame: slot, occupant: WindowTabs.Member(id: window.id, pid: window.pid)))
         }
@@ -969,7 +971,7 @@ final class LayoutController: ObservableObject {
                 if self.drag?.grab.id == grab.id { self.drag?.eligible = true }
             }
             // A snapped window dragged away gets its old size back, with the
-            // pointer at the same place across it, as Rectangle does.
+            // pointer at the same place across it.
             // A window macOS filled is put back by macOS.
             LayoutTrace.log("layout: drag of \(grab.id), record \(self.placements[grab.id].map { "applied \(LayoutTrace.text($0.applied)), original \(LayoutTrace.text($0.original)), tiled by macOS \($0.tiledByMacOS)" } ?? "none")")
             guard restore, let record = self.placements[grab.id], !record.tiledByMacOS, LayoutWindow.close(record.applied.size, grab.frame.size),
@@ -1133,9 +1135,9 @@ final class LayoutController: ObservableObject {
     /// The parts of the display left after a drop, to offer windows for: the
     /// other parts of a layout picked in the ⌥ bar, or what's beside a half
     /// or a third. None for shapes that leave no clean part.
-    private static func rest(after target: Target, picker: SlotPicker?, gap: CGFloat) -> [SnapAssist.Slot] {
-        func slot(_ unit: CGRect, _ display: LayoutDisplay) -> SnapAssist.Slot {
-            SnapAssist.Slot(unit: unit, display: display, frame: LayoutGeometry.place(unit, in: display.usable, gap: gap))
+    private static func rest(after target: Target, picker: SlotPicker?, gap: CGFloat) -> [WindowSuggestions.Slot] {
+        func slot(_ unit: CGRect, _ display: LayoutDisplay) -> WindowSuggestions.Slot {
+            WindowSuggestions.Slot(unit: unit, display: display, frame: LayoutGeometry.place(unit, in: display.usable, gap: gap))
         }
         switch target {
         case .unit(let unit, let display):
@@ -1152,7 +1154,7 @@ final class LayoutController: ObservableObject {
     }
 
     /// A window picked for the rest of the display: put there, then the next part.
-    private func suggested(_ item: SwitcherItem, into slot: SnapAssist.Slot) {
+    private func suggested(_ item: SwitcherItem, into slot: WindowSuggestions.Slot) {
         guard let id = item.window else { return assist.next() }
         let displays = self.displays, gap = CGFloat(config.gap)
         work.async {

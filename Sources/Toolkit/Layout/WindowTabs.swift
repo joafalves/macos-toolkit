@@ -285,12 +285,12 @@ final class WindowTabs {
     }
 
     /// The tabs where they go now. `onScreen`: the windows front to back, if already known.
-    private func place(_ stack: Stack, onScreen: [SnapAssist.OnScreen]? = nil) {
+    private func place(_ stack: Stack, onScreen: [WindowSuggestions.OnScreen]? = nil) {
         let frame = TabGeometry.tabs(in: slot(of: stack), style: style, position: position, count: stack.members.count)
         stack.strip.show(at: frame, above: stack.shown)
         // For a pill (see TabsStyle):
         // let pill = style == .pill
-        // let inSight = pill && Self.inSight(stack, at: frame, onScreen: onScreen ?? SnapAssist.onScreen(),
+        // let inSight = pill && Self.inSight(stack, at: frame, onScreen: onScreen ?? WindowSuggestions.onScreen(),
         //                                    strips: Set(stacks.map { CGWindowID($0.strip.windowNumber) }))
         // stack.strip.show(at: frame, above: stack.shown, floating: pill, inSight: inSight)
     }
@@ -299,7 +299,7 @@ final class WindowTabs {
     /// another Space, not hidden), and no other window is in front of it
     /// there. Its own stack's windows don't count: one of them may still be
     /// in front for a moment while the one picked comes forward.
-    private static func inSight(_ stack: Stack, at frame: CGRect, onScreen: [SnapAssist.OnScreen], strips: Set<CGWindowID>) -> Bool {
+    private static func inSight(_ stack: Stack, at frame: CGRect, onScreen: [WindowSuggestions.OnScreen], strips: Set<CGWindowID>) -> Bool {
         guard let index = onScreen.firstIndex(where: { $0.id == stack.shown }) else { return false }
         return !onScreen[..<index].contains { !strips.contains($0.id) && !stack.contains($0.id) && $0.frame.intersects(frame) }
     }
@@ -327,7 +327,7 @@ final class WindowTabs {
     /// Each stack's tabs placed again for the windows as they are now.
     private func reorder() {
         guard !stacks.isEmpty else { return }
-        let onScreen = SnapAssist.onScreen()
+        let onScreen = WindowSuggestions.onScreen()
         for stack in stacks { place(stack, onScreen: onScreen) }
     }
 
@@ -476,7 +476,7 @@ final class WindowTabs {
 
     private func showFront() {
         guard !stacks.isEmpty else { return }
-        let order = SnapAssist.onScreen().map(\.id)
+        let order = WindowSuggestions.onScreen().map(\.id)
         // A member being dragged out is in front for now; its stack waits for the drop.
         picking = picking.filter { $0.value.until > Date() }
         for stack in stacks where !(dragging.map(stack.contains) ?? false) && picking[ObjectIdentifier(stack)] == nil {

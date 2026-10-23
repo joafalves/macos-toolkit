@@ -44,7 +44,7 @@ struct LayoutDisplay: Equatable {
 }
 
 enum LayoutGeometry {
-    /// How close to an edge counts (a little more than Rectangle's 5), and
+    /// How close to an edge counts, and
     /// how far along an edge a corner reaches.
     static let edgeMargin: CGFloat = 8
     /// An edge against another display has no wall to push against, so the

@@ -67,11 +67,15 @@ final class CaptureController: ObservableObject {
         overlay.onConfirm = { [weak self] event in self?.captureFromToolbar(event) }
     }
 
+    /// For a snapshot of the page with Copy text from the screen on.
+    static var previewText = false
+
     static func preview() -> CaptureController {
         let capture = CaptureController()
         capture.persists = false
         capture.isPreview = true
         capture.config = CaptureConfig()
+        capture.config.textEnabled = previewText
         capture.screenPermission = true
         capture.micPermission = .authorized
         capture.hasArea = true
@@ -103,6 +107,16 @@ final class CaptureController: ObservableObject {
     private func apply() {
         // A snapshot must not take the shortcuts from macOS.
         guard !isPreview else { return }
+        // Switched off while it reads: the reading stops, and gives its memory back.
+        if !config.enabled || !config.textEnabled {
+            TextReader.cancel()
+        } else {
+            // Not at once: launch has enough to do.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+                guard let self, self.config.enabled, self.config.textEnabled else { return }
+                TextReader.prepare()
+            }
+        }
         if config.enabled {
             keys.start(config.bindings)
         } else {
@@ -180,18 +194,28 @@ final class CaptureController: ObservableObject {
             guard recorder == nil else { return }
             closeToolbar()
             startQuickSelection(copy: copy)
+        case .text:
+            guard recorder == nil, config.textEnabled else { return }
+            closeToolbar()
+            startQuickSelection(copy: false, text: true)
         case .toolbar:
             if recorder != nil { stopRecording() } else if toolbar.isVisible { closeToolbar() } else { openToolbar() }
         }
     }
 
-    private func startQuickSelection(copy: Bool) {
+    /// ⇧⌘4, or with `text` ⇧⌘2: T in the overlay switches between the two.
+    private func startQuickSelection(copy: Bool, text: Bool = false) {
         overlay.onPick = { [weak self] target, held in
             guard let self else { return }
+            let readsText = self.overlay.readsText
             self.overlay.hide()
-            self.takeScreenshot(target, copy: copy || held, screen: Self.screen(of: target))
+            if readsText {
+                self.copyText(target, screen: Self.screen(of: target))
+            } else {
+                self.takeScreenshot(target, copy: copy || held, screen: Self.screen(of: target))
+            }
         }
-        overlay.show(mode: .area, quick: true)
+        overlay.show(mode: .area, quick: true, text: text, allowsText: config.textEnabled)
     }
 
     private func cancelSelection() {
@@ -358,6 +382,40 @@ final class CaptureController: ObservableObject {
         thumbnails.show(image: image, scale: scale, file: file, isVideo: false, on: screen) { [weak self] in
             // A clipboard-only shot gets a file when it's dragged or opened.
             self?.save(image, scale: scale, in: FileManager.default.temporaryDirectory, format: format)
+        }
+    }
+
+    /// The text in the target, or what a code in it holds, to the clipboard.
+    /// The clipboard is left alone when there's none.
+    private func copyText(_ target: CaptureTarget, screen: NSScreen?) {
+        guard config.textEnabled, ensurePermission() else { return }
+        var config = config
+        // The window as it is: a backdrop has no text in it.
+        config.windowStyle = .plain
+        let excluded = ownWindows
+        Task { @MainActor in
+            do {
+                let (image, _) = try await Screenshotter.capture(target, config: config, excluding: excluded)
+                // Usually well under a second. The first time ever it's much
+                // longer, and the card says why rather than nothing happening.
+                var putAway: (() -> Void)?
+                let slow = DispatchWorkItem { putAway = self.thumbnails.show(text: .reading, on: screen) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: slow)
+                let text = await TextReader.read(image)
+                slow.cancel()
+                putAway?()
+                // Switched off meanwhile: nothing was read, and nothing to say.
+                guard self.config.textEnabled else { return }
+                NSLog("Toolkit: text from \(image.width)×\(image.height): \(text.map { "\($0.count) characters" } ?? "none")")
+                if let text {
+                    let board = NSPasteboard.general
+                    board.clearContents()
+                    board.setString(text, forType: .string)
+                }
+                self.thumbnails.show(text: text.map(TextThumbnailView.State.copied) ?? .none, on: screen)
+            } catch {
+                self.report(error)
+            }
         }
     }
 

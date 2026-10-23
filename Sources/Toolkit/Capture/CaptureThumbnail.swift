@@ -9,8 +9,20 @@ final class ThumbnailStack {
     /// `file` is nil for a screenshot that only went to the clipboard; one is
     /// written to the temporary folder if it is dragged or opened.
     func show(image: CGImage, scale: CGFloat, file: URL?, isVideo: Bool, on screen: NSScreen?, makeFile: (() -> URL?)? = nil) {
+        add(ThumbnailPanel(image: image, file: file, isVideo: isVideo, makeFile: makeFile), on: screen)
+    }
+
+    /// What was copied from the screen, that nothing was, or that it's still
+    /// being read. Returns what puts the card away.
+    @discardableResult
+    func show(text: TextThumbnailView.State, on screen: NSScreen?) -> () -> Void {
+        let panel = ThumbnailPanel(content: TextThumbnailView(text))
+        add(panel, on: screen)
+        return { [weak panel] in panel?.onClose?() }
+    }
+
+    private func add(_ panel: ThumbnailPanel, on screen: NSScreen?) {
         let screen = screen ?? NSScreen.main ?? NSScreen.screens[0]
-        let panel = ThumbnailPanel(image: image, file: file, isVideo: isVideo, makeFile: makeFile)
         panel.onClose = { [weak self, weak panel] in
             guard let self, let panel else { return }
             panel.orderOut(nil)
@@ -22,7 +34,7 @@ final class ThumbnailStack {
         while shown.count > 4 { shown.removeLast().orderOut(nil) }
         layout(on: screen)
         panel.orderFrontRegardless()
-        panel.scheduleDismiss()
+        if !panel.waits { panel.scheduleDismiss() }
     }
 
     static func show(video url: URL, in stack: ThumbnailStack, on screen: NSScreen?) {
@@ -48,16 +60,25 @@ final class ThumbnailStack {
 private final class ThumbnailPanel: CapturePanel {
     var onClose: (() -> Void)?
     private var dismiss: DispatchWorkItem?
+    /// Stays until put away, for as long as the reading goes on.
+    var waits: Bool { (contentView as? TextThumbnailView)?.state == .reading }
 
-    init(image: CGImage, file: URL?, isVideo: Bool, makeFile: (() -> URL?)?) {
+    convenience init(image: CGImage, file: URL?, isVideo: Bool, makeFile: (() -> URL?)?) {
         let aspect = CGFloat(image.width) / CGFloat(max(image.height, 1))
         let box: CGFloat = 200
         let size = aspect >= 1 ? NSSize(width: box, height: max(box / aspect, 48)) : NSSize(width: max(box * aspect, 64), height: box)
-        super.init(frame: NSRect(origin: .zero, size: size), level: .popUpMenu)
-        hasShadow = true
         let view = ThumbnailView(image: image, file: file, isVideo: isVideo, makeFile: makeFile)
+        view.frame.size = size
+        self.init(content: view)
+    }
+
+    /// Sized to the view.
+    init(content view: ThumbnailContent) {
+        super.init(frame: NSRect(origin: .zero, size: view.frame.size), level: .popUpMenu)
+        hasShadow = true
         view.onClose = { [weak self] in self?.onClose?() }
         view.onHover = { [weak self] inside in
+            guard self?.waits == false else { return }
             if inside { self?.dismiss?.cancel() } else { self?.scheduleDismiss() }
         }
         contentView = view
@@ -73,10 +94,13 @@ private final class ThumbnailPanel: CapturePanel {
     }
 }
 
-private final class ThumbnailView: NSView, NSDraggingSource {
+/// What a thumbnail shows: its panel closes it and keeps it while hovered.
+class ThumbnailContent: NSView {
     var onClose: (() -> Void)?
     var onHover: ((Bool) -> Void)?
+}
 
+private final class ThumbnailView: ThumbnailContent, NSDraggingSource {
     private let image: CGImage
     private var file: URL?
     private let isVideo: Bool
@@ -178,7 +202,7 @@ private final class ThumbnailView: NSView, NSDraggingSource {
         onClose?()
     }
 
-    private static func button(_ symbol: String, help: String, action: @escaping () -> Void) -> NSButton {
+    static func button(_ symbol: String, help: String, action: @escaping () -> Void) -> NSButton {
         let button = ClosureButton(action: action)
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: help)?
             .withSymbolConfiguration(.init(pointSize: 10, weight: .bold))
@@ -197,7 +221,7 @@ private final class ThumbnailView: NSView, NSDraggingSource {
 }
 
 private final class ClosureButton: NSButton {
-    private let handler: () -> Void
+    var handler: () -> Void
 
     init(action: @escaping () -> Void) {
         handler = action
@@ -211,4 +235,143 @@ private final class ClosureButton: NSButton {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     @objc private func run() { handler() }
+}
+
+/// The text just copied, its first few lines, or that there was none. Drag it
+/// into an app for the text again; a click puts it away.
+final class TextThumbnailView: ThumbnailContent, NSDraggingSource {
+    enum State: Equatable {
+        case copied(String)
+        case none
+        /// Taking long: the first time ever, macOS readies its text
+        /// recognition for the app, which takes it some 25 seconds.
+        case reading
+    }
+
+    let state: State
+    private var text: String? {
+        if case .copied(let text) = state { return text }
+        return nil
+    }
+    private var downAt: NSPoint?
+    private let close: NSButton
+
+    init(_ state: State) {
+        self.state = state
+        close = ThumbnailView.button("xmark", help: String(localized: "Dismiss")) {}
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 10
+        layer?.masksToBounds = true
+        layer?.borderWidth = 1
+
+        let symbol: String, heading: String, detail: String
+        switch state {
+        case .copied(let text): (symbol, heading, detail) = ("text.viewfinder", String(localized: "Text Copied"), Self.excerpt(text))
+        case .none: (symbol, heading, detail) = ("text.badge.xmark", String(localized: "No Text Found"), String(localized: "Nothing was copied."))
+        case .reading: (symbol, heading, detail) = ("hourglass", String(localized: "Reading Text…"),
+                                                    String(localized: "The first time, macOS takes a while to get ready."))
+        }
+        let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!)
+        icon.symbolConfiguration = .init(pointSize: 13, weight: .semibold)
+        icon.contentTintColor = text == nil ? .secondaryLabelColor : .controlAccentColor
+        let title = NSTextField(labelWithString: heading)
+        title.font = .systemFont(ofSize: 12, weight: .semibold)
+        let header = NSStackView(views: [icon, title])
+        header.spacing = 6
+        let body = NSTextField(wrappingLabelWithString: detail)
+        body.font = .systemFont(ofSize: 11)
+        body.textColor = .secondaryLabelColor
+        body.maximumNumberOfLines = 4
+        body.lineBreakMode = .byWordWrapping
+        body.cell?.truncatesLastVisibleLine = true
+        body.preferredMaxLayoutWidth = 216
+        let stack = NSStackView(views: [header, body])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 12, right: 12)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        close.isHidden = true
+        addSubview(close)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            close.topAnchor.constraint(equalTo: topAnchor, constant: 6),
+            close.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            widthAnchor.constraint(equalToConstant: 240),
+        ])
+        frame.size = fittingSize
+        viewDidChangeEffectiveAppearance()
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil))
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    /// Layer colours are fixed when set, so they're set again whenever the
+    /// card's appearance changes (and once at the start, when it hasn't).
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            layer?.borderColor = NSColor.separatorColor.cgColor
+        }
+    }
+
+    override var onClose: (() -> Void)? {
+        didSet { (close as? ClosureButton)?.handler = { [weak self] in self?.onClose?() } }
+    }
+
+    /// Lines as they are, blank ones dropped, tabs as spaces: it's a glance.
+    private static func excerpt(_ text: String) -> String {
+        text.split(whereSeparator: \.isNewline).prefix(6)
+            .map { $0.replacingOccurrences(of: "\t", with: "   ") }
+            .joined(separator: "\n")
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseEntered(with event: NSEvent) {
+        close.isHidden = false
+        onHover?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        close.isHidden = true
+        onHover?(false)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        downAt = event.locationInWindow
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let text, let downAt, hypot(event.locationInWindow.x - downAt.x, event.locationInWindow.y - downAt.y) > 4 else { return }
+        self.downAt = nil
+        let item = NSDraggingItem(pasteboardWriter: text as NSString)
+        let picture = NSImage(size: bounds.size)
+        if let rep = bitmapImageRepForCachingDisplay(in: bounds) {
+            cacheDisplay(in: bounds, to: rep)
+            picture.addRepresentation(rep)
+        }
+        item.setDraggingFrame(bounds, contents: picture)
+        beginDraggingSession(with: [item], event: event, source: self)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard downAt != nil else { return }
+        downAt = nil
+        onClose?()
+    }
+
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        .copy
+    }
+
+    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+        if operation != [] { onClose?() }
+    }
 }

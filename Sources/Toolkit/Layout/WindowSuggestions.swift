@@ -2,10 +2,10 @@ import AppKit
 import Carbon.HIToolbox
 
 /// After a window is dropped into part of a display, the other windows on it
-/// are offered for the part that's left, as Windows' Snap Assist does: in the
-/// switcher's own list or grid, filling that part. Picking one puts it there;
-/// for a layout of three, the part after that is offered next.
-final class SnapAssist {
+/// are offered for the part that's left, in the switcher's own list or grid,
+/// filling that part. Picking one puts it there; for a layout of three, the
+/// part after that is offered next.
+final class WindowSuggestions {
     /// A part of a display that's left.
     struct Slot: Equatable {
         let unit: CGRect

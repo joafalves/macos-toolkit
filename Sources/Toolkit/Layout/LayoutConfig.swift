@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 
 /// Something a shortcut does to the focused window. The default keys are
-/// Rectangle's, so muscle memory carries over.
+/// the ones people already know for these, so muscle memory carries over.
 enum LayoutAction: String, Codable, CaseIterable {
     case leftHalf, rightHalf, topHalf, bottomHalf
     case topLeft, topRight, bottomLeft, bottomRight
@@ -77,7 +77,7 @@ enum LayoutAction: String, Codable, CaseIterable {
         case .restore: return key(kVK_Delete)
         case .previousDisplay: return key(kVK_LeftArrow, nil, co.union(.command))
         case .nextDisplay: return key(kVK_RightArrow, nil, co.union(.command))
-        // As Windows' ⊞D; ⌃⌥D is the first third.
+        // ⌃⌥D is the first third.
         case .showDesktop: return key(kVK_ANSI_D, "D", co.union(.command))
         case .nextTab: return key(kVK_Tab)
         case .previousTab: return key(kVK_Tab, nil, co.union(.shift))

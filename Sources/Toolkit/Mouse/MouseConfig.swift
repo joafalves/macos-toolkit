@@ -39,7 +39,7 @@ enum AccelMode: String, Codable, CaseIterable {
 enum ScrollMode: String, Codable, CaseIterable {
     /// macOS's own: a slow notch barely moves, fast spins go further.
     case macOS
-    /// Every notch the same distance, as a wheel scrolls on Windows.
+    /// Every notch the same distance.
     case fixed
     /// A single notch one distance, fast spins further, along a graph.
     case curve
@@ -244,7 +244,7 @@ struct MouseConfig: Codable, Equatable {
     }
 
     /// Seeds the MX Anywhere 2S (Bluetooth) with the cursor values carried over
-    /// from the previous SteerMouse setup: tracking speed 0.685 at native CPI.
+    /// from the previous setup: tracking speed 0.685 at native CPI.
     private static var firstRun: MouseConfig {
         var config = MouseConfig()
         var profile = Profile(name: "MX Anywhere 2S")

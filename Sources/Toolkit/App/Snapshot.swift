@@ -497,6 +497,48 @@ enum Snapshot {
         if let view = window.contentView { save(view, to: path) }
     }
 
+    /// The card after text is copied from the screen, with made-up text, or
+    /// with `none` the one when there was none, with `reading` while it reads.
+    static func writeCaptureText(to path: String, light: Bool, none: Bool, reading: Bool) {
+        _ = NSApplication.shared
+        let text = "Build failed: 2 errors\n\nSources/App/Main.swift:42:7\nCannot find 'config' in scope\nSources/App/Main.swift:57:12"
+        let card = TextThumbnailView(reading ? .reading : none ? .none : .copied(text))
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: NSSize(width: card.frame.width + 32, height: card.frame.height + 32)),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.backgroundColor = light ? NSColor(white: 0.86, alpha: 1) : NSColor(white: 0.16, alpha: 1)
+        card.frame.origin = NSPoint(x: 16, y: 16)
+        window.contentView?.addSubview(card)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        if let view = window.contentView { save(view, to: path) }
+    }
+
+    /// The volume keys' bar at a few volumes: whole steps, part of one (a
+    /// Fine or ⇧⌥ press), and muted.
+    static func writeVolumeHUD(to path: String, light: Bool) {
+        _ = NSApplication.shared
+        let rows = VStack(spacing: 12) {
+            ForEach([Float(0.5), 0.53125, 0.0625, 1], id: \.self) { volume in
+                VolumeHUD.view(volume: volume, muted: false)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            VolumeHUD.view(volume: 0.5, muted: true)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        let host = NSHostingController(rootView: rows.padding(16))
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.borderless]
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.backgroundColor = light ? NSColor(white: 0.86, alpha: 1) : NSColor(white: 0.16, alpha: 1)
+        window.setContentSize(host.view.fittingSize)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        if let view = window.contentView { save(view, to: path) }
+    }
+
     /// Images come out at the scale of the display the window is on, so the
     /// window goes to a Retina one when there is one.
     private static func onRetina(_ window: NSWindow) {

@@ -5,9 +5,12 @@ import SwiftUI
 struct CaptureSettingsView: View {
     @ObservedObject var capture: CaptureController
 
-    private var others: (screen: [Shortcut], area: [Shortcut], toolbar: [Shortcut]) {
+    /// Every capture shortcut but `own`, so one can't be set to another's keys.
+    private func others(than own: Shortcut) -> [Shortcut] {
         let c = capture.config
-        return ([c.areaShortcut, c.toolbarShortcut], [c.screenShortcut, c.toolbarShortcut], [c.screenShortcut, c.areaShortcut])
+        var all = [c.screenShortcut, c.areaShortcut, c.textShortcut, c.toolbarShortcut]
+        if let index = all.firstIndex(of: own) { all.remove(at: index) }
+        return all
     }
 
     /// What the chosen quality means, and what it costs on the main display.
@@ -39,13 +42,19 @@ struct CaptureSettingsView: View {
                 Card(title: "Shortcuts",
                      footnote: "macOS's own screenshot shortcuts are off only where they clash with these. ⌃ counts if it's held when the capture happens: at the end of the drag, or at the click on a window.") {
                     ShortcutRow(title: "Screenshot of the display", caption: "The display under the pointer.",
-                                shortcut: $capture.config.screenShortcut, defaultValue: CaptureConfig.defaultScreenShortcut, taken: others.screen)
+                                shortcut: $capture.config.screenShortcut, defaultValue: CaptureConfig.defaultScreenShortcut,
+                                taken: others(than: capture.config.screenShortcut))
                     RowDivider()
-                    ShortcutRow(title: "Screenshot of an area", caption: "Space switches to clicking a window.",
-                                shortcut: $capture.config.areaShortcut, defaultValue: CaptureConfig.defaultAreaShortcut, taken: others.area)
+                    ShortcutRow(title: "Screenshot of an area",
+                                caption: capture.config.textEnabled
+                                    ? "Space switches to clicking a window, and T to copying the text."
+                                    : "Space switches to clicking a window.",
+                                shortcut: $capture.config.areaShortcut, defaultValue: CaptureConfig.defaultAreaShortcut,
+                                taken: others(than: capture.config.areaShortcut))
                     RowDivider()
                     ShortcutRow(title: "Toolbar", caption: "Recordings, the timer and options. Stops a recording.",
-                                shortcut: $capture.config.toolbarShortcut, defaultValue: CaptureConfig.defaultToolbarShortcut, taken: others.toolbar)
+                                shortcut: $capture.config.toolbarShortcut, defaultValue: CaptureConfig.defaultToolbarShortcut,
+                                taken: others(than: capture.config.toolbarShortcut))
                     RowDivider()
                     SettingRow(title: "Copy to the clipboard instead of saving") {
                         Text("hold ⌃").font(.callout).foregroundStyle(.secondary)
@@ -53,6 +62,18 @@ struct CaptureSettingsView: View {
                     RowDivider()
                     SettingRow(title: "Cancel") {
                         Text("esc").font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+
+                Card(title: "Text") {
+                    ToggleRow(title: "Copy text from the screen",
+                              caption: "Copies the text in an area or a window, or what a QR code holds. It takes a little more memory, only while it reads.",
+                              isOn: $capture.config.textEnabled)
+                    if capture.config.textEnabled {
+                        RowDivider()
+                        ShortcutRow(title: "Text from an area", caption: "Space switches to clicking a window, and T to a screenshot.",
+                                    shortcut: $capture.config.textShortcut, defaultValue: CaptureConfig.defaultTextShortcut,
+                                    taken: others(than: capture.config.textShortcut))
                     }
                 }
 

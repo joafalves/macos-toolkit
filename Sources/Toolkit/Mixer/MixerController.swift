@@ -298,24 +298,25 @@ final class MixerController: ObservableObject {
     /// A volume key, on any output: the device's own volume where it has one,
     /// the software volume where it doesn't. The same steps either way.
     func volumeKey(_ key: VolumeKey, fine: Bool) {
+        let size = fine ? Double(config.fineStep) / 100 : 1 / Double(config.keyStep.presses)
         if softwareActive {
             updateSoftware { setting in
-                setting.volume = Self.step(setting.volume, muted: &setting.muted, key: key, fine: fine)
+                setting.volume = Self.step(setting.volume, muted: &setting.muted, key: key, size: size)
             }
         } else if hardwareVolume {
             var muted = mainMuted
-            let volume = Self.step(Double(mainVolume), muted: &muted, key: key, fine: fine)
+            let volume = Self.step(Double(mainVolume), muted: &muted, key: key, size: size)
             if muted != mainMuted { toggleMainMute() }
             if !muted, volume != Double(mainVolume) { setMainVolume(Float(volume)) }
         }
     }
 
-    /// Whole percents that land on round numbers: 5% a press, 1% with Shift and
-    /// Option. A volume set with the slider moves to the next round one. From
-    /// muted, up unmutes before it raises anything.
-    private static func step(_ volume: Double, muted: inout Bool, key: VolumeKey, fine: Bool) -> Double {
-        let step = fine ? 1 : 5
-        let percent = Int((volume * 100).rounded())
+    /// A press lands on a whole number of steps of `size`, so a volume set with
+    /// the slider moves to the next one. From muted, up unmutes before it
+    /// raises anything.
+    static func step(_ volume: Double, muted: inout Bool, key: VolumeKey, size: Double) -> Double {
+        // Steps counted with a little slack, as Float volumes aren't exact.
+        let steps = volume / size
         switch key {
         case .mute:
             muted.toggle()
@@ -325,10 +326,10 @@ final class MixerController: ObservableObject {
                 muted = false
                 return volume
             }
-            return Double(min(100, percent / step * step + step)) / 100
+            return min(1, ((steps + 0.001).rounded(.down) + 1) * size)
         case .down:
             if muted { return volume }
-            return Double(max(0, (percent + step - 1) / step * step - step)) / 100
+            return max(0, ((steps - 0.001).rounded(.up) - 1) * size)
         }
     }
 
@@ -533,7 +534,7 @@ final class MixerController: ObservableObject {
             return
         }
 
-        // Like Windows: every Dock app with sound open, playing or not. Menu
+        // Every Dock app with sound open, playing or not. Menu
         // bar apps only once they've played, since many keep audio open and
         // never make a sound. Playing first, then the most recently heard,
         // then the rest by name.
@@ -703,6 +704,9 @@ extension MixerController {
     static func preview(software: Bool = false, equalizer: Bool = false, menuBarIcon: MixerMenuBarIcon? = nil) -> MixerController {
         let mixer = MixerController()
         mixer.persists = false
+        // Defaults, not this Mac's settings: its excluded apps and volumes
+        // aren't for a picture.
+        mixer.config = MixerConfig()
         func icon(_ bundleID: String) -> NSImage? {
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID).map { NSWorkspace.shared.icon(forFile: $0.path) }
         }

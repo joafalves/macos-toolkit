@@ -103,6 +103,7 @@ struct Shortcut: Codable, Equatable {
         case kVK_F10: return "F10"
         case kVK_F11: return "F11"
         case kVK_F12: return "F12"
+        case kVK_ANSI_2: return "2"
         case kVK_ANSI_3: return "3"
         case kVK_ANSI_4: return "4"
         case kVK_ANSI_5: return "5"

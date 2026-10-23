@@ -77,10 +77,16 @@ struct CaptureConfig: Codable, Equatable {
     /// copies instead of saving.
     var screenShortcut = Self.defaultScreenShortcut
     var areaShortcut = Self.defaultAreaShortcut
+    /// Copying the text on screen: ⇧⌘2, and T in the ⇧⌘4 overlay. Off, neither
+    /// is there and nothing is read.
+    var textEnabled = false
+    /// An area whose text goes to the clipboard: always copied, so no ⌃ one.
+    var textShortcut = Self.defaultTextShortcut
     var toolbarShortcut = Self.defaultToolbarShortcut
     static let defaultScreenShortcut = Shortcut(keyCode: kVK_ANSI_3, flags: [.shift, .command])
     static let defaultAreaShortcut = Shortcut(keyCode: kVK_ANSI_4, flags: [.shift, .command])
     static let defaultToolbarShortcut = Shortcut(keyCode: kVK_ANSI_5, flags: [.shift, .command])
+    static let defaultTextShortcut = Shortcut(keyCode: kVK_ANSI_2, flags: [.shift, .command])
     /// Gives Screen Capture an icon of its own in the menu bar.
     var standaloneIcon = false
 
@@ -131,6 +137,8 @@ struct CaptureConfig: Codable, Equatable {
             ?? legacy.decodeIfPresent(Bool.self, forKey: .replaceShortcuts) ?? true
         screenShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .screenShortcut)) ?? Self.defaultScreenShortcut
         areaShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .areaShortcut)) ?? Self.defaultAreaShortcut
+        textEnabled = try c.decodeIfPresent(Bool.self, forKey: .textEnabled) ?? false
+        textShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .textShortcut)) ?? Self.defaultTextShortcut
         toolbarShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .toolbarShortcut)) ?? Self.defaultToolbarShortcut
         standaloneIcon = try c.decodeIfPresent(Bool.self, forKey: .standaloneIcon) ?? false
         mode = (try? c.decodeIfPresent(CaptureMode.self, forKey: .mode)) ?? .area
@@ -170,7 +178,8 @@ struct CaptureConfig: Codable, Equatable {
 
     /// The shortcuts in use, for `CaptureKeys`.
     var bindings: CaptureKeys.Bindings {
-        CaptureKeys.Bindings(screen: screenShortcut.active, area: areaShortcut.active, toolbar: toolbarShortcut.active)
+        CaptureKeys.Bindings(screen: screenShortcut.active, area: areaShortcut.active, text: textEnabled ? textShortcut.active : nil,
+                             toolbar: toolbarShortcut.active)
     }
 
     var screenshotDirectory: URL {

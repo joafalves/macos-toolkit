@@ -307,3 +307,119 @@ extension SwitcherController {
         }
     }
 }
+
+extension CaptureController {
+    /// Draws text and codes the way a display shows them and reads them back,
+    /// printing what came out beside what went in.
+    static func textTest() {
+        _ = NSApplication.shared
+        func draw(_ size: NSSize, _ body: (CGContext) -> Void) -> CGImage? {
+            let scale: CGFloat = 2
+            guard let ctx = CGContext(data: nil, width: Int(size.width * scale), height: Int(size.height * scale), bitsPerComponent: 8,
+                                      bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+            else { return nil }
+            ctx.scaleBy(x: scale, y: scale)
+            ctx.setFillColor(NSColor.white.cgColor)
+            ctx.fill(CGRect(origin: .zero, size: size))
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+            body(ctx)
+            NSGraphicsContext.restoreGraphicsState()
+            return ctx.makeImage()
+        }
+        func text(_ lines: [(String, CGFloat, CGFloat)], size: NSSize, font: NSFont = .systemFont(ofSize: 13)) -> CGImage? {
+            draw(size) { _ in
+                for (string, x, top) in lines {
+                    (string as NSString).draw(at: NSPoint(x: x, y: size.height - top), withAttributes: [.font: font, .foregroundColor: NSColor.black])
+                }
+            }
+        }
+        func qr(_ payload: String, beside caption: String?) -> CGImage? {
+            guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+            filter.setValue(Data(payload.utf8), forKey: "inputMessage")
+            guard let code = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)),
+                  let image = CIContext().createCGImage(code, from: code.extent)
+            else { return nil }
+            return draw(NSSize(width: 420, height: 260)) { ctx in
+                ctx.interpolationQuality = .none
+                ctx.draw(image, in: CGRect(x: 20, y: 20, width: 220, height: 220))
+                if let caption {
+                    (caption as NSString).draw(at: NSPoint(x: 260, y: 130), withAttributes: [.font: NSFont.systemFont(ofSize: 13)])
+                }
+            }
+        }
+        let cases: [(String, CGImage?, String)] = [
+            ("one line", text([("The quick brown fox jumps over the lazy dog.", 12, 30)], size: NSSize(width: 360, height: 44)),
+             "The quick brown fox jumps over the lazy dog."),
+            ("paragraphs", text([("First paragraph, first line,", 12, 26), ("and its second line.", 12, 44),
+                                 ("A second paragraph after a gap.", 12, 84)], size: NSSize(width: 320, height: 100)),
+             "First paragraph, first line, and its second line.\n\nA second paragraph after a gap."),
+            // As text wraps: each line stops where the next word wouldn't fit.
+            ("wrapped prose", text([("The window can be snapped to a half of the display, and the", 12, 26),
+                                    ("rest of it offers the other windows on the display.", 12, 44),
+                                    ("Everything after that goes on, to the end.", 12, 62)], size: NSSize(width: 460, height: 76)),
+             "The window can be snapped to a half of the display, and the rest of it offers the other windows on the display. Everything after that goes on, to the end."),
+            ("sentence on a new line", text([("The first sentence ends right at the edge.", 12, 26), ("Another one follows below.", 12, 44)],
+                                            size: NSSize(width: 340, height: 60)),
+             "The first sentence ends right at the edge.\nAnother one follows below."),
+            ("hyphen", text([("Recordings are written as soon as some-", 12, 26), ("thing on the screen changes.", 12, 44)], size: NSSize(width: 320, height: 60)),
+             "Recordings are written as soon as something on the screen changes."),
+            ("list", text([("• Open the toolbar with the shortcut", 12, 26), ("• then pick an area to capture", 12, 44),
+                           ("- and press the button", 12, 62)], size: NSSize(width: 320, height: 76)),
+             "• Open the toolbar with the shortcut\n• then pick an area to capture\n- and press the button"),
+            ("address", text([("Rua das Flores, 12", 12, 26), ("Lisboa", 12, 44)], size: NSSize(width: 200, height: 60)),
+             "Rua das Flores, 12\nLisboa"),
+            ("short labels", text([("Name: report", 12, 26), ("Kind: document", 12, 44), ("Size: 2 MB", 12, 62)], size: NSSize(width: 200, height: 76)),
+             "Name: report\nKind: document\nSize: 2 MB"),
+            ("columns", text([("Name", 12, 26), ("Size", 220, 26), ("report.pdf", 12, 46), ("2.4 MB", 220, 46)], size: NSSize(width: 300, height: 60)),
+             "Name\tSize\nreport.pdf\t2.4 MB"),
+            // Every recognizer macOS has, Live Text's too, reads "possível"
+            // at this size as "possivel".
+            ("Portuguese", text([("Não foi possível abrir a aplicação.", 12, 30)], size: NSSize(width: 340, height: 44)),
+             "Não foi possivel abrir a aplicação."),
+            ("code", text([("let total = items.reduce(0, +)", 12, 26), ("print(\"Total: \\(total)\")", 12, 44)],
+                          size: NSSize(width: 320, height: 60), font: .monospacedSystemFont(ofSize: 12, weight: .regular)),
+             "let total = items.reduce(0, +)\nprint(\"Total: \\(total)\")"),
+            ("QR code", qr("https://example.com/qr-test", beside: nil), "https://example.com/qr-test"),
+            ("QR with a caption", qr("https://example.com/qr-test", beside: "Scan to open"), "https://example.com/qr-test"),
+            ("nothing", draw(NSSize(width: 200, height: 100)) { _ in }, "(none)"),
+        ]
+        // The app's own path: a copy of it reads and quits, and our memory
+        // stays where it was. Then one switched off as it reads.
+        if let image = cases[2].1 {
+            let mb = { Double(processFootprint()) / 1_048_576 }
+            let before = mb()
+            for i in 1...3 {
+                let start = Date()
+                let got = runAsync { await TextReader.read(image) }
+                print("\(got == cases[2].2 ? "ok  " : "DIFF") through a helper, read \(i): \(Int(Date().timeIntervalSince(start) * 1000)) ms")
+            }
+            print(String(format: "memory here: %.0f MB before, %.0f MB after", before, mb()))
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.03) { TextReader.cancel() }
+            let start = Date()
+            let stopped = runAsync { await TextReader.read(image) }
+            print("\(stopped == nil ? "ok  " : "DIFF") stopped while reading: \(stopped == nil ? "nothing" : "text") after \(Int(Date().timeIntervalSince(start) * 1000)) ms")
+        }
+        for (name, image, expected) in cases {
+            guard let image else { print("\(name): could not draw"); continue }
+            let start = Date()
+            let got = TextReader.readNow(image) ?? "(none)"
+            let ms = Int(Date().timeIntervalSince(start) * 1000)
+            print("\(got == expected ? "ok  " : "DIFF") \(name) (\(image.width)×\(image.height), \(ms) ms)")
+            if got != expected { print("     expected: \(expected.debugDescription)\n     got:      \(got.debugDescription)") }
+        }
+    }
+}
+
+/// Waits for an async call from synchronous test code.
+private func runAsync<T>(_ body: @escaping () async -> T) -> T {
+    let done = DispatchSemaphore(value: 0)
+    let result = Locked<T?>(nil)
+    Task.detached {
+        result.value = await body()
+        done.signal()
+    }
+    done.wait()
+    return result.value!
+}

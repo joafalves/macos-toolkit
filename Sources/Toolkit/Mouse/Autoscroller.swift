@@ -1,9 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Scrolls while the wheel button is held and the mouse moves, like autoscroll
-/// in Windows browsers: the farther the pointer is from where the button went
-/// down, the faster it scrolls that way. A press and release without moving
+/// Scrolls while the wheel button is held and the mouse moves: the farther
+/// the pointer is from where the button went down, the faster it scrolls that
+/// way. A press and release without moving
 /// is still a normal middle click, so links still open in new tabs.
 ///
 /// Lives on the wheel tap's thread, timer included; only the marker, being a

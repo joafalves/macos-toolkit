@@ -1,6 +1,12 @@
 import AppKit
 import ServiceManagement
 
+// Screen Capture's text reader: a copy of the app reads one image and quits,
+// so Vision's memory goes with it (`TextReader.read`).
+if CommandLine.arguments.contains("--read-text") {
+    TextReader.serve()
+}
+
 // Maintenance flags, used by the build script when the app is replaced.
 if CommandLine.arguments.contains("--unregister-login-item") {
     try? SMAppService.mainApp.unregister()
@@ -78,11 +84,20 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeLayoutGrid(to: rest[0], light: rest.contains("light"), slots: rest.contains("layout-slots"))
         exit(0)
     }
+    if rest.contains("volume-hud") {
+        Snapshot.writeVolumeHUD(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
+    if rest.contains("capture-text") {
+        Snapshot.writeCaptureText(to: rest[0], light: rest.contains("light"), none: rest.contains("none"), reading: rest.contains("reading"))
+        exit(0)
+    }
     if rest.contains("capture-toolbar") {
         Snapshot.writeCaptureToolbar(to: rest[0], light: rest.contains("light"), video: rest.contains("video"))
         exit(0)
     }
     // `layout tabs` or `layout keyboard`: that tab of the Window Layout page.
+    CaptureController.previewText = rest.contains("text")
     LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
     Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"))
     exit(0)
@@ -111,6 +126,12 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-update"), CommandLine
 }
 
 // Development aid: `--list-audio` prints the apps the audio mixer sees.
+// Development aid: `--test-volume`, the volume keys' steps and saved
+// software volumes read onto the even scale.
+if CommandLine.arguments.contains("--test-volume") {
+    MixerController.volumeTest()
+    exit(0)
+}
 if CommandLine.arguments.contains("--list-audio") {
     MixerController.dumpApps()
     exit(0)
@@ -186,6 +207,12 @@ if let flag = CommandLine.arguments.firstIndex(of: "--dump-menus"), CommandLine.
 }
 if CommandLine.arguments.contains("--layout-test-window") {
     LayoutController.runTestWindows()
+    exit(0)
+}
+// Development aid: `--test-text`, drawn text and codes through the text
+// reader: what comes out against what went in. Needs no permission.
+if CommandLine.arguments.contains("--test-text") {
+    CaptureController.textTest()
     exit(0)
 }
 if CommandLine.arguments.contains("--test-shortcuts") {
