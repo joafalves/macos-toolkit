@@ -3,6 +3,13 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.18.1 (unreleased)
+
+### Changed
+
+- **Keep Awake:** in its panel, a click anywhere on the header, the cup and the name included,
+  turns it on or off, as the switch does.
+
 ## 0.18.0 (2026-10-23)
 
 ### Added

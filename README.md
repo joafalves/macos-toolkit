@@ -591,7 +591,7 @@ quits or the tool is turned off.
 
 A session keeps the Mac from sleeping until you turn it off, or for 5 minutes to 24 hours, or until a
 time you pick. Start one from its panel in the menu bar, from its settings, or with a shortcut you
-set. The panel shows the session with a switch to turn it on or off, and a bar of the time left;
+set. The panel shows the session, turned on or off with a click anywhere on it, and a bar of the time left;
 the usual lengths are a click each, with the rest under More, and Until sets an end time a quarter
 of an hour at a time. Keep the display on and Stay available are switches at the bottom. A session carries on if the app is restarted or the Mac reboots, until its time is up.
 

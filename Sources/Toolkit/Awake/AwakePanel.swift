@@ -10,6 +10,7 @@ struct AwakePanelView: View {
 
     /// The end time offered: on the quarter hour, an hour or so from now.
     @StateObject private var until = ViewState(AwakePanelView.soon())
+    @StateObject private var hoveringHeader = ViewState(false)
 
     /// One click away; the rest are under More.
     static let quick = [15 * 60, 30 * 60, 3600, 2 * 3600, 4 * 3600, 8 * 3600]
@@ -32,24 +33,37 @@ struct AwakePanelView: View {
     private var session: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 10) {
-                IconTile(symbol: awake.isOn ? "cup.and.saucer.fill" : "cup.and.saucer",
-                         color: awake.isOn ? AppSection.awake.color : .gray, size: 30)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(AppSection.awake.title)
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(awake.status)
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                // The whole header turns it on or off, not only the switch.
+                Button(action: flip) {
+                    HStack(spacing: 10) {
+                        IconTile(symbol: awake.isOn ? "cup.and.saucer.fill" : "cup.and.saucer",
+                                 color: awake.isOn ? AppSection.awake.color : .gray, size: 30)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(AppSection.awake.title)
+                                .font(.system(size: 13, weight: .semibold))
+                            Text(awake.status)
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 6)
+                    }
+                    .contentShape(Rectangle())
                 }
-                Spacer(minLength: 6)
+                .buttonStyle(.plain)
+                .accessibilityHidden(true)
                 Toggle(AppSection.awake.title, isOn: Binding(get: { awake.isOn }, set: { $0 ? awake.turnOn(for: nil) : awake.turnOff() }))
                     .toggleStyle(PanelSwitch())
                     .labelsHidden()
-                    .disabled(!awake.isOn && awake.batteryLow)
-                    .help("Turns it on with no end, or off again.")
             }
+            .disabled(!awake.isOn && awake.batteryLow)
+            .help("Turns it on with no end, or off again.")
+            .padding(6)
+            .background(Color.primary.opacity(hoveringHeader.value && !(awake.batteryLow && !awake.isOn) ? 0.06 : 0),
+                        in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .onHover { hoveringHeader.value = $0 }
+            .padding(-6)
             if awake.isOn, let session = awake.session, session.until != nil {
                 // What's left of it, as the pill in the menu bar shows.
                 GeometryReader { geo in
@@ -153,6 +167,10 @@ struct AwakePanelView: View {
         .padding(.leading, 8)
         .padding(.vertical, 2)
         .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func flip() {
+        awake.isOn ? awake.turnOff() : awake.turnOn(for: nil)
     }
 
     private func step(_ quarters: Int) {
