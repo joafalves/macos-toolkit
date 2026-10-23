@@ -51,11 +51,12 @@ final class Updater: ObservableObject {
     static var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev" }
 
     /// For `--snapshot about available`: a made-up newer release on show.
-    func preview() {
-        state = .available(Release(version: "9.9.0", notes: """
+    func preview(notes: String? = nil) {
+        state = .available(Release(version: "9.9.0", notes: notes ?? """
             ### Added
 
-            - **Window Switcher:** something new, in a line or two.
+            - **Window Switcher:** something new, in a line or two, wrapped as the changelog
+              wraps it.
 
             ### Fixed
 
@@ -169,10 +170,24 @@ final class Updater: ObservableObject {
                 case .success:
                     Relaunch.now(target, restartingFinder: true)
                 case .failure(let error):
-                    self.state = .failed(error.localizedDescription)
+                    // Still on offer, to try again or to get by hand.
+                    self.state = .available(release)
+                    Self.failed(release, error)
                 }
             }
         }
+    }
+
+    /// The way round it, whatever went wrong: the release page has the app.
+    private static func failed(_ release: Release, _ error: Error) {
+        NSLog("Toolkit: update to \(release.version) not installed: \(error.localizedDescription)")
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = String(localized: "The update couldn't be installed")
+        alert.informativeText = String(localized: "Download version \(release.version) from its release page and install it by hand.")
+        alert.addButton(withTitle: String(localized: "Release Page"))
+        alert.addButton(withTitle: String(localized: "OK"))
+        if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(release.page) }
     }
 
     /// The whole way up to the swap, which leaves the running copy's files

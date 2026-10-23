@@ -3,6 +3,17 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.18.2 (unreleased)
+
+### Fixed
+
+- **Updates:** on About, a new version's notes showed an item that runs over two lines as two, and
+  sat between the card's lines like a setting; they're in a box of their own now, under the version
+  on offer, each heading set apart and each item a bullet of its own. The line beside it only says
+  which version you have.
+- **Updates:** when an update can't be installed, an alert says so and offers its release page, to
+  install it by hand.
+
 ## 0.18.1 (2026-10-23)
 
 ### Changed

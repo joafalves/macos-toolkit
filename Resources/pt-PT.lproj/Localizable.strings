@@ -4,10 +4,10 @@
 /* Sources/Toolkit/UI/Components.swift:448 */
 "%@" = "%@";
 
-/* Sources/Toolkit/App/Updater.swift:183 */
+/* Sources/Toolkit/App/Updater.swift:198 */
 "%@ can't be written to, so the update can't be put there. Install it from the release page." = "Não é possível escrever em %@, por isso a atualização não pode ser posta lá. Instale-a a partir da página da versão.";
 
-/* Sources/Toolkit/App/Updater.swift:263 */
+/* Sources/Toolkit/App/Updater.swift:278 */
 "%@ failed (%d)." = "%@ falhou (%d).";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:62 */
@@ -43,7 +43,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:296 */
 "%lld down" = "%lld na vertical";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:169 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:187 */
 "%lld h" = "%lld h";
 
 /* Sources/Toolkit/Awake/AwakeController.swift:34 */
@@ -289,7 +289,7 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:168 */
 "Battery" = "Bateria";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:67 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:81 */
 "Battery below %lld%%" = "Bateria abaixo de %lld%%";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:169 */
@@ -340,7 +340,7 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:31 */
 "Center third" = "Terço central";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:68 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:82 */
 "Charge it, or lower the stop level." = "Carregue-a, ou baixe o nível em que para.";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:167 */
@@ -349,13 +349,13 @@
 /* Sources/Toolkit/Stats/StatsConfig.swift:77 */
 "Chart" = "Gráfico";
 
-/* Sources/Toolkit/App/AboutView.swift:102 */
+/* Sources/Toolkit/App/AboutView.swift:105 */
 "Check automatically" = "Verificar automaticamente";
 
 /* Sources/Toolkit/App/AboutView.swift:77 */
 "Check Now" = "Verificar agora";
 
-/* Sources/Toolkit/App/AboutView.swift:116 */
+/* Sources/Toolkit/App/AboutView.swift:119 */
 "Checking…" = "A verificar…";
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:174 */
@@ -454,7 +454,7 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:311 */
 "Cores" = "Núcleos";
 
-/* Sources/Toolkit/App/AboutView.swift:120 */
+/* Sources/Toolkit/App/AboutView.swift:123 */
 "Couldn't check for updates" = "Não foi possível verificar se há atualizações";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:70 */
@@ -550,6 +550,9 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:142 */
 "Download" = "Recebidos";
 
+/* Sources/Toolkit/App/Updater.swift:187 */
+"Download version %@ from its release page and install it by hand." = "Descarregue a versão %@ a partir da página da versão e instale-a à mão.";
+
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:80 */
 "Drag a window to a side or the bottom for half the display, to a corner for a quarter, or to the top to fill it. Where a side meets another display, stop just short of the edge." = "Arraste uma janela para um lado ou para baixo para metade do monitor, para um canto para um quarto, ou para cima para o preencher. Onde um lado encontra outro monitor, pare mesmo antes da margem.";
 
@@ -571,7 +574,7 @@
 /* Sources/Toolkit/App/WelcomeView.swift:69 */
 "Each tool is turned on and off on its page. Tools that are on are also in the toolkit's menu in the menu bar." = "Cada ferramenta ativa-se e desativa-se na sua página. As que estão ativas também aparecem no menu do toolkit na barra de menus.";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:134 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:148 */
 "Earlier" = "Mais cedo";
 
 /* Sources/Toolkit/Stats/StatsReadings.swift:29 */
@@ -694,7 +697,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:113 */
 "Gap" = "Margens";
 
-/* Sources/Toolkit/App/Updater.swift:111 */
+/* Sources/Toolkit/App/Updater.swift:112 */
 "GitHub didn't answer (%lld)." = "O GitHub não respondeu (%lld).";
 
 /* Sources/Toolkit/App/AboutView.swift:46 */
@@ -838,7 +841,7 @@
 /* Sources/Toolkit/App/AboutView.swift:75 */
 "Install and Relaunch" = "Instalar e reiniciar";
 
-/* Sources/Toolkit/App/AboutView.swift:119 */
+/* Sources/Toolkit/App/AboutView.swift:122 */
 "Installing %@…" = "A instalar a versão %@…";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:143 */
@@ -862,7 +865,7 @@
 /* Sources/Toolkit/App/AppModel.swift:25 */
 "Keep Awake" = "Keep Awake";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:86 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:100 */
 "Keep awake for" = "Manter ativo durante";
 
 /* Sources/Toolkit/Awake/AwakeController.swift:361 */
@@ -904,7 +907,7 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:39 */
 "Larger" = "Maior";
 
-/* Sources/Toolkit/App/AboutView.swift:131 */
+/* Sources/Toolkit/App/AboutView.swift:134 */
 "Last checked %@." = "Última verificação: %@.";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:32 */
@@ -916,7 +919,7 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:57 */
 "Late Night" = "Noite";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:138 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:152 */
 "Later" = "Mais tarde";
 
 /* Sources/Toolkit/App/MainView.swift:145 */
@@ -1081,7 +1084,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:255 */
 "Navigate" = "Navegar";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:188 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:206 */
 "Needs Accessibility" = "Precisa de Acessibilidade";
 
 /* Sources/Toolkit/Stats/StatsConfig.swift:25 */
@@ -1146,6 +1149,9 @@
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:37 */
 "Off, as Activity Monitor counts it: 100%% is one core, so an app can reach %lld%% on this Mac. On, its share of every core, up to 100%%, like the CPU figure itself." = "Desativado, como o Monitor de Atividade conta: 100%% é um núcleo, por isso uma aplicação pode chegar a %lld%% neste Mac. Ativado, a sua parte de todos os núcleos, até 100%%, como o próprio valor da CPU.";
+
+/* Sources/Toolkit/App/Updater.swift:189 */
+"OK" = "OK";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:161 */
 "On" = "Ativado";
@@ -1396,7 +1402,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:23 */
 "release %@" = "soltar %@";
 
-/* Sources/Toolkit/App/AboutView.swift:86 */
+/* Sources/Toolkit/App/AboutView.swift:87 */
 "Release Page" = "Página da versão";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:59 */
@@ -1651,7 +1657,7 @@
 /* Sources/Toolkit/Capture/CaptureConfig.swift:40 */
 "Standard" = "Normal";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:140 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:154 */
 "Start" = "Iniciar";
 
 /* Sources/Toolkit/App/MainView.swift:146 */
@@ -1756,10 +1762,10 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:168 */
 "That window of the stack, by number." = "Essa janela da pilha, pelo número.";
 
-/* Sources/Toolkit/App/Updater.swift:205 */
+/* Sources/Toolkit/App/Updater.swift:220 */
 "The app couldn't be replaced: %@" = "Não foi possível substituir a aplicação: %@";
 
-/* Sources/Toolkit/App/AboutView.swift:127 */
+/* Sources/Toolkit/App/AboutView.swift:130 */
 "The app restarts when it's done." = "A aplicação reinicia quando terminar.";
 
 /* Sources/Toolkit/App/MainView.swift:155 */
@@ -1783,22 +1789,22 @@
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:41 */
 "The display under the pointer." = "O monitor sob o ponteiro.";
 
-/* Sources/Toolkit/App/Updater.swift:248 */
+/* Sources/Toolkit/App/Updater.swift:263 */
 "The download failed (%lld)." = "A transferência falhou (%lld).";
 
-/* Sources/Toolkit/App/Updater.swift:194 */
+/* Sources/Toolkit/App/Updater.swift:209 */
 "The download has no app in it." = "A transferência não contém nenhuma aplicação.";
 
-/* Sources/Toolkit/App/Updater.swift:217 */
+/* Sources/Toolkit/App/Updater.swift:232 */
 "The download is version %@, not %@." = "A transferência é a versão %@, não a %@.";
 
-/* Sources/Toolkit/App/Updater.swift:214 */
+/* Sources/Toolkit/App/Updater.swift:229 */
 "The download isn't MacOS Toolkit." = "A transferência não é o MacOS Toolkit.";
 
-/* Sources/Toolkit/App/Updater.swift:237 */
+/* Sources/Toolkit/App/Updater.swift:252 */
 "The download isn't signed with this app's certificate, so it wasn't installed." = "A transferência não está assinada com o certificado desta aplicação, por isso não foi instalada.";
 
-/* Sources/Toolkit/App/Updater.swift:233 */
+/* Sources/Toolkit/App/Updater.swift:248 */
 "The download's signature can't be read." = "Não é possível ler a assinatura da transferência.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:80 */
@@ -1837,6 +1843,9 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:55 */
 "The switcher is not active yet. It needs the Accessibility permission to see %@ and your windows." = "O Window Switcher ainda não está ativo. Precisa da permissão de Acessibilidade para ver %@ e as suas janelas.";
 
+/* Sources/Toolkit/App/Updater.swift:186 */
+"The update couldn't be installed" = "Não foi possível instalar a atualização";
+
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:21 */
 "The volume keys need Accessibility. Until it's granted, macOS handles them." = "As teclas de volume precisam da Acessibilidade. Até ser concedida, o macOS trata delas.";
 
@@ -1858,10 +1867,10 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:17 */
 "Thirds" = "Terços";
 
-/* Sources/Toolkit/App/Updater.swift:229 */
+/* Sources/Toolkit/App/Updater.swift:244 */
 "This copy isn't signed with a certificate, so an update can't be checked. Install it from the release page." = "Esta cópia não está assinada com um certificado, por isso não é possível verificar uma atualização. Instale-a a partir da página da versão.";
 
-/* Sources/Toolkit/App/Updater.swift:224 */
+/* Sources/Toolkit/App/Updater.swift:239 */
 "This copy's own signature can't be read." = "Não é possível ler a assinatura desta cópia.";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:124 */
@@ -1876,7 +1885,7 @@
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:150 */
 "Timer" = "Temporizador";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:150 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:164 */
 "Today, or tomorrow if the time has passed." = "Hoje, ou amanhã se a hora já passou.";
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:47 */
@@ -1945,7 +1954,7 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:341 */
 "Unmute" = "Ligar o som";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:130 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:144 */
 "Until" = "Até às";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:45 */
@@ -1957,7 +1966,7 @@
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:26 */
 "Up to about %@ a minute while the whole screen moves." = "Até cerca de %@ por minuto enquanto o ecrã inteiro se mexe.";
 
-/* Sources/Toolkit/App/AboutView.swift:117 */
+/* Sources/Toolkit/App/AboutView.swift:120 */
 "Up to date" = "Atualizado";
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:21 */
@@ -1999,10 +2008,10 @@
 /* Sources/Toolkit/App/AboutView.swift:17 */
 "Version %@ (%@, modified)" = "Versão %@ (%@, modificada)";
 
-/* Sources/Toolkit/App/Updater.swift:144 */
+/* Sources/Toolkit/App/Updater.swift:145 */
 "Version %@ has no app to download yet." = "A versão %@ ainda não tem aplicação para descarregar.";
 
-/* Sources/Toolkit/App/AboutView.swift:118 */
+/* Sources/Toolkit/App/AboutView.swift:121 */
 "Version %@ is available" = "A versão %@ está disponível";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:217 */
@@ -2053,7 +2062,7 @@
 /* Sources/Toolkit/Stats/StatsConfig.swift:39 */
 "What the Mac draws, in watts." = "O que o Mac consome, em watts.";
 
-/* Sources/Toolkit/App/AboutView.swift:84 */
+/* Sources/Toolkit/App/AboutView.swift:85 */
 "What's in %@" = "Novidades da versão %@";
 
 /* Sources/Toolkit/App/AboutView.swift:50 */
@@ -2083,7 +2092,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:22 */
 "When off, cursor settings stay applied after the app quits, until the mouse reconnects." = "Se desativado, as definições do cursor ficam aplicadas depois de sair da aplicação, até o rato voltar a ligar-se.";
 
-/* Sources/Toolkit/App/AboutView.swift:103 */
+/* Sources/Toolkit/App/AboutView.swift:106 */
 "When the app starts and once a day, from the project's releases on GitHub. It asks before installing anything." = "Quando a aplicação arranca e uma vez por dia, a partir das versões do projeto no GitHub. Pergunta antes de instalar o que quer que seja.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:118 */
@@ -2164,10 +2173,10 @@
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:31 */
 "Yellow, then red, as macOS reports memory running short. Off, it keeps the menu bar's color." = "Amarelo, depois vermelho, à medida que o macOS indica que a memória escasseia. Se desativado, mantém a cor da barra de menus.";
 
-/* Sources/Toolkit/App/AboutView.swift:126 */
-"You have %@. It's checked against this app's signature before it's installed, then the app restarts." = "Tem a versão %@. A nova é verificada com a assinatura desta aplicação antes de ser instalada, e depois a aplicação reinicia.";
+/* Sources/Toolkit/App/AboutView.swift:129 */
+"You have %@." = "Tem a %@.";
 
-/* Sources/Toolkit/Awake/AwakePanel.swift:188 */
+/* Sources/Toolkit/Awake/AwakePanel.swift:206 */
 "Your status stays available" = "O seu estado mantém-se disponível";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:114 */
