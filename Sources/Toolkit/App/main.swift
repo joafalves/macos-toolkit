@@ -23,8 +23,16 @@ AppLanguage.apply(GeneralConfig.load().language)
 if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.arguments.count > flag + 1 {
     let rest = Array(CommandLine.arguments[(flag + 1)...])
     // `available`: a new version on offer, for About and the toolkit panel.
-    // `available [notes.md]`: a new version on offer, with those notes if given.
-    if rest.contains("available") { Updater.shared.preview(notes: rest.first { $0.hasSuffix(".md") }.flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }) }
+    // `available [notes.md | releases.json since=X.Y.Z]`: a new version on
+    // offer, with those notes, or what GitHub's list offers a copy at X.Y.Z.
+    if rest.contains("available") {
+        if let feed = rest.first(where: { $0.hasSuffix(".json") }).flatMap({ FileManager.default.contents(atPath: $0) }),
+           let since = rest.first(where: { $0.hasPrefix("since=") })?.dropFirst(6) {
+            Updater.shared.preview(feed: feed, since: String(since))
+        } else {
+            Updater.shared.preview(notes: rest.first { $0.hasSuffix(".md") }.flatMap { try? String(contentsOfFile: $0, encoding: .utf8) })
+        }
+    }
     if rest.contains("switcher-list") || rest.contains("switcher-grid") {
         Snapshot.writeSwitcher(to: rest[0], light: rest.contains("light"), grid: rest.contains("switcher-grid"))
         exit(0)

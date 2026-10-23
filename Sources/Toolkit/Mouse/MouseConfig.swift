@@ -92,8 +92,10 @@ struct Profile: Codable, Equatable {
     /// Holding the wheel button and moving the mouse scrolls, faster the
     /// farther it moves.
     var autoscroll = false
-    /// Multiplier on the autoscroll speed.
-    var autoscrollSpeed = 1.0
+    /// Multiplier on the autoscroll speed, 1 for a pace that can be read
+    /// as it goes (`Autoscroller.pace`).
+    var autoscrollPace = 1.0
+    static let autoscrollPaceRange: ClosedRange<Double> = 0.25...4
 
     init(name: String) {
         self.name = name
@@ -129,7 +131,14 @@ struct Profile: Codable, Equatable {
         smoothScrolling = try c.decodeIfPresent(Bool.self, forKey: .smoothScrolling) ?? false
         navigationButtons = try c.decodeIfPresent(Bool.self, forKey: .navigationButtons) ?? false
         autoscroll = try c.decodeIfPresent(Bool.self, forKey: .autoscroll) ?? false
-        autoscrollSpeed = within(try c.decodeIfPresent(Double.self, forKey: .autoscrollSpeed), 0.25...3, 1.0)
+        if let pace = try c.decodeIfPresent(Double.self, forKey: .autoscrollPace) {
+            autoscrollPace = within(pace, Self.autoscrollPaceRange, 1.0)
+        } else if let speed = try decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(Double.self, forKey: .autoscrollSpeed),
+                  speed.isFinite, speed != 1 {
+            // Before 0.18.3, 1 was four times as fast, too fast to read by: one
+            // picked by hand stays as fast; the 1 nobody changed is the new 1.
+            autoscrollPace = within(speed * 4, Self.autoscrollPaceRange, 1.0)
+        }
     }
 
     /// Before one setting for the distance, a speed and an acceleration, each
@@ -158,7 +167,7 @@ struct Profile: Codable, Equatable {
     }
 
     private enum LegacyKeys: String, CodingKey {
-        case scrollSpeedMode, scrollAccelMode, scrollAccel, scrollAccelStart, scrollAccelEnd
+        case scrollSpeedMode, scrollAccelMode, scrollAccel, scrollAccelStart, scrollAccelEnd, autoscrollSpeed
     }
 
     /// True when any setting needs the event tap (and so Accessibility).

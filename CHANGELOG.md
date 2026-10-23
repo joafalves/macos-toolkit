@@ -3,6 +3,16 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.18.3 (unreleased)
+
+### Changed
+
+- **Mouse:** autoscroll's speed has a new scale: 1 is what 0.25 was, slow enough to read as it goes,
+  and the slider goes from 0.25 to 4. A speed you had picked stays as fast; the 1 nobody changed
+  is the new, slower 1.
+- **Updates:** with versions skipped, About shows what's new in each of them since yours, newest
+  first under its number, rather than only the latest's.
+
 ## 0.18.2 (2026-10-23)
 
 ### Fixed

@@ -12,10 +12,14 @@ final class Updater: ObservableObject {
 
     struct Release: Equatable {
         let version: String
-        /// The release's notes, Markdown.
+        /// The release's notes, Markdown. With versions skipped, each one's
+        /// under a `# X.Y.Z` heading, newest first.
         let notes: String
         let archive: URL
         let page: URL
+        /// Newer than this copy, this one among them: more than one when
+        /// versions were skipped.
+        var versions: [String] = []
     }
 
     enum State: Equatable {
@@ -43,8 +47,10 @@ final class Updater: ObservableObject {
         static let feed = "updateFeed"
     }
 
-    private static let latest = URL(string: "https://api.github.com/repos/joafalves/macos-toolkit/releases/latest")!
-    private var feed: URL { UserDefaults.standard.string(forKey: Keys.feed).flatMap(URL.init(string:)) ?? Self.latest }
+    /// The recent releases, not only the latest: the notes of every version
+    /// skipped are shown too.
+    private static let releases = URL(string: "https://api.github.com/repos/joafalves/macos-toolkit/releases?per_page=30")!
+    private var feed: URL { UserDefaults.standard.string(forKey: Keys.feed).flatMap(URL.init(string:)) ?? Self.releases }
     private var timer: Timer?
     private var launchCheck: DispatchWorkItem?
 
@@ -62,6 +68,10 @@ final class Updater: ObservableObject {
 
             - **Window Layout:** something that didn't work before.
             """, archive: URL(string: "https://example.invalid/app.zip")!, page: URL(string: "https://example.invalid")!))
+    }
+
+    func preview(feed: Data, since version: String) {
+        if let release = try? Self.newer(in: feed, than: version) { state = .available(release) }
     }
 
     var available: Release? {
@@ -125,8 +135,9 @@ final class Updater: ObservableObject {
         }.resume()
     }
 
-    /// The release described by GitHub's answer, if it's newer than
-    /// `version` and has the app's zip.
+    /// The newest release in GitHub's answer (a list of releases, or one),
+    /// if it's newer than `version` and has the app's zip, with the notes of
+    /// every release since `version`.
     static func newer(in data: Data, than version: String) throws -> Release? {
         struct Answer: Decodable {
             struct Asset: Decodable {
@@ -137,13 +148,27 @@ final class Updater: ObservableObject {
             let html_url: URL
             let body: String?
             let assets: [Asset]
+            let draft: Bool?
+            let prerelease: Bool?
+            var version: String { tag_name.hasPrefix("v") ? String(tag_name.dropFirst()) : tag_name }
         }
-        let answer = try JSONDecoder().decode(Answer.self, from: data)
-        let tag = answer.tag_name.hasPrefix("v") ? String(answer.tag_name.dropFirst()) : answer.tag_name
-        guard isNewer(tag, than: version) else { return nil }
-        guard let zip = answer.assets.first(where: { $0.name == "MacOS-Toolkit-\(tag).zip" }) ?? answer.assets.first(where: { $0.name.hasSuffix(".zip") })
+        let decoder = JSONDecoder()
+        let answers: [Answer]
+        if let list = try? decoder.decode([Answer].self, from: data) {
+            answers = list
+        } else {
+            answers = [try decoder.decode(Answer.self, from: data)]
+        }
+        let newer = answers
+            .filter { $0.draft != true && $0.prerelease != true && isNewer($0.version, than: version) }
+            .sorted { isNewer($0.version, than: $1.version) }
+        guard let top = newer.first else { return nil }
+        let tag = top.version
+        guard let zip = top.assets.first(where: { $0.name == "MacOS-Toolkit-\(tag).zip" }) ?? top.assets.first(where: { $0.name.hasSuffix(".zip") })
         else { throw UpdateError("Version \(tag) has no app to download yet.") }
-        return Release(version: tag, notes: answer.body ?? "", archive: zip.browser_download_url, page: answer.html_url)
+        let notes = newer.count == 1 ? top.body ?? ""
+            : newer.map { "# \($0.version)\n\n\($0.body ?? "")" }.joined(separator: "\n\n")
+        return Release(version: tag, notes: notes, archive: zip.browser_download_url, page: top.html_url, versions: newer.map(\.version))
     }
 
     /// By number, part by part: 0.10.0 comes after 0.9.1.

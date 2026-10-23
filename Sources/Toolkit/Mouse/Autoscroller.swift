@@ -22,6 +22,8 @@ final class Autoscroller {
     private static let startDistance = 6.0
     /// Around the anchor nothing scrolls, so a still hand doesn't drift.
     private static let deadZone = 10.0
+    /// The speed at a pace of 1, a quarter of what 1 was before 0.18.3.
+    private static let pace = 0.25
 
     private var state = State.idle
     private var anchor = CGPoint.zero
@@ -53,7 +55,7 @@ final class Autoscroller {
             state = .pending
             anchor = event.location
             pointer = anchor
-            speed = profile.autoscrollSpeed
+            speed = profile.autoscrollPace * Self.pace
             flags = event.flags
             return true
         case .otherMouseDragged:

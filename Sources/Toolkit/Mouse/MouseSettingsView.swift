@@ -257,7 +257,7 @@ private struct ProfileEditor: View {
             OptionRow(title: "Wheel button", caption: "Hold it and move the mouse to scroll, faster the farther you move, in any app.",
                       selection: p.autoscroll, options: [(false, "macOS"), (true, "Autoscroll")]) {
                 if p.wrappedValue.autoscroll {
-                    ValueSlider(value: p.autoscrollSpeed, range: 0.25...3, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", locale: .current, $0) }
+                    ValueSlider(value: p.autoscrollPace, range: Profile.autoscrollPaceRange, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", locale: .current, $0) }
                 }
             }
             if p.wrappedValue.autoscroll {

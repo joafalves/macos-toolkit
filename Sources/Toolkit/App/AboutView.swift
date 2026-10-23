@@ -82,7 +82,9 @@ struct AboutView: View {
                 // between the card's lines like a setting.
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("What's in \(release.version)").font(.subheadline.weight(.semibold))
+                        // Versions skipped: everything since the one here.
+                        Text(release.versions.count > 1 ? "What's new since \(Updater.currentVersion)" : "What's in \(release.version)")
+                            .font(.subheadline.weight(.semibold))
                         Spacer()
                         Button("Release Page") { NSWorkspace.shared.open(release.page) }
                             .buttonStyle(.link)
@@ -137,6 +139,8 @@ struct AboutView: View {
     /// Install instructions and the attribution are for the release page.
     struct NotesSection: Identifiable {
         let id: Int
+        /// Over the first section of each version, when there are several.
+        var version: String?
         var title: String?
         var items: [AttributedString] = []
     }
@@ -144,21 +148,35 @@ struct AboutView: View {
     static func notes(_ markdown: String) -> [NotesSection] {
         var sections: [NotesSection] = []
         var items: [String] = []
+        // A `# X.Y.Z` starts a version's notes; its `## Installing` and the
+        // rest are skipped up to the next.
+        var version: String?
+        var skipping = false
         func close() {
             guard !items.isEmpty else { return }
-            if sections.isEmpty { sections.append(NotesSection(id: 0)) }
+            if sections.isEmpty || version != nil {
+                sections.append(NotesSection(id: sections.count, version: version))
+                version = nil
+            }
             sections[sections.count - 1].items += items.map {
                 (try? AttributedString(markdown: $0, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString($0)
             }
             items = []
         }
-        for raw in markdown.replacingOccurrences(of: "\r\n", with: "\n").split(separator: "\n", omittingEmptySubsequences: false)
-            .prefix(while: { !$0.hasPrefix("## ") && !$0.hasPrefix("---") }) {
+        for raw in markdown.replacingOccurrences(of: "\r\n", with: "\n").split(separator: "\n", omittingEmptySubsequences: false) {
             let line = raw.trimmingCharacters(in: .whitespaces)
-            guard !line.isEmpty else { continue }
+            if line.hasPrefix("# ") {
+                close()
+                version = String(line.dropFirst(2))
+                skipping = false
+                continue
+            }
+            if line.hasPrefix("## ") || line.hasPrefix("---") { skipping = true }
+            guard !skipping, !line.isEmpty else { continue }
             if line.hasPrefix("### ") {
                 close()
-                sections.append(NotesSection(id: sections.count, title: String(line.dropFirst(4))))
+                sections.append(NotesSection(id: sections.count, version: version, title: String(line.dropFirst(4))))
+                version = nil
             } else if raw.first?.isWhitespace == true, let last = items.last {
                 items[items.count - 1] = last + " " + line
             } else {
@@ -183,6 +201,12 @@ private struct ReleaseNotesView: View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(sections) { section in
                 VStack(alignment: .leading, spacing: 6) {
+                    if let version = section.version {
+                        Text(verbatim: version)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, section.id > 0 ? 6 : 0)
+                    }
                     if let title = section.title {
                         Text(verbatim: title)
                             .font(.callout.weight(.semibold))
