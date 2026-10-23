@@ -203,8 +203,8 @@ final class TabStrip {
     fileprivate func menu(for index: Int, at point: NSPoint, in view: NSView) {
         let id = model.tabs[index].id
         let menu = NSMenu()
-        let takeOut = NSMenuItem(title: "Take Out of Stack", action: #selector(MenuTarget.fire(_:)), keyEquivalent: "")
-        let close = NSMenuItem(title: "Close Window", action: #selector(MenuTarget.fire(_:)), keyEquivalent: "")
+        let takeOut = NSMenuItem(title: String(localized: "Take Out of Stack"), action: #selector(MenuTarget.fire(_:)), keyEquivalent: "")
+        let close = NSMenuItem(title: String(localized: "Close Window"), action: #selector(MenuTarget.fire(_:)), keyEquivalent: "")
         let target = MenuTarget { [weak self] item in
             if item === takeOut { self?.onTakeOut(id) } else { self?.onClose(id) }
         }

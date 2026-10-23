@@ -15,15 +15,15 @@ struct CaptureSettingsView: View {
         let quality = capture.config.quality
         let what: String
         switch quality {
-        case .standard: what = "Half the pixels on Retina. Fine for clicking through a UI."
-        case .high: what = "Every pixel. Small text stays sharp while it scrolls."
-        case .maximum: what = "Every pixel, with detail to spare for code and tutorials."
+        case .standard: what = String(localized: "Half the pixels on Retina. Fine for clicking through a UI.")
+        case .high: what = String(localized: "Every pixel. Small text stays sharp while it scrolls.")
+        case .maximum: what = String(localized: "Every pixel, with detail to spare for code and tutorials.")
         }
         guard let screen = NSScreen.main else { return what }
         let minute = Recorder.busyMinute(points: screen.frame.size, scale: screen.backingScaleFactor,
                                          fps: capture.config.frameRate, quality: quality)
         let size = ByteCountFormatter.string(fromByteCount: minute, countStyle: .file)
-        return what + " Up to about \(size) a minute while the whole screen moves."
+        return what + " " + String(localized: "Up to about \(size) a minute while the whole screen moves.")
     }
 
     var body: some View {
@@ -107,7 +107,7 @@ struct CaptureSettingsView: View {
                      footnote: "H.264 MP4, which plays everywhere. Frames are only written when something on screen changes, so a still screen adds almost nothing to the file. When it stops, the file is put on the clipboard, ready to paste.") {
                     FolderRow(title: "Save to", path: $capture.config.recordingFolder, fallback: CaptureConfig.defaultRecordingDirectory)
                     RowDivider()
-                    OptionRow(title: "Quality", caption: qualityCaption,
+                    OptionRow(title: "Quality", caption: .verbatim(qualityCaption),
                               selection: $capture.config.quality,
                               options: RecordingQuality.allCases.map { ($0, $0.title) })
                     RowDivider()
@@ -151,12 +151,12 @@ struct CaptureSettingsView: View {
 /// A folder setting: where files go, and a button to pick another. Empty
 /// means `fallback`, which is made on first use.
 private struct FolderRow: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var path: String
     let fallback: URL
 
     var body: some View {
-        SettingRow(title: title, caption: ((path.isEmpty ? fallback.path : path) as NSString).abbreviatingWithTildeInPath) {
+        SettingRow(title: title, caption: .verbatim(((path.isEmpty ? fallback.path : path) as NSString).abbreviatingWithTildeInPath)) {
             HStack(spacing: 8) {
                 Button("Choose…") { choose() }
                 if !path.isEmpty {
@@ -171,7 +171,7 @@ private struct FolderRow: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.prompt = "Choose"
+        panel.prompt = String(localized: "Choose")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         path = url.path
     }

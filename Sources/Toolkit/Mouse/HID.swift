@@ -78,7 +78,7 @@ enum HID {
                   let product = (prop(kIOHIDProductIDKey) as? NSNumber)?.intValue
             else { return nil }
             let transport = prop(kIOHIDTransportKey) as? String ?? "Unknown"
-            let name = prop(kIOHIDProductKey) as? String ?? "Mouse"
+            let name = prop(kIOHIDProductKey) as? String ?? String(localized: "Mouse")
             let builtIn = (prop(kIOHIDBuiltInKey) as? NSNumber)?.boolValue ?? false
             let isTrackpad = (prop("HIDPointerAccelerationType") as? String) == "HIDTrackpadAcceleration"
             let registryID = (IOHIDServiceClientGetRegistryID(service) as? NSNumber)?.uint64Value ?? 0

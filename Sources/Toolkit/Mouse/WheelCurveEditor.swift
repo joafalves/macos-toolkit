@@ -96,8 +96,8 @@ struct WheelCurveEditor: View {
     }
 
     private static func lines(_ value: Double) -> String {
-        let number = value == value.rounded() ? "\(Int(value))" : String(format: "%.1f", value)
-        return number + (value == 1 ? " line" : " lines")
+        let number = value == value.rounded() ? "\(Int(value))" : String(format: "%.1f", locale: .current, value)
+        return value == 1 ? String(localized: "1 line") : String(localized: "\(number) lines")
     }
 
     /// Faint lines every three lines.

@@ -54,7 +54,7 @@ struct Shortcut: Codable, Equatable {
             + (flags.contains(.shift) ? "⇧" : "") + (flags.contains(.command) ? "⌘" : "")
     }
 
-    var display: String { isNone ? "None" : Self.glyphs(flags) + key }
+    var display: String { isNone ? String(localized: "Shortcut.none", defaultValue: "None", comment: "A shortcut that is not set; masculine in Portuguese, unlike a gap's None") : Self.glyphs(flags) + key }
 
     var carbonModifiers: UInt32 {
         var value = 0
@@ -78,7 +78,7 @@ struct Shortcut: Codable, Equatable {
     static func name(of keyCode: Int) -> String? {
         switch keyCode {
         case kVK_Tab: return "⇥"
-        case kVK_Space: return "Space"
+        case kVK_Space: return String(localized: "Space")
         case kVK_Return: return "↩"
         case kVK_Escape: return "⎋"
         case kVK_Delete: return "⌫"
@@ -140,12 +140,12 @@ struct ShortcutRecorder: View {
     var body: some View {
         HStack(spacing: 6) {
             Button(action: toggle) {
-                Text(model.recording ? (model.live.isEmpty ? "Type Shortcut" : model.live) : shortcut.display)
+                Group { if model.recording, model.live.isEmpty { Text("Type Shortcut") } else { Text(verbatim: model.recording ? model.live : shortcut.display) } }
                     .font(.system(.callout, design: .rounded).weight(.medium))
                     .foregroundStyle(model.recording ? Color.accentColor : shortcut.isNone ? .secondary : .primary)
                     .frame(minWidth: 96)
             }
-            .help(model.recording ? "Press the keys. Esc cancels\(optional ? ", Delete clears" : "")." : "Click to change")
+            .help(!model.recording ? "Click to change" : optional ? "Press the keys. Esc cancels, Delete clears." : "Press the keys. Esc cancels.")
             if shortcut != defaultValue, !model.recording {
                 Button { shortcut = defaultValue } label: { Image(systemName: "arrow.uturn.backward") }
                     .buttonStyle(.borderless)

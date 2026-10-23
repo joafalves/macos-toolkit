@@ -10,16 +10,25 @@ import SwiftUI
 /// the macOS app it goes with, by name, with an arrow for leaving the
 /// toolkit; on the right the tool's own settings, under the toolkit's mark.
 struct PanelFooter: View {
-    let app: String
-    let openApp: () -> Void
+    /// None for a tool with no macOS app of its own to go to.
+    var app: String?
+    var openApp: () -> Void = {}
     let openSettings: () -> Void
+
+    /// An app's name in the reader's language, without the ".app" that
+    /// Finder's "Show all filename extensions" adds.
+    static func name(ofAppAt path: String) -> String {
+        (FileManager.default.displayName(atPath: path) as NSString).deletingPathExtension
+    }
 
     var body: some View {
         HStack {
-            Button(action: openApp) {
-                HStack(spacing: 3) {
-                    Text(app)
-                    Image(systemName: "arrow.up.forward").font(.caption2.weight(.semibold))
+            if let app {
+                Button(action: openApp) {
+                    HStack(spacing: 3) {
+                        Text(app)
+                        Image(systemName: "arrow.up.forward").font(.caption2.weight(.semibold))
+                    }
                 }
             }
             Spacer()

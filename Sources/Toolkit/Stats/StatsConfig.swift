@@ -8,35 +8,35 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .cpu: return "CPU"
-        case .memory: return "Memory"
-        case .network: return "Network"
-        case .disk: return "Disk"
-        case .gpu: return "GPU"
-        case .power: return "Power"
+        case .cpu: return String(localized: "CPU")
+        case .memory: return String(localized: "Memory")
+        case .network: return String(localized: "Network")
+        case .disk: return String(localized: "Disk")
+        case .gpu: return String(localized: "GPU")
+        case .power: return String(localized: "Power")
         }
     }
 
     /// The short name in the compact layout.
     var short: String {
         switch self {
-        case .cpu: return "CPU"
-        case .memory: return "MEM"
-        case .network: return "NET"
-        case .disk: return "SSD"
-        case .gpu: return "GPU"
-        case .power: return "PWR"
+        case .cpu: return String(localized: "CPU")
+        case .memory: return String(localized: "MEM")
+        case .network: return String(localized: "NET")
+        case .disk: return String(localized: "SSD")
+        case .gpu: return String(localized: "GPU")
+        case .power: return String(localized: "PWR")
         }
     }
 
     var caption: String {
         switch self {
-        case .cpu: return "How busy the processor is."
-        case .memory: return "What apps need, without the files macOS keeps cached."
-        case .network: return "Upload and download speed."
-        case .disk: return "Free space on the startup disk."
-        case .gpu: return "How busy the graphics processor is."
-        case .power: return "What the Mac draws, in watts."
+        case .cpu: return String(localized: "How busy the processor is.")
+        case .memory: return String(localized: "What apps need, without the files macOS keeps cached.")
+        case .network: return String(localized: "Upload and download speed.")
+        case .disk: return String(localized: "Free space on the startup disk.")
+        case .gpu: return String(localized: "How busy the graphics processor is.")
+        case .power: return String(localized: "What the Mac draws, in watts.")
         }
     }
 
@@ -72,9 +72,9 @@ enum StatLook: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .number: return "Number"
-        case .pill: return "Pill"
-        case .chart: return "Chart"
+        case .number: return String(localized: "Number")
+        case .pill: return String(localized: "Pill")
+        case .chart: return String(localized: "Chart")
         }
     }
 }

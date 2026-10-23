@@ -11,7 +11,7 @@ struct LayoutSettingsView: View {
     @StateObject private var recording = ViewState(SwitcherPreviews.permitted)
     @StateObject private var page = ViewState(LayoutPage.snapping)
 
-    private static let groups: [(String, [LayoutAction])] = [
+    private static let groups: [(LocalizedStringKey, [LayoutAction])] = [
         ("Halves", [.leftHalf, .rightHalf, .topHalf, .bottomHalf]),
         ("Quarters", [.topLeft, .topRight, .bottomLeft, .bottomRight]),
         ("Thirds", [.firstThird, .centerThird, .lastThird, .firstTwoThirds, .lastTwoThirds]),
@@ -20,9 +20,9 @@ struct LayoutSettingsView: View {
         ("Desktop", [.showDesktop]),
     ]
 
-    private static let halvesNote = "They go by where the window is, however it got there. Left or right again moves the window on to the next display that way. Up again maximizes it, and once more moves it, maximized, to the display above. Down again moves it to the top half of the display below."
+    private static let halvesNote: LocalizedStringKey = "They go by where the window is, however it got there. Left or right again moves the window on to the next display that way. Up again maximizes it, and once more moves it, maximized, to the display above. Down again moves it to the top half of the display below."
 
-    private static let gridKeys: [(String, String)] = [
+    private static let gridKeys: [(LocalizedStringKey, LocalizedStringKey)] = [
         ("Pick two corners", "two letter keys"),
         ("Move the selection", "←  ↑  →  ↓"),
         ("Grow or shrink it", "⇧ ←  ↑  →  ↓"),
@@ -33,7 +33,7 @@ struct LayoutSettingsView: View {
         ("With the mouse", "drag across the cells"),
     ]
 
-    private func caption(_ action: LayoutAction) -> String? {
+    private func caption(_ action: LayoutAction) -> LocalizedStringKey? {
         switch action {
         case .firstThird, .centerThird, .lastThird, .firstTwoThirds, .lastTwoThirds:
             return action == .firstThird ? "Down the display instead of across on one that stands upright." : nil
@@ -114,7 +114,7 @@ struct LayoutSettingsView: View {
                 EmptyView()
             } extra: {
                 ValueSlider(value: $layout.config.gap, range: 0...40, step: 2, low: "0", high: "40") {
-                    $0 == 0 ? "None" : "\(Int($0)) pt"
+                    String(localized: "\(Int($0)) pt")
                 }
             }
         }
@@ -161,7 +161,7 @@ struct LayoutSettingsView: View {
             Card(title: "Stack Shortcuts", footnote: "For the stack of the window you're in. Right-click a tab to take its window out, or to close it.") {
                 ForEach(Array([LayoutAction.nextTab, .previousTab, .takeOutOfTabs, .joinTabs].enumerated()), id: \.offset) { index, action in
                     if index > 0 { RowDivider() }
-                    ShortcutRow(title: action.title, caption: caption(action), shortcut: binding(action),
+                    ShortcutRow(title: .verbatim(action.title), caption: caption(action), shortcut: binding(action),
                                 defaultValue: action.defaultShortcut, taken: taken(except: action))
                 }
                 RowDivider()
@@ -185,14 +185,15 @@ struct LayoutSettingsView: View {
             }
         }
 
-        ForEach(Self.groups, id: \.0) { group in
-            Card(title: group.0, footnote: group.0 == "Halves" ? Self.halvesNote : nil) {
+        // The first group is the halves, with their note and setting.
+        ForEach(Array(Self.groups.enumerated()), id: \.offset) { number, group in
+            Card(title: group.0, footnote: number == 0 ? Self.halvesNote : nil) {
                 ForEach(Array(group.1.enumerated()), id: \.offset) { index, action in
                     if index > 0 { RowDivider() }
-                    ShortcutRow(title: action.title, caption: caption(action), shortcut: binding(action),
+                    ShortcutRow(title: .verbatim(action.title), caption: caption(action), shortcut: binding(action),
                                 defaultValue: action.defaultShortcut, taken: taken(except: action))
                 }
-                if group.0 == "Halves" {
+                if number == 0 {
                     RowDivider()
                     ToggleRow(title: "Sizes at the outer edge",
                               caption: "At the outer edge of the last display, left or right pressed again goes through ⅔ and ⅓ instead of stopping.",
@@ -213,7 +214,7 @@ struct LayoutSettingsView: View {
                            button: "Grant Access…") { mouse.requestAccessibility() }
                 } else if layout.tapFailed {
                     Banner(text: "Accessibility is granted, but the app has to restart before snapping by dragging takes effect.",
-                           button: "Restart") { mouse.relaunch() }
+                           button: "Restart") { Relaunch.now() }
                 }
                 if layout.rectangleRunning {
                     Banner(text: "Rectangle is running. It has the same shortcuts and snaps windows too, so the two get in each other's way.",
@@ -265,9 +266,9 @@ enum LayoutPage: CaseIterable {
 
     var title: String {
         switch self {
-        case .snapping: return "Snapping"
-        case .tabs: return "Stacks (Preview)"
-        case .keyboard: return "Keyboard"
+        case .snapping: return String(localized: "Snapping")
+        case .tabs: return String(localized: "Stacks (Preview)")
+        case .keyboard: return String(localized: "Keyboard")
         }
     }
 }
@@ -285,7 +286,7 @@ private struct GridRow: View {
     }
 
     var body: some View {
-        SettingRow(title: display.name, caption: custom ? "\(size.columns) × \(size.rows)" : "\(size.columns) × \(size.rows), to suit its shape") {
+        SettingRow(title: .verbatim(display.name), caption: custom ? "\(size.columns) × \(size.rows)" : "\(size.columns) × \(size.rows), to suit its shape") {
             HStack(spacing: 14) {
                 GridThumbnail(size: size, aspect: display.frame.width / max(display.frame.height, 1))
                 Stepper(value: Binding(get: { size.columns }, set: { set(columns: $0) }), in: GridSize.columnRange) {

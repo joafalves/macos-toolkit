@@ -34,8 +34,9 @@ final class FinderSync: FIFinderSync {
         // Drawn now, in the colour of the current theme: Finder shows these
         // images as they are, without tinting them the way it does its own.
         let color = Self.menuColor
-        func add(_ title: String, _ symbol: String, _ action: Selector) {
-            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        let words = Settings.translations()
+        func add(_ title: String.LocalizationValue, _ symbol: String, _ action: Selector) {
+            let item = NSMenuItem(title: String(localized: title, bundle: words), action: action, keyEquivalent: "")
             item.image = Self.glyph(symbol, pointSize: 13, color: color)
             item.tag = onItems ? Self.onItems : 0
             menu.addItem(item)
@@ -129,6 +130,18 @@ private struct Settings {
             settings.json = json
         }
         return settings
+    }
+
+    /// The translations for the language picked in the app, if one was:
+    /// Finder runs us in its own, macOS's.
+    static func translations() -> Bundle {
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent("general.json")),
+              let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let language = json["language"] as? String, language != "system",
+              let path = Bundle.main.path(forResource: language, ofType: "lproj"),
+              let bundle = Bundle(path: path)
+        else { return .main }
+        return bundle
     }
 
     static func token() -> String? {

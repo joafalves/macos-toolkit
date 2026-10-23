@@ -21,6 +21,15 @@ struct CPUReading: Equatable {
 struct CoreGroup: Equatable {
     var name: String
     var cores: Range<Int>
+
+    /// macOS names the kinds of core in English: in the reader's words.
+    static func shown(_ name: String) -> String {
+        switch name {
+        case "Performance": return String(localized: "Performance")
+        case "Efficiency": return String(localized: "Efficiency")
+        default: return name
+        }
+    }
 }
 
 struct MemoryReading: Equatable {
@@ -145,7 +154,7 @@ enum StatsReadings {
             var start = 0
             for level in (0..<levels).reversed() {
                 guard let count = int("hw.perflevel\(level).logicalcpu") else { return [] }
-                groups.append(CoreGroup(name: string("hw.perflevel\(level).name") ?? "Level \(level)", cores: start..<(start + count)))
+                groups.append(CoreGroup(name: string("hw.perflevel\(level).name") ?? String(localized: "Level \(level)"), cores: start..<(start + count)))
                 start += count
             }
             return groups

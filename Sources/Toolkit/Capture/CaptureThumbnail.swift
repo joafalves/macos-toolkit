@@ -97,10 +97,10 @@ private final class ThumbnailView: NSView, NSDraggingSource {
         layer?.borderColor = NSColor.white.withAlphaComponent(0.25).cgColor
         layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
-        let close = Self.button("xmark", help: "Dismiss") { [weak self] in self?.onClose?() }
+        let close = Self.button("xmark", help: String(localized: "Dismiss")) { [weak self] in self?.onClose?() }
         buttons.addArrangedSubview(close)
         if file != nil {
-            let trash = Self.button("trash", help: "Move to Trash") { [weak self] in self?.trash() }
+            let trash = Self.button("trash", help: String(localized: "Move to Trash")) { [weak self] in self?.trash() }
             buttons.addArrangedSubview(trash)
         }
         buttons.spacing = 6

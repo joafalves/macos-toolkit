@@ -206,7 +206,7 @@ final class LayoutOverlayView: NSView {
     /// In the middle of the preview: this drop adds a tab.
     private func joiningBadge(in rect: CGRect) {
         let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 15, weight: .semibold), .foregroundColor: NSColor.white]
-        let text = NSAttributedString(string: "Add as a tab", attributes: attributes)
+        let text = NSAttributedString(string: String(localized: "Add as a tab"), attributes: attributes)
         let size = text.size()
         let symbol = NSImage(systemSymbolName: "rectangle.stack.badge.plus", accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: 18, weight: .semibold).applying(.init(paletteColors: [.white])))

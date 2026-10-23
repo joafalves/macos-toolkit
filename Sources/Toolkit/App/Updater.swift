@@ -167,7 +167,7 @@ final class Updater: ObservableObject {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    Self.relaunch(target)
+                    Relaunch.now(target, restartingFinder: true)
                 case .failure(let error):
                     self.state = .failed(error.localizedDescription)
                 }
@@ -238,26 +238,6 @@ final class Updater: ObservableObject {
         }
     }
 
-    /// Once this copy has quit: the new one starts, and Finder too if the
-    /// extension is on, as `build.sh --install` does, since Finder keeps the
-    /// old extension loaded otherwise.
-    private static func relaunch(_ app: URL) {
-        let pid = ProcessInfo.processInfo.processIdentifier
-        let id = (Bundle.main.bundleIdentifier ?? "") + ".finder"
-        let script = """
-        while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done
-        if /usr/bin/pluginkit -m -i '\(id)' | /usr/bin/grep -q '^+'; then
-          /usr/bin/pkill -f FinderExtension.appex; /usr/bin/killall Finder
-        fi
-        /usr/bin/open "$1"
-        """
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", script, "sh", app.path]
-        try? process.run()
-        NSApp.terminate(nil)
-    }
-
     private static func download(_ url: URL, to destination: URL) throws {
         let done = DispatchSemaphore(value: 0)
         var failure: Error?
@@ -286,7 +266,7 @@ final class Updater: ObservableObject {
 
 struct UpdateError: LocalizedError {
     let message: String
-    init(_ message: String) { self.message = message }
+    init(_ message: String.LocalizationValue) { self.message = String(localized: message) }
     var errorDescription: String? { message }
 }
 

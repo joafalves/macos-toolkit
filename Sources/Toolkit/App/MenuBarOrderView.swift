@@ -48,7 +48,7 @@ struct MenuBarOrderList: View {
             } else {
                 KitIcon(size: 20)
             }
-            Text(section?.title ?? "Toolkit menu")
+            Text(section?.title ?? String(localized: "Toolkit menu"))
                 .foregroundStyle(on ? .primary : .secondary)
             Spacer()
             switch place {

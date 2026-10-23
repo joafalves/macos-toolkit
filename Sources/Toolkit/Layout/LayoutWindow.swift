@@ -290,14 +290,6 @@ enum LayoutWindow {
         }
     }
 
-    /// Whether macOS's Fill and Return to Previous Size can be sent to it now:
-    /// through its app's Window menu, which acts on the app's focused window;
-    /// to one of ours, straight to the window.
-    var takesTilingCommands: Bool {
-        if case .own = self { return true }
-        return isFocusedInApp
-    }
-
     /// macOS has tiled it (filled it, or put it in a half): its Return to
     /// Previous Size is there to press, which it is for no other window.
     var isTiledByMacOS: Bool {

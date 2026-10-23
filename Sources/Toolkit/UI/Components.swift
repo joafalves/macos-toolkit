@@ -40,10 +40,10 @@ struct Page<Content: View>: View {
 
 /// A titled group of rows on a rounded panel.
 struct Card<Content: View>: View {
-    var title: String?
+    var title: LocalizedStringKey?
     /// A word next to the title, like "Preview".
-    var badge: String?
-    var footnote: String?
+    var badge: LocalizedStringKey?
+    var footnote: LocalizedStringKey?
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -81,53 +81,71 @@ struct RowDivider: View {
 /// extra controls underneath. A link to another setting shows as a badge
 /// under the caption, and when this one is held, its control is locked.
 struct SettingRow<Control: View, Extra: View>: View {
-    let title: String
-    var caption: String?
+    let title: LocalizedStringKey
+    var caption: LocalizedStringKey?
     var link: SettingLink?
     /// A word next to the title, like "Preview".
-    var badge: String?
+    var badge: LocalizedStringKey?
     @ViewBuilder var control: () -> Control
     @ViewBuilder var extra: () -> Extra
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        Text(title)
-                        if let badge { TagBadge(text: badge) }
-                    }
-                    if let caption {
-                        Text(caption)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let link {
-                        LinkBadge(link: link)
-                            .padding(.top, 5)
-                    }
+            // The control beside the text while the text keeps a readable
+            // width, and under it when not: a wide control, or long words in
+            // another language, would squeeze the text to a word a line.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 16) {
+                    label
+                        .frame(minWidth: 0, idealWidth: 260, maxWidth: .infinity, alignment: .leading)
+                    lockedControl
                 }
-                Spacer(minLength: 0)
-                control()
-                    .disabled(link?.locks == true)
+                VStack(alignment: .leading, spacing: 10) {
+                    label
+                    lockedControl
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             extra()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
     }
+
+    private var label: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Text(title)
+                if let badge { TagBadge(text: badge) }
+            }
+            if let caption {
+                Text(caption)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let link {
+                LinkBadge(link: link)
+                    .padding(.top, 5)
+            }
+        }
+    }
+
+    private var lockedControl: some View {
+        control()
+            .disabled(link?.locks == true)
+    }
 }
 
 extension SettingRow where Extra == EmptyView {
-    init(title: String, caption: String? = nil, link: SettingLink? = nil, badge: String? = nil, @ViewBuilder control: @escaping () -> Control) {
+    init(title: LocalizedStringKey, caption: LocalizedStringKey? = nil, link: SettingLink? = nil, badge: LocalizedStringKey? = nil, @ViewBuilder control: @escaping () -> Control) {
         self.init(title: title, caption: caption, link: link, badge: badge, control: control, extra: { EmptyView() })
     }
 }
 
 /// A small coloured word next to a title, for something not finished yet.
 struct TagBadge: View {
-    let text: String
+    let text: LocalizedStringKey
 
     var body: some View {
         Text(text)
@@ -143,10 +161,10 @@ struct TagBadge: View {
 /// With `menu`, a pop-up instead: for long option names, or so many that the
 /// segments would squeeze the caption.
 struct OptionRow<Value: Hashable, Extra: View>: View {
-    let title: String
-    var caption: String?
+    let title: LocalizedStringKey
+    var caption: LocalizedStringKey?
     @Binding var selection: Value
-    let options: [(Value, String)]
+    let options: [(Value, LocalizedStringKey)]
     var menu = false
     var link: SettingLink?
     @ViewBuilder var extra: () -> Extra
@@ -174,18 +192,33 @@ struct OptionRow<Value: Hashable, Extra: View>: View {
     }
 }
 
+extension OptionRow {
+    /// Options named by a model, already in the reader's words.
+    @_disfavoredOverload
+    init(title: LocalizedStringKey, caption: LocalizedStringKey? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false,
+         link: SettingLink? = nil, @ViewBuilder extra: @escaping () -> Extra) {
+        self.init(title: title, caption: caption, selection: selection, options: options.map { ($0.0, LocalizedStringKey.verbatim($0.1)) },
+                  menu: menu, link: link, extra: extra)
+    }
+}
+
 extension OptionRow where Extra == EmptyView {
-    init(title: String, caption: String? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false, link: SettingLink? = nil) {
+    @_disfavoredOverload
+    init(title: LocalizedStringKey, caption: LocalizedStringKey? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false, link: SettingLink? = nil) {
+        self.init(title: title, caption: caption, selection: selection, options: options, menu: menu, link: link, extra: { EmptyView() })
+    }
+
+    init(title: LocalizedStringKey, caption: LocalizedStringKey? = nil, selection: Binding<Value>, options: [(Value, LocalizedStringKey)], menu: Bool = false, link: SettingLink? = nil) {
         self.init(title: title, caption: caption, selection: selection, options: options, menu: menu, link: link, extra: { EmptyView() })
     }
 }
 
 struct ToggleRow: View {
-    let title: String
-    var caption: String?
+    let title: LocalizedStringKey
+    var caption: LocalizedStringKey?
     @Binding var isOn: Bool
     var link: SettingLink?
-    var badge: String?
+    var badge: LocalizedStringKey?
 
     var body: some View {
         SettingRow(title: title, caption: caption, link: link, badge: badge) {
@@ -201,8 +234,8 @@ struct ValueSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     let step: Double
-    var low: String
-    var high: String
+    var low: LocalizedStringKey
+    var high: LocalizedStringKey
     let format: (Double) -> String
 
     /// Snaps to `step` without drawing a tick mark for every step.
@@ -221,6 +254,9 @@ struct ValueSlider: View {
             }
             Text(format(value))
                 .font(.callout.monospacedDigit())
+                // One line at the badge's width: a longer word shrinks to fit.
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .frame(width: 52)
                 .padding(.vertical, 3)
                 .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
@@ -230,8 +266,8 @@ struct ValueSlider: View {
 
 /// A tinted notice with an action, for things that need the user's attention.
 struct Banner: View {
-    let text: String
-    let button: String
+    let text: LocalizedStringKey
+    let button: LocalizedStringKey
     let action: () -> Void
 
     var body: some View {
@@ -256,9 +292,11 @@ struct Banner: View {
 /// on and off. The same on every tool, so "on" always looks the same.
 struct ToolHeader: View {
     let section: AppSection
-    var title: String?
-    let subtitle: String
+    var title: LocalizedStringKey?
+    let subtitle: LocalizedStringKey
     @Binding var enabled: Bool
+
+    private var name: Text { title.map { Text($0) } ?? Text(section.title) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -267,7 +305,7 @@ struct ToolHeader: View {
                 IconTile(symbol: section.symbol, color: enabled ? section.color : .gray, size: 46)
                     .opacity(enabled ? 1 : 0.6)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title ?? section.title).font(.title2.weight(.semibold))
+                    name.font(.title2.weight(.semibold))
                     Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -289,7 +327,7 @@ struct ToolHeader: View {
                 .strokeBorder(enabled ? section.color.opacity(0.28) : Color.primary.opacity(0.08)))
             // What the faded settings below are waiting for.
             if !enabled {
-                Text("Turn \(title ?? section.title) on to use these settings.")
+                Text("Turn \(name) on to use these settings.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .padding(.leading, 2)
@@ -303,7 +341,7 @@ struct ToolHeader: View {
 /// tool's header, without the switch.
 struct PageHeader: View {
     let section: AppSection
-    let subtitle: String
+    let subtitle: LocalizedStringKey
 
     var body: some View {
         HStack(spacing: 14) {
@@ -338,8 +376,8 @@ struct WhenEnabled<Content: View>: View {
 
 /// A setting that's a shortcut, with a recorder on the right.
 struct ShortcutRow: View {
-    let title: String
-    var caption: String?
+    let title: LocalizedStringKey
+    var caption: LocalizedStringKey?
     @Binding var shortcut: Shortcut
     let defaultValue: Shortcut
     var optional = true
@@ -402,4 +440,10 @@ struct KitIcon: View {
 final class ViewState<Value>: ObservableObject {
     @Published var value: Value
     init(_ value: Value) { self.value = value }
+}
+
+extension LocalizedStringKey {
+    /// Text already in the reader's words, or not words at all (a name, a
+    /// figure): shown as it is, never looked up.
+    static func verbatim(_ text: String) -> LocalizedStringKey { "\(text)" }
 }

@@ -455,8 +455,8 @@ final class LayoutController: ObservableObject {
     private func title(_ command: LayoutKeys.Command) -> String {
         switch command {
         case .action(let action): return "\(action.title) (\(config.shortcut(action).display))"
-        case .grid: return "Grid (\(config.gridShortcut.display))"
-        case .tab(let index): return "Tab \(index + 1)"
+        case .grid: return String(localized: "Grid (\(config.gridShortcut.display))")
+        case .tab(let index): return String(localized: "Tab \(index + 1)")
         }
     }
 
@@ -764,25 +764,10 @@ final class LayoutController: ObservableObject {
                 rect = fill(unit, on: current)
             }
         }
-        // The whole display is macOS's own Fill when its margin is the gap
-        // (none at 0, 8 above that): the app is asked to do it, so macOS
-        // treats the window as filled, title bar and all. With another gap
-        // it's our frame, like the halves beside it: a window macOS filled
-        // can't be moved to fit the gap, macOS puts it back. Onto another
-        // display, it goes there first.
-        if gap == 0 || gap == LayoutGeometry.macOSMargin, placement.unit == CGRect(x: 0, y: 0, width: 1, height: 1), window.takesTilingCommands {
-            if display.id != current.id { window.setFrame(rect, within: display.usable) }
-            // Only if it really filled: an app can take the command and do nothing.
-            if window.perform(.fill), let filled = Self.settled(window, near: rect), LayoutWindow.near(filled, rect) {
-                LayoutTrace.log("layout: filled \(window.id) at \(LayoutTrace.text(filled))")
-                placement.applied = filled
-                placement.tiledByMacOS = true
-                placement.display = display.id
-                placement.displayUUID = display.uuid
-                placements[window.id] = placement
-                return
-            }
-        }
+        // The whole display is our frame too, not macOS's Fill, whatever the
+        // gap: Fill only knows macOS's own margin, a window it filled can't be
+        // moved to fit ours, and some apps take the command and do nothing.
+        // (macOS darkens the menu bar only over a window it filled.)
         guard let actual = window.setFrame(rect, within: display.usable, tiled: record?.tiledByMacOS ?? false, afterDrag: afterDrag) else { return Self.beep() }
         placement.applied = actual
         // Moved by us, it may still be in macOS's tiling, which then puts it
@@ -831,28 +816,6 @@ final class LayoutController: ObservableObject {
         }
     }
 
-    /// Where a window ends up once macOS has finished moving it, which it
-    /// animates: read until it hasn't moved for a few reads, for half a
-    /// second at most. The end of the animation is slow, so two reads alike
-    /// came a few points short of where it stopped, and the window then
-    /// looked moved by hand since: a new gap left it alone.
-    private static func settled(_ window: LayoutWindow, near target: CGRect) -> CGRect? {
-        var last = window.frame
-        var still = 0
-        for _ in 0..<20 {
-            usleep(25_000)
-            let now = window.frame
-            if let now, let previous = last, now == previous, LayoutWindow.near(now, target) {
-                still += 1
-                if still >= 3 { return now }
-            } else {
-                still = 0
-            }
-            last = now
-        }
-        return last
-    }
-
     // MARK: - Grid
 
     private func openGrid() {
@@ -884,9 +847,9 @@ final class LayoutController: ObservableObject {
 
     private func showGrid() {
         guard let grid else { return }
-        var hint = ["Type two corners", "←↑↓→ move", "⇧ extends", "↩ place"]
-        if displays.count > 1 { hint.append("⇥ next display") }
-        hint.append("esc cancel")
+        var hint = [String(localized: "Type two corners"), String(localized: "←↑↓→ move"), String(localized: "⇧ extends"), String(localized: "↩ place")]
+        if displays.count > 1 { hint.append(String(localized: "⇥ next display")) }
+        hint.append(String(localized: "esc cancel"))
         let unit = grid.range.unit(in: grid.size)
         gridOverlay.content = LayoutOverlayContent(
             grid: grid.size, selection: grid.range, pending: grid.pending,
@@ -1057,7 +1020,7 @@ final class LayoutController: ObservableObject {
                 session.target = nil
             }
         }
-        let escape = "esc: don't snap"
+        let escape = String(localized: "esc: don't snap")
         if wantsTabs(flags), let display = LayoutGeometry.display(at: point, in: displays) {
             // Stacking: every window it can stack with is outlined; the one
             // under the pointer is where it goes.
@@ -1073,8 +1036,8 @@ final class LayoutController: ObservableObject {
             content.outlines = session.stackTargets.map(\.frame)
             content.highlight = hit?.frame
             content.joining = hit != nil
-            content.hint = session.stackTargets.isEmpty ? "No windows here to stack with  ·  \(escape)"
-                                                        : "Let go over a window to stack with it  ·  \(escape)"
+            content.hint = session.stackTargets.isEmpty ? String(localized: "No windows here to stack with  ·  \(escape)")
+                                                        : String(localized: "Let go over a window to stack with it  ·  \(escape)")
             shownOn = display
         } else if config.dragSlots != .none, flags.contains(config.dragSlots.flag),
            let display = LayoutGeometry.display(at: point, in: displays) {
@@ -1094,7 +1057,7 @@ final class LayoutController: ObservableObject {
             }
             session.picker = picker
             content.picker = picker
-            content.hint = "Let go over a layout  ·  \(escape)"
+            content.hint = String(localized: "Let go over a layout  ·  \(escape)")
             shownOn = display
         } else if config.dragGrid != .none, flags.contains(config.dragGrid.flag),
            let display = LayoutGeometry.display(at: point, in: displays) {
@@ -1111,7 +1074,7 @@ final class LayoutController: ObservableObject {
             content.selection = range
             content.dim = 0.15
             content.highlight = LayoutGeometry.place(unit, in: display.usable, gap: gap)
-            content.hint = "Let go of \(config.dragGrid.title) to start again  ·  \(escape)"
+            content.hint = String(localized: "Let go of \(config.dragGrid.title) to start again  ·  \(escape)")
             shownOn = display
         } else {
             session.anchor = nil

@@ -76,7 +76,7 @@ struct WelcomeView: View {
 
 private extension WelcomeView {
     func summary(_ section: AppSection) -> String {
-        section == .switcher ? "\(switcherShortcut) through windows instead of apps." : section.summary
+        section == .switcher ? String(localized: "\(switcherShortcut) through windows instead of apps.") : section.summary
     }
 }
 

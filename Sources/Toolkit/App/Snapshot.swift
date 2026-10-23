@@ -54,6 +54,7 @@ enum Snapshot {
             }
             size = model.layout.size
         }
+        model.size = size
         let window = NSWindow(contentViewController: NSHostingController(rootView: SwitcherView(model: model).background(Color(nsColor: .windowBackgroundColor))))
         window.styleMask = [.borderless]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
@@ -317,6 +318,22 @@ enum Snapshot {
         if let view = window.contentView { save(view, to: path) }
     }
 
+    /// Keep Awake's panel, on part way through a session, or `off`.
+    static func writeAwakePanel(to path: String, light: Bool, off: Bool) {
+        _ = NSApplication.shared
+        let awake = AwakeController.preview()
+        if off { awake.turnOff() }
+        let host = NSHostingController(rootView: AwakePanelView(awake: awake).background(Color(nsColor: .windowBackgroundColor)))
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.borderless]
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.setContentSize(host.view.fittingSize)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        if let view = window.contentView { save(view, to: path) }
+    }
+
     /// A System Stats panel, from made-up readings.
     static func writeStatsPanel(to path: String, light: Bool, kinds: [StatKind]) {
         _ = NSApplication.shared
@@ -334,10 +351,8 @@ enum Snapshot {
     /// Window Layout's suggestions after a drop on the left edge: a drawn
     /// window in the left half, and the switcher's grid of made-up windows
     /// in the right half. Nothing from the screen.
-    /// `style`, being chosen between: `current`, `frosted` (the part filled
-    /// with a frosted surface, the windows straight on it), `outline` (a thin
-    /// outline and the panel), `quiet` (the panel alone).
-    static func writeLayoutSuggest(to path: String, light: Bool, style: String = "current") {
+    /// The part offered is a frosted surface, the windows straight on it.
+    static func writeLayoutSuggest(to path: String, light: Bool) {
         _ = NSApplication.shared
         let size = CGSize(width: 1512, height: 982)
         let usable = CGRect(x: 0, y: 33, width: size.width, height: 949 - 70)
@@ -376,47 +391,20 @@ enum Snapshot {
             if let image = fakeWindow(accent: row.2, dark: !light, wide: index % 2 == 0) { model.previews[CGWindowID(index + 1)] = image }
         }
         model.style = .previews
-        let inset: CGFloat = style == "frosted" ? 20 : 24
         model.layout = GridLayout(count: rows.count, maxTileWidth: PreviewSize.large.maxTileWidth,
-                                  area: CGSize(width: rightHalf.width - inset, height: rightHalf.height - inset))
+                                  area: CGSize(width: rightHalf.width - 24, height: rightHalf.height - 24))
         model.selection = 0
         let panelSize = model.layout.size
-        let panelFrame = CGRect(x: rightHalf.midX - panelSize.width / 2, y: rightHalf.midY - panelSize.height / 2,
-                                width: panelSize.width, height: panelSize.height)
-        // The part offered, outlined the way the app shows it.
-        let display = LayoutDisplay(id: 1, uuid: "preview", name: "Built-in Display", frame: CGRect(origin: .zero, size: size), usable: usable)
-        switch style {
-        case "current":
-            let outline = LayoutOverlayView(display: display)
-            outline.content = LayoutOverlayContent(highlight: rightHalf)
-            outline.frame = container.bounds
-            container.addSubview(outline)
-        case "outline":
-            let outline = NSView(frame: local(rightHalf))
-            outline.wantsLayer = true
-            outline.layer?.cornerRadius = 12
-            outline.layer?.borderWidth = 1.5
-            outline.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.7).cgColor
-            container.addSubview(outline)
-        default:
-            break
-        }
-        let frosted = style == "frosted"
-        let panel = NSView(frame: local(frosted ? rightHalf : panelFrame))
+        model.size = panelSize
+        // As the app's panel: the whole part, frosted, its corners rounded.
+        let panel = NSView(frame: local(rightHalf))
         panel.wantsLayer = true
-        panel.layer?.cornerRadius = frosted ? 12 : 14
-        panel.layer?.backgroundColor = (light ? NSColor(white: 0.97, alpha: frosted ? 0.78 : 0.92) : NSColor(white: 0.12, alpha: frosted ? 0.72 : 0.92)).cgColor
-        panel.layer?.borderWidth = frosted ? 0.5 : 0
+        panel.layer?.cornerRadius = 14
+        panel.layer?.backgroundColor = (light ? NSColor(white: 0.97, alpha: 0.78) : NSColor(white: 0.12, alpha: 0.72)).cgColor
+        panel.layer?.borderWidth = 0.5
         panel.layer?.borderColor = NSColor(white: light ? 0 : 1, alpha: 0.12).cgColor
-        if style == "quiet" {
-            panel.shadow = NSShadow()
-            panel.layer?.shadowOpacity = 0.35
-            panel.layer?.shadowRadius = 18
-            panel.layer?.shadowOffset = CGSize(width: 0, height: -6)
-        }
         let grid = NSHostingView(rootView: SwitcherView(model: model))
-        grid.frame = frosted ? CGRect(x: (panel.bounds.width - panelSize.width) / 2, y: (panel.bounds.height - panelSize.height) / 2,
-                                      width: panelSize.width, height: panelSize.height) : panel.bounds
+        grid.frame = panel.bounds
         panel.addSubview(grid)
         container.addSubview(panel)
 

@@ -40,7 +40,9 @@ tool; keep it in step with the code.
   `FinderController.handle` acts on. Its `Info.plist` and entitlements are in `Resources/FinderExtension`.
 - `Sources/Toolkit/UI/Components.swift`: shared settings-page building blocks (`Page`, `Card`,
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
-- `Resources`: `Info.plist` (the only place the version lives), app icon.
+- `Resources`: `Info.plist` (the only place the version lives), app icon, and the translations:
+  `<lang>.lproj/Localizable.strings` (and `InfoPlist.strings` for the permission prompts), the
+  extension's in `Resources/FinderExtension/<lang>.lproj`. `build.sh` copies them into the bundles.
 - Window Layout's placements (what's snapped where, and where each window was before) are saved
   to `layout-placements.json` a second after they change and on quit, with the boot time; windows
   closed since are dropped then. At launch only those still true are kept: the same window number,
@@ -55,7 +57,8 @@ tool; keep it in step with the code.
 - `CHANGELOG.md`: what each version adds, changes and fixes (see Versions and releases).
 - `LICENSE`: the Apache License 2.0, unchanged; the copyright line is in the README and on About.
 - `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `test-update.sh` (the updater
-  against made-up releases), `test-persist.sh` (snaps kept across restarts), `make-icon.swift` (the app icon;
+  against made-up releases), `test-persist.sh` (snaps kept across restarts), `strings.py` (the translations'
+  check), `make-icon.swift` (the app icon;
   `KitIcon` in `Components.swift` and `MenuBarArt.toolkit` draw it too, keep them in step).
 - `docs/images`: the README's screenshots. **None of them is a screenshot of the desktop**: every
   one is rendered from the app's own views with `--snapshot`, through the tools' `preview()`
@@ -150,6 +153,25 @@ tool; keep it in step with the code.
 - Clean up after yourself: anything the app changes outside itself (Cmd-Tab, the screenshot keys,
   macOS's window tiling, device properties, Core Audio taps, `pmset disablesleep`) is restored on quit, on `kill`, and at the next launch if the
   app crashed.
+- **Languages:** English (the code's own text, no table) and Portuguese (Portugal), `pt-PT`. The app
+  follows macOS unless Settings picks one (`GeneralConfig.language`, applied as the app's
+  `AppleLanguages` at launch; a change takes a restart). Every text a person reads goes through the
+  compiler's localization: `Text("…")`, `LocalizedStringKey` parameters (the `Components` all take
+  one), or `String(localized: "…")` for a `String` (menus, alerts, AppKit, model titles). A
+  `String` already in the reader's words goes into a key with `.verbatim(_:)`. A whole sentence is
+  one key: never build one from pieces (`"When the \(grid ? "grid" : "list") appears"` leaves the
+  inner words in English); write each sentence out. Numbers with decimals use
+  `String(format:locale: .current, …)`. Names of macOS apps come from the system
+  (`PanelFooter.name(ofAppAt:)`). Every new or changed text gets its `pt-PT` translation in the
+  same commit, in the words macOS itself uses in pt-PT: look them up in the system's `.loctable`
+  files rather than translating literally ("aplicação", "monitor" for a display and "ecrã" for
+  the screen, "Sair", "pausa" for sleep, "o clipboard", "Spaces", "Gravação do ecrã",
+  "deslocação" for scrolling, "menu de atalhos" for the right-click menu, "Verificar" for checking
+  for updates, "Conceder acesso", "Permitido", the Music app's equalizer preset names). A system
+  word for the same English text wins over a translation of our own. Tool names
+  in pt-PT, in Portuguese only where it's what someone would say, and in English as a proper name
+  otherwise (as Apple keeps Mission Control): Rato, Window Switcher, Gestor de Janelas, Misturador
+  de Áudio, Finder, Captura de Ecrã, Keep Awake, Monitor do Sistema. `scripts/strings.py check` must be clean.
 - Comments say why, not what; match the surrounding density. Prose in the UI and README is plain and
   short, no marketing words.
 - Permissions: Accessibility (mouse wheel and buttons, switcher, Window Layout, Finder cut and swipes, the capture's Content
@@ -174,6 +196,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
 .build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power ...] [light]
 .build/debug/Toolkit --snapshot out.png toolkit-panel [light]   # the panel the toolkit's mark opens, from the tools' previews
+.build/debug/Toolkit --snapshot out.png awake-panel [light] [off]   # Keep Awake's panel, part way through a session or off
 .build/debug/Toolkit --snapshot out.png menu-bar-strip [light]  # the item in a drawn menu bar, for the top of the README
 .build/debug/Toolkit --snapshot out.png layout-grid [light]     # the Window Layout grid over a drawn desktop
 .build/debug/Toolkit --snapshot out.png layout-slots [light]    # its layouts bar while dragging
@@ -186,7 +209,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-snap [report]   # the installed app's snaps, for real, on a helper's windows: edges, corners, gaps, out and back, every display (install first; open -n; leave the mouse alone)
 .build/debug/Toolkit --test-show-desktop [report]   # Show Desktop on and off, called and by its keys through the installed app (open -n; every window moves a moment)
 .build/debug/Toolkit --test-displays [report]   # snaps follow a display that goes and comes back: one made a mirror for a moment (two displays; open -n; they flicker)
-.build/debug/Toolkit --test-gap [report]    # a maximized (macOS's Fill) and a half window follow each change of gap (open -n)
+.build/debug/Toolkit --test-gap [report]    # a maximized and a half window follow each change of gap (open -n)
 .build/debug/Toolkit --test-drag [report]   # real drags on a helper's window macOS tiled, and resizes: which the drag watcher takes for a move (open -n; leave the mouse alone)
 .build/debug/Toolkit --measure-idle <file>   # memory idle, with the settings window, and after (run with open -n, app quit first)
 .build/debug/Toolkit --test-wheel <report>   # one scroll notch through the installed app's wheel tap: what comes out (open -n)
@@ -222,8 +245,15 @@ to stop) makes the app write each decision of Window Layout's drag path to that 
 under the press, why a drag was ignored, the target, what was placed. Use it when a snap doesn't
 happen, with `--test-snap` or by hand.
 
+```bash
+python3 scripts/strings.py check             # every text has its pt-PT, none left over, the same %@ in each
+python3 scripts/strings.py update            # adds the missing keys to the tables, in English, to translate
+python3 scripts/strings.py audit             # literals that look shown but are never looked up (noisy)
+"build/MacOS Toolkit.app/Contents/MacOS/Toolkit" --snapshot out.png general -AppleLanguages '(pt-PT)'  # a page in Portuguese (after build.sh: the tables are in the bundle)
+```
+
 There is no test suite. Check UI changes by rendering `--snapshot` images in both light and dark and
-looking at them, and check behaviour by running the installed app. Keep idle CPU near zero: a hidden
+looking at them (in Portuguese too, where words run longer), and check behaviour by running the installed app. Keep idle CPU near zero: a hidden
 SwiftUI view that animates still costs CPU, and Core Audio taps show macOS's purple recording
 indicator, so run them only when needed.
 

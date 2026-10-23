@@ -18,8 +18,8 @@ enum CaptureError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notFound: return "The window or display is no longer there."
-        case .failed: return "The capture did not produce an image."
+        case .notFound: return String(localized: "The window or display is no longer there.")
+        case .failed: return String(localized: "The capture did not produce an image.")
         }
     }
 }

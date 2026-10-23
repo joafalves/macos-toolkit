@@ -364,7 +364,8 @@ final class CaptureController: ObservableObject {
     @discardableResult
     private func save(_ image: CGImage, scale: CGFloat, in folder: URL, format: ImageFormat) -> URL? {
         guard let data = Screenshotter.encode(image, as: format, scale: scale) else { return nil }
-        let url = Self.uniqueURL(in: folder, base: "Screenshot", ext: format.fileExtension)
+        let (date, time) = Self.now()
+        let url = Self.uniqueURL(in: folder, stem: String(localized: "Screenshot \(date) at \(time)"), ext: format.fileExtension)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try data.write(to: url)
@@ -383,7 +384,8 @@ final class CaptureController: ObservableObject {
         guard ensurePermission() else { return }
         let folder = config.recordingDirectory
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let recorder = Recorder(url: Self.uniqueURL(in: folder, base: "Screen Recording", ext: "mp4"))
+        let (date, time) = Self.now()
+        let recorder = Recorder(url: Self.uniqueURL(in: folder, stem: String(localized: "Screen Recording \(date) at \(time)"), ext: "mp4"))
         recorder.onInterrupted = { [weak self, weak recorder] error in
             guard let self, self.recorder === recorder else { return }
             NSLog("Toolkit: recording stopped by the system: \(error?.localizedDescription ?? "")")
@@ -514,7 +516,7 @@ final class CaptureController: ObservableObject {
         }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "The capture didn't work."
+        alert.messageText = String(localized: "The capture didn't work.")
         alert.informativeText = error.localizedDescription
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
@@ -535,12 +537,20 @@ final class CaptureController: ObservableObject {
         }
     }
 
-    /// "Screenshot 2026-10-20 at 14.03.22.png", with " (2)" and so on when taken
-    /// within the same second.
-    static func uniqueURL(in folder: URL, base: String, ext: String) -> URL {
+    /// "2026-10-20" and "14.03.22", for a name like macOS's own
+    /// "Screenshot 2026-10-20 at 14.03.22".
+    static func now() -> (date: String, time: String) {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-        let stem = "\(base) \(formatter.string(from: Date()))"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let date = formatter.string(from: Date())
+        formatter.dateFormat = "HH.mm.ss"
+        return (date, formatter.string(from: Date()))
+    }
+
+    /// `stem` plus the extension, with " (2)" and so on when taken within the
+    /// same second.
+    static func uniqueURL(in folder: URL, stem: String, ext: String) -> URL {
         var url = folder.appendingPathComponent("\(stem).\(ext)")
         var n = 2
         while FileManager.default.fileExists(atPath: url.path) {

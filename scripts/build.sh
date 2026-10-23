@@ -24,11 +24,15 @@ if COMMIT="$(git rev-parse --short HEAD 2>/dev/null)"; then
   /usr/libexec/PlistBuddy -c "Add :ToolkitModified bool $MODIFIED" "$APP/Contents/Info.plist"
 fi
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# The translations; English is the code's own text.
+cp -R Resources/*.lproj "$APP/Contents/Resources/"
 
 # The Finder extension, with the app's version so the two never disagree.
 mkdir -p "$APPEX/Contents/MacOS"
 cp .build/release/FinderExtension "$APPEX/Contents/MacOS/FinderExtension"
 cp Resources/FinderExtension/Info.plist "$APPEX/Contents/Info.plist"
+mkdir -p "$APPEX/Contents/Resources"
+cp -R Resources/FinderExtension/*.lproj "$APPEX/Contents/Resources/"
 for key in CFBundleShortVersionString CFBundleVersion; do
   value="$(/usr/libexec/PlistBuddy -c "Print :$key" Resources/Info.plist)"
   /usr/libexec/PlistBuddy -c "Set :$key $value" "$APPEX/Contents/Info.plist"

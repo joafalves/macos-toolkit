@@ -108,6 +108,6 @@ final class TopApps {
         var buffer = [CChar](repeating: 0, count: 256)
         proc_name(pid, &buffer, UInt32(buffer.count))
         let name = String(cString: buffer)
-        return AppUsage(id: pid, name: name.isEmpty ? "Process \(pid)" : name, icon: nil, cpu: 0, memory: 0)
+        return AppUsage(id: pid, name: name.isEmpty ? String(localized: "Process \(pid)") : name, icon: nil, cpu: 0, memory: 0)
     }
 }

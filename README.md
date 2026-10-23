@@ -310,7 +310,7 @@ changes; each one can be changed or cleared in the settings.
 | ⌃⌥ U I J K | Top left, top right, bottom left, bottom right quarter |
 | ⌃⌥ D F G | First, center, last third (down the display on one that stands upright) |
 | ⌃⌥ E T | First, last two thirds |
-| ⌃⌥↩ | Maximize. With no gap, or a gap of 8 points (macOS's own margin), it's macOS's own Fill, so macOS treats the window as filled, as after a double-click on its title bar; with another gap the toolkit places it, so it lines up with the halves beside it. Almost maximize (nine tenths, centered) is there too, without a key |
+| ⌃⌥↩ | Maximize, with the gap around it like the halves beside it. The toolkit places it itself rather than asking for macOS's Fill, so the menu bar above stays as it is (macOS darkens it only over a window it filled, as after a double-click on a title bar). Almost maximize (nine tenths, centered) is there too, without a key |
 | ⌃⌥⇧↑ | Maximize the height, keeping the width |
 | ⌃⌥C | Center |
 | ⌃⌥= ⌃⌥- | Larger, smaller: 30 points on every side |
@@ -389,7 +389,7 @@ Dragging across the cells with the mouse works too.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-suggest-dark.png">
-    <img src="docs/images/layout-suggest-light.png" width="620" alt="A window in the left half of a display, and pictures of five other windows filling the right half to pick from">
+    <img src="docs/images/layout-suggest-light.png" width="620" alt="A window in the left half of a display, and the right half a frosted surface with pictures of five other windows to pick from">
   </picture>
 </p>
 
@@ -590,13 +590,14 @@ quits or the tool is turned off.
 </p>
 
 A session keeps the Mac from sleeping until you turn it off, or for 5 minutes to 24 hours, or until a
-time you pick. Start one from its menu in the menu bar, from its settings, or with a shortcut you
-set. The menu has the usual durations at the top and the rest under Other, and Keep the Display On
-and Stay Available as switches; while it's on, Turn Off says what's left. A session carries on if the app is restarted or the Mac reboots, until its time is up.
+time you pick. Start one from its panel in the menu bar, from its settings, or with a shortcut you
+set. The panel shows the session with a switch to turn it on or off, and a bar of the time left;
+the usual lengths are a click each, with the rest under More, and Until sets an end time a quarter
+of an hour at a time. Keep the display on and Stay available are switches at the bottom. A session carries on if the app is restarted or the Mac reboots, until its time is up.
 
 - **In the menu bar** it's a cup. While a session is on it becomes a **pill that empties as the time
   runs out**, with the time left in it (full, with no time, when it has no end), the cup with the
-  time beside it, or only the cup, filled while it's on. With none, it sits in the toolkit panel: the cup turns it on or off, its name opens its menu. **Count up with no end**, off by
+  time beside it, or only the cup, filled while it's on. With none, it sits in the toolkit panel: the cup turns it on or off, its name opens its panel. **Count up with no end**, off by
   default, shows how long a session with no end has been on instead.
 - **Keep the display on** is the default. Turned off, only the Mac stays awake: the display sleeps,
   and downloads and long jobs go on.
@@ -743,6 +744,12 @@ and Keep Awake's cup turns it on with no end, or off, while its name opens its m
 Then every tool, with a switch that turns it on or off and leaves the panel open, so you can set
 several at once; a tool's name opens its settings. Quit and Settings are at the bottom.
 
+## Languages
+
+The app is in English and Portuguese (Portugal). It follows the order of your languages in macOS;
+**Settings → Language** picks one for the app alone, from the next launch. The Finder menu follows
+it too.
+
 ## Good to know
 
 - It uses **private macOS APIs** (window discovery for the switcher, the permission check for the
@@ -768,7 +775,8 @@ Sources/Toolkit
 ├── Stats      the System Stats tool
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu
-scripts        build.sh, make-cert.sh, make-icon.swift, test-update.sh, test-persist.sh
+Resources      Info.plist, the icon, and the translations (pt-PT.lproj)
+scripts        build.sh, make-cert.sh, make-icon.swift, strings.py, test-update.sh, test-persist.sh
 docs/images    the screenshots above
 ```
 

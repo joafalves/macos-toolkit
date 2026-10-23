@@ -7,8 +7,8 @@ struct ToolkitPanelActions {
     var openCapture: () -> Void = {}
     var stopRecording: () -> Void = {}
     var openMixer: () -> Void = {}
-    /// Keep Awake's own menu, for its durations.
-    var awakeMenu: () -> Void = {}
+    /// Keep Awake's own panel, for its lengths.
+    var openAwake: () -> Void = {}
 }
 
 /// The panel the toolkit's mark opens: up top, the tools that have no part
@@ -123,32 +123,32 @@ struct ToolkitPanelView: View {
     private var modules: [Module] {
         var modules: [Module] = []
         if capture.recording != nil {
-            modules.append(Module(id: "recording", symbol: "stop.fill", title: "Stop Recording", detail: capture.recording.map { MenuBarArt.duration($0.elapsed) },
+            modules.append(Module(id: "recording", symbol: "stop.fill", title: String(localized: "Stop Recording"), detail: capture.recording.map { MenuBarArt.duration($0.elapsed) },
                                   tint: .red, lit: true, action: actions.stopRecording))
         } else if capture.config.enabled, !capture.config.standaloneIcon {
-            modules.append(Module(id: "capture", symbol: AppSection.capture.symbol, title: "Screen Capture", detail: capture.config.toolbarShortcut.active?.display,
+            modules.append(Module(id: "capture", symbol: AppSection.capture.symbol, title: AppSection.capture.title, detail: capture.config.toolbarShortcut.active?.display,
                                   tint: AppSection.capture.color, lit: false, action: actions.openCapture))
         }
         if mixer.config.enabled, mixer.config.menuBarIcon == .none {
-            let detail = mixer.mainMuted ? "Muted" : "\(Int((mixer.mainVolume * 100).rounded()))%"
-            modules.append(Module(id: "mixer", symbol: AppSection.mixer.symbol, title: "Audio Mixer", detail: detail,
+            let detail = mixer.mainMuted ? String(localized: "Muted") : "\(Int((mixer.mainVolume * 100).rounded()))%"
+            modules.append(Module(id: "mixer", symbol: AppSection.mixer.symbol, title: AppSection.mixer.title, detail: detail,
                                   tint: AppSection.mixer.color, lit: false, action: actions.openMixer))
         }
         if awake.config.enabled, awake.config.menuBarIcon == .none {
             // The circle turns it on until turned off, or off; the rest opens
             // its menu, for the durations.
-            modules.append(Module(id: "awake", symbol: awake.isOn ? "cup.and.saucer.fill" : "cup.and.saucer", title: "Keep Awake", detail: awakeDetail,
+            modules.append(Module(id: "awake", symbol: awake.isOn ? "cup.and.saucer.fill" : "cup.and.saucer", title: AppSection.awake.title, detail: awakeDetail,
                                   tint: AppSection.awake.color, lit: awake.isOn,
                                   action: { [awake] in awake.isOn ? awake.turnOff() : awake.turnOn(for: nil) },
-                                  more: actions.awakeMenu))
+                                  more: actions.openAwake))
         }
         return modules
     }
 
     private var awakeDetail: String {
-        guard awake.isOn, let session = awake.session else { return "Off" }
-        guard let until = session.until else { return "On" }
-        return AwakeController.left(until.timeIntervalSinceNow) + " left"
+        guard awake.isOn, let session = awake.session else { return String(localized: "Off") }
+        guard let until = session.until else { return String(localized: "On") }
+        return String(localized: "\(AwakeController.left(until.timeIntervalSinceNow)) left")
     }
 }
 
@@ -184,7 +184,8 @@ private struct ModuleTile: View {
             Button(action: module.more ?? module.action) {
                 VStack(spacing: 1) {
                     HStack(spacing: 2) {
-                        Text(module.title).lineLimit(1).minimumScaleFactor(0.85)
+                        // Two lines for a long name in another language, rather than cut.
+                        Text(module.title).lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.85)
                         if module.more != nil {
                             Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary)
                         }
@@ -247,7 +248,7 @@ private struct ToolRow: View {
 /// A switch drawn here, in the accent colour while on: the panel's window
 /// isn't key, as the app isn't made active for it, and macOS draws its own
 /// switches grey there.
-private struct PanelSwitch: ToggleStyle {
+struct PanelSwitch: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button { configuration.isOn.toggle() } label: {
             Capsule()

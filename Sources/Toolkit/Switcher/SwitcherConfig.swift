@@ -31,10 +31,10 @@ enum PreviewSize: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .small: return "Small"
-        case .medium: return "Medium"
-        case .large: return "Large"
-        case .fit: return "Fit"
+        case .small: return String(localized: "Small")
+        case .medium: return String(localized: "Medium")
+        case .large: return String(localized: "Large")
+        case .fit: return String(localized: "Fit")
         }
     }
 
@@ -60,9 +60,9 @@ enum PreviewFreshness: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .cached: return "Cached"
-        case .fresh: return "Fresh"
-        case .live: return "Live"
+        case .cached: return String(localized: "Cached")
+        case .fresh: return String(localized: "Fresh")
+        case .live: return String(localized: "Live")
         }
     }
 }

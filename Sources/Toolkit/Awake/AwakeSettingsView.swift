@@ -18,14 +18,14 @@ struct AwakeSettingsView: View {
                        enabled: $awake.config.enabled)
 
             if awake.config.enabled, awake.config.stayAvailable, !awake.accessibility {
-                Banner(text: "Stay available needs the Accessibility permission. Until it's granted, chat apps can still switch you to away.",
+                Banner(text: "Stay available needs the Accessibility permission.",
                        button: "Grant Access…") { mouse.requestAccessibility() }
             }
 
             WhenEnabled(enabled: awake.config.enabled) {
                 Card {
-                    SettingRow(title: awake.status,
-                               caption: awake.isOn ? nil : awake.cantStart ?? "Start one here, from the menu bar, or with the shortcut.") {
+                    SettingRow(title: .verbatim(awake.status),
+                               caption: awake.isOn ? nil : awake.cantStart.map { .verbatim($0) } ?? "Start one here, from the menu bar, or with the shortcut.") {
                         if awake.isOn {
                             Button("Turn Off") { awake.turnOff() }
                         } else {
@@ -109,9 +109,9 @@ struct AwakeSettingsView: View {
                     ToggleRow(title: "Sound", isOn: $awake.config.soundAtEnd)
                 }
 
-                Card(title: "Chat Apps") {
+                Card(title: "Status") {
                     ToggleRow(title: "Stay available",
-                              caption: "Keeps chat apps like Slack and Teams from switching you to away while the Mac is awake.",
+                              caption: "Your status stays available while the Mac is awake.",
                               isOn: $awake.config.stayAvailable,
                               link: awake.config.stayAvailable ? .holds("Keeps the display on", anchor: Anchor.keepDisplayOn) : nil)
                         .settingAnchor(Anchor.stayAvailable)

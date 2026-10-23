@@ -12,9 +12,9 @@ struct AboutView: View {
     private var version: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "dev"
-        guard let commit = info?["ToolkitCommit"] as? String else { return "Version \(short)" }
+        guard let commit = info?["ToolkitCommit"] as? String else { return String(localized: "Version \(short)") }
         let modified = info?["ToolkitModified"] as? Bool == true
-        return "Version \(short) (\(commit)\(modified ? ", modified" : ""))"
+        return modified ? String(localized: "Version \(short) (\(commit), modified)") : String(localized: "Version \(short) (\(commit))")
     }
 
     var body: some View {
@@ -110,7 +110,7 @@ struct AboutView: View {
         return nil
     }
 
-    private var status: String {
+    private var status: LocalizedStringKey {
         switch updater.state {
         case .idle: return "Version \(Updater.currentVersion)"
         case .checking: return "Checking…"
@@ -121,11 +121,11 @@ struct AboutView: View {
         }
     }
 
-    private var statusCaption: String? {
+    private var statusCaption: LocalizedStringKey? {
         switch updater.state {
         case .available: return "You have \(Updater.currentVersion). It's checked against this app's signature before it's installed, then the app restarts."
         case .installing: return "The app restarts when it's done."
-        case .failed(let message): return message
+        case .failed(let message): return .verbatim(message)
         default:
             guard let last = updater.lastChecked else { return nil }
             return "Last checked \(last.formatted(.relative(presentation: .named)))."
@@ -149,7 +149,7 @@ struct AboutView: View {
         return (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
     }
 
-    private func link(_ title: String, _ path: String) -> some View {
+    private func link(_ title: LocalizedStringKey, _ path: String) -> some View {
         Button(title) { NSWorkspace.shared.open(path.isEmpty ? Self.repository : Self.repository.appendingPathComponent(path)) }
     }
 }

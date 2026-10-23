@@ -719,7 +719,7 @@ extension MixerController {
         ]
         if equalizer {
             mixer.config.equalizer.enabled = true
-            mixer.config.equalizer.gains = EqualizerPreset.all.first { $0.name == "Loudness" }?.gains ?? []
+            mixer.config.equalizer.gains = EqualizerPreset.loudness.gains
         }
         mixer.outputs = [
             OutputDevice(id: 1, uid: "a", name: "MacBook Pro Speakers"),

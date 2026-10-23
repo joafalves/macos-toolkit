@@ -60,7 +60,7 @@ struct MixerSettingsView: View {
                     let ignored = mixer.config.ignored.sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
                     ForEach(Array(ignored.enumerated()), id: \.element.key) { index, entry in
                         if index > 0 { RowDivider() }
-                        SettingRow(title: entry.value) {
+                        SettingRow(title: .verbatim(entry.value)) {
                             Button("Remove") { mixer.unignore(entry.key) }
                         }
                     }

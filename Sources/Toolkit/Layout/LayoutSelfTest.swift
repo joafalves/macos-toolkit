@@ -410,10 +410,10 @@ extension LayoutController {
                     if SystemTiling.value(SystemTiling.marginsKey) == false {
                         check("with macOS's margins off, Fill takes the whole display", after.map { LayoutWindow.close($0, display.usable) } ?? false, text(after))
                     }
-                    // Through the controller: a maximize with no gap is macOS's Fill.
+                    // Through the controller: a maximize is our own frame, even with no gap.
                     layout.place(window, .action(.maximize), displays: displays, gap: 0, cycle: false)
                     let maximized = window.frame
-                    check("maximize with no gap uses macOS's Fill", maximized.map { LayoutWindow.near($0, unit(.maximize)) } ?? false, text(maximized))
+                    check("maximize with no gap takes the display", maximized.map { LayoutWindow.near($0, unit(.maximize)) } ?? false, text(maximized))
                     // Filled by macOS, then placed by us: ours sticks.
                     layout.place(window, .action(.leftHalf), displays: displays, gap: 0, cycle: false)
                     RunLoop.main.run(until: Date().addingTimeInterval(0.6))
@@ -1122,8 +1122,7 @@ extension LayoutController {
 }
 
 extension LayoutController {
-    /// `--test-gap [report]`: a window maximized with macOS's Fill and one in
-    /// the left half, both by the controller, then the gap changed both ways
+    /// `--test-gap [report]`: a maximized window and one in the left half, both by the controller, then the gap changed both ways
     /// with the helper in the background, as from the settings page: each
     /// must move to the new gap. Uses macOS's margins as they're set now.
     static func gapTest(report path: String?) {
@@ -1173,17 +1172,11 @@ extension LayoutController {
             // Moved on the controller's queue, and macOS may hold a tiled one a moment.
             wait(2)
         }
-        // No gap is macOS's Fill only with its margins off, as the app sets
-        // them for no gap; with them on, this can't show it.
-        let gaps: [(Double, Double)] = [(8, 2), (2, 8), (8, 4), (4, 8), (8, 2)] + (margins ? [] : [(2, 0), (0, 8)])
+        let gaps: [(Double, Double)] = [(8, 2), (2, 8), (8, 4), (4, 8), (8, 2), (2, 0), (0, 8)]
         for (first, then) in gaps {
             layout.config.gap = first
             // From somewhere else each time: a second left half is the next display's.
             b.setFrame(CGRect(x: display.usable.midX, y: display.usable.minY + 200, width: 600, height: 420), within: display.usable, tiled: true)
-            // In front for the Fill, which acts on the app's focused window.
-            NSRunningApplication(processIdentifier: pid)?.activate()
-            for _ in 0..<20 where !a.isFocusedInApp { wait(0.05) }
-            wait(0.3)
             layout.place(a, .action(.maximize), displays: displays, gap: CGFloat(first), cycle: false)
             layout.place(b, .action(.leftHalf), displays: displays, gap: CGFloat(first), cycle: false)
             wait(0.6)
@@ -1200,9 +1193,8 @@ extension LayoutController {
                   "wanted \(text(unit(.leftHalf, CGFloat(then)))), got \(text(b.frame))")
         }
         a.setFrame(start, within: display.usable)
-        // One of our own, like the settings window: macOS's Fill too, as a
-        // double-click on its title bar gives it, when the gap is its margin.
-        if margins {
+        // One of our own, like the settings window.
+        do {
             let app = NSApplication.shared
             app.setActivationPolicy(.regular)
             let own = NSWindow(contentRect: CGRect(x: 300, y: 300, width: 640, height: 420), styleMask: [.titled, .resizable, .closable], backing: .buffered, defer: false)
@@ -1226,7 +1218,7 @@ extension LayoutController {
                 }
                 while done.wait(timeout: .now()) == .timedOut { wait(0.05) }
                 wait(0.6)
-                check("our own window, gap 8: maximized by macOS's Fill", window.isTiledByMacOS && (window.frame.map { LayoutWindow.close($0, ownUnit(8)) } ?? false),
+                check("our own window, gap 8: maximized", window.frame.map { LayoutWindow.close($0, ownUnit(8)) } ?? false,
                       "wanted \(text(ownUnit(8))), got \(text(window.frame)), macOS's tiling \(window.isTiledByMacOS)")
                 gapTo(2)
                 check("our own window, gap 8 → 2: takes it", window.frame.map { LayoutWindow.close($0, ownUnit(2)) } ?? false,

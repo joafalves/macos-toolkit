@@ -37,9 +37,9 @@ enum RecordingQuality: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .standard: return "Standard"
-        case .high: return "High"
-        case .maximum: return "Maximum"
+        case .standard: return String(localized: "Standard")
+        case .high: return String(localized: "High")
+        case .maximum: return String(localized: "Maximum")
         }
     }
 

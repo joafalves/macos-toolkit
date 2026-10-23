@@ -98,7 +98,7 @@ struct CaptureToolbarView: View {
         .fixedSize()
     }
 
-    private var captureTitle: String {
+    private var captureTitle: LocalizedStringKey {
         let copy = capture.controlHeld && capture.config.kind == .photo
         if capture.config.mode == .window {
             return capture.config.kind == .video ? "Click a Window to Record" : copy ? "Click a Window to Copy" : "Click a Window"
@@ -123,7 +123,7 @@ private struct Separator: View {
 
 private struct ToolbarIcon: View {
     let symbol: String
-    let help: String
+    let help: LocalizedStringKey
     let selected: Bool
     var muted = false
     let action: () -> Void

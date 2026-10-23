@@ -55,7 +55,7 @@ private struct AutoscrollExceptions: View {
         let apps = mouse.config.autoscrollExcluded.sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
         ForEach(apps, id: \.key) { bundleID, name in
             RowDivider()
-            SettingRow(title: name) {
+            SettingRow(title: .verbatim(name)) {
                 Button("Remove") { mouse.config.autoscrollExcluded[bundleID] = nil }
             }
         }
@@ -173,7 +173,7 @@ private struct ProfileEditor: View {
         Binding(get: { mouse.profile(for: device) }, set: { mouse.setProfile($0, for: device) })
     }
 
-    private static func distanceCaption(_ mode: ScrollMode) -> String {
+    private static func distanceCaption(_ mode: ScrollMode) -> LocalizedStringKey {
         switch mode {
         case .macOS: return "macOS's own: a slow notch barely moves, fast spins go further. The slider scales it."
         case .fixed: return "Every notch the same distance, however fast the wheel turns."
@@ -190,7 +190,7 @@ private struct ProfileEditor: View {
                        button: "Grant Access…") { mouse.requestAccessibility() }
             } else if mouse.wheelTapFailed {
                 Banner(text: "Accessibility is granted, but the app has to restart before wheel and button settings take effect.",
-                       button: "Restart") { mouse.relaunch() }
+                       button: "Restart") { Relaunch.now() }
             } else if mouse.needsInputMonitoring {
                 Banner(text: "With several mice connected, Input Monitoring lets the toolkit tell which one is being used.",
                        button: "Allow…") { mouse.requestInputMonitoring() }
@@ -201,14 +201,14 @@ private struct ProfileEditor: View {
             OptionRow(title: "Speed", caption: "How far the cursor travels for a given hand movement.",
                       selection: p.cursorSpeedMode, options: [(.macOS, "macOS"), (.custom, "Custom")]) {
                 if p.wrappedValue.cursorSpeedMode == .custom {
-                    ValueSlider(value: p.cursorSpeed, range: 0.2...3, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", $0) }
+                    ValueSlider(value: p.cursorSpeed, range: 0.2...3, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", locale: .current, $0) }
                 }
             }
             RowDivider()
             OptionRow(title: "Acceleration", caption: "How much further the cursor goes when you move quickly. Off is 1:1.",
                       selection: p.accelMode, options: [(.macOS, "macOS"), (.off, "Off"), (.custom, "Custom")]) {
                 if p.wrappedValue.accelMode == .custom {
-                    ValueSlider(value: p.accel, range: 0...3, step: 0.005, low: "Less", high: "More") { String(format: "%.2f", $0) }
+                    ValueSlider(value: p.accel, range: 0...3, step: 0.005, low: "Less", high: "More") { String(format: "%.2f", locale: .current, $0) }
                 }
             }
         }
@@ -223,10 +223,10 @@ private struct ProfileEditor: View {
                       selection: p.scrollMode, options: [(.macOS, "macOS"), (.fixed, "Fixed"), (.curve, "Curve")]) {
                 switch p.wrappedValue.scrollMode {
                 case .macOS:
-                    ValueSlider(value: p.scrollSpeed, range: 0.25...5, step: 0.05, low: "Short", high: "Long") { String(format: "%.2f×", $0) }
+                    ValueSlider(value: p.scrollSpeed, range: 0.25...5, step: 0.05, low: "Short", high: "Long") { String(format: "%.2f×", locale: .current, $0) }
                 case .fixed:
                     ValueSlider(value: p.scrollLines, range: Profile.scrollLinesRange, step: 1, low: "Short", high: "Long") {
-                        $0 == 1 ? "1 line" : "\(Int($0)) lines"
+                        $0 == 1 ? String(localized: "1 line") : String(localized: "\(Int($0)) lines")
                     }
                 case .curve:
                     HStack {
@@ -257,7 +257,7 @@ private struct ProfileEditor: View {
             OptionRow(title: "Wheel button", caption: "Hold it and move the mouse to scroll, faster the farther you move, in any app.",
                       selection: p.autoscroll, options: [(false, "macOS"), (true, "Autoscroll")]) {
                 if p.wrappedValue.autoscroll {
-                    ValueSlider(value: p.autoscrollSpeed, range: 0.25...3, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", $0) }
+                    ValueSlider(value: p.autoscrollSpeed, range: 0.25...3, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", locale: .current, $0) }
                 }
             }
             if p.wrappedValue.autoscroll {

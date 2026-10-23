@@ -18,16 +18,28 @@ worked on; it gets its date when it's released.
   press Check Now on About. A new version shows there and at the top of the toolkit panel, and is
   installed only when you ask, if it's signed with the same certificate as the app you have; then
   the app restarts.
+- **Languages:** the app is in Portuguese (Portugal) as well as English, in the words macOS itself
+  uses. It follows your languages in macOS, or the one picked in Settings → Language; the Finder
+  menu and the permission prompts follow too.
 
 ### Changed
+
+- **Keep Awake:** its menu in the menu bar is now a panel like the mixer's: the session with its
+  switch and a bar of the time left, the lengths as buttons with the one running lit, an end time
+  set with − and +, and Keep the display on and Stay available as switches.
 
 - **Menu bar:** the toolkit's mark opens a panel instead of a menu. Every tool is listed with a
   switch to turn it on or off, which leaves the panel open, and its name opens its settings. Screen
   Capture, the Audio Mixer and Keep Awake, when they have no part of their own in the menu bar, are
   tiles at the top: Keep Awake's turns it on or off in one click, with its menu a click away.
+- **Window Layout:** the suggestions for the rest of a display fill it with a frosted surface, the
+  windows straight on it, instead of a coloured block with a panel on top.
 - **Mouse:** shorter wording for the wheel's Fixed distance.
 
 ### Fixed
+
+- **Settings:** the Restart buttons (after granting a permission, or changing the language)
+  sometimes only quit the app: it now opens again once it has fully quit.
 
 - **Menu bar:** the toolkit's item is centred on a laptop's own display, beside the notch, where it
   sat a point low. With several displays it's centred on the main one and no longer moves as you
@@ -39,8 +51,9 @@ worked on; it gets its date when it's released.
   showed no snap for the whole drag: macOS gives it back its old size as the drag starts, and that
   was taken for a resize.
 - **Window Layout:** a maximized window had macOS's own margin of 8 points rather than the gap, so
-  it didn't line up with the halves beside it. macOS's Fill is used only when its margin is the gap
-  (0 or 8); otherwise the toolkit places the window itself.
+  it didn't line up with the halves beside it. Maximize no longer asks for macOS's Fill: the toolkit
+  places the window itself, the same with any gap and in any app. The menu bar above it no longer
+  turns dark, which macOS does only for windows it filled.
 - **Window Layout:** a new gap now reaches a maximized window too, and any window still in macOS's
   tiling; they kept the old one.
 - **Window Layout:** what's snapped where is no longer lost when the app restarts, updates or

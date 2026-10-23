@@ -17,7 +17,7 @@ struct EqualizerConfig: Codable, Equatable {
 
     /// The preset these gains match, if any.
     var presetName: String {
-        EqualizerPreset.all.first { $0.gains == gains }?.name ?? "Custom"
+        EqualizerPreset.all.first { $0.gains == gains }?.name ?? String(localized: "Custom")
     }
 
     init() {}
@@ -31,22 +31,30 @@ struct EqualizerConfig: Codable, Equatable {
 }
 
 struct EqualizerPreset: Identifiable {
+    /// In the app's language, so it's only for showing.
     let name: String
     let gains: [Double]
-    var id: String { name }
+    var id: [Double] { gains }
+
+    init(_ name: String.LocalizationValue, gains: [Double]) {
+        self.name = String(localized: name)
+        self.gains = gains
+    }
+
+    static let loudness = EqualizerPreset("Loudness", gains: [5, 1, -1, 2, 5])
 
     static let all: [EqualizerPreset] = [
-        .init(name: "Flat", gains: [0, 0, 0, 0, 0]),
-        .init(name: "Bass Boost", gains: [6, 3, 0, 0, 0]),
-        .init(name: "Bass Reducer", gains: [-6, -3, 0, 0, 0]),
-        .init(name: "Treble Boost", gains: [0, 0, 0, 3, 6]),
-        .init(name: "Vocal", gains: [-2, -1, 3, 4, 1]),
-        .init(name: "Loudness", gains: [5, 1, -1, 2, 5]),
-        .init(name: "Rock", gains: [4, 2, -1, 2, 4]),
-        .init(name: "Electronic", gains: [5, 2, 0, 1, 4]),
-        .init(name: "Acoustic", gains: [3, 1, 1, 2, 2]),
-        .init(name: "Small Speakers", gains: [4, 3, 0, 1, -1]),
-        .init(name: "Late Night", gains: [-4, -1, 2, 2, -2]),
+        .init("Flat", gains: [0, 0, 0, 0, 0]),
+        .init("Bass Boost", gains: [6, 3, 0, 0, 0]),
+        .init("Bass Reducer", gains: [-6, -3, 0, 0, 0]),
+        .init("Treble Boost", gains: [0, 0, 0, 3, 6]),
+        .init("Vocal", gains: [-2, -1, 3, 4, 1]),
+        loudness,
+        .init("Rock", gains: [4, 2, -1, 2, 4]),
+        .init("Electronic", gains: [5, 2, 0, 1, 4]),
+        .init("Acoustic", gains: [3, 1, 1, 2, 2]),
+        .init("Small Speakers", gains: [4, 3, 0, 1, -1]),
+        .init("Late Night", gains: [-4, -1, 2, 2, -2]),
     ]
 }
 

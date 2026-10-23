@@ -12,17 +12,17 @@ struct SettingLink {
 
     let role: Role
     /// What the badge says.
-    let text: String
+    let text: LocalizedStringKey
     /// The other row's anchor on the page.
     let anchor: String
 
     /// The held row: "On while Stay available is on".
-    static func heldBy(_ text: String, anchor: String) -> SettingLink {
+    static func heldBy(_ text: LocalizedStringKey, anchor: String) -> SettingLink {
         SettingLink(role: .heldBy, text: text, anchor: anchor)
     }
 
     /// The holding row: "Keeps the display on".
-    static func holds(_ text: String, anchor: String) -> SettingLink {
+    static func holds(_ text: LocalizedStringKey, anchor: String) -> SettingLink {
         SettingLink(role: .holds, text: text, anchor: anchor)
     }
 

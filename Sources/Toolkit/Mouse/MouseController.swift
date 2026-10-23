@@ -177,7 +177,7 @@ final class MouseController: ObservableObject {
             let transport = device.transport.hasPrefix("Bluetooth") ? "Bluetooth" : device.transport
             label += " (\(transport))"
         }
-        return device.connected ? label : label + " — not connected"
+        return device.connected ? label : String(localized: "\(label) — not connected")
     }
 
     func battery(for device: MouseDevice) -> Int? {
@@ -309,13 +309,6 @@ final class MouseController: ObservableObject {
         IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
     }
 
-    func relaunch() {
-        let config = NSWorkspace.OpenConfiguration()
-        config.createsNewApplicationInstance = true
-        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { _, _ in
-            DispatchQueue.main.async { NSApp.terminate(nil) }
-        }
-    }
 }
 
 /// Not in the public IOKit headers, but it is what `pmset -g accps` uses.

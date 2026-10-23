@@ -57,7 +57,7 @@ extension AwakeController {
         if let battery = battery() {
             print("      battery: \(battery.percent)%, \(battery.charging ? "on power" : "on battery")")
             if !battery.charging, battery.percent < 95 {
-                // A stop level above the charge: nothing starts, and the menu says why.
+                // A stop level above the charge: nothing starts.
                 let low = AwakeController()
                 low.persists = false
                 var config = AwakeConfig()
@@ -65,9 +65,7 @@ extension AwakeController {
                 config.soundAtEnd = false
                 low.config = config
                 low.turnOn(for: 600)
-                let titles = low.menuItems(openSettings: {}).map(\.title)
                 check(low.batteryLow && low.session == nil && assertions().isEmpty, "below the stop level (\(config.batteryFloor)%): it won't start")
-                check(titles.contains { $0.hasPrefix("Battery below") }, "and its menu says why")
                 low.config.batteryFloor = 0
                 check(!low.batteryLow, "with Never, it can start again")
                 low.stop()

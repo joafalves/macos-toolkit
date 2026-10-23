@@ -16,7 +16,7 @@ struct FinderSettingsView: View {
     }
 
     private var terminalOptions: [(String, String)] {
-        [("", "Automatic")] + terminals.map { ($0.id, $0.name) }
+        [("", String(localized: "Automatic"))] + terminals.map { ($0.id, $0.name) }
     }
 
     var body: some View {
@@ -29,7 +29,7 @@ struct FinderSettingsView: View {
                            button: "Grant Access…") { mouse.requestAccessibility() }
                 } else if finder.tapFailed {
                     Banner(text: "Accessibility is granted, but the app has to restart before Cut and swiping take effect.",
-                           button: "Restart") { mouse.relaunch() }
+                           button: "Restart") { Relaunch.now() }
                 }
             }
 

@@ -139,12 +139,27 @@ private struct GeneralView: View {
 
     var body: some View {
         Page(goTo: $model.goTo) {
-            PageHeader(section: .general, subtitle: "The app's own settings: startup, the menu bar, backups and permissions.")
+            PageHeader(section: .general, subtitle: "The app's own settings: startup, language, the menu bar, backups and permissions.")
 
             Card(title: "Startup") {
                 ToggleRow(title: "Launch at login",
                           caption: "Start in the menu bar when you log in.",
                           isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+            }
+
+            Card(title: "Language") {
+                OptionRow(title: "App language", caption: "Unless you pick one, the app is in the first of your languages in macOS that it has.",
+                          selection: $model.general.language, options: AppLanguage.allCases.map { ($0, $0.title) }, menu: true) {
+                    if model.general.language != AppLanguage.launched {
+                        HStack {
+                            Text("The app shows it after a restart.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Restart") { Relaunch.now() }
+                        }
+                    }
+                }
             }
 
             Card(title: "Menu Bar") {

@@ -15,18 +15,18 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .welcome: return "Overview"
-        case .mouse: return "Mouse"
-        case .switcher: return "Window Switcher"
-        case .layout: return "Window Layout"
-        case .mixer: return "Audio Mixer"
-        case .finder: return "Finder"
-        case .capture: return "Screen Capture"
-        case .awake: return "Keep Awake"
-        case .stats: return "System Stats"
+        case .welcome: return String(localized: "Overview")
+        case .mouse: return String(localized: "Mouse")
+        case .switcher: return String(localized: "Window Switcher")
+        case .layout: return String(localized: "Window Layout")
+        case .mixer: return String(localized: "Audio Mixer")
+        case .finder: return String(localized: "Finder")
+        case .capture: return String(localized: "Screen Capture")
+        case .awake: return String(localized: "Keep Awake")
+        case .stats: return String(localized: "System Stats")
         // Stored as "general", as it was called before.
-        case .general: return "Settings"
-        case .about: return "About"
+        case .general: return String(localized: "Settings")
+        case .about: return String(localized: "About")
         }
     }
 
@@ -67,14 +67,14 @@ enum AppSection: String, CaseIterable, Identifiable {
     var summary: String {
         switch self {
         case .welcome: return ""
-        case .mouse: return "Cursor and wheel settings for each mouse."
-        case .switcher: return "⌘Tab through windows instead of apps."
-        case .layout: return "Snap windows to halves, quarters, thirds or a grid."
-        case .mixer: return "A volume for each app, and an equalizer."
-        case .finder: return "Cut and paste files, and more in the right-click menu."
-        case .capture: return "Screenshots and small screen recordings."
-        case .awake: return "Keeps the Mac awake for as long as you need."
-        case .stats: return "CPU, memory and more in the menu bar."
+        case .mouse: return String(localized: "Cursor and wheel settings for each mouse.")
+        case .switcher: return String(localized: "⌘Tab through windows instead of apps.")
+        case .layout: return String(localized: "Snap windows to halves, quarters, thirds or a grid.")
+        case .mixer: return String(localized: "A volume for each app, and an equalizer.")
+        case .finder: return String(localized: "Cut and paste files, and more in the right-click menu.")
+        case .capture: return String(localized: "Screenshots and small screen recordings.")
+        case .awake: return String(localized: "Keeps the Mac awake for as long as you need.")
+        case .stats: return String(localized: "CPU, memory and more in the menu bar.")
         case .general, .about: return ""
         }
     }

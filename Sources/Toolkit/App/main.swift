@@ -11,6 +11,8 @@ if CommandLine.arguments.contains("--register-login-item") {
     exit(0)
 }
 
+AppLanguage.apply(GeneralConfig.load().language)
+
 // Development aid: `--snapshot <png> [section] [light]` renders the main window
 // to an image without showing it, so layout can be checked from the terminal.
 // `switcher-list` in place of a section renders the window switcher's list,
@@ -20,10 +22,6 @@ if CommandLine.arguments.contains("--register-login-item") {
 // `layout-suggest` the windows it offers for the rest of a display.
 if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.arguments.count > flag + 1 {
     let rest = Array(CommandLine.arguments[(flag + 1)...])
-    // `look-expose`, `look-card`, `look-tag`: another look for the preview tiles.
-    if let look = rest.compactMap({ $0.hasPrefix("look-") ? PreviewTileLook(rawValue: String($0.dropFirst(5))) : nil }).first {
-        PreviewTileLook.current = look
-    }
     // `available`: a new version on offer, for About and the toolkit panel.
     if rest.contains("available") { Updater.shared.preview() }
     if rest.contains("switcher-list") || rest.contains("switcher-grid") {
@@ -43,6 +41,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeStatsPanel(to: rest[0], light: rest.contains("light"), kinds: kinds.isEmpty ? StatKind.allCases : kinds)
         exit(0)
     }
+    if rest.contains("awake-panel") {
+        Snapshot.writeAwakePanel(to: rest[0], light: rest.contains("light"), off: rest.contains("off"))
+        exit(0)
+    }
     if rest.contains("toolkit-panel") {
         Snapshot.writeToolkitPanel(to: rest[0], light: rest.contains("light"))
         exit(0)
@@ -60,8 +62,7 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         exit(0)
     }
     if rest.contains("layout-suggest") {
-        let style = ["frosted", "outline", "quiet"].first(where: rest.contains) ?? "current"
-        Snapshot.writeLayoutSuggest(to: rest[0], light: rest.contains("light"), style: style)
+        Snapshot.writeLayoutSuggest(to: rest[0], light: rest.contains("light"))
         exit(0)
     }
     if rest.contains("layout-grid") || rest.contains("layout-slots") {

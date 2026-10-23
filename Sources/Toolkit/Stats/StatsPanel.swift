@@ -27,7 +27,7 @@ struct StatsPanelView: View {
                 section(kind)
             }
             Divider().padding(.top, 12).padding(.bottom, 8)
-            PanelFooter(app: "Activity Monitor", openApp: {
+            PanelFooter(app: PanelFooter.name(ofAppAt: "/System/Applications/Utilities/Activity Monitor.app"), openApp: {
                 close()
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
             }, openSettings: openSettings)
@@ -56,10 +56,10 @@ struct StatsPanelView: View {
         switch kind {
         case .memory:
             guard let memory = stats.memory else { return "–" }
-            return "\(StatsController.memory(memory.needed)) of \(StatsController.memory(memory.total))"
+            return String(localized: "\(StatsController.memory(memory.needed)) of \(StatsController.memory(memory.total))")
         case .disk:
             guard let disk = stats.disk else { return "–" }
-            return "\(StatsController.bytes(disk.free)) free"
+            return String(localized: "\(StatsController.bytes(disk.free)) free")
         case .network:
             guard let network = stats.network else { return "–" }
             return "↓ \(StatsController.speed(network.down))  ↑ \(StatsController.speed(network.up))"
@@ -130,7 +130,7 @@ struct StatsPanelView: View {
     private var memoryDetails: some View {
         if let memory = stats.memory {
             MemoryBar(memory: memory)
-            Row("Pressure", memory.pressure == .normal ? "Normal" : memory.pressure == .warning ? "Warning" : "Critical")
+            Row("Pressure", memory.pressure == .normal ? String(localized: "Normal") : memory.pressure == .warning ? String(localized: "Warning") : String(localized: "Critical"))
             Row("Swap used", StatsController.memory(memory.swapUsed))
             TopList(apps: stats.apps.sorted { $0.memory > $1.memory }.prefix(5).map { ($0, StatsController.memory($0.memory)) })
         }
@@ -155,7 +155,7 @@ struct StatsPanelView: View {
             }
             ShareBar(share: disk.usedShare, color: .purple)
                 .padding(.top, 4)
-            Row("Used", "\(StatsController.bytes(disk.total - disk.free)) of \(StatsController.bytes(disk.total))")
+            Row("Used", String(localized: "\(StatsController.bytes(disk.total - disk.free)) of \(StatsController.bytes(disk.total))"))
         }
     }
 
@@ -164,7 +164,7 @@ struct StatsPanelView: View {
         if let power = stats.power {
             if let cpu = power.cpu { Row("CPU", StatsController.watts(cpu)) }
             if let gpu = power.gpu { Row("GPU", StatsController.watts(gpu)) }
-            if let charger = power.charger { Row("Charger", "\(charger) W" + (power.charging ? ", charging" : "")) }
+            if let charger = power.charger { Row("Charger", power.charging ? String(localized: "\(charger) W, charging") : "\(charger) W") }
             if let battery = power.battery { Row("Battery", "\(battery)%") }
             if let health = power.health { Row("Battery health", "\(health)%") }
             if let cycles = power.cycles { Row("Cycles", "\(cycles)") }
@@ -174,10 +174,10 @@ struct StatsPanelView: View {
 
 /// A label and its value, on one line.
 private struct Row: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
 
-    init(_ title: String, _ value: String) {
+    init(_ title: LocalizedStringKey, _ value: String) {
         self.title = title
         self.value = value
     }
@@ -193,11 +193,11 @@ private struct Row: View {
 }
 
 private struct Legend: View {
-    let items: [(String, Color)]
+    let items: [(LocalizedStringKey, Color)]
 
     var body: some View {
         HStack(spacing: 12) {
-            ForEach(items, id: \.0) { item in
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                 HStack(spacing: 4) {
                     Circle().fill(item.1).frame(width: 7, height: 7)
                     Text(item.0).font(.caption).foregroundStyle(.secondary)
@@ -308,7 +308,7 @@ private struct CoreCharts: View {
     }
 
     var body: some View {
-        let groups = cpu.groups.isEmpty ? [CoreGroup(name: "Cores", cores: 0..<cpu.cores.count)] : cpu.groups
+        let groups = cpu.groups.isEmpty ? [CoreGroup(name: String(localized: "Cores"), cores: 0..<cpu.cores.count)] : cpu.groups
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(groups.enumerated()), id: \.element.name) { index, group in
                 let cores = group.cores.filter { $0 < cpu.cores.count }
@@ -316,7 +316,7 @@ private struct CoreCharts: View {
                 let color: Color = groups.count > 1 && index == 0 ? .teal : .blue
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(group.name)
+                        Text(CoreGroup.shown(group.name))
                         Spacer()
                         Text(StatsController.percent(cores.isEmpty ? 0 : cores.map { cpu.cores[$0] }.reduce(0, +) / Double(cores.count)))
                             .monospacedDigit()
@@ -345,7 +345,7 @@ private struct CoreCharts: View {
 private struct MemoryBar: View {
     let memory: MemoryReading
 
-    private var parts: [(String, UInt64, Color)] {
+    private var parts: [(LocalizedStringKey, UInt64, Color)] {
         [("App", memory.app, .blue), ("Wired", memory.wired, .orange), ("Compressed", memory.compressed, .purple),
          ("Cached", memory.cached, .gray.opacity(0.5))]
     }
@@ -354,7 +354,7 @@ private struct MemoryBar: View {
         VStack(alignment: .leading, spacing: 6) {
             GeometryReader { geometry in
                 HStack(spacing: 1) {
-                    ForEach(parts, id: \.0) { part in
+                    ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
                         Rectangle().fill(part.2)
                             .frame(width: geometry.size.width * CGFloat(Double(part.1) / Double(max(memory.total, 1))))
                     }
@@ -365,7 +365,7 @@ private struct MemoryBar: View {
             .background(Color.primary.opacity(0.08))
             .clipShape(Capsule())
             LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], spacing: 4) {
-                ForEach(parts, id: \.0) { part in
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
                     HStack(spacing: 4) {
                         Circle().fill(part.2).frame(width: 7, height: 7)
                         Text(part.0).foregroundStyle(.secondary)
@@ -389,7 +389,7 @@ private struct PlaceholderRow: View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 4, style: .continuous).frame(width: 16, height: 16)
             // A line of text's height, so the row is as tall as an app's.
-            Text("Wg").hidden()
+            Text(verbatim: "Wg").hidden()
                 .overlay(alignment: .leading) { Capsule().frame(width: width, height: 8) }
             Spacer()
             Capsule().frame(width: 26, height: 8)

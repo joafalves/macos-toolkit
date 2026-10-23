@@ -1,0 +1,3 @@
+/* What macOS shows when it asks for each permission. */
+"NSAudioCaptureUsageDescription" = "O Misturador de Áudio toca o som de cada aplicação ao volume que definir para ela.";
+"NSMicrophoneUsageDescription" = "A Captura de Ecrã grava o seu microfone com uma gravação do ecrã, quando o ativar.";

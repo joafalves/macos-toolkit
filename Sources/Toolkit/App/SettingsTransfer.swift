@@ -39,7 +39,7 @@ enum SettingsTransfer {
             let file = SettingsFile(mouse: mouse.config, switcher: switcher.config, layout: layout.config, mixer: mixer.config, finder: finder.config, capture: capture.config, awake: awake.config, general: model.general, stats: stats.config)
             try exported(file).write(to: url, options: .atomic)
         } catch {
-            show(error: "The settings could not be exported.", detail: error.localizedDescription)
+            show(error: String(localized: "The settings could not be exported."), detail: error.localizedDescription)
         }
     }
 
@@ -67,15 +67,15 @@ enum SettingsTransfer {
             _ = try JSONDecoder().decode(SettingsFile.self, from: data)
             json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         } catch {
-            show(error: "“\(url.lastPathComponent)” is not a MacOS Toolkit settings file.", detail: error.localizedDescription)
+            show(error: String(localized: "“\(url.lastPathComponent)” is not a MacOS Toolkit settings file."), detail: error.localizedDescription)
             return
         }
 
         let confirm = NSAlert()
-        confirm.messageText = "Import these settings?"
-        confirm.informativeText = "The settings in “\(url.lastPathComponent)” replace yours. Anything the file doesn't have, from tools or versions it predates, stays as it is."
-        confirm.addButton(withTitle: "Import")
-        confirm.addButton(withTitle: "Cancel")
+        confirm.messageText = String(localized: "Import these settings?")
+        confirm.informativeText = String(localized: "The settings in “\(url.lastPathComponent)” replace yours. Anything the file doesn't have, from tools or versions it predates, stays as it is.")
+        confirm.addButton(withTitle: String(localized: "Import"))
+        confirm.addButton(withTitle: String(localized: "Cancel"))
         guard confirm.runModal() == .alertFirstButtonReturn else { return }
 
         merge(&mouse.config, json["mouse"], tool: "mouse")

@@ -19,33 +19,33 @@ enum LayoutAction: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .leftHalf: return "Left half"
-        case .rightHalf: return "Right half"
-        case .topHalf: return "Top half"
-        case .bottomHalf: return "Bottom half"
-        case .topLeft: return "Top left"
-        case .topRight: return "Top right"
-        case .bottomLeft: return "Bottom left"
-        case .bottomRight: return "Bottom right"
-        case .firstThird: return "First third"
-        case .centerThird: return "Center third"
-        case .lastThird: return "Last third"
-        case .firstTwoThirds: return "First two thirds"
-        case .lastTwoThirds: return "Last two thirds"
-        case .maximize: return "Maximize"
-        case .almostMaximize: return "Almost maximize"
-        case .maximizeHeight: return "Maximize height"
-        case .center: return "Center"
-        case .larger: return "Larger"
-        case .smaller: return "Smaller"
-        case .restore: return "Restore"
-        case .previousDisplay: return "Previous display"
-        case .nextDisplay: return "Next display"
-        case .showDesktop: return "Show the desktop"
-        case .nextTab: return "Next window in the stack"
-        case .previousTab: return "Previous window in the stack"
-        case .takeOutOfTabs: return "Take the window out of its stack"
-        case .joinTabs: return "Stack with the window under it"
+        case .leftHalf: return String(localized: "Left half")
+        case .rightHalf: return String(localized: "Right half")
+        case .topHalf: return String(localized: "Top half")
+        case .bottomHalf: return String(localized: "Bottom half")
+        case .topLeft: return String(localized: "Top left")
+        case .topRight: return String(localized: "Top right")
+        case .bottomLeft: return String(localized: "Bottom left")
+        case .bottomRight: return String(localized: "Bottom right")
+        case .firstThird: return String(localized: "First third")
+        case .centerThird: return String(localized: "Center third")
+        case .lastThird: return String(localized: "Last third")
+        case .firstTwoThirds: return String(localized: "First two thirds")
+        case .lastTwoThirds: return String(localized: "Last two thirds")
+        case .maximize: return String(localized: "Maximize")
+        case .almostMaximize: return String(localized: "Almost maximize")
+        case .maximizeHeight: return String(localized: "Maximize height")
+        case .center: return String(localized: "Center")
+        case .larger: return String(localized: "Larger")
+        case .smaller: return String(localized: "Smaller")
+        case .restore: return String(localized: "Restore")
+        case .previousDisplay: return String(localized: "Previous display")
+        case .nextDisplay: return String(localized: "Next display")
+        case .showDesktop: return String(localized: "Show the desktop")
+        case .nextTab: return String(localized: "Next window in the stack")
+        case .previousTab: return String(localized: "Previous window in the stack")
+        case .takeOutOfTabs: return String(localized: "Take the window out of its stack")
+        case .joinTabs: return String(localized: "Stack with the window under it")
         }
     }
 
@@ -127,9 +127,9 @@ enum SuggestStyle: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .off: return "Off"
-        case .list: return "List"
-        case .previews: return "Previews"
+        case .off: return String(localized: "Off")
+        case .list: return String(localized: "List")
+        case .previews: return String(localized: "Previews")
         }
     }
 }
@@ -145,9 +145,9 @@ enum SuggestFrom: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .display: return "Only this display's"
-        case .fallback: return "Others' if it has none"
-        case .all: return "Always, after its own"
+        case .display: return String(localized: "Only this display's")
+        case .fallback: return String(localized: "Others' if it has none")
+        case .all: return String(localized: "Always, after its own")
         }
     }
 }
@@ -158,7 +158,7 @@ enum TabsJoin: String, Codable, CaseIterable {
     case off
     case key
 
-    var title: String { self == .off ? "Off" : "On" }
+    var title: String { self == .off ? String(localized: "Off") : String(localized: "On") }
 
     init(from decoder: Decoder) throws {
         // An "always" from before is on.
@@ -170,7 +170,7 @@ enum TabsJoin: String, Codable, CaseIterable {
 enum TabsPosition: String, Codable, CaseIterable {
     case bottom, top
 
-    var title: String { self == .bottom ? "Bottom" : "Top" }
+    var title: String { self == .bottom ? String(localized: "Bottom") : String(localized: "Top") }
 }
 
 /// The compact pill, a small bar of app icons over the window's bottom edge,
@@ -191,7 +191,7 @@ enum TabsStyle: String, Codable, CaseIterable {
     // /// A small pill of app icons over the window's edge.
     // case pill
 
-    var title: String { "Tabs" }
+    var title: String { String(localized: "Tabs") }
     // var title: String { self == .strip ? "Tabs" : "Compact" }
 }
 
@@ -201,9 +201,9 @@ enum TabNumbers: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .off: return "Off"
-        case .controlOption: return "⌃⌥ 1–9"
-        case .controlOptionCommand: return "⌃⌥⌘ 1–9"
+        case .off: return String(localized: "Off")
+        case .controlOption: return String(localized: "⌃⌥ 1–9")
+        case .controlOptionCommand: return String(localized: "⌃⌥⌘ 1–9")
         }
     }
 
@@ -222,11 +222,11 @@ enum DragModifier: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .none: return "Off"
-        case .shift: return "⇧"
-        case .control: return "⌃"
-        case .option: return "⌥"
-        case .command: return "⌘"
+        case .none: return String(localized: "Off")
+        case .shift: return String(localized: "⇧")
+        case .control: return String(localized: "⌃")
+        case .option: return String(localized: "⌥")
+        case .command: return String(localized: "⌘")
         }
     }
 

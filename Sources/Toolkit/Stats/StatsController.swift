@@ -263,7 +263,7 @@ final class StatsController: ObservableObject {
             let lines = shown.map { compactLine($0) }
             // Two to a column, so they fit the menu bar's height.
             let columns = stride(from: 0, to: lines.count, by: 2).map { Array(lines[$0..<min($0 + 2, lines.count)]) }
-            return [MenuBarSegment(kind: .stats, columns: columns.map(MenuBarArt.column), label: "System Stats, " + shown.map(spoken).joined(separator: ", "))]
+            return [MenuBarSegment(kind: .stats, columns: columns.map(MenuBarArt.column), label: String(localized: "System Stats, \(shown.map(spoken).joined(separator: ", "))"))]
         }
         return shown.map(segment)
     }
@@ -375,7 +375,7 @@ final class StatsController: ObservableObject {
 
     private func spoken(_ kind: StatKind) -> String {
         switch kind {
-        case .network: return network.map { "down \(Self.speed($0.down)), up \(Self.speed($0.up))" } ?? "reading"
+        case .network: return network.map { String(localized: "down \(Self.speed($0.down)), up \(Self.speed($0.up))") } ?? String(localized: "reading")
         default: return text(kind)
         }
     }
@@ -395,16 +395,16 @@ final class StatsController: ObservableObject {
         guard ofWhole else { return "\(Int((used * 100).rounded()))%" }
         let share = used / Double(max(cores, 1)) * 100
         // Most apps are a fraction of a percent of every core: one decimal.
-        return share < 10 ? String(format: "%.1f%%", share) : "\(Int(share.rounded()))%"
+        return share < 10 ? String(format: "%.1f%%", locale: .current, share) : "\(Int(share.rounded()))%"
     }
 
     /// What the figures are out of, for perspective.
     static func appCPUScale(ofWhole: Bool, cores: Int) -> String {
-        ofWhole ? "Of the whole CPU, up to 100%" : "Per core, up to \(max(cores, 1) * 100)%"
+        ofWhole ? String(localized: "Of the whole CPU, up to 100%") : String(localized: "Per core, up to \(max(cores, 1) * 100)%")
     }
 
     static func watts(_ watts: Double) -> String {
-        watts < 10 ? String(format: "%.1f W", watts) : "\(Int(watts.rounded())) W"
+        watts < 10 ? String(format: "%.1f W", locale: .current, watts) : "\(Int(watts.rounded())) W"
     }
 
     /// 0 KB/s, 840 KB/s, 1.2 MB/s, 34 MB/s.
@@ -416,7 +416,7 @@ final class StatsController: ObservableObject {
             value /= 1000
             unit += 1
         }
-        return (value < 10 && unit > 0 ? String(format: "%.1f", value) : "\(Int(value.rounded()))") + " " + units[unit]
+        return (value < 10 && unit > 0 ? String(format: "%.1f", locale: .current, value) : "\(Int(value.rounded()))") + " " + units[unit]
     }
 
     static func bytes(_ count: Int64) -> String {

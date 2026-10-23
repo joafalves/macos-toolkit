@@ -12,6 +12,11 @@
 	<string>dev.jalves.macos-toolkit.finder</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>pt-PT</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>MacOS Toolkit</string>
 	<key>CFBundlePackageType</key>

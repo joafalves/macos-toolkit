@@ -56,7 +56,7 @@ private struct StatRow: View {
     private var setting: StatSetting { stats.config.setting(kind) }
 
     var body: some View {
-        SettingRow(title: kind.title, caption: kind.caption) {
+        SettingRow(title: .verbatim(kind.title), caption: .verbatim(kind.caption)) {
             HStack(spacing: 12) {
                 if setting.shown, stats.config.layout == .separate, kind.looks.count > 1 {
                     Picker("Look", selection: Binding(get: { setting.look }, set: { look in stats.config.set(kind) { $0.look = look } })) {

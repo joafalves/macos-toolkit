@@ -54,7 +54,9 @@ struct MixerPopoverView: View {
 
             Divider().padding(.horizontal, 4)
 
-            PanelFooter(app: "System Settings", openApp: {
+            // By its full name: in some languages its own is the same word as
+            // the toolkit's Settings beside it ("Definições").
+            PanelFooter(app: String(localized: "System Settings"), openApp: {
                 close()
                 mixer.openSoundSettings()
             }, openSettings: openSettings)
@@ -153,7 +155,7 @@ private struct EqualizerModule: View {
                     HStack(spacing: 8) {
                         SectionTitle("Equalizer")
                         Spacer(minLength: 8)
-                        Text(eq.enabled ? eq.presetName : "Off")
+                        Text(eq.enabled ? eq.presetName : String(localized: "Off"))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -230,7 +232,7 @@ private struct BandColumn: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text(gain == 0 ? "0" : String(format: "%+.1f", gain).replacingOccurrences(of: ".0", with: ""))
+            Text(verbatim: gain == 0 ? "0" : gain == gain.rounded() ? String(format: "%+d", Int(gain)) : String(format: "%+.1f", locale: .current, gain))
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
                 .foregroundStyle(gain == 0 ? .tertiary : .secondary)
             GeometryReader { geo in
@@ -275,7 +277,7 @@ private struct BandColumn: View {
         .help("\(label) Hz. Drag to boost or cut; double-click for 0 dB.")
         .accessibilityElement()
         .accessibilityLabel("\(label) hertz")
-        .accessibilityValue("\(gain) decibels")
+        .accessibilityValue("\(gain, specifier: "%.1f") decibels")
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: change(gain + 1)
@@ -541,13 +543,17 @@ private struct PercentLabel: View {
         }
         .font(.system(size: 11, weight: .medium).monospacedDigit())
         .foregroundStyle(.secondary)
+        // Every row's slider the same length: a longer word for Muted in
+        // another language shrinks to the column rather than wrapping.
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
         .frame(width: 38, alignment: .trailing)
     }
 }
 
 private struct SectionTitle: View {
-    let text: String
-    init(_ text: String) { self.text = text }
+    let text: LocalizedStringKey
+    init(_ text: LocalizedStringKey) { self.text = text }
 
     var body: some View {
         Text(text).font(.system(size: 13, weight: .semibold))
@@ -555,7 +561,7 @@ private struct SectionTitle: View {
 }
 
 private struct PillButton: View {
-    let title: String
+    let title: LocalizedStringKey
     let symbol: String
     let action: () -> Void
     @Environment(\.isEnabled) private var isEnabled
@@ -576,7 +582,8 @@ private struct PillButton: View {
     }
 }
 
-private struct ModuleBackground: View {
+/// The rounded card behind a panel's module, as in Control Center.
+struct ModuleBackground: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
             .fill(Color.primary.opacity(0.05))

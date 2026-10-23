@@ -30,8 +30,8 @@ final class AwakeController: ObservableObject {
     static let minutes = [5, 10, 15, 20, 30, 45, 50, 55]
     static let hours = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24]
 
-    static func title(minutes: Int) -> String { "\(minutes) Minutes" }
-    static func title(hours: Int) -> String { hours == 1 ? "1 Hour" : "\(hours) Hours" }
+    static func title(minutes: Int) -> String { String(localized: "\(minutes) Minutes") }
+    static func title(hours: Int) -> String { hours == 1 ? String(localized: "1 Hour") : String(localized: "\(hours) Hours") }
 
     enum Ending {
         case byHand, ranOut, battery(Int), hot
@@ -48,7 +48,6 @@ final class AwakeController: ObservableObject {
     private let stay = StayAvailable()
     private let key = AwakeKey()
     private var observers: [NSObjectProtocol] = []
-    private lazy var menuTarget = AwakeMenuTarget(self)
 
     init() {
         config = AwakeConfig.load()
@@ -127,7 +126,7 @@ final class AwakeController: ObservableObject {
 
     /// Why a session can't start now, if it can't.
     var cantStart: String? {
-        batteryLow ? "The battery is below \(config.batteryFloor)%. Charge it, or lower the stop level." : nil
+        batteryLow ? String(localized: "The battery is below \(config.batteryFloor)%. Charge it, or lower the stop level.") : nil
     }
 
     private func begin(_ session: AwakeSession) {
@@ -292,12 +291,12 @@ final class AwakeController: ObservableObject {
 
     /// For the menu and the settings page.
     var status: String {
-        guard isOn, let session else { return "Off" }
+        guard isOn, let session else { return String(localized: "Off") }
         guard let until = session.until else {
-            return config.showElapsed ? "On until you turn it off, on for \(Self.elapsed(Date().timeIntervalSince(session.started)))"
-                                      : "On until you turn it off"
+            return config.showElapsed ? String(localized: "On until you turn it off, on for \(Self.elapsed(Date().timeIntervalSince(session.started)))")
+                                      : String(localized: "On until you turn it off")
         }
-        return "On until \(until.formatted(date: Calendar.current.isDateInToday(until) ? .omitted : .abbreviated, time: .shortened)), \(Self.left(until.timeIntervalSinceNow)) left"
+        return String(localized: "On until \(until.formatted(date: Calendar.current.isDateInToday(until) ? .omitted : .abbreviated, time: .shortened)), \(Self.left(until.timeIntervalSinceNow)) left")
     }
 
     // MARK: - Battery
@@ -355,93 +354,22 @@ final class AwakeController: ObservableObject {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    private func notify(_ why: String) {
+    private func notify(_ why: String.LocalizationValue) {
         if config.soundAtEnd { NSSound(named: "Glass")?.play() }
         guard config.notifyAtEnd, persists, Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Keep Awake is off"
-        content.body = why
+        content.title = String(localized: "Keep Awake is off")
+        content.body = String(localized: why)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "keep-awake-ended", content: content, trigger: nil))
     }
 
-    // MARK: - Menu
-
-    /// One click away; every duration is under Other.
-    static let quick = [15 * 60, 30 * 60, 3600, 2 * 3600, 4 * 3600]
-
-    static func title(seconds: Int) -> String {
-        seconds < 3600 ? title(minutes: seconds / 60) : title(hours: seconds / 3600)
-    }
-
-    /// Its menu: Turn Off with what's left while it's on, the durations,
-    /// the two switches changed most often, and Settings…. A duration picked
-    /// while it's on counts from now; none is ticked, since a running one
-    /// stops matching its name a minute in.
-    func menuItems(openSettings: @escaping () -> Void) -> [NSMenuItem] {
-        menuTarget.openSettings = openSettings
-        var items: [NSMenuItem] = []
-        if isOn, let session {
-            let off = menuTarget.item("Turn Off", #selector(AwakeMenuTarget.turnOff))
-            off.subtitle = Self.menuDetail(session, showElapsed: config.showElapsed)
-            items.append(off)
-            items.append(.separator())
-        }
-        items.append(.sectionHeader(title: "Keep Awake"))
-        if batteryLow, !isOn {
-            let why = NSMenuItem(title: "Battery below \(config.batteryFloor)%", action: nil, keyEquivalent: "")
-            why.subtitle = "Charge it, or lower the stop level."
-            why.isEnabled = false
-            items.append(why)
-        }
-        func duration(_ seconds: Int) -> NSMenuItem {
-            let item = menuTarget.item(Self.title(seconds: seconds), #selector(AwakeMenuTarget.turnOnFor(_:)))
-            item.tag = seconds
-            return item
-        }
-        items.append(menuTarget.item("Until Turned Off", #selector(AwakeMenuTarget.turnOn)))
-        Self.quick.forEach { items.append(duration($0)) }
-        let other = NSMenuItem(title: "Other", action: nil, keyEquivalent: "")
-        // With no submenu and no action, the menu shows it greyed.
-        if !batteryLow {
-            let submenu = NSMenu()
-            Self.minutes.forEach { submenu.addItem(duration($0 * 60)) }
-            submenu.addItem(.separator())
-            Self.hours.forEach { submenu.addItem(duration($0 * 3600)) }
-            other.submenu = submenu
-        }
-        items.append(other)
-        items.append(menuTarget.item("Until a Time…", #selector(AwakeMenuTarget.askUntil)))
-
-        items.append(.separator())
-        let display = menuTarget.item("Keep the Display On", #selector(AwakeMenuTarget.toggleDisplay))
-        display.state = config.displayStaysOn ? .on : .off
-        if config.stayAvailable { display.subtitle = "On while Stay Available is on" }
-        items.append(display)
-        let available = menuTarget.item("Stay Available", #selector(AwakeMenuTarget.toggleStayAvailable))
-        available.state = config.stayAvailable ? .on : .off
-        available.subtitle = config.stayAvailable && !accessibility ? "Needs Accessibility" : "For chat apps like Slack and Teams"
-        items.append(available)
-
-        items.append(.separator())
-        items.append(menuTarget.item("Settings…", #selector(AwakeMenuTarget.settings)))
-        return items
-    }
-
-    /// Under Turn Off: what's left, and when it ends.
-    private static func menuDetail(_ session: AwakeSession, showElapsed: Bool) -> String {
-        guard let until = session.until else {
-            return showElapsed ? "On for \(elapsed(Date().timeIntervalSince(session.started))), with no end" : "On, with no end"
-        }
-        let end = until.formatted(date: Calendar.current.isDateInToday(until) ? .omitted : .abbreviated, time: .shortened)
-        return "\(left(until.timeIntervalSinceNow)) left, until \(end)"
-    }
-
-    /// A time today, or tomorrow if it has passed.
+    /// A time today, or tomorrow if it has passed: from the settings page,
+    /// whose window takes the keyboard.
     func askUntil() {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Keep awake until"
-        alert.informativeText = "Today, or tomorrow if the time has passed."
+        alert.messageText = String(localized: "Keep awake until")
+        alert.informativeText = String(localized: "Today, or tomorrow if the time has passed.")
         let picker = NSDatePicker()
         picker.datePickerStyle = .textFieldAndStepper
         picker.datePickerElements = .hourMinute
@@ -450,53 +378,11 @@ final class AwakeController: ObservableObject {
         picker.dateValue = quarter.addingTimeInterval((soon.timeIntervalSince(quarter) / 900).rounded(.up) * 900)
         picker.sizeToFit()
         alert.accessoryView = picker
-        alert.addButton(withTitle: "Start")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Start"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let parts = Calendar.current.dateComponents([.hour, .minute], from: picker.dateValue)
         guard let next = Calendar.current.nextDate(after: Date(), matching: parts, matchingPolicy: .nextTime) else { return }
         turnOn(until: next)
     }
 }
-
-/// The menu's actions: menu items need an Objective-C target.
-final class AwakeMenuTarget: NSObject {
-    private weak var awake: AwakeController?
-    var openSettings: (() -> Void)?
-
-    init(_ awake: AwakeController) { self.awake = awake }
-
-    func item(_ title: String, _ action: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-        item.target = self
-        return item
-    }
-
-    /// Nothing that starts a session while one can't start.
-    @objc func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        let starts: Set<Selector> = [#selector(turnOn), #selector(turnOnFor(_:)), #selector(askUntil)]
-        guard let action = item.action else { return true }
-        // Held on by Stay available, as on the settings page.
-        if action == #selector(toggleDisplay) { return awake?.config.stayAvailable != true }
-        guard starts.contains(action) else { return true }
-        return awake?.batteryLow != true
-    }
-
-    @objc func turnOn() { awake?.turnOn(for: nil) }
-    @objc func turnOff() { awake?.turnOff() }
-    @objc func turnOnFor(_ sender: NSMenuItem) {
-        guard sender.tag > 0 else { return }
-        awake?.turnOn(for: TimeInterval(sender.tag))
-    }
-    /// After the menu has closed.
-    @objc func askUntil() { DispatchQueue.main.async { self.awake?.askUntil() } }
-    @objc func settings() { openSettings?() }
-    @objc func toggleDisplay() { awake?.config.keepDisplayOn.toggle() }
-    /// Without Accessibility its events are dropped: the settings page says so.
-    @objc func toggleStayAvailable() {
-        guard let awake else { return }
-        awake.config.stayAvailable.toggle()
-        if awake.config.stayAvailable, !awake.accessibility { openSettings?() }
-    }
-}
-

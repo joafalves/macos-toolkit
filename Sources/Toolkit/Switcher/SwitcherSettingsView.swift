@@ -12,12 +12,12 @@ struct SwitcherSettingsView: View {
     private var held: String { Shortcut.glyphs(shortcut.flags.subtracting(.shift)) }
     private var key: String { shortcut.key }
 
-    private var keys: [(String, String)] {
+    private var keys: [(LocalizedStringKey, LocalizedStringKey)] {
         let grid = switcher.config.style == .previews
         let back = shortcut.flags.contains(.shift) ? (grid ? "←" : "↑") : "⇧\(key)  \(grid ? "←" : "↑")"
         return [
-            ("Next window", "\(key)  \(grid ? "→" : "↓")"),
-            ("Previous window", back),
+            ("Next window", .verbatim("\(key)  \(grid ? "→" : "↓")")),
+            ("Previous window", .verbatim(back)),
         ] + (grid ? [("The window above or below", "↑  ↓")] : []) + [
             ("Go straight to one of the first nine", "1 – 9"),
             ("Go to the selected window", "release \(held)"),
@@ -30,7 +30,7 @@ struct SwitcherSettingsView: View {
         ]
     }
 
-    private var freshnessCaption: String {
+    private var freshnessCaption: LocalizedStringKey {
         switch switcher.config.previewFreshness {
         case .cached: return "Shows the last picture of each window at once, and a new one a moment later."
         case .fresh: return "Only new pictures: each window shows its app's icon until its picture arrives."
@@ -56,7 +56,7 @@ struct SwitcherSettingsView: View {
                            button: "Grant Access…") { mouse.requestAccessibility() }
                 } else if switcher.tapFailed {
                     Banner(text: "Accessibility is granted, but the app has to restart before the switcher takes effect.",
-                           button: "Restart") { mouse.relaunch() }
+                           button: "Restart") { Relaunch.now() }
                 }
             }
 
@@ -92,7 +92,9 @@ struct SwitcherSettingsView: View {
                         ? "macOS's app switcher is off while the switcher has ⌘Tab. ⌘` still cycles the windows of the current app."
                         : "macOS's ⌘Tab app switcher works as usual alongside this.") {
                     ShortcutRow(title: "Open the switcher",
-                                caption: "Hold \(held) to keep the list open and let go to switch.\(shortcut.flags.contains(.shift) ? "" : " Add ⇧ to go backwards.")",
+                                caption: shortcut.flags.contains(.shift)
+                                    ? "Hold \(held) to keep the list open and let go to switch."
+                                    : "Hold \(held) to keep the list open and let go to switch. Add ⇧ to go backwards.",
                                 shortcut: $switcher.config.shortcut, defaultValue: .commandTab, optional: false)
                     RowDivider()
                     OptionRow(title: "Show on", caption: "Which display the list opens on.",
@@ -112,7 +114,9 @@ struct SwitcherSettingsView: View {
                         .settingAnchor(Anchor.windows)
                     RowDivider()
                     ToggleRow(title: "Open on the previous window",
-                              caption: "When the \(switcher.config.style == .previews ? "grid" : "list") appears, the window you were in before is selected, like macOS's own ⌘Tab. When off, the window you're in is. A quick \(shortcut.display) goes back to the previous window either way.",
+                              caption: switcher.config.style == .previews
+                                  ? "When the grid appears, the window you were in before is selected, like macOS's own ⌘Tab. When off, the window you're in is. A quick \(shortcut.display) goes back to the previous window either way."
+                                  : "When the list appears, the window you were in before is selected, like macOS's own ⌘Tab. When off, the window you're in is. A quick \(shortcut.display) goes back to the previous window either way.",
                               isOn: $switcher.config.startOnPrevious)
                 }
 

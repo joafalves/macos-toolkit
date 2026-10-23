@@ -29,8 +29,6 @@ final class SnapAssist {
     var taken: (CGRect) -> Bool = { _ in false }
 
     private let panel = SwitcherPanel(takesKeys: true)
-    /// The part being offered, drawn like a drop preview, under the panel.
-    private let outline = LayoutOverlay()
     private let previews = SwitcherPreviews()
     private var pending: [Slot] = []
     private var current: Slot?
@@ -105,15 +103,12 @@ final class SnapAssist {
         previews.cancel()
         panel.model.previews = [:]
         panel.hide()
-        outline.hide()
     }
 
     private func show(_ candidates: [SwitcherItem], in slot: Slot) {
         current = slot
         items = candidates
         selection = 0
-        outline.content = LayoutOverlayContent(highlight: slot.frame)
-        outline.show(on: slot.display, interactive: false)
         let pictures = style == .previews && SwitcherPreviews.permitted
         panel.style = pictures ? .previews : .list
         panel.previewSize = .large
@@ -138,7 +133,6 @@ final class SnapAssist {
         if let id = item.window { used.insert(id) }
         lastPicked = item
         panel.hide()
-        outline.hide()
         previews.cancel()
         onPick?(item, slot)
     }

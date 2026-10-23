@@ -158,14 +158,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         if let state = capture.recording {
             let time = MenuBarArt.duration(state.elapsed) + (state.bytes > 0 ? " · " + MenuBarArt.bytes(state.bytes) : "")
             segments.append(MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: state.paused), text: time,
-                                           label: state.paused ? "Recording paused. Click to stop, right-click for more." : "Recording. Click to stop, right-click to pause."))
+                                           label: state.paused ? String(localized: "Recording paused. Click to stop, right-click for more.")
+                                                               : String(localized: "Recording. Click to stop, right-click to pause.")))
         } else if capture.config.enabled, capture.config.standaloneIcon {
-            segments.append(MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture"))
+            segments.append(MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: AppSection.capture.title))
         }
         if awake.config.enabled, awake.config.menuBarIcon != .none {
             let time = awake.config.menuBarIcon == .cup ? nil : awake.menuBarTime
             let left = time?.text, widest = time?.widest
-            let label = "Keep Awake, " + awake.status.prefix(1).lowercased() + awake.status.dropFirst()
+            let label = String(localized: "Keep Awake, \(awake.status.prefix(1).lowercased() + awake.status.dropFirst())")
             if awake.config.menuBarIcon == .pill, awake.isOn, let session = awake.session {
                 segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: session.fractionLeft(), time: left, widthOf: widest), label: label))
             } else {
@@ -175,10 +176,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }
         if mixer.config.enabled, mixer.config.menuBarIcon != .none {
             let volume = mixer.mainVolume, muted = mixer.mainMuted || mixer.mainVolume <= 0
-            let label = mixer.mainMuted ? "Audio Mixer, muted" : "Audio Mixer, volume \(Int((volume * 100).rounded()))%"
+            let label = mixer.mainMuted ? String(localized: "Audio Mixer, muted") : String(localized: "Audio Mixer, volume \(Int((volume * 100).rounded()))%")
             switch mixer.config.menuBarIcon {
             case .mixer:
-                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.glyph(AppSection.mixer.symbol), label: "Audio Mixer"))
+                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.glyph(AppSection.mixer.symbol), label: AppSection.mixer.title))
             case .volume:
                 segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.speaker(volume: volume, muted: muted), label: label))
             case .volumePercent:
@@ -225,15 +226,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             guard right else { return capture.stopRecording() }
             let menu = NSMenu()
             let paused = capture.recording?.paused == true
-            menu.addItem(withTitle: paused ? "Resume Recording" : "Pause Recording", action: #selector(pauseRecording), keyEquivalent: "").target = self
-            menu.addItem(withTitle: "Stop Recording", action: #selector(stopRecording), keyEquivalent: "").target = self
+            menu.addItem(withTitle: paused ? String(localized: "Resume Recording") : String(localized: "Pause Recording"), action: #selector(pauseRecording), keyEquivalent: "").target = self
+            menu.addItem(withTitle: String(localized: "Stop Recording"), action: #selector(stopRecording), keyEquivalent: "").target = self
             menu.addItem(.separator())
-            menu.addItem(withTitle: "Discard Recording", action: #selector(discardRecording), keyEquivalent: "").target = self
+            menu.addItem(withTitle: String(localized: "Discard Recording"), action: #selector(discardRecording), keyEquivalent: "").target = self
             popUp(menu, from: .recording, at: rect)
         case .awake:
-            let menu = NSMenu()
-            awake.menuItems { [weak self] in self?.show(.awake) }.forEach(menu.addItem)
-            popUp(menu, from: .awake, at: rect)
+            showAwake(from: .awake)
         case .mixer:
             if mixerPopover != nil {
                 mixerPopover?.performClose(nil)
@@ -250,6 +249,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             StatsPanelView(stats: stats, kinds: kinds, close: { [weak self] in self?.panel.close() }) { [weak self] in
                 self?.panel.close()
                 self?.show(.stats)
+            }
+        }
+    }
+
+    /// Keep Awake's panel, from its own part or, with none, the toolkit's.
+    private func showAwake(from kind: MenuBarSegment.Kind) {
+        panel.show(from: kind) {
+            AwakePanelView(awake: awake) { [weak self] in
+                self?.panel.close()
+                self?.show(.awake)
             }
         }
     }
@@ -277,16 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 self?.panel.close()
                 self?.showMixer(from: .toolkit)
             },
-            awakeMenu: { [weak self] in
-                self?.panel.close()
-                // Once the panel has let go of the part.
-                DispatchQueue.main.async {
-                    guard let self else { return }
-                    let menu = NSMenu()
-                    self.awake.menuItems { [weak self] in self?.show(.awake) }.forEach(menu.addItem)
-                    self.popUp(menu, from: .toolkit, at: .zero)
-                }
-            })
+            openAwake: { [weak self] in self?.showAwake(from: .toolkit) })
         panel.show(from: .toolkit) {
             ToolkitPanelView(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder,
                              capture: capture, awake: awake, stats: stats, actions: actions)
@@ -419,18 +419,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         let main = NSMenu()
 
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About MacOS Toolkit", action: #selector(openAbout), keyEquivalent: "").target = self
+        appMenu.addItem(withTitle: String(localized: "About MacOS Toolkit"), action: #selector(openAbout), keyEquivalent: "").target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        appMenu.addItem(withTitle: String(localized: "Settings…"), action: #selector(openSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide MacOS Toolkit", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit MacOS Toolkit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: String(localized: "Hide MacOS Toolkit"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: String(localized: "Quit MacOS Toolkit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(withTitle: "MacOS Toolkit", action: nil, keyEquivalent: "").submenu = appMenu
 
-        let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
-        windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        main.addItem(withTitle: "Window", action: nil, keyEquivalent: "").submenu = windowMenu
+        let windowMenu = NSMenu(title: String(localized: "Window"))
+        windowMenu.addItem(withTitle: String(localized: "Close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowMenu.addItem(withTitle: String(localized: "Minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        main.addItem(withTitle: String(localized: "Window"), action: nil, keyEquivalent: "").submenu = windowMenu
         NSApp.windowsMenu = windowMenu
         return main
     }

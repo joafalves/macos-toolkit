@@ -490,7 +490,7 @@ private final class OverlayView: NSView {
         case .screen:
             if overlay.hoveredScreen == screen {
                 box(bounds, fill: NSColor.controlAccentColor.withAlphaComponent(0.18))
-                label("Click to capture this display", at: NSPoint(x: bounds.midX, y: bounds.midY), below: false, centered: true)
+                label(String(localized: "Click to capture this display"), at: NSPoint(x: bounds.midX, y: bounds.midY), below: false, centered: true)
             }
         }
     }
