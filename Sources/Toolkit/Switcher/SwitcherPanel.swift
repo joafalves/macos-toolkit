@@ -15,9 +15,6 @@ final class SwitcherListModel: ObservableObject {
     /// Pictures for the grid, by window.
     @Published var previews: [CGWindowID: CGImage] = [:]
     @Published var layout = GridLayout()
-    /// On a frosted surface that fills an area (Window Layout's suggestions),
-    /// not in a panel of its own.
-    @Published var onSurface = false
 
     var visible: ArraySlice<SwitcherItem> {
         items[min(first, items.count)..<min(first + shown, items.count)]
@@ -128,7 +125,7 @@ struct SwitcherGridView: View {
             ForEach(Array(model.items.enumerated()), id: \.element.id) { index, item in
                 let frame = model.layout.frame(of: index)
                 PreviewTile(item: item, image: item.window.flatMap { model.previews[$0] },
-                            number: index < 9 ? index + 1 : nil, selected: index == model.selection, onSurface: model.onSurface)
+                            number: index < 9 ? index + 1 : nil, selected: index == model.selection)
                     .frame(width: frame.width, height: frame.height)
                     .offset(x: frame.minX, y: frame.minY)
             }
@@ -142,18 +139,17 @@ private struct PreviewTile: View {
     let image: CGImage?
     let number: Int?
     let selected: Bool
-    var onSurface = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // On the suggestions' frosted surface, a card of its own: the
-            // faint one of the switcher's panel was lost on it, and windows
-            // with see-through parts seemed to have no background.
+            // A card of its own: a fainter one was lost on the frosted
+            // surface behind, and windows with see-through parts seemed to
+            // have no background.
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(selected ? Color.accentColor.opacity(0.25) : Color.primary.opacity(onSurface ? 0.14 : 0.07))
+                .fill(selected ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.14))
                 .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(onSurface && !selected ? 0.12 : 0), lineWidth: 1))
-                .shadow(color: .black.opacity(onSurface ? 0.25 : 0), radius: 8, y: 3)
+                    .strokeBorder(Color.primary.opacity(selected ? 0 : 0.12), lineWidth: 1))
+                .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
             Group {
                 if let image {
                     Image(decorative: image, scale: 1)
@@ -423,7 +419,6 @@ final class SwitcherPanel {
     /// around it, a frosted surface over that part of the display.
     private func place(_ size: NSSize) {
         if model.size != size { model.size = size }
-        if model.onSurface != fills { model.onSurface = fills }
         let frame = fills ? screen.integral
                           : NSRect(x: screen.midX - size.width / 2, y: screen.midY - size.height / 2, width: size.width, height: size.height).integral
         if panel.frame != frame {

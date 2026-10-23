@@ -391,7 +391,6 @@ enum Snapshot {
             if let image = fakeWindow(accent: row.2, dark: !light, wide: index % 2 == 0) { model.previews[CGWindowID(index + 1)] = image }
         }
         model.style = .previews
-        model.onSurface = true
         model.layout = GridLayout(count: rows.count, maxTileWidth: PreviewSize.large.maxTileWidth,
                                   area: CGSize(width: rightHalf.width - 24, height: rightHalf.height - 24))
         model.selection = 0

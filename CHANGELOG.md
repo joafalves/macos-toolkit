@@ -31,8 +31,10 @@ worked on; it gets its date when it's released.
   switch to turn it on or off, which leaves the panel open, and its name opens its settings. Screen
   Capture, the Audio Mixer and Keep Awake, when they have no part of their own in the menu bar, are
   tiles at the top: Keep Awake's turns it on or off in one click, with its panel a click away.
-- **Window Layout:** the suggestions for the rest of a display fill it with a frosted surface, the
-  windows straight on it, instead of a coloured block with a panel on top.
+- **Window Layout:** the suggestions for the rest of a display fill it with a frosted surface, each
+  window on a card of its own, instead of a coloured block with a panel on top.
+- **Window Switcher:** each preview sits on a card of its own, so a window with see-through parts
+  (a sidebar, a toolbar) no longer looks as if it had no background.
 - **Mouse:** shorter wording for the wheel's Fixed distance.
 
 ### Fixed
