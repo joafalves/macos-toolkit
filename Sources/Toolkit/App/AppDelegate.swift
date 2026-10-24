@@ -474,6 +474,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         appMenu.addItem(withTitle: String(localized: "Quit MacOS Toolkit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(withTitle: "MacOS Toolkit", action: nil, keyEquivalent: "").submenu = appMenu
 
+        // A text field's ⌘A, ⌘C, ⌘V, ⌘X and ⌘Z are these items, sent to
+        // whatever has the keyboard: without them, the settings' search field
+        // and the rename field took none of them.
+        let editMenu = NSMenu(title: String(localized: "Edit"))
+        editMenu.addItem(withTitle: String(localized: "Undo"), action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: String(localized: "Redo"), action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: String(localized: "Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: String(localized: "Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: String(localized: "Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: String(localized: "Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        main.addItem(withTitle: String(localized: "Edit"), action: nil, keyEquivalent: "").submenu = editMenu
+
         let windowMenu = NSMenu(title: String(localized: "Window"))
         windowMenu.addItem(withTitle: String(localized: "Close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windowMenu.addItem(withTitle: String(localized: "Minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

@@ -55,6 +55,9 @@ final class LayoutController: ObservableObject {
     private(set) var isPreview = false
     /// For `--snapshot … layout tabs|keyboard`: the page's tab to show.
     static var previewPage: LayoutPage?
+    /// The tab the settings page shows: kept here so a search can open the
+    /// one its setting is on.
+    @Published var page = LayoutPage.snapping
 
     private struct Placement: Codable {
         /// Before the first snap, for Restore and for dragging out.

@@ -1,7 +1,7 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:279 */
 "%.1f decibels" = "%.1f decibéis";
 
-/* Sources/Toolkit/UI/Components.swift:501 */
+/* Sources/Toolkit/UI/Components.swift:531 */
 "%@" = "%@";
 
 /* Sources/Toolkit/App/Updater.swift:223 */
@@ -127,7 +127,7 @@
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:132 */
 "60 fps" = "60 fps";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:102 */
+/* Sources/Toolkit/App/SettingsIndex.swift:111 */
 "A blurred piece of your desktop picture, or a solid color." = "Um pedaço desfocado da imagem da secretária, ou uma cor sólida.";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:19 */
@@ -148,7 +148,7 @@
 /* Sources/Toolkit/Mouse/WheelCurveEditor.swift:54 */
 "A fast spin" = "Rodar depressa";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:75 */
+/* Sources/Toolkit/App/SettingsIndex.swift:50 */
 "A list of rows, or a grid with a picture of each window." = "Uma lista de linhas, ou uma grelha com uma imagem de cada janela.";
 
 /* Sources/Toolkit/Mouse/WheelCurveEditor.swift:22 */
@@ -157,7 +157,7 @@
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:57 */
 "A pill fills with the time left; with no end it's full. The cup alone is filled while it's on." = "Uma cápsula enche-se com o tempo que falta; sem fim, fica cheia. A chávena sozinha fica preenchida enquanto está ativo.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:136 */
+/* Sources/Toolkit/App/SettingsIndex.swift:118 */
 "A ring where you click." = "Um anel onde clica.";
 
 /* Sources/Toolkit/Mouse/WheelCurveEditor.swift:52 */
@@ -169,7 +169,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:44 */
 "A snapped window stays snapped the same way." = "Uma janela encaixada continua encaixada da mesma forma.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:108 */
+/* Sources/Toolkit/App/SettingsIndex.swift:65 */
 "A snapped window you drag away gets back the size it had." = "Uma janela encaixada que arraste para fora volta ao tamanho que tinha.";
 
 /* Sources/Toolkit/App/AppModel.swift:73 */
@@ -184,7 +184,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:336 */
 "Acceleration" = "Aceleração";
 
-/* Sources/Toolkit/App/MainView.swift:250 */
+/* Sources/Toolkit/App/MainView.swift:330 */
 "Accessibility" = "Acessibilidade";
 
 /* Sources/Toolkit/Finder/FinderSettingsView.swift:31 */
@@ -205,7 +205,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:54 */
 "Add" = "Adicionar";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:82 */
+/* Sources/Toolkit/App/SettingsIndex.swift:86 */
 "Add an app" = "Adicionar uma aplicação";
 
 /* Sources/Toolkit/Layout/LayoutOverlay.swift:209 */
@@ -214,10 +214,10 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:144 */
 "Address" = "Endereço";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:53 */
+/* Sources/Toolkit/App/SettingsIndex.swift:92 */
 "Adds these items to Finder's right-click menu. macOS keeps it off until you turn it on." = "Adiciona estes itens ao menu de atalhos do Finder (clique com o botão direito). O macOS mantém a extensão desativada até a ativar.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:92 */
+/* Sources/Toolkit/App/SettingsIndex.swift:62 */
 "After you drop a window into part of a display, the other windows are offered for the part that's left. Previews need Screen Recording." = "Depois de largar uma janela numa parte de um monitor, as outras janelas são sugeridas para a parte que sobra. As pré-visualizações precisam da Gravação do ecrã.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:23 */
@@ -229,7 +229,7 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:36 */
 "Almost maximize" = "Quase maximizar";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:155 */
+/* Sources/Toolkit/App/SettingsIndex.swift:72 */
 "Along the slot's bottom edge, or its top." = "Ao longo da margem inferior da zona, ou da superior.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:29 */
@@ -253,16 +253,16 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:349 */
 "App" = "Aplicações";
 
-/* Sources/Toolkit/App/MainView.swift:208 */
+/* Sources/Toolkit/App/MainView.swift:288 */
 "App language" = "Idioma da aplicação";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:74 */
+/* Sources/Toolkit/App/SettingsIndex.swift:49 */
 "Appearance" = "Apresentação";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:33 */
 "Apps" = "Aplicações";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:199 */
+/* Sources/Toolkit/App/SettingsIndex.swift:77 */
 "At the outer edge of the last display, left or right pressed again goes through ⅔ and ⅓ instead of stopping." = "Na margem exterior do último monitor, voltar a premir esquerda ou direita passa por ⅔ e ⅓ em vez de parar.";
 
 /* Sources/Toolkit/App/AppModel.swift:22 */
@@ -277,13 +277,13 @@
 /* Sources/Toolkit/Finder/FinderSettingsView.swift:19 */
 "Automatic" = "Automático";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:70 */
+/* Sources/Toolkit/App/SettingsIndex.swift:94 */
 "Automatic picks the first installed of Ghostty, iTerm and Terminal." = "Automático escolhe o primeiro instalado de entre Ghostty, iTerm e Terminal.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:386 */
 "Autoscroll" = "Deslocação automática";
 
-/* Sources/Toolkit/App/MainView.swift:116 */
+/* Sources/Toolkit/App/MainView.swift:158 */
 "Back" = "Anterior";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:382 */
@@ -298,10 +298,10 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:43 */
 "Back to the size and place it had before it was snapped." = "Volta ao tamanho e ao lugar que tinha antes de ser encaixada.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:102 */
+/* Sources/Toolkit/App/SettingsIndex.swift:111 */
 "Backdrop" = "Fundo";
 
-/* Sources/Toolkit/App/MainView.swift:240 */
+/* Sources/Toolkit/App/MainView.swift:320 */
 "Backup" = "Cópia de segurança";
 
 /* Sources/Toolkit/Mixer/Equalizer.swift:48 */
@@ -322,7 +322,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:175 */
 "Battery level" = "Nível da bateria";
 
-/* Sources/Toolkit/App/MainView.swift:223 */
+/* Sources/Toolkit/App/MainView.swift:303 */
 "Between the toolkit's parts in the menu bar. It changes as you drag." = "Entre as partes do toolkit na barra de menus. Muda enquanto arrasta.";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:173 */
@@ -385,7 +385,7 @@
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:191 */
 "Choose" = "Escolher";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:82 */
+/* Sources/Toolkit/App/SettingsIndex.swift:86 */
 "Choose from the apps that are open." = "Escolha entre as aplicações que estão abertas.";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:115 */
@@ -430,7 +430,7 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:338 */
 "Click to unmute %@" = "Clique para ligar o som de %@";
 
-/* Sources/Toolkit/App/AppDelegate.swift:478 */
+/* Sources/Toolkit/App/AppDelegate.swift:491 */
 "Close" = "Fechar";
 
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:77 */
@@ -463,22 +463,22 @@
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:161 */
 "Content Only" = "Só o conteúdo";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:97 */
+/* Sources/Toolkit/App/SettingsIndex.swift:109 */
 "Content Only cuts at the bottom of the title bar and toolbar. Apps that draw their own title bar may keep part of it." = "Só o conteúdo corta por baixo da barra de título e da barra de ferramentas. As aplicações que desenham a sua própria barra de título podem manter parte dela.";
 
 /* Sources/Toolkit/App/AboutView.swift:40 */
 "Contributors" = "Contribuidores";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:72 */
+/* Sources/Toolkit/App/SettingsIndex.swift:102 */
 "Copies the text in an area or a window, or what a QR code holds. It takes a little more memory, only while it reads." = "Copia o texto de uma área ou de uma janela, ou o que um código QR guarda. Usa um pouco mais de memória, só enquanto lê.";
 
-/* Sources/Toolkit/Capture/CaptureToolbar.swift:110 */
+/* Sources/Toolkit/App/AppDelegate.swift:485 */
 "Copy" = "Copiar";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:71 */
+/* Sources/Toolkit/App/SettingsIndex.swift:102 */
 "Copy text from the screen" = "Copiar texto do ecrã";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:61 */
+/* Sources/Toolkit/App/SettingsIndex.swift:99 */
 "Copy to the clipboard instead of saving" = "Copiar para o clipboard em vez de guardar";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:311 */
@@ -499,7 +499,7 @@
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:9 */
 "CPU, memory, network, disk, GPU and power, in the menu bar." = "CPU, memória, rede, disco, GPU e energia, na barra de menus.";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:62 */
+/* Sources/Toolkit/App/SettingsIndex.swift:93 */
 "Creates an empty untitled.txt in the folder and starts renaming it." = "Cria um untitled.txt vazio na pasta e começa a mudar-lhe o nome.";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:133 */
@@ -523,10 +523,10 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:20 */
 "Custom" = "Personalizado";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:37 */
+/* Sources/Toolkit/App/AppDelegate.swift:484 */
 "Cut" = "Cortar";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:39 */
+/* Sources/Toolkit/App/SettingsIndex.swift:88 */
 "Cut and paste files" = "Cortar e colar ficheiros";
 
 /* Sources/Toolkit/App/AppModel.swift:74 */
@@ -538,7 +538,7 @@
 /* Sources/Toolkit/Finder/FinderSettingsView.swift:28 */
 "Cut and swiping are not active yet. They need the Accessibility permission to see the keys you press and the swipes you make in Finder." = "Cortar e os gestos de deslizar ainda não estão ativos. Precisam da permissão de Acessibilidade para ver as teclas que prime e os gestos que faz no Finder.";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:52 */
+/* Sources/Toolkit/App/SettingsIndex.swift:91 */
 "Cut is in the menu too while it's on. Changes show the next time you right-click." = "Cortar também está no menu enquanto estiver ativo. As alterações aparecem no próximo clique com o botão direito.";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:170 */
@@ -550,7 +550,7 @@
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:175 */
 "Default" = "Predefinição";
 
-/* Sources/Toolkit/App/MainView.swift:231 */
+/* Sources/Toolkit/App/MainView.swift:311 */
 "Default Order" = "Ordem predefinida";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:20 */
@@ -583,7 +583,7 @@
 /* Sources/Toolkit/App/Updater.swift:212 */
 "Download version %@ from its release page and install it by hand." = "Descarregue a versão %@ a partir da página da versão e instale-a à mão.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:80 */
+/* Sources/Toolkit/App/SettingsIndex.swift:59 */
 "Drag a window to a side or the bottom for half the display, to a corner for a quarter, or to the top to fill it. Where a side meets another display, stop just short of the edge." = "Arraste uma janela para um lado ou para baixo para metade do monitor, para um canto para um quarto, ou para cima para o preencher. Onde um lado encontra outro monitor, pare mesmo antes da margem.";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:33 */
@@ -595,10 +595,10 @@
 /* Sources/Toolkit/Mouse/WheelCurveEditor.swift:25 */
 "Drag the ends and the middle" = "Arraste as pontas e o meio";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:77 */
+/* Sources/Toolkit/App/SettingsIndex.swift:58 */
 "Dragging" = "Ao arrastar";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:59 */
+/* Sources/Toolkit/App/SettingsIndex.swift:83 */
 "Each press" = "Cada toque";
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:16 */
@@ -609,6 +609,9 @@
 
 /* Sources/Toolkit/Awake/AwakePanel.swift:148 */
 "Earlier" = "Mais cedo";
+
+/* Sources/Toolkit/App/AppDelegate.swift:480 */
+"Edit" = "Edição";
 
 /* Sources/Toolkit/Stats/StatsReadings.swift:29 */
 "Efficiency" = "Eficiência";
@@ -625,7 +628,7 @@
 /* Sources/Toolkit/Layout/LayoutController.swift:860 */
 "esc cancel" = "esc cancela";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:78 */
+/* Sources/Toolkit/App/SettingsIndex.swift:58 */
 "Esc while dragging drops the window without snapping. macOS's own tiling by dragging is off while any of these is on, and turned on when you turn them off. If the app quits, it's put back as it was." = "Esc enquanto arrasta larga a janela sem a encaixar. A disposição de janelas em mosaico do próprio macOS ao arrastar fica desativada enquanto alguma destas estiver ativa, e volta quando as desativar. Se a aplicação sair, fica como estava.";
 
 /* Sources/Toolkit/Layout/LayoutController.swift:1031 */
@@ -658,7 +661,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:45 */
 "Every window slides aside, as with macOS's own gesture, and the same keys bring them back where they were, snapped ones still snapped. So does a click on one." = "Todas as janelas deslizam para o lado, como com o gesto do próprio macOS, e as mesmas teclas trazem-nas de volta para onde estavam, as encaixadas ainda encaixadas. Um clique numa delas também.";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:110 */
+/* Sources/Toolkit/App/SettingsIndex.swift:56 */
 "Every window, or only those on the display the list opens on." = "Todas as janelas, ou só as do monitor onde a lista abre.";
 
 /* Sources/Toolkit/App/AboutView.swift:40 */
@@ -667,10 +670,10 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:346 */
 "Exclude %@" = "Excluir %@";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:72 */
+/* Sources/Toolkit/App/SettingsIndex.swift:85 */
 "Excluded Apps" = "Aplicações excluídas";
 
-/* Sources/Toolkit/App/MainView.swift:243 */
+/* Sources/Toolkit/App/MainView.swift:323 */
 "Export…" = "Exportar…";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:332 */
@@ -679,10 +682,10 @@
 /* Sources/Toolkit/App/AppModel.swift:23 */
 "Finder" = "Finder";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:53 */
+/* Sources/Toolkit/App/SettingsIndex.swift:92 */
 "Finder extension" = "Extensão do Finder";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:38 */
+/* Sources/Toolkit/App/SettingsIndex.swift:87 */
 "Finder has no Cut, so this copies the selection and the next ⌘V in Finder moves it (Move Item Here, ⌥⌘V). A short sound says the files were cut, since Finder has no way to mark them. Copying something else first cancels the cut." = "O Finder não tem Cortar, por isso isto copia a seleção e o próximo ⌘V no Finder move-a (Mover item para aqui, ⌥⌘V). Um som curto diz que os ficheiros foram cortados, já que o Finder não tem forma de os marcar. Copiar outra coisa antes cancela o corte.";
 
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:61 */
@@ -703,10 +706,10 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:47 */
 "Flat" = "Neutro";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:123 */
+/* Sources/Toolkit/App/SettingsIndex.swift:68 */
 "For the grid while dragging and the one from the keyboard. Each display keeps its own." = "Para a grelha ao arrastar e para a do teclado. Cada monitor guarda a sua.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:161 */
+/* Sources/Toolkit/App/SettingsIndex.swift:73 */
 "For the stack of the window you're in. Right-click a tab to take its window out, or to close it." = "Para a pilha da janela onde está. Clique com o botão direito num separador para tirar a sua janela, ou para a fechar.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:284 */
@@ -718,16 +721,16 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:273 */
 "Forget This Mouse…" = "Esquecer este rato…";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:85 */
+/* Sources/Toolkit/App/SettingsIndex.swift:106 */
 "Format" = "Formato";
 
-/* Sources/Toolkit/App/MainView.swift:120 */
+/* Sources/Toolkit/App/MainView.swift:162 */
 "Forward" = "Seguinte";
 
 /* Sources/Toolkit/App/AboutView.swift:36 */
 "Founder" = "Fundador";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:131 */
+/* Sources/Toolkit/App/SettingsIndex.swift:116 */
 "Frame rate" = "Taxa de fotogramas";
 
 /* Sources/Toolkit/Stats/StatsConfig.swift:37 */
@@ -739,7 +742,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:41 */
 "Full height, keeping the width." = "Altura total, mantendo a largura.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:113 */
+/* Sources/Toolkit/App/SettingsIndex.swift:67 */
 "Gap" = "Margens";
 
 /* Sources/Toolkit/App/Updater.swift:122 */
@@ -772,19 +775,19 @@
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:23 */
 "Grant Access…" = "Conceder acesso…";
 
-/* Sources/Toolkit/App/MainView.swift:252 */
+/* Sources/Toolkit/App/MainView.swift:332 */
 "Granted" = "Permitido";
 
-/* Sources/Toolkit/Layout/LayoutPanel.swift:54 */
+/* Sources/Toolkit/App/SettingsIndex.swift:75 */
 "Grid" = "Grelha";
 
 /* Sources/Toolkit/Layout/LayoutController.swift:460 */
 "Grid (%@)" = "Grelha (%@)";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:87 */
+/* Sources/Toolkit/App/SettingsIndex.swift:61 */
 "Grid while dragging" = "Grelha ao arrastar";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:122 */
+/* Sources/Toolkit/App/SettingsIndex.swift:68 */
 "Grids" = "Grelhas";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:28 */
@@ -793,7 +796,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:27 */
 "H" = "H";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:124 */
+/* Sources/Toolkit/App/SettingsIndex.swift:114 */
 "H.264 MP4, which plays everywhere. Frames are only written when something on screen changes, so a still screen adds almost nothing to the file. When it stops, the file is put on the clipboard, ready to paste." = "MP4 H.264, que abre em todo o lado. Só se gravam fotogramas quando algo muda no ecrã, por isso um ecrã parado quase nada acrescenta ao ficheiro. Quando para, o ficheiro fica no clipboard, pronto a colar.";
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:21 */
@@ -826,16 +829,16 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:385 */
 "Hold it and move the mouse to scroll, faster the farther you move, in any app." = "Mantenha-o premido e mova o rato para deslocar, mais depressa quanto mais longe mover, em qualquer aplicação.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:149 */
+/* Sources/Toolkit/App/SettingsIndex.swift:71 */
 "Hold it while dragging a window: the windows you can stack it with are outlined. Let go over one." = "Mantenha-a premida enquanto arrasta uma janela: as janelas com que a pode empilhar ficam contornadas. Solte sobre uma.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:48 */
 "Hold it while pressing the wheel to get what the app does with it, like its own autoscroll or panning. For every mouse." = "Mantenha-a premida ao premir a roda para ter o que a aplicação faz com ela, como a sua própria deslocação automática ou deslocar a vista. Para todos os ratos.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:88 */
+/* Sources/Toolkit/App/SettingsIndex.swift:61 */
 "Hold this key while dragging a window to drop it on the grid. The cell under the pointer is one corner: move to the other and let go. Let go of the key to start again." = "Mantenha esta tecla premida enquanto arrasta uma janela para a largar na grelha. A célula sob o ponteiro é um canto: mova até ao outro e solte. Solte a tecla para recomeçar.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:84 */
+/* Sources/Toolkit/App/SettingsIndex.swift:60 */
 "Hold this key while dragging a window: a bar of layouts shows by the pointer. Move onto a part of one and let go." = "Mantenha esta tecla premida enquanto arrasta uma janela: aparece uma barra de disposições junto ao ponteiro. Passe sobre uma parte de uma e solte.";
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:62 */
@@ -859,7 +862,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:329 */
 "How far the cursor travels for a given hand movement." = "Quanto o cursor anda para um dado movimento da mão.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:63 */
+/* Sources/Toolkit/App/SettingsIndex.swift:84 */
 "How much a press moves the volume while Shift and Option are held." = "Quanto um toque muda o volume com Shift e Option premidas.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:336 */
@@ -871,7 +874,7 @@
 /* Sources/Toolkit/App/SettingsTransfer.swift:76 */
 "Import these settings?" = "Importar estas definições?";
 
-/* Sources/Toolkit/App/MainView.swift:244 */
+/* Sources/Toolkit/App/MainView.swift:324 */
 "Import…" = "Importar…";
 
 /* Sources/Toolkit/App/MenuBarOrderView.swift:58 */
@@ -883,7 +886,7 @@
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:31 */
 "In the mixer, which opens from the toolkit's panel, or in one click once it's in the menu bar." = "No misturador, que abre a partir do painel do toolkit, ou com um clique quando está na barra de menus.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:147 */
+/* Sources/Toolkit/App/SettingsIndex.swift:121 */
 "Input" = "Entrada";
 
 /* Sources/Toolkit/App/AboutView.swift:75 */
@@ -943,7 +946,7 @@
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:17 */
 "Keeps the Mac from sleeping, for a while or until you turn it off." = "Impede o Mac de entrar em pausa, durante algum tempo ou até o desativar.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:149 */
+/* Sources/Toolkit/App/SettingsIndex.swift:71 */
 "Key" = "Tecla";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:47 */
@@ -952,7 +955,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:272 */
 "Keyboard" = "Teclado";
 
-/* Sources/Toolkit/App/MainView.swift:207 */
+/* Sources/Toolkit/App/MainView.swift:287 */
 "Language" = "Idioma";
 
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:61 */
@@ -976,13 +979,13 @@
 /* Sources/Toolkit/Awake/AwakePanel.swift:152 */
 "Later" = "Mais tarde";
 
-/* Sources/Toolkit/App/MainView.swift:202 */
+/* Sources/Toolkit/App/MainView.swift:282 */
 "Launch at login" = "Abrir ao iniciar sessão";
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:14 */
 "Layout" = "Disposição";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:83 */
+/* Sources/Toolkit/App/SettingsIndex.swift:60 */
 "Layouts while dragging" = "Disposições ao arrastar";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:281 */
@@ -994,7 +997,7 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:22 */
 "Left half" = "Metade esquerda";
 
-/* Sources/Toolkit/App/MainView.swift:230 */
+/* Sources/Toolkit/App/MainView.swift:310 */
 "Left to right. Drag a tool to move it, and switch its place in the menu bar on or off; one that's off keeps its place." = "Da esquerda para a direita. Arraste uma ferramenta para a mover, e ative ou desative o seu lugar na barra de menus; uma desativada mantém o seu lugar.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:339 */
@@ -1009,7 +1012,7 @@
 /* Sources/Toolkit/Layout/LayoutController.swift:1048 */
 "Let go over a window to stack with it  ·  %@" = "Solte sobre uma janela para empilhar com ela  ·  %@";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:54 */
+/* Sources/Toolkit/App/SettingsIndex.swift:81 */
 "Lets the toolkit control the sound itself when an output has no volume control of its own, as many monitors don't." = "Deixa o toolkit controlar o som ele próprio quando uma saída não tem controlo de volume, como acontece em muitos monitores.";
 
 /* Sources/Toolkit/Stats/StatsReadings.swift:157 */
@@ -1060,7 +1063,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:92 */
 "macOS's app switcher is off while the switcher has ⌘Tab. ⌘` still cycles the windows of the current app." = "O seletor de aplicações do macOS fica desativado enquanto o Window Switcher tiver ⌘Tab. ⌘` continua a percorrer as janelas da aplicação atual.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:45 */
+/* Sources/Toolkit/App/SettingsIndex.swift:95 */
 "macOS's own screenshot shortcuts are off only where they clash with these. ⌃ counts if it's held when the capture happens: at the end of the drag, or at the click on a window." = "Os atalhos de captura do próprio macOS só ficam desativados onde coincidem com estes. ⌃ conta se estiver premido no momento da captura: no fim do arrasto, ou no clique numa janela.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:306 */
@@ -1102,7 +1105,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:91 */
 "Mice" = "Ratos";
 
-/* Sources/Toolkit/App/MainView.swift:274 */
+/* Sources/Toolkit/App/MainView.swift:354 */
 "Microphone" = "Microfone";
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:142 */
@@ -1111,7 +1114,7 @@
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:174 */
 "Microphone Input" = "Entrada do microfone";
 
-/* Sources/Toolkit/App/AppDelegate.swift:479 */
+/* Sources/Toolkit/App/AppDelegate.swift:492 */
 "Minimize" = "Minimizar";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:26 */
@@ -1135,7 +1138,7 @@
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:121 */
 "Mouse move" = "Movimento do rato";
 
-/* Sources/Toolkit/App/MainView.swift:66 */
+/* Sources/Toolkit/App/MainView.swift:72 */
 "Mouse Settings" = "Definições do rato";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:27 */
@@ -1168,7 +1171,7 @@
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:93 */
 "Never" = "Nunca";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:61 */
+/* Sources/Toolkit/App/SettingsIndex.swift:93 */
 "New Text File" = "Novo ficheiro de texto";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:43 */
@@ -1264,19 +1267,19 @@
 /* Sources/Toolkit/Finder/FinderSettingsView.swift:65 */
 "Open in %@" = "Abrir no %@";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:116 */
+/* Sources/Toolkit/App/SettingsIndex.swift:57 */
 "Open on the previous window" = "Abrir na janela anterior";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:623 */
 "Open System Settings…" = "Abrir Definições do Sistema…";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:177 */
+/* Sources/Toolkit/App/SettingsIndex.swift:76 */
 "Open the grid" = "Abrir a grelha";
 
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:33 */
 "Open the Mixer" = "Abrir o misturador";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:94 */
+/* Sources/Toolkit/App/SettingsIndex.swift:54 */
 "Open the switcher" = "Abrir o Window Switcher";
 
 /* Sources/Toolkit/Finder/FinderSettingsView.swift:66 */
@@ -1291,7 +1294,7 @@
 /* Sources/Toolkit/App/AboutView.swift:54 */
 "Or suggest something." = "Ou sugira algo.";
 
-/* Sources/Toolkit/App/MainView.swift:230 */
+/* Sources/Toolkit/App/MainView.swift:310 */
 "Order" = "Ordem";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:381 */
@@ -1300,13 +1303,13 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:149 */
 "Others' if it has none" = "As dos outros, se não tiver";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:177 */
+/* Sources/Toolkit/App/SettingsIndex.swift:76 */
 "Over the display with the focused window." = "Sobre o monitor com a janela em foco.";
 
 /* Sources/Toolkit/App/AppModel.swift:18 */
 "Overview" = "Visão geral";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:113 */
+/* Sources/Toolkit/App/SettingsIndex.swift:112 */
 "Padding" = "Margem";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:240 */
@@ -1314,6 +1317,9 @@
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:35 */
 "Panels" = "Painéis";
+
+/* Sources/Toolkit/App/AppDelegate.swift:486 */
+"Paste" = "Colar";
 
 /* Sources/Toolkit/App/AppDelegate.swift:237 */
 "Pause Recording" = "Pausar gravação";
@@ -1327,19 +1333,19 @@
 /* Sources/Toolkit/Stats/StatsReadings.swift:28 */
 "Performance" = "Desempenho";
 
-/* Sources/Toolkit/App/MainView.swift:249 */
+/* Sources/Toolkit/App/MainView.swift:329 */
 "Permissions" = "Permissões";
 
 /* Sources/Toolkit/App/WelcomeView.swift:46 */
 "Permissions…" = "Permissões…";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:168 */
+/* Sources/Toolkit/App/SettingsIndex.swift:74 */
 "Pick one" = "Escolher uma";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:26 */
 "Pick two corners" = "Escolha dois cantos";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:84 */
+/* Sources/Toolkit/App/SettingsIndex.swift:52 */
 "Pictures" = "Imagens";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:37 */
@@ -1348,13 +1354,13 @@
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:59 */
 "Pill" = "Cápsula";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:155 */
+/* Sources/Toolkit/App/SettingsIndex.swift:72 */
 "Place" = "Posição";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:29 */
 "Place the window" = "Colocar a janela";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:112 */
+/* Sources/Toolkit/App/SettingsIndex.swift:66 */
 "Placement" = "Posição";
 
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:162 */
@@ -1366,7 +1372,7 @@
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:87 */
 "PNG" = "PNG";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:85 */
+/* Sources/Toolkit/App/SettingsIndex.swift:106 */
 "PNG is lossless. JPEG and HEIC are much smaller. The clipboard always gets PNG." = "PNG não perde qualidade. JPEG e HEIC são muito mais pequenos. O clipboard recebe sempre PNG.";
 
 /* Sources/Toolkit/Stats/StatsConfig.swift:16 */
@@ -1420,7 +1426,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:28 */
 "Q" = "Q";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:127 */
+/* Sources/Toolkit/App/SettingsIndex.swift:115 */
 "Quality" = "Qualidade";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:16 */
@@ -1468,11 +1474,14 @@
 /* Sources/Toolkit/App/AppDelegate.swift:164 */
 "Recording. Click to stop, right-click to pause." = "A gravar. Clique para parar, clique com o botão direito para pausar.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:123 */
+/* Sources/Toolkit/App/SettingsIndex.swift:114 */
 "Recordings" = "Gravações";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:57 */
+/* Sources/Toolkit/App/SettingsIndex.swift:98 */
 "Recordings, the timer and options. Stops a recording." = "Gravações, o temporizador e as opções. Para uma gravação.";
+
+/* Sources/Toolkit/App/AppDelegate.swift:482 */
+"Redo" = "Refazer";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:96 */
 "Refresh" = "Atualizar";
@@ -1516,7 +1525,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:24 */
 "Restore macOS behavior on quit" = "Repor o comportamento do macOS ao sair";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:107 */
+/* Sources/Toolkit/App/SettingsIndex.swift:65 */
 "Restore the size when dragged away" = "Repor o tamanho ao arrastar para fora";
 
 /* Sources/Toolkit/App/AppDelegate.swift:237 */
@@ -1528,13 +1537,13 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:23 */
 "Right half" = "Metade direita";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:51 */
+/* Sources/Toolkit/App/SettingsIndex.swift:91 */
 "Right-Click Menu" = "Menu de atalhos";
 
 /* Sources/Toolkit/Mixer/Equalizer.swift:53 */
 "Rock" = "Rock";
 
-/* Sources/Toolkit/App/MainView.swift:227 */
+/* Sources/Toolkit/App/MainView.swift:307 */
 "Roomy" = "Amplo";
 
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:61 */
@@ -1543,10 +1552,10 @@
 /* Sources/Toolkit/App/GeneralConfig.swift:30 */
 "Same as macOS" = "Predefinição do sistema";
 
-/* Sources/Toolkit/App/MainView.swift:241 */
+/* Sources/Toolkit/App/MainView.swift:321 */
 "Save every setting to a file, or load them from one." = "Guardar todas as definições num ficheiro, ou carregá-las de um.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:83 */
+/* Sources/Toolkit/App/SettingsIndex.swift:105 */
 "Save to" = "Guardar em";
 
 /* Sources/Toolkit/App/AppModel.swift:24 */
@@ -1558,7 +1567,7 @@
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:180 */
 "Screen Capture Settings…" = "Definições da Captura de Ecrã…";
 
-/* Sources/Toolkit/App/MainView.swift:266 */
+/* Sources/Toolkit/App/MainView.swift:346 */
 "Screen Recording" = "Gravação do ecrã";
 
 /* Sources/Toolkit/Capture/CaptureController.swift:447 */
@@ -1570,25 +1579,31 @@
 /* Sources/Toolkit/Capture/CaptureController.swift:427 */
 "Screenshot %@ at %@" = "Captura de ecrã %@ às %@";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:50 */
+/* Sources/Toolkit/App/SettingsIndex.swift:97 */
 "Screenshot of an area" = "Captura de uma área";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:46 */
+/* Sources/Toolkit/App/SettingsIndex.swift:96 */
 "Screenshot of the display" = "Captura do ecrã inteiro";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:82 */
+/* Sources/Toolkit/App/SettingsIndex.swift:104 */
 "Screenshots" = "Capturas de ecrã";
 
 /* Sources/Toolkit/App/AppModel.swift:75 */
 "Screenshots and small screen recordings." = "Capturas de ecrã e gravações curtas do ecrã.";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:45 */
+/* Sources/Toolkit/App/SettingsIndex.swift:89 */
 "Scrolling is never changed: a swipe over something that can still scroll sideways, like the column view, scrolls it. The swipe goes back or forward once it's at the edge." = "A deslocação nunca muda: deslizar sobre algo que ainda se desloca na horizontal, como a vista em colunas, desloca-o. O gesto recua ou avança quando chega à margem.";
+
+/* Sources/Toolkit/App/MainView.swift:169 */
+"Search" = "Pesquisar";
 
 /* Sources/Toolkit/App/ToolkitPanel.swift:44 */
 "See what's new and install" = "Ver o que há de novo e instalar";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:40 */
+/* Sources/Toolkit/App/AppDelegate.swift:487 */
+"Select All" = "Selecionar tudo";
+
+/* Sources/Toolkit/App/SettingsIndex.swift:88 */
 "Select files, press ⌘X or choose Cut from the right-click menu, open another folder, press ⌘V." = "Selecione ficheiros, prima ⌘X ou escolha Cortar no menu de atalhos, abra outra pasta, prima ⌘V.";
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:19 */
@@ -1597,16 +1612,16 @@
 /* Sources/Toolkit/App/AppModel.swift:28 */
 "Settings" = "Definições";
 
-/* Sources/Toolkit/App/MainView.swift:241 */
+/* Sources/Toolkit/App/MainView.swift:321 */
 "Settings file" = "Ficheiro de definições";
 
 /* Sources/Toolkit/App/AppDelegate.swift:471 */
 "Settings…" = "Definições…";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:135 */
+/* Sources/Toolkit/App/SettingsIndex.swift:70 */
 "Several windows in one slot, one shown at a time, with tabs to switch between them." = "Várias janelas numa zona, uma de cada vez, com separadores para alternar entre elas.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:117 */
+/* Sources/Toolkit/App/SettingsIndex.swift:113 */
 "Shadow" = "Sombra";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:361 */
@@ -1621,7 +1636,7 @@
 /* Sources/Toolkit/UI/Shortcut.swift:57 */
 "Shortcut.none" = "Nenhum";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:44 */
+/* Sources/Toolkit/App/SettingsIndex.swift:95 */
 "Shortcuts" = "Atalhos";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:28 */
@@ -1630,19 +1645,19 @@
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:170 */
 "Show Clicks" = "Mostrar cliques do rato";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:136 */
+/* Sources/Toolkit/App/SettingsIndex.swift:118 */
 "Show clicks" = "Mostrar cliques do rato";
 
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:169 */
 "Show Cursor" = "Mostrar cursor do rato";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:134 */
+/* Sources/Toolkit/App/SettingsIndex.swift:117 */
 "Show cursor" = "Mostrar cursor do rato";
 
-/* Sources/Toolkit/UI/Components.swift:352 */
+/* Sources/Toolkit/UI/Components.swift:373 */
 "Show in the menu bar" = "Mostrar na barra de menus";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:100 */
+/* Sources/Toolkit/App/SettingsIndex.swift:55 */
 "Show on" = "Mostrar em";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:170 */
@@ -1654,25 +1669,25 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:227 */
 "Show this mouse's settings" = "Mostrar as definições deste rato";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:40 */
+/* Sources/Toolkit/App/SettingsIndex.swift:80 */
 "Shown when it's in the menu bar, which is set at the top of the page." = "Usado quando está na barra de menus, o que se define no topo da página.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:35 */
 "Shows the last picture of each window at once, and a new one a moment later." = "Mostra logo a última imagem de cada janela, e uma nova pouco depois.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:93 */
+/* Sources/Toolkit/App/SettingsIndex.swift:108 */
 "Shutter sound" = "Som do obturador";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:121 */
 "Signal only" = "Só o sinal";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:80 */
+/* Sources/Toolkit/App/SettingsIndex.swift:51 */
 "Size" = "Tamanho";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:18 */
 "Size and Position" = "Tamanho e posição";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:198 */
+/* Sources/Toolkit/App/SettingsIndex.swift:77 */
 "Sizes at the outer edge" = "Tamanhos na margem exterior";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:332 */
@@ -1693,7 +1708,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:377 */
 "Smoothing" = "Suavização";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:79 */
+/* Sources/Toolkit/App/SettingsIndex.swift:59 */
 "Snap at the edges" = "Encaixar nas margens";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:208 */
@@ -1705,7 +1720,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:270 */
 "Snapping" = "Encaixe";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:53 */
+/* Sources/Toolkit/App/SettingsIndex.swift:81 */
 "Software volume" = "Volume por software";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:95 */
@@ -1720,13 +1735,13 @@
 /* Sources/Toolkit/UI/Shortcut.swift:81 */
 "Space" = "Espaço";
 
-/* Sources/Toolkit/App/MainView.swift:223 */
+/* Sources/Toolkit/App/MainView.swift:303 */
 "Space between items" = "Espaçamento entre itens";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:113 */
+/* Sources/Toolkit/App/SettingsIndex.swift:67 */
 "Space between windows and around the edges of the display. macOS's own window margins follow it." = "Espaço entre janelas e à volta das margens do monitor. As margens de janelas do próprio macOS seguem-no.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:76 */
+/* Sources/Toolkit/App/SettingsIndex.swift:103 */
 "Space switches to clicking a window, and T to a screenshot." = "Espaço muda para clicar numa janela, e T para uma captura.";
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:52 */
@@ -1741,16 +1756,16 @@
 /* Sources/Toolkit/Stats/StatsConfig.swift:26 */
 "SSD" = "SSD";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:161 */
+/* Sources/Toolkit/App/SettingsIndex.swift:73 */
 "Stack Shortcuts" = "Atalhos das pilhas";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:134 */
+/* Sources/Toolkit/App/SettingsIndex.swift:70 */
 "Stack windows" = "Empilhar janelas";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:48 */
 "Stack with the window under it" = "Empilhar com a janela por baixo";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:132 */
+/* Sources/Toolkit/App/SettingsIndex.swift:69 */
 "Stacks" = "Pilhas";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:271 */
@@ -1762,7 +1777,7 @@
 /* Sources/Toolkit/Awake/AwakePanel.swift:154 */
 "Start" = "Iniciar";
 
-/* Sources/Toolkit/App/MainView.swift:203 */
+/* Sources/Toolkit/App/MainView.swift:283 */
 "Start in the menu bar when you log in." = "Começar na barra de menus quando inicia sessão.";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:29 */
@@ -1771,7 +1786,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:30 */
 "Start the corners again" = "Recomeçar os cantos";
 
-/* Sources/Toolkit/App/MainView.swift:201 */
+/* Sources/Toolkit/App/MainView.swift:281 */
 "Startup" = "Arranque";
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:41 */
@@ -1789,7 +1804,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:133 */
 "Still rough in places. The windows not shown wait behind the shown one, at the same size. One dragged out, resized so it no longer fits, closed or minimized leaves the stack; with one left, it gets the whole slot back." = "Ainda pouco polido em alguns pontos. As janelas não mostradas esperam atrás da mostrada, com o mesmo tamanho. Uma arrastada para fora, redimensionada de forma a já não caber, fechada ou minimizada sai da pilha; quando sobra uma, volta a ter a zona inteira.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:103 */
+/* Sources/Toolkit/App/SettingsIndex.swift:64 */
 "Stop at the edge between displays" = "Parar na margem entre monitores";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:91 */
@@ -1798,10 +1813,10 @@
 /* Sources/Toolkit/App/AppDelegate.swift:238 */
 "Stop Recording" = "Parar a gravação";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:98 */
+/* Sources/Toolkit/App/SettingsIndex.swift:50 */
 "Style" = "Estilo";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:91 */
+/* Sources/Toolkit/App/SettingsIndex.swift:62 */
 "Suggest windows for the rest" = "Sugerir janelas para o resto";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:225 */
@@ -1810,7 +1825,7 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:134 */
 "Swap used" = "Swap utilizado";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:46 */
+/* Sources/Toolkit/App/SettingsIndex.swift:90 */
 "Swipe back and forward" = "Deslizar para recuar e avançar";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:112 */
@@ -1819,10 +1834,10 @@
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:171 */
 "System Audio" = "Áudio do sistema";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:138 */
+/* Sources/Toolkit/App/SettingsIndex.swift:119 */
 "System audio" = "Áudio do sistema";
 
-/* Sources/Toolkit/App/MainView.swift:258 */
+/* Sources/Toolkit/App/MainView.swift:338 */
 "System Audio Recording" = "Gravação de áudio do sistema";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:619 */
@@ -1852,16 +1867,16 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:47 */
 "Take the window out of its stack" = "Tirar a janela da sua pilha";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:70 */
+/* Sources/Toolkit/App/SettingsIndex.swift:94 */
 "Terminal" = "Terminal";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:70 */
+/* Sources/Toolkit/App/SettingsIndex.swift:101 */
 "Text" = "Texto";
 
 /* Sources/Toolkit/Capture/CaptureThumbnail.swift:270 */
 "Text Copied" = "Texto copiado";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:76 */
+/* Sources/Toolkit/App/SettingsIndex.swift:103 */
 "Text from an area" = "Texto de uma área";
 
 /* Sources/Toolkit/Capture/SelectionOverlay.swift:597 */
@@ -1870,7 +1885,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:112 */
 "That display" = "Esse monitor";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:168 */
+/* Sources/Toolkit/App/SettingsIndex.swift:74 */
 "That window of the stack, by number." = "Essa janela da pilha, pelo número.";
 
 /* Sources/Toolkit/App/Updater.swift:245 */
@@ -1879,10 +1894,10 @@
 /* Sources/Toolkit/App/AboutView.swift:129 */
 "The app restarts when it's done." = "A aplicação reinicia quando terminar.";
 
-/* Sources/Toolkit/App/MainView.swift:212 */
+/* Sources/Toolkit/App/MainView.swift:292 */
 "The app shows it after a restart." = "Aplica-se depois de reiniciar a aplicação.";
 
-/* Sources/Toolkit/App/MainView.swift:199 */
+/* Sources/Toolkit/App/MainView.swift:279 */
 "The app's own settings: startup, language, the menu bar, backups and permissions." = "As definições da própria aplicação: arranque, idioma, barra de menus, cópias de segurança e permissões.";
 
 /* Sources/Toolkit/Awake/AwakeController.swift:141 */
@@ -1897,7 +1912,7 @@
 /* Sources/Toolkit/Capture/CaptureController.swift:578 */
 "The capture didn't work." = "A captura não funcionou.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:46 */
+/* Sources/Toolkit/App/SettingsIndex.swift:96 */
 "The display under the pointer." = "O monitor sob o ponteiro.";
 
 /* Sources/Toolkit/App/Updater.swift:288 */
@@ -1924,10 +1939,10 @@
 /* Sources/Toolkit/Layout/LayoutPanel.swift:54 */
 "The grid" = "The grid";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:80 */
+/* Sources/Toolkit/App/SettingsIndex.swift:51 */
 "The largest a preview gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows." = "O maior que uma pré-visualização fica. Com muitas janelas, encolhem para caberem todas. Ajustar torna-as tão grandes quanto o monitor permite.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:176 */
+/* Sources/Toolkit/App/SettingsIndex.swift:75 */
 "The letters are the keys in the grid's place on the keyboard, whatever the layout: the top left cell is always the key where Q is on a US keyboard." = "As letras são as teclas no lugar da grelha no teclado, seja qual for a disposição: a célula superior esquerda é sempre a tecla onde fica o Q num teclado dos EUA.";
 
 /* Sources/Toolkit/App/AboutView.swift:25 */
@@ -1951,7 +1966,7 @@
 /* Sources/Toolkit/App/SettingsTransfer.swift:77 */
 "The settings in “%@” replace yours. Anything the file doesn't have, from tools or versions it predates, stays as it is." = "As definições em “%@” substituem as suas. O que o ficheiro não tiver, de ferramentas ou versões posteriores, fica como está.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:138 */
+/* Sources/Toolkit/App/SettingsIndex.swift:119 */
 "The sound of other apps." = "O som das outras aplicações.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:55 */
@@ -1972,7 +1987,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:46 */
 "The window you're in joins the window under it." = "A janela onde está junta-se à janela por baixo.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:73 */
+/* Sources/Toolkit/App/SettingsIndex.swift:85 */
 "These apps are hidden from the mixer and always play at the main volume." = "Estas aplicações ficam ocultas no misturador e tocam sempre ao volume principal.";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:23 */
@@ -1990,7 +2005,7 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:124 */
 "This output has no volume control." = "Esta saída não tem controlo de volume.";
 
-/* Sources/Toolkit/App/MainView.swift:227 */
+/* Sources/Toolkit/App/MainView.swift:307 */
 "Tight" = "Apertado";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:347 */
@@ -2002,13 +2017,13 @@
 /* Sources/Toolkit/Awake/AwakePanel.swift:164 */
 "Today, or tomorrow if the time has passed." = "Hoje, ou amanhã se a hora já passou.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:57 */
+/* Sources/Toolkit/App/SettingsIndex.swift:98 */
 "Toolbar" = "Barra de ferramentas";
 
 /* Sources/Toolkit/App/MenuBarOrderView.swift:51 */
 "Toolkit menu" = "Menu do toolkit";
 
-/* Sources/Toolkit/App/MainView.swift:81 */
+/* Sources/Toolkit/App/MainView.swift:192 */
 "Tools" = "Ferramentas";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:173 */
@@ -2029,7 +2044,7 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:27 */
 "Top right" = "Canto superior direito";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:44 */
+/* Sources/Toolkit/App/SettingsIndex.swift:89 */
 "Trackpad" = "Trackpad";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:344 */
@@ -2038,7 +2053,7 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:50 */
 "Treble Boost" = "Agudos amplificados";
 
-/* Sources/Toolkit/UI/Components.swift:370 */
+/* Sources/Toolkit/UI/Components.swift:392 */
 "Turn %@ on to use these settings." = "Ative %@ para usar estas definições.";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:31 */
@@ -2050,7 +2065,7 @@
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:75 */
 "Turns it on with no end, or off again." = "Ativa-o sem fim, ou volta a desativá-lo.";
 
-/* Sources/Toolkit/Finder/FinderSettingsView.swift:47 */
+/* Sources/Toolkit/App/SettingsIndex.swift:90 */
 "Two fingers to the right go back, to the left go forward, as in a browser. In System Settings too." = "Dois dedos para a direita recuam, para a esquerda avançam, como num navegador. Também nas Definições do Sistema.";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:26 */
@@ -2062,7 +2077,10 @@
 /* Sources/Toolkit/Layout/LayoutController.swift:858 */
 "Type two corners" = "Prima dois cantos";
 
-/* Sources/Toolkit/App/MainView.swift:208 */
+/* Sources/Toolkit/App/AppDelegate.swift:481 */
+"Undo" = "Desfazer";
+
+/* Sources/Toolkit/App/MainView.swift:288 */
 "Unless you pick one, the app is in the first of your languages in macOS that it has." = "Com a predefinição do sistema, a aplicação usa o primeiro dos seus idiomas do macOS que tiver.";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:340 */
@@ -2098,16 +2116,16 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:158 */
 "Used" = "Utilizada";
 
-/* Sources/Toolkit/App/MainView.swift:250 */
+/* Sources/Toolkit/App/MainView.swift:330 */
 "Used by Mouse, the Window Switcher, Window Layout, Finder, Screen Capture and Keep Awake." = "Usada pelo Rato, pelo Window Switcher, pelo Gestor de Janelas, pelo Finder, pela Captura de Ecrã e pelo Keep Awake.";
 
-/* Sources/Toolkit/App/MainView.swift:274 */
+/* Sources/Toolkit/App/MainView.swift:354 */
 "Used by Screen Capture to record your voice. Only needed for that." = "Usado pela Captura de Ecrã para gravar a sua voz. Só é preciso para isso.";
 
-/* Sources/Toolkit/App/MainView.swift:266 */
+/* Sources/Toolkit/App/MainView.swift:346 */
 "Used by Screen Capture, and for the pictures of windows in the Window Switcher and Window Layout." = "Usada pela Captura de Ecrã, e para as imagens das janelas no Window Switcher e no Gestor de Janelas.";
 
-/* Sources/Toolkit/App/MainView.swift:258 */
+/* Sources/Toolkit/App/MainView.swift:338 */
 "Used by the Audio Mixer to change the volume of each app." = "Usada pelo Misturador de Áudio para alterar o volume de cada aplicação.";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:111 */
@@ -2149,7 +2167,7 @@
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:17 */
 "Volume changes need the System Audio Recording permission. macOS asks for it the first time you turn an app down." = "As alterações de volume precisam da permissão de Gravação de áudio do sistema. O macOS pede-a da primeira vez que baixar o volume de uma aplicação.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:58 */
+/* Sources/Toolkit/App/SettingsIndex.swift:82 */
 "Volume Keys" = "Teclas de volume";
 
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:10 */
@@ -2158,7 +2176,7 @@
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:46 */
 "Volume pill" = "Cápsula de volume";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:29 */
+/* Sources/Toolkit/App/SettingsIndex.swift:78 */
 "Volumes and equalizer" = "Volumes e equalizador";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:25 */
@@ -2197,7 +2215,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:385 */
 "Wheel button" = "Botão da roda";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:89 */
+/* Sources/Toolkit/App/SettingsIndex.swift:107 */
 "When copying, also save a file" = "Ao copiar, guardar também um ficheiro";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:102 */
@@ -2221,16 +2239,16 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:119 */
 "When the list appears, the window you were in before is selected, like macOS's own ⌘Tab. When off, the window you're in is. A quick %@ goes back to the previous window either way." = "Quando a lista aparece, fica selecionada a janela onde estava antes, como no ⌘Tab do próprio macOS. Se desativado, fica a janela onde está. Um %@ rápido volta à janela anterior em qualquer dos casos.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:98 */
+/* Sources/Toolkit/App/SettingsIndex.swift:63 */
 "Whether windows on the other displays are offered too." = "Se as janelas dos outros monitores também são sugeridas.";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:100 */
+/* Sources/Toolkit/App/SettingsIndex.swift:55 */
 "Which display the list opens on." = "Em que monitor a lista abre.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:123 */
 "While %@ Is Held" = "Enquanto %@ estiver premido";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:104 */
+/* Sources/Toolkit/App/SettingsIndex.swift:64 */
 "While dragging a window, the pointer stops where one display meets another, so the snap there is easy to hit. Moving away or along the edge lets go; keep pushing to cross. Once per drag." = "Ao arrastar uma janela, o ponteiro para onde um monitor encontra outro, para ser fácil encaixar aí. Afastar-se ou mover ao longo da margem liberta-o; continue a empurrar para passar. Uma vez por arrasto.";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:175 */
@@ -2239,7 +2257,7 @@
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:114 */
 "Wide" = "Larga";
 
-/* Sources/Toolkit/App/AppDelegate.swift:477 */
+/* Sources/Toolkit/App/AppDelegate.swift:490 */
 "Window" = "Janela";
 
 /* Sources/Toolkit/App/AppModel.swift:21 */
@@ -2248,13 +2266,13 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:214 */
 "Window Layout needs the Accessibility permission to move windows and to notice them being dragged." = "O Gestor de Janelas precisa da permissão de Acessibilidade para mover janelas e para notar quando são arrastadas.";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:96 */
+/* Sources/Toolkit/App/SettingsIndex.swift:109 */
 "Window Screenshots" = "Capturas de janelas";
 
 /* Sources/Toolkit/App/AppModel.swift:20 */
 "Window Switcher" = "Window Switcher";
 
-/* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:110 */
+/* Sources/Toolkit/App/SettingsIndex.swift:56 */
 "Windows" = "Janelas";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:125 */
@@ -2263,7 +2281,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:126 */
 "Windows are listed most recently used first, across all Spaces. Minimized windows, hidden apps and apps without a window come last." = "As janelas aparecem pela utilização mais recente, em todos os Spaces. As janelas minimizadas, as aplicações ocultas e as aplicações sem janela vêm no fim.";
 
-/* Sources/Toolkit/Layout/LayoutSettingsView.swift:97 */
+/* Sources/Toolkit/App/SettingsIndex.swift:63 */
 "Windows from other displays" = "Janelas de outros monitores";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:349 */
@@ -2281,10 +2299,10 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:33 */
 "With the mouse" = "Com o rato";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:63 */
+/* Sources/Toolkit/App/SettingsIndex.swift:84 */
 "With ⇧⌥" = "Com ⇧⌥";
 
-/* Sources/Toolkit/Capture/CaptureSettingsView.swift:90 */
+/* Sources/Toolkit/App/SettingsIndex.swift:107 */
 "With ⌃ held, the screenshot goes to the clipboard and to the folder." = "Com ⌃ premido, a captura vai para o clipboard e para a pasta.";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:151 */
@@ -2308,7 +2326,7 @@
 /* Sources/Toolkit/App/SettingsTransfer.swift:71 */
 "“%@” is not a MacOS Toolkit settings file." = "“%@” não é um ficheiro de definições do MacOS Toolkit.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:59 */
+/* Sources/Toolkit/App/SettingsIndex.swift:83 */
 "• Fine: 32 presses from silent to full, about 3% each.\n• Round: 20 presses, 5% each, so the volume stays on round numbers.\n• Standard: 16 presses, about 6% each, as macOS's own keys.\n• Large: 10 presses, 10% each." = "• Fino: 32 toques do silêncio ao máximo, cerca de 3% cada.\n• Redondo: 20 toques, 5% cada, para o volume ficar em números redondos.\n• Normal: 16 toques, cerca de 6% cada, como as teclas do próprio macOS.\n• Grande: 10 toques, 10% cada.";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:27 */
@@ -2361,3 +2379,191 @@
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:30 */
 "⌫" = "⌫";
+
+"Startup settings" = "Definições de arranque";
+
+"Language settings" = "Definições de idioma";
+
+"Menu bar settings" = "Definições da barra de menus";
+
+"Space between menu bar items" = "Espaçamento entre itens da barra de menus";
+
+"Order of the tools in the menu bar" = "Ordem das ferramentas na barra de menus";
+
+"Back up settings" = "Cópia de segurança das definições";
+
+"Export or import settings" = "Exportar ou importar definições";
+
+"Permissions the app needs" = "Permissões de que a aplicação precisa";
+
+"Accessibility permission" = "Permissão de Acessibilidade";
+
+"System Audio Recording permission" = "Permissão de Gravação de áudio do sistema";
+
+"Screen Recording permission" = "Permissão de Gravação do ecrã";
+
+"Microphone permission" = "Permissão do microfone";
+
+"People who made the app" = "Pessoas que fizeram a aplicação";
+
+"Project links" = "Ligações do projeto";
+
+"What's new in each version" = "Novidades de cada versão";
+
+"Check for updates" = "Verificar atualizações";
+
+"Check for updates automatically" = "Verificar atualizações automaticamente";
+
+"Settings for all mice" = "Definições de todos os ratos";
+
+"Cursor settings" = "Definições do cursor";
+
+"Cursor speed" = "Velocidade do cursor";
+
+"Cursor acceleration" = "Aceleração do cursor";
+
+"Scroll wheel settings" = "Definições da roda";
+
+"Scroll direction" = "Direção da deslocação";
+
+"Sideways scroll direction" = "Direção da deslocação lateral";
+
+"How far the wheel scrolls" = "Distância da deslocação da roda";
+
+"Smooth scrolling" = "Deslocação suave";
+
+"Mouse button settings" = "Definições dos botões do rato";
+
+"Autoscroll with the wheel button" = "Deslocação automática com o botão da roda";
+
+"Switcher appearance" = "Apresentação do Window Switcher";
+
+"List or previews" = "Lista ou pré-visualizações";
+
+"Size of the previews" = "Tamanho das pré-visualizações";
+
+"Pictures of the windows" = "Imagens das janelas";
+
+"Switcher shortcut" = "Atalho do Window Switcher";
+
+"Display the switcher opens on" = "Monitor onde o Window Switcher abre";
+
+"Windows the switcher lists" = "Janelas que o Window Switcher lista";
+
+"Snapping windows by dragging" = "Encaixar janelas ao arrastar";
+
+"Suggest windows from other displays" = "Sugerir janelas de outros monitores";
+
+"Window placement" = "Posição das janelas";
+
+"Gap between windows" = "Margens entre janelas";
+
+"Grid for each display" = "Grelha de cada monitor";
+
+"Window stacks" = "Pilhas de janelas";
+
+"Key to stack windows" = "Tecla para empilhar janelas";
+
+"Where a stack's tabs go" = "Onde ficam os separadores de uma pilha";
+
+"Stack shortcuts" = "Atalhos das pilhas";
+
+"Pick a window of a stack by number" = "Escolher uma janela da pilha pelo número";
+
+"Grid from the keyboard" = "Grelha a partir do teclado";
+
+"Mixer options" = "Opções do misturador";
+
+"Look of the mixer in the menu bar" = "Aspeto do misturador na barra de menus";
+
+"Volume keys" = "Teclas de volume";
+
+"How much each volume key press changes" = "Quanto muda cada toque nas teclas de volume";
+
+"Finer volume steps with ⇧⌥" = "Passos de volume mais finos com ⇧⌥";
+
+"Apps left out of the mixer" = "Aplicações deixadas fora do misturador";
+
+"Leave an app out of the mixer" = "Deixar uma aplicação fora do misturador";
+
+"Cut and paste in Finder" = "Cortar e colar no Finder";
+
+"Trackpad in Finder" = "Trackpad no Finder";
+
+"Finder's right-click menu" = "Menu de atalhos do Finder";
+
+"New text file from the right-click menu" = "Novo ficheiro de texto a partir do menu de atalhos";
+
+"Terminal to open folders in" = "Terminal onde abrir as pastas";
+
+"Screen capture shortcuts" = "Atalhos da captura de ecrã";
+
+"Capture toolbar shortcut" = "Atalho da barra de ferramentas da captura";
+
+"Cancel a capture" = "Cancelar uma captura";
+
+"Text from the screen" = "Texto do ecrã";
+
+"Screenshot settings" = "Definições das capturas de ecrã";
+
+"Where screenshots are saved" = "Onde as capturas de ecrã são guardadas";
+
+"Screenshot format" = "Formato das capturas de ecrã";
+
+"Window screenshot settings" = "Definições das capturas de janelas";
+
+"Window screenshot style" = "Estilo das capturas de janelas";
+
+"Backdrop behind window screenshots" = "Fundo das capturas de janelas";
+
+"Padding around window screenshots" = "Margem à volta das capturas de janelas";
+
+"Shadow of window screenshots" = "Sombra das capturas de janelas";
+
+"Screen recording settings" = "Definições das gravações do ecrã";
+
+"Recording quality" = "Qualidade da gravação";
+
+"Recording frame rate" = "Taxa de fotogramas da gravação";
+
+"Record system audio" = "Gravar o áudio do sistema";
+
+"Record the microphone" = "Gravar o microfone";
+
+"Microphone for recordings" = "Microfone para as gravações";
+
+"Keep Awake options" = "Opções do Keep Awake";
+
+"Look of Keep Awake in the menu bar" = "Aspeto do Keep Awake na barra de menus";
+
+"Keep Awake shortcut" = "Atalho do Keep Awake";
+
+"When Keep Awake ends" = "Quando o Keep Awake termina";
+
+"Notification when Keep Awake ends" = "Notificação quando o Keep Awake termina";
+
+"Sound when Keep Awake ends" = "Som quando o Keep Awake termina";
+
+"Keep Awake status" = "Estado do Keep Awake";
+
+"How Stay available keeps you available" = "Como o Manter disponível o mantém disponível";
+
+"How often Stay available acts" = "Com que frequência o Manter disponível atua";
+
+"Stats in the menu bar" = "Estatísticas na barra de menus";
+
+"Layout of the stats" = "Disposição das estatísticas";
+
+"Stat panels" = "Painéis das estatísticas";
+
+"Which stats are shown" = "Que estatísticas são mostradas";
+
+"Show Screen Capture in the menu bar" = "Mostrar a Captura de Ecrã na barra de menus";
+
+"Show Keep Awake in the menu bar" = "Mostrar o Keep Awake na barra de menus";
+
+"Show the Audio Mixer in the menu bar" = "Mostrar o Misturador de Áudio na barra de menus";
+
+"Show Mouse in the menu bar" = "Mostrar o Rato na barra de menus";
+
+"Show Window Layout in the menu bar" = "Mostrar o Gestor de Janelas na barra de menus";

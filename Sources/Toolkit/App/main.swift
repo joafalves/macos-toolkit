@@ -113,6 +113,7 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     // `mouse device`: the made-up mouse's own page.
     CaptureController.previewText = rest.contains("text")
     MouseController.previewOpen = rest.contains("device")
+    MainView.previewSearch = rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) } ?? ""
     LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
     Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"))
     exit(0)

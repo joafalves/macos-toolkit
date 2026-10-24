@@ -82,6 +82,13 @@ tool; keep it in step with the code.
 - **Import merges, setting by setting** (`SettingsTransfer.merge`): what a file lacks stays as it is
   here. A setting that only holds on this Mac, because it goes with a grant made here, goes in
   `SettingsTransfer.localOnly`: never exported, never imported (none at the moment).
+- **Search** (`App/SettingsSearch.swift`) finds the rows listed in `App/SettingsIndex.swift`, which
+  `scripts/settings-index.py generate` writes from the pages: a row is anchored by its title's key
+  (row titles are `LocalizedStringResource`s for that), and search goes to it through
+  `\.pageGoTo`. A new or renamed row is regenerated in the same commit; `check` must be clean.
+  A title that only makes sense on its page ("Updates", "Speed") gets a `name:` written by hand in
+  the index, as System Settings names its results ("Check for updates", "Cursor speed"), with its
+  pt-PT; generating keeps it.
 - **Settings pages** use `Page` and `Card`. Controls that change behaviour go through the config.
   A tool's page starts with `ToolHeader` (its name and the Enabled switch, bound to the config's
   `enabled`) and wraps the rest in `WhenEnabled`. Shortcuts are `Shortcut` values set with
@@ -206,6 +213,7 @@ swift build                                  # compile check
 ./scripts/build.sh --dev [--install]         # with the development flags, for the tests run through the app bundle
 .build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general] [light]
 .build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
+.build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
@@ -274,6 +282,7 @@ happen, with `--test-snap` or by hand.
 
 ```bash
 python3 scripts/strings.py check             # every text has its pt-PT, none left over, the same %@ in each
+python3 scripts/settings-index.py check      # every settings row is in the search's index, none left over
 python3 scripts/strings.py update            # adds the missing keys to the tables, in English, to translate
 python3 scripts/strings.py audit             # literals that look shown but are never looked up (noisy)
 "build/MacOS Toolkit.app/Contents/MacOS/Toolkit" --snapshot out.png general -AppleLanguages '(pt-PT)'  # a page in Portuguese (after build.sh --dev: the tables are in the bundle)

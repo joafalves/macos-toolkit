@@ -44,7 +44,7 @@ final class SettingFocus: ObservableObject {
             withAnimation(.easeOut(duration: 0.6)) { self?.lit = nil }
         }
         self.clear = clear
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: clear)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: clear)
     }
 }
 

@@ -25,6 +25,57 @@ private struct SidebarRow: View {
     }
 }
 
+/// The sidebar while searching, as System Settings has it: a row for each
+/// page or setting found, with the page's icon, the setting's name, and
+/// under it where it is.
+private struct SearchResults: View {
+    let hits: [SettingsIndex.Hit]
+    let enabled: (AppSection) -> Bool
+    let open: (AppSection, SettingsEntry?) -> Void
+
+    var body: some View {
+        if hits.isEmpty {
+            ContentUnavailableView.search
+        } else {
+            List(hits) { hit in
+                Button { open(hit.section, hit.entry) } label: {
+                    HStack(alignment: .top, spacing: 8) {
+                        // Grey rather than `.saturation(0)`, as in the sidebar.
+                        IconTile(symbol: hit.section.symbol, color: enabled(hit.section) ? hit.section.color : .gray, size: 22)
+                        VStack(alignment: .leading, spacing: 1) {
+                            // Wrapped rather than cut, as System Settings does.
+                            Text(hit.entry?.shown ?? LocalizedStringResource(stringLiteral: hit.section.title))
+                                .lineLimit(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let place = place(of: hit) {
+                                Text(verbatim: place)
+                                    .font(.callout)
+                                    .lineLimit(2)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .listStyle(.sidebar)
+        }
+    }
+
+    /// Where a setting is: its page, and a mouse's own page under Mouse; for
+    /// a page, what it does.
+    private func place(of hit: SettingsIndex.Hit) -> String? {
+        guard let entry = hit.entry else {
+            return hit.section.summary.isEmpty ? nil : hit.section.summary
+        }
+        return entry.perMouse ? "\(hit.section.title) → \(String(localized: "Mouse Settings"))" : hit.section.title
+    }
+}
+
 struct MainView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var mouse: MouseController
@@ -53,6 +104,9 @@ struct MainView: View {
 
     @StateObject private var navigator = Navigator()
     @StateObject private var swipes = SwipeNavigation()
+    @StateObject private var query = ViewState(MainView.previewSearch)
+    /// For `--snapshot … search=<words>`: the window as that search shows it.
+    static var previewSearch = ""
 
     /// What's shown: the section, and on Mouse the mouse whose page is open.
     private var place: Place {
@@ -61,32 +115,26 @@ struct MainView: View {
     }
 
     /// The section's name, beside back and forward; on a mouse's page, what
-    /// the page is, as its card names the mouse.
+    /// the page is, as its card names the mouse. Only when that page is what
+    /// shows: with the mouse gone, or the tool off, Mouse shows its list.
     private var title: String {
-        place.mouse == nil ? place.section.title : String(localized: "Mouse Settings")
+        guard let id = place.mouse, mouse.config.enabled, mouse.devices.contains(where: { $0.id == id }) else {
+            return place.section.title
+        }
+        return String(localized: "Mouse Settings")
     }
 
     var body: some View {
         // As System Settings: the sidebar runs the window's full height, and
         // the toolbar over the page has back, forward and the page's title.
         NavigationSplitView {
-            List(selection: $model.section) {
-                // Overview and the app's own settings, then the tools.
-                SidebarRow(section: .welcome).tag(AppSection.welcome)
-                SidebarRow(section: .general).tag(AppSection.general)
-                SidebarRow(section: .about).tag(AppSection.about)
-                // A header of its own rather than a section's: a sidebar section
-                // hides its rows on a click of its header and shows an arrow for
-                // it, and these are the tools themselves, nothing to tidy away.
-                Text("Tools")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 10)
-                    .padding(.leading, -2)
-                    .selectionDisabled()
-                ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0)).tag($0) }
+            Group {
+                if query.value.trimmingCharacters(in: .whitespaces).isEmpty {
+                    sections
+                } else {
+                    SearchResults(hits: SettingsIndex.search(query.value), enabled: enabled, open: open)
+                }
             }
-            .listStyle(.sidebar)
             // Wide enough for the longest name, in Portuguese too. The column
             // width alone isn't kept in a window that isn't a SwiftUI scene.
             .frame(minWidth: 230)
@@ -110,6 +158,7 @@ struct MainView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .environment(\.pageGoTo, $model.goTo)
             .toolbar {
                 ToolbarItemGroup(placement: .navigation) {
                     Button(action: goBack) { Image(systemName: "chevron.left") }
@@ -123,6 +172,8 @@ struct MainView: View {
                 }
             }
         }
+        // As in System Settings, at the top of the sidebar.
+        .searchable(text: $query.value, placement: .sidebar, prompt: Text("Search"))
         .navigationTitle(title)
         // A window that isn't a SwiftUI scene doesn't take the title from it,
         // so it's set here; the toolbar shows it beside back and forward.
@@ -134,6 +185,44 @@ struct MainView: View {
         }
         .onDisappear { swipes.stop() }
         .onChange(of: place) { _, place in navigator.moved(to: place) }
+    }
+
+    /// Overview and the app's own settings, then the tools.
+    private var sections: some View {
+        List(selection: $model.section) {
+            SidebarRow(section: .welcome).tag(AppSection.welcome)
+            SidebarRow(section: .general).tag(AppSection.general)
+            SidebarRow(section: .about).tag(AppSection.about)
+            // A header of its own rather than a section's: a sidebar section
+            // hides its rows on a click of its header and shows an arrow for
+            // it, and these are the tools themselves, nothing to tidy away.
+            Text("Tools")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 10)
+                .padding(.leading, -2)
+                .selectionDisabled()
+            ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0)).tag($0) }
+        }
+        .listStyle(.sidebar)
+    }
+
+    /// A page from the search, at the setting if one was picked. One that's
+    /// on a mouse's own page opens the mouse already open, or the first
+    /// connected one.
+    private func open(_ section: AppSection, _ entry: SettingsEntry?) {
+        if section == .mouse {
+            if entry?.perMouse == true {
+                let shown = mouse.openID.flatMap { id in mouse.devices.first { $0.id == id } }
+                mouse.openID = (shown ?? mouse.devices.first(where: \.connected) ?? mouse.devices.first)?.id
+            } else {
+                mouse.openID = nil
+            }
+        }
+        // The tab first, so the setting is on the page to go to.
+        if let tab = entry?.tab.flatMap(LayoutPage.init(rawValue:)) { layout.page = tab }
+        model.section = section
+        model.goTo = entry?.anchor
     }
 
     private func goBack() {
@@ -195,7 +284,7 @@ private struct GeneralView: View {
     }
 
     var body: some View {
-        Page(goTo: $model.goTo) {
+        Page {
             PageHeader(section: .general, subtitle: "The app's own settings: startup, language, the menu bar, backups and permissions.")
 
             Card(title: "Startup") {

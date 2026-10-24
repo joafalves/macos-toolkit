@@ -7,6 +7,9 @@ worked on; it gets its date when it's released.
 
 ### Added
 
+- **Settings:** a search field at the top of the sidebar, as in System Settings. It lists the pages
+  and settings that match, in English or Portuguese, each with the page it's on; a click opens the
+  page there and lights the setting up.
 - **Menu bar:** Mouse and Window Layout can have a part in the menu bar too. Mouse's panel lists each
   connected mouse with its charge and opens its settings. Window Layout's places the window in front
   (halves, quarters, thirds, maximize), restores it, opens the grid, shows the desktop, or moves it to
@@ -31,6 +34,8 @@ worked on; it gets its date when it's released.
 
 ### Fixed
 
+- **Settings:** ⌘A, ⌘C, ⌘V, ⌘X and ⌘Z work in text fields, such as search and renaming a mouse. The
+  app had no Edit menu, which is where macOS takes them from.
 - **Mouse:** two mice of the same model are told apart, each with its own settings and charge. They
   were one entry, and one's settings went to both. A mouse is known by its Bluetooth address or
   serial number now, so an Apple mouse keeps its settings on its cable too. Settings saved for a

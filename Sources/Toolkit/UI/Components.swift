@@ -4,12 +4,12 @@ import SwiftUI
 /// settings' badges scroll it to the row they name.
 struct Page<Content: View>: View {
     @ViewBuilder var content: () -> Content
-    /// A setting to go to as the page opens, from another page; cleared once there.
-    var goTo: Binding<String?>?
+    /// A setting to go to, from another page or a search: as the page opens,
+    /// or at once if it's open. Cleared once there.
+    @Environment(\.pageGoTo) private var goTo
     @StateObject private var focus = SettingFocus()
 
-    init(goTo: Binding<String?>? = nil, @ViewBuilder content: @escaping () -> Content) {
-        self.goTo = goTo
+    init(@ViewBuilder content: @escaping () -> Content) {
         self.content = content
     }
 
@@ -26,21 +26,38 @@ struct Page<Content: View>: View {
             }
             .onAppear {
                 focus.scroll = { anchor in proxy.scrollTo(anchor, anchor: .center) }
-                guard let goTo, let anchor = goTo.wrappedValue else { return }
-                // Once the page is laid out, or there's nothing to scroll to.
-                DispatchQueue.main.async {
-                    withAnimation(.easeInOut(duration: 0.3)) { focus.go(to: anchor) }
-                    goTo.wrappedValue = nil
-                }
+                go()
             }
+            .onChange(of: goTo?.wrappedValue) { _, _ in go() }
         }
         .environment(\.settingFocus, focus)
+    }
+
+    private func go() {
+        guard let goTo, let anchor = goTo.wrappedValue else { return }
+        // Once the page is laid out, or there's nothing to scroll to.
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.3)) { focus.go(to: anchor) }
+            goTo.wrappedValue = nil
+        }
+    }
+}
+
+private struct PageGoToKey: EnvironmentKey {
+    static let defaultValue: Binding<String?>? = nil
+}
+
+extension EnvironmentValues {
+    /// The setting the page shown should go to; the main window passes its own.
+    var pageGoTo: Binding<String?>? {
+        get { self[PageGoToKey.self] }
+        set { self[PageGoToKey.self] = newValue }
     }
 }
 
 /// A titled group of rows on a rounded panel.
 struct Card<Content: View>: View {
-    var title: LocalizedStringKey?
+    var title: LocalizedStringResource?
     /// A word next to the title, like "Preview".
     var badge: LocalizedStringKey?
     var footnote: LocalizedStringKey?
@@ -68,6 +85,8 @@ struct Card<Content: View>: View {
                     .padding(.leading, 2)
             }
         }
+        // Found by its title, for a search to go to.
+        .settingAnchor(title?.key ?? "")
     }
 }
 
@@ -81,7 +100,7 @@ struct RowDivider: View {
 /// extra controls underneath. A link to another setting shows as a badge
 /// under the caption, and when this one is held, its control is locked.
 struct SettingRow<Control: View, Extra: View>: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     var caption: LocalizedStringKey?
     var link: SettingLink?
     /// A word next to the title, like "Preview".
@@ -110,6 +129,8 @@ struct SettingRow<Control: View, Extra: View>: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
+        // Found by its title, for a search to go to.
+        .settingAnchor(title.key)
     }
 
     private var label: some View {
@@ -138,7 +159,7 @@ struct SettingRow<Control: View, Extra: View>: View {
 }
 
 extension SettingRow where Extra == EmptyView {
-    init(title: LocalizedStringKey, caption: LocalizedStringKey? = nil, link: SettingLink? = nil, badge: LocalizedStringKey? = nil, @ViewBuilder control: @escaping () -> Control) {
+    init(title: LocalizedStringResource, caption: LocalizedStringKey? = nil, link: SettingLink? = nil, badge: LocalizedStringKey? = nil, @ViewBuilder control: @escaping () -> Control) {
         self.init(title: title, caption: caption, link: link, badge: badge, control: control, extra: { EmptyView() })
     }
 }
@@ -161,7 +182,7 @@ struct TagBadge: View {
 /// With `menu`, a pop-up instead: for long option names, or so many that the
 /// segments would squeeze the caption.
 struct OptionRow<Value: Hashable, Extra: View>: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     var caption: LocalizedStringKey?
     @Binding var selection: Value
     let options: [(Value, LocalizedStringKey)]
@@ -195,7 +216,7 @@ struct OptionRow<Value: Hashable, Extra: View>: View {
 extension OptionRow {
     /// Options named by a model, already in the reader's words.
     @_disfavoredOverload
-    init(title: LocalizedStringKey, caption: LocalizedStringKey? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false,
+    init(title: LocalizedStringResource, caption: LocalizedStringKey? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false,
          link: SettingLink? = nil, @ViewBuilder extra: @escaping () -> Extra) {
         self.init(title: title, caption: caption, selection: selection, options: options.map { ($0.0, LocalizedStringKey.verbatim($0.1)) },
                   menu: menu, link: link, extra: extra)
@@ -204,17 +225,17 @@ extension OptionRow {
 
 extension OptionRow where Extra == EmptyView {
     @_disfavoredOverload
-    init(title: LocalizedStringKey, caption: LocalizedStringKey? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false, link: SettingLink? = nil) {
+    init(title: LocalizedStringResource, caption: LocalizedStringKey? = nil, selection: Binding<Value>, options: [(Value, String)], menu: Bool = false, link: SettingLink? = nil) {
         self.init(title: title, caption: caption, selection: selection, options: options, menu: menu, link: link, extra: { EmptyView() })
     }
 
-    init(title: LocalizedStringKey, caption: LocalizedStringKey? = nil, selection: Binding<Value>, options: [(Value, LocalizedStringKey)], menu: Bool = false, link: SettingLink? = nil) {
+    init(title: LocalizedStringResource, caption: LocalizedStringKey? = nil, selection: Binding<Value>, options: [(Value, LocalizedStringKey)], menu: Bool = false, link: SettingLink? = nil) {
         self.init(title: title, caption: caption, selection: selection, options: options, menu: menu, link: link, extra: { EmptyView() })
     }
 }
 
 struct ToggleRow: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     var caption: LocalizedStringKey?
     @Binding var isOn: Bool
     var link: SettingLink?
@@ -358,6 +379,7 @@ struct ToolHeader: View {
                     // Only a tool that's on has a part to show.
                     .disabled(!enabled)
                     .opacity(enabled ? 1 : 0.5)
+                    .settingAnchor("Show in the menu bar")
                 }
             }
             .padding(.horizontal, 16)
@@ -416,7 +438,7 @@ struct WhenEnabled<Content: View>: View {
 
 /// A setting that's a shortcut, with a recorder on the right.
 struct ShortcutRow: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     var caption: LocalizedStringKey?
     @Binding var shortcut: Shortcut
     let defaultValue: Shortcut
@@ -480,6 +502,14 @@ struct KitIcon: View {
 final class ViewState<Value>: ObservableObject {
     @Published var value: Value
     init(_ value: Value) { self.value = value }
+}
+
+extension LocalizedStringResource {
+    /// Text already in the reader's words (a name), as a row's title: never
+    /// found in a table, so shown as it is.
+    static func verbatim(_ text: String) -> LocalizedStringResource {
+        LocalizedStringResource(String.LocalizationValue(text), table: "Verbatim")
+    }
 }
 
 extension Binding {

@@ -112,7 +112,7 @@ struct AboutView: View {
         return nil
     }
 
-    private var status: LocalizedStringKey {
+    private var status: LocalizedStringResource {
         switch updater.state {
         case .idle: return "Version \(Updater.currentVersion)"
         case .checking: return "Checking…"

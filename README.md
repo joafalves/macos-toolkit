@@ -786,7 +786,8 @@ it too.
 ## Good to know
 
 - The settings window works like System Settings: back and forward in the toolbar retrace the
-  pages you've seen, as do ⌘[ and ⌘] and a two-finger swipe right or left on the trackpad.
+  pages you've seen, as do ⌘[ and ⌘] and a two-finger swipe right or left on the trackpad. The
+  search field at the top of the sidebar finds any setting, in English or Portuguese, and goes to it.
 
 - It uses **private macOS APIs** (window discovery for the switcher, the permission check for the
   mixer, grouping helper processes under their app, switching off the system's ⌘Tab and screenshot

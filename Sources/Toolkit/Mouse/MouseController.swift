@@ -238,8 +238,11 @@ final class MouseController: ObservableObject {
     func battery(for device: MouseDevice) -> Int? {
         guard device.connected else { return nil }
         if let level = device.batteryIDs.lazy.compactMap({ self.batteries[$0] }).first { return level }
-        // A mouse with nothing of its own to go by, by its model.
-        guard device.batteryIDs.isEmpty, let model = services.first(where: { $0.identity.key == device.id })?.identity else { return nil }
+        // Not listed under its own address or serial number: by its model,
+        // as long as it's the only one of it connected, so the charge is its own.
+        guard let model = services.first(where: { $0.identity.key == device.id })?.identity else { return nil }
+        let same = Set(services.filter { $0.identity.vendorID == model.vendorID && $0.identity.productID == model.productID }.map(\.identity.key))
+        guard same.count == 1 else { return nil }
         return batteries["\(model.vendorID):\(model.productID)"]
     }
 
@@ -268,19 +271,21 @@ final class MouseController: ObservableObject {
 
     /// Before 0.20.0, mice were saved by model and connection, so two of the
     /// same shared one profile. A mouse now saved by its own address that has
-    /// none yet takes its model's, and once one has, the model's goes.
+    /// none yet takes its model's, and once one has, the model's goes. One
+    /// that has its own already supersedes its model's, as when settings
+    /// exported before then are imported.
     /// Returns true when it changed the config, which refreshes again.
     private func adoptModelProfiles() -> Bool {
         var profiles = config.profiles
         var adopted: Set<String> = []
         for service in services {
             let identity = service.identity
-            guard identity.unit != nil, profiles[identity.key] == nil,
-                  var profile = profiles[identity.modelKey] else { continue }
+            guard identity.unit != nil, var profile = profiles[identity.modelKey] else { continue }
+            adopted.insert(identity.modelKey)
+            guard profiles[identity.key] == nil else { continue }
             profile.transport = identity.transport
             profile.shortUnit = identity.shortUnit
             profiles[identity.key] = profile
-            adopted.insert(identity.modelKey)
         }
         guard !adopted.isEmpty else { return false }
         for key in adopted { profiles[key] = nil }

@@ -168,7 +168,7 @@ struct CaptureSettingsView: View {
 /// A folder setting: where files go, and a button to pick another. Empty
 /// means `fallback`, which is made on first use.
 private struct FolderRow: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var path: String
     let fallback: URL
 

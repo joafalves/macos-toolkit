@@ -9,9 +9,8 @@ struct LayoutSettingsView: View {
     private var config: LayoutConfig { layout.config }
     /// Screen Recording, checked again when the app comes back to the front.
     @StateObject private var recording = ViewState(SwitcherPreviews.permitted)
-    @StateObject private var page = ViewState(LayoutPage.snapping)
 
-    private static let groups: [(LocalizedStringKey, [LayoutAction])] = [
+    private static let groups: [(LocalizedStringResource, [LayoutAction])] = [
         ("Halves", [.leftHalf, .rightHalf, .topHalf, .bottomHalf]),
         ("Quarters", [.topLeft, .topRight, .bottomLeft, .bottomRight]),
         ("Thirds", [.firstThird, .centerThird, .lastThird, .firstTwoThirds, .lastTwoThirds]),
@@ -22,7 +21,7 @@ struct LayoutSettingsView: View {
 
     private static let halvesNote: LocalizedStringKey = "They go by where the window is, however it got there. Left or right again moves the window on to the next display that way. Up again maximizes it, and once more moves it, maximized, to the display above. Down again moves it to the top half of the display below."
 
-    private static let gridKeys: [(LocalizedStringKey, LocalizedStringKey)] = [
+    private static let gridKeys: [(LocalizedStringResource, LocalizedStringKey)] = [
         ("Pick two corners", "two letter keys"),
         ("Move the selection", "←  ↑  →  ↓"),
         ("Grow or shrink it", "⇧ ←  ↑  →  ↓"),
@@ -237,7 +236,7 @@ struct LayoutSettingsView: View {
             }
 
             WhenEnabled(enabled: config.enabled) {
-                Picker("Page", selection: $page.value.afterUpdate) {
+                Picker("Page", selection: $layout.page.afterUpdate) {
                     ForEach(LayoutPage.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
@@ -245,7 +244,7 @@ struct LayoutSettingsView: View {
                 .frame(maxWidth: 360)
                 .frame(maxWidth: .infinity)
 
-                switch page.value {
+                switch layout.page {
                 case .snapping: snapping
                 case .tabs: tabsPage
                 case .keyboard: keyboard
@@ -256,13 +255,14 @@ struct LayoutSettingsView: View {
             recording.value = SwitcherPreviews.permitted
         }
         .onAppear {
-            if layout.isPreview, let preview = LayoutController.previewPage { page.value = preview }
+            if layout.isPreview, let preview = LayoutController.previewPage { layout.page = preview }
         }
     }
 }
 
 /// The parts of the Window Layout page, most used first, the preview last.
-enum LayoutPage: CaseIterable {
+/// The page's tabs. The raw values name them in the search's index.
+enum LayoutPage: String, CaseIterable {
     case snapping, keyboard, tabs
 
     var title: String {

@@ -12,7 +12,7 @@ struct SwitcherSettingsView: View {
     private var held: String { Shortcut.glyphs(shortcut.flags.subtracting(.shift)) }
     private var key: String { shortcut.key }
 
-    private var keys: [(LocalizedStringKey, LocalizedStringKey)] {
+    private var keys: [(LocalizedStringResource, LocalizedStringKey)] {
         let grid = switcher.config.style == .previews
         let back = shortcut.flags.contains(.shift) ? (grid ? "←" : "↑") : "⇧\(key)  \(grid ? "←" : "↑")"
         return [
