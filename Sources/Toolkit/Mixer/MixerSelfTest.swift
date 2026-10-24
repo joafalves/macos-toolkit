@@ -1,3 +1,4 @@
+import CoreAudio
 import Foundation
 
 extension MixerController {
@@ -38,6 +39,7 @@ extension MixerController {
             setting.volume = level
             print(String(format: "  %5.1f%% -> %6.1f dB", level * 100, 20 * log10(Double(setting.gain))))
         }
+        builtInCurveCheck()
         print("saved before 0.19 (gain = volume²), read now:")
         for old in [0.0, 0.01, 0.1, 0.25, 0.5, 0.8, 1] {
             let json = Data(#"{"volume": \#(old), "muted": false}"#.utf8)
@@ -53,5 +55,51 @@ extension MixerController {
         setting.volume = 0.8
         let round = (try? JSONEncoder().encode(setting)).flatMap { try? JSONDecoder().decode(SoftwareVolume.self, from: $0) }
         print("saved and read again: \(round?.volume ?? -1) (expect 0.8), file: \(String(decoding: (try? JSONEncoder().encode(setting)) ?? Data(), as: UTF8.self))")
+    }
+
+    /// The software volume's curve against the one this Mac's own output
+    /// reports, which is what macOS steps through on its speakers. A macOS
+    /// that changes it shows here.
+    private static func builtInCurveCheck() {
+        func property<T>(_ id: AudioObjectID, _ selector: AudioObjectPropertySelector, _ scope: AudioObjectPropertyScope,
+                         _ element: UInt32, _ value: inout T) -> Bool {
+            var address = AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: element)
+            var size = UInt32(MemoryLayout<T>.size)
+            return AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr
+        }
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size)
+        var devices = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &devices)
+        let output = kAudioObjectPropertyScopeOutput
+        for device in devices {
+            var transport: UInt32 = 0
+            guard property(device, kAudioDevicePropertyTransportType, kAudioObjectPropertyScopeGlobal, 0, &transport),
+                  transport == kAudioDeviceTransportTypeBuiltIn
+            else { continue }
+            for element: UInt32 in [0, 1] {
+                var range = AudioValueRange()
+                guard property(device, kAudioDevicePropertyVolumeRangeDecibels, output, element, &range) else { continue }
+                var name: CFString = "" as CFString
+                _ = property(device, kAudioObjectPropertyName, kAudioObjectPropertyScopeGlobal, 0, &name)
+                var worst = 0.0, at = 0
+                for step in 1...16 {
+                    var db = Float32(step) / 16
+                    guard property(device, kAudioDevicePropertyVolumeScalarToDecibels, output, element, &db) else { continue }
+                    var setting = SoftwareVolume()
+                    setting.volume = Double(step) / 16
+                    let ours = 20 * log10(Double(setting.gain))
+                    let off = abs(Double(db) - Double(range.mMaximum) - ours)
+                    if off > worst { (worst, at) = (off, step) }
+                }
+                print(String(format: "%@ the software volume against %@ (%.1f to %.1f dB): at most %.2f dB apart%@",
+                             worst < 1 ? "ok  " : "DIFF", name as String, range.mMinimum, range.mMaximum, worst,
+                             worst < 1 ? "" : " (at \(at)/16)"))
+                return
+            }
+        }
+        print("     no built-in output with a volume of its own here, so nothing to compare with")
     }
 }

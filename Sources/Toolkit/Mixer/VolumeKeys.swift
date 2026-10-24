@@ -96,7 +96,7 @@ final class VolumeKeys {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.mixer.volumeKey(key, fine: fine)
-            self.hud.show(volume: self.mixer.mainVolume, muted: self.mixer.mainMuted)
+            self.hud.show(volume: self.mixer.mainVolume, muted: self.mixer.mainMuted, segments: self.mixer.config.keyStep.segments)
         }
         return nil
     }
@@ -107,6 +107,8 @@ final class VolumeKeys {
 private final class HUDModel: ObservableObject {
     @Published var volume: Float = 0
     @Published var muted = false
+    /// One a press, as the press size has it.
+    @Published var segments = 16
 }
 
 /// A small floating bar that shows the volume after a key press, in place of
@@ -130,16 +132,18 @@ final class VolumeHUD {
     }
 
     /// For `--snapshot volume-hud`: the bar at each volume, without showing it.
-    static func view(volume: Float, muted: Bool) -> some View {
+    static func view(volume: Float, muted: Bool, segments: Int = 16) -> some View {
         let model = HUDModel()
         model.volume = volume
         model.muted = muted
+        model.segments = segments
         return VolumeHUDView(model: model)
     }
 
-    func show(volume: Float, muted: Bool) {
+    func show(volume: Float, muted: Bool, segments: Int = 16) {
         model.volume = volume
         model.muted = muted
+        model.segments = segments
         let panel = self.panel ?? makePanel()
         self.panel = panel
 
@@ -220,8 +224,6 @@ final class VolumeHUD {
 
 private struct VolumeHUDView: View {
     @ObservedObject var model: HUDModel
-    /// One a press at the Standard step, as macOS's own bar.
-    private static let segments = 16
 
     private var symbol: String {
         if model.muted || model.volume <= 0 { return "speaker.slash.fill" }
@@ -229,22 +231,20 @@ private struct VolumeHUDView: View {
     }
 
     var body: some View {
-        // Smaller steps fill part of a segment, so every press shows.
-        let filled = model.muted ? 0 : Double(model.volume) * Double(Self.segments)
+        // A volume between presses (⇧⌥, the slider) fills part of a segment, in
+        // quarters as macOS's own bar: no sliver for a few points over.
+        let filled = model.muted ? 0 : (Double(model.volume) * Double(model.segments) * 4).rounded() / 4
         HStack(spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
                 .frame(width: 26)
             HStack(spacing: 2.5) {
-                ForEach(0..<Self.segments, id: \.self) { index in
+                ForEach(0..<model.segments, id: \.self) { index in
+                    // Part of a segment is the whole of it, lighter: filled
+                    // from one side, its rounded corners cut it into a sliver.
                     let part = min(max(filled - Double(index), 0), 1)
-                    Color.primary.opacity(0.2)
-                        .overlay(alignment: .leading) {
-                            GeometryReader { box in
-                                Color.primary.frame(width: box.size.width * part)
-                            }
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(Color.primary.opacity(0.2 + 0.8 * part))
                         .frame(height: 9)
                 }
             }

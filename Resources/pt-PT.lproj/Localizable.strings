@@ -187,7 +187,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:48 */
 "Add" = "Adicionar";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:82 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:89 */
 "Add an app" = "Adicionar uma aplicação";
 
 /* Sources/Toolkit/Layout/LayoutOverlay.swift:209 */
@@ -364,7 +364,7 @@
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:195 */
 "Choose" = "Escolher";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:82 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:89 */
 "Choose from the apps that are open." = "Escolha entre as aplicações que estão abertas.";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:115 */
@@ -577,7 +577,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:77 */
 "Dragging" = "Ao arrastar";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:59 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:66 */
 "Each press" = "Cada toque";
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:16 */
@@ -646,7 +646,7 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:347 */
 "Exclude %@" = "Excluir %@";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:72 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:79 */
 "Excluded Apps" = "Aplicações excluídas";
 
 /* Sources/Toolkit/App/MainView.swift:186 */
@@ -664,7 +664,7 @@
 /* Sources/Toolkit/Finder/FinderSettingsView.swift:38 */
 "Finder has no Cut, so this copies the selection and the next ⌘V in Finder moves it (Move Item Here, ⌥⌘V). A short sound says the files were cut, since Finder has no way to mark them. Copying something else first cancels the cut." = "O Finder não tem Cortar, por isso isto copia a seleção e o próximo ⌘V no Finder move-a (Mover item para aqui, ⌥⌘V). Um som curto diz que os ficheiros foram cortados, já que o Finder não tem forma de os marcar. Copiar outra coisa antes cancela o corte.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:61 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:68 */
 "Fine" = "Fino";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:30 */
@@ -829,7 +829,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:201 */
 "How far the cursor travels for a given hand movement." = "Quanto o cursor anda para um dado movimento da mão.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:63 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:70 */
 "How much a press moves the volume while Shift and Option are held." = "Quanto um toque muda o volume com Shift e Option premidas.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:208 */
@@ -919,10 +919,10 @@
 /* Sources/Toolkit/App/MainView.swift:150 */
 "Language" = "Idioma";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:61 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:68 */
 "Large" = "Grande";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:66 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:73 */
 "Larger" = "Maior";
 
 /* Sources/Toolkit/App/AboutView.swift:133 */
@@ -1474,7 +1474,7 @@
 /* Sources/Toolkit/App/MainView.swift:170 */
 "Roomy" = "Amplo";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:61 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:68 */
 "Round" = "Redondo";
 
 /* Sources/Toolkit/App/GeneralConfig.swift:30 */
@@ -1615,7 +1615,7 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:56 */
 "Small Speakers" = "Minicolunas";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:66 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:73 */
 "Smaller" = "Mais pequeno";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:250 */
@@ -1906,7 +1906,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:46 */
 "The window you're in joins the window under it." = "A janela onde está junta-se à janela por baixo.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:73 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:80 */
 "These apps are hidden from the mixer and always play at the main volume." = "Estas aplicações ficam ocultas no misturador e tocam sempre ao volume principal.";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:23 */
@@ -2083,7 +2083,7 @@
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:16 */
 "Volume changes need the System Audio Recording permission. macOS asks for it the first time you turn an app down." = "As alterações de volume precisam da permissão de Gravação de áudio do sistema. O macOS pede-a da primeira vez que baixar o volume de uma aplicação.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:58 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:65 */
 "Volume Keys" = "Teclas de volume";
 
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:10 */
@@ -2215,7 +2215,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:33 */
 "With the mouse" = "Com o rato";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:63 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:70 */
 "With ⇧⌥" = "Com ⇧⌥";
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:94 */
@@ -2242,7 +2242,7 @@
 /* Sources/Toolkit/App/SettingsTransfer.swift:70 */
 "“%@” is not a MacOS Toolkit settings file." = "“%@” não é um ficheiro de definições do MacOS Toolkit.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:59 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:66 */
 "• Fine: 32 presses from silent to full, about 3% each.\n• Round: 20 presses, 5% each, so the volume stays on round numbers.\n• Standard: 16 presses, about 6% each, as macOS's own keys.\n• Large: 10 presses, 10% each." = "• Fino: 32 toques do silêncio ao máximo, cerca de 3% cada.\n• Redondo: 20 toques, 5% cada, para o volume ficar em números redondos.\n• Normal: 16 toques, cerca de 6% cada, como as teclas do próprio macOS.\n• Grande: 10 toques, 10% cada.";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:27 */

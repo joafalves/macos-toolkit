@@ -97,7 +97,6 @@ final class MixerController: ObservableObject {
     private var masterTap: AppTap?
     private var hardwareVolume = false
     private var loggedMasterSkip = false
-    private var lastMasterSound: Date?
     private lazy var volumeKeys = VolumeKeys(mixer: self)
     /// Taps macOS refused, so they're not retried on every slider move.
     private var failed: Set<String> = []
@@ -484,10 +483,9 @@ final class MixerController: ObservableObject {
     }
 
     private func updateLevels() {
-        guard running, !taps.isEmpty || masterTap != nil else { return }
+        guard running, !taps.isEmpty else { return }
         let now = Date()
         for (pid, tap) in taps where tap.takePeak() > 0.001 { lastSound[pid] = now }
-        if let masterTap, masterTap.takePeak() > 0.001 { lastMasterSound = now }
         if currentlyAudible() != audible { updateList() }
         // A tap kept on only to avoid a click can go once its sound has stopped.
         if lingering(now) { applyTaps() }
@@ -508,7 +506,6 @@ final class MixerController: ObservableObject {
             let bundleID = groups[pid]?.app.bundleIdentifier ?? ""
             if (config.apps[bundleID]?.isDefault ?? true), isQuiet(since: lastSound[pid], now) { return true }
         }
-        if masterTap != nil, !softwareActive, !config.equalizer.isActive, isQuiet(since: lastMasterSound, now) { return true }
         return false
     }
 
@@ -643,10 +640,10 @@ final class MixerController: ObservableObject {
     /// The equalizer needs it too, on any output: everything has to pass
     /// through the toolkit to be equalized.
     private func applyMasterTap(device: OutputDevice, controlled: [AudioObjectID], gain: Float) {
-        // Like the app taps, it stays up after the equalizer goes off until the
-        // sound stops, so turning it off doesn't click.
-        let lingers = masterTap != nil && !isQuiet(since: lastMasterSound)
-        guard softwareActive || config.equalizer.isActive || lingers else {
+        // Unlike an app's, it goes as soon as the equalizer does, with a small
+        // pop like the one when it starts: waiting for a silence kept it, and
+        // macOS's recording dot, up for as long as music played.
+        guard softwareActive || config.equalizer.isActive else {
             masterTap = nil
             return
         }

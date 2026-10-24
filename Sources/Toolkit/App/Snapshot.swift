@@ -515,13 +515,14 @@ enum Snapshot {
         if let view = window.contentView { save(view, to: path) }
     }
 
-    /// The volume keys' bar at a few volumes: whole steps, part of one (a
-    /// Fine or ⇧⌥ press), and muted.
+    /// The volume keys' bar at a few volumes and press sizes (its segments):
+    /// whole presses, part of one (⇧⌥, the slider), and muted.
     static func writeVolumeHUD(to path: String, light: Bool) {
         _ = NSApplication.shared
+        let cases: [(Float, Int)] = [(0.2, 20), (0.2, 16), (0.5, 16), (0.53, 16), (0.6, 10), (0.0625, 16), (1, 20)]
         let rows = VStack(spacing: 12) {
-            ForEach([Float(0.5), 0.53125, 0.0625, 1], id: \.self) { volume in
-                VolumeHUD.view(volume: volume, muted: false)
+            ForEach(cases.indices, id: \.self) { i in
+                VolumeHUD.view(volume: cases[i].0, muted: false, segments: cases[i].1)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
             VolumeHUD.view(volume: 0.5, muted: true)

@@ -170,8 +170,7 @@ private struct EqualizerModule: View {
                 .help("Show the bands and presets")
 
                 Toggle("Equalizer", isOn: Binding(get: { eq.enabled }, set: { mixer.setEqualizerEnabled($0) }))
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
+                    .toggleStyle(PanelSwitch())
                     .labelsHidden()
                     .help("While it's on and not flat, all sound goes through the toolkit to be equalized.")
             }

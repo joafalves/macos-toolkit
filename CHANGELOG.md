@@ -3,6 +3,18 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.19.1 (unreleased)
+
+### Fixed
+
+- **Audio Mixer:** the volume keys' bar has as many segments as presses from silent to full (20 with
+  Round, 10 with Large), so 20% with Round no longer showed three segments and a sliver. A volume
+  between presses lights its segment lighter, rather than cutting it into a thin crescent.
+- **Audio Mixer:** turning the equalizer off ends its recording at once, so macOS's purple dot goes
+  too. It waited for a moment of silence, which with music playing never came.
+- **Audio Mixer:** the equalizer's switch shows its colour while on as soon as the mixer opens, as the
+  other panels' switches do; it was grey until the mixer was clicked.
+
 ## 0.19.0 (2026-10-24)
 
 ### Added

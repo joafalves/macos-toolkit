@@ -76,6 +76,10 @@ enum VolumeKeyStep: String, Codable, CaseIterable {
         case .large: return 10
         }
     }
+
+    /// In the on-screen bar, one a press; Fine's 32 would be too thin, so it
+    /// has two a segment.
+    var segments: Int { self == .fine ? 16 : presses }
 }
 
 /// What the mixer shows in the menu bar besides the toolkit's own icon.
