@@ -5,6 +5,14 @@ worked on; it gets its date when it's released.
 
 ## 0.19.2 (unreleased)
 
+### Added
+
+- **Menu bar:** About in the toolkit panel, beside Settings, for the version and updates.
+
+### Changed
+
+- **Settings window:** in Portuguese, About is now called Sobre.
+
 ### Fixed
 
 - **Security:** other apps on this Mac can no longer use the toolkit's permissions (Accessibility,

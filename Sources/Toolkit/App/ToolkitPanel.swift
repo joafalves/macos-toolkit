@@ -14,7 +14,7 @@ struct ToolkitPanelActions {
 /// The panel the toolkit's mark opens: up top, the tools that have no part
 /// of their own in the menu bar, to use at once; then every tool, with a
 /// switch to turn it on or off, which leaves the panel open, and its name to
-/// open its settings; then Quit and Settings.
+/// open its settings; then Quit, About and Settings.
 struct ToolkitPanelView: View {
     @ObservedObject var mouse: MouseController
     @ObservedObject var switcher: SwitcherController
@@ -82,12 +82,19 @@ struct ToolkitPanelView: View {
     }
 
     /// As the other panels' footers: what leaves on the left, the settings
-    /// under the toolkit's mark on the right. Overview and About are in the
-    /// settings window's sidebar.
+    /// under the toolkit's mark on the right, with About beside them, drawn
+    /// the same way. Overview is in the settings window's sidebar.
     private var footer: some View {
         HStack {
             Button("Quit") { NSApp.terminate(nil) }
             Spacer()
+            Button { actions.open(.about) } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "info.circle").font(.system(size: 12.5))
+                    Text("About")
+                }
+            }
+            .padding(.trailing, 12)
             Button { actions.open(.general) } label: {
                 HStack(spacing: 5) {
                     Image(nsImage: MenuBarArt.toolkit).resizable().frame(width: 12, height: 13.5)

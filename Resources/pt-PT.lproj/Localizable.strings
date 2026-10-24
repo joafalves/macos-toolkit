@@ -158,7 +158,7 @@
 "A volume for each app, and an equalizer." = "Um volume para cada aplicação, e um equalizador.";
 
 /* Sources/Toolkit/App/AppModel.swift:29 */
-"About" = "Informações";
+"About" = "Sobre";
 
 /* Sources/Toolkit/App/AppDelegate.swift:422 */
 "About MacOS Toolkit" = "Acerca do MacOS Toolkit";

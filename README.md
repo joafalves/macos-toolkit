@@ -752,7 +752,7 @@ each puts it in the menu bar or takes it out; a tool that's off opens its page i
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/toolkit-panel-dark.png">
-    <img src="docs/images/toolkit-panel-light.png" width="300" alt="The toolkit panel: Screen Capture, Audio Mixer and Keep Awake as tiles at the top, then every tool with a switch, two of them off, then Quit and Settings">
+    <img src="docs/images/toolkit-panel-light.png" width="300" alt="The toolkit panel: Screen Capture, Audio Mixer and Keep Awake as tiles at the top, then every tool with a switch, two of them off, then Quit, About and Settings">
   </picture>
 </p>
 
@@ -760,7 +760,7 @@ The toolkit's mark opens its panel. At the top are the tools that have no part o
 menu bar: Screen Capture opens its toolbar (or stops a recording), the Audio Mixer opens the mixer,
 and Keep Awake's cup turns it on with no end, or off, while its name opens its panel for a set time.
 Then every tool, with a switch that turns it on or off and leaves the panel open, so you can set
-several at once; a tool's name opens its settings. Quit and Settings are at the bottom.
+several at once; a tool's name opens its settings. Quit, About and Settings are at the bottom.
 
 ## Languages
 
