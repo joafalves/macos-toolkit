@@ -1,12 +1,10 @@
 import AVFoundation
-import Combine
 import SwiftUI
 
 /// The ⇧⌘5 bar: what to capture, photo or video, options, and Capture.
 final class CaptureToolbar {
     private var panel: CapturePanel?
     private var host: NSView?
-    private var changes: AnyCancellable?
     unowned let capture: CaptureController
 
     init(capture: CaptureController) {
@@ -18,7 +16,12 @@ final class CaptureToolbar {
 
     func show(on screen: NSScreen) {
         if panel == nil {
-            let host = NSHostingView(rootView: CaptureToolbarView(capture: capture))
+            // The Capture button's label changes width ("Click a Window",
+            // "Copy"); the panel follows, keeping its centre, from the size
+            // the content itself reports once it has it.
+            let host = NSHostingView(rootView: CaptureToolbarView(capture: capture) { [weak self] size in
+                self?.fit(size)
+            })
             let size = host.fittingSize
             let panel = CapturePanel(frame: NSRect(origin: .zero, size: size), level: NSWindow.Level(NSWindow.Level.screenSaver.rawValue + 1))
             let container = ArrowCursorView(frame: NSRect(origin: .zero, size: size))
@@ -34,13 +37,12 @@ final class CaptureToolbar {
                 default: return false
                 }
             }
+            // Unseen until the content has said how wide it is: the first time
+            // after launch it can be measured before it has its full width.
+            panel.alphaValue = 0
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak panel] in panel?.alphaValue = 1 }
             self.panel = panel
             self.host = host
-            // The Capture button's label changes width ("Click a Window",
-            // "Copy"); the panel follows, keeping its centre.
-            changes = capture.objectWillChange.sink { [weak self] _ in
-                DispatchQueue.main.async { self?.fit() }
-            }
         }
         guard let panel, let host else { return }
         let size = host.fittingSize
@@ -50,16 +52,15 @@ final class CaptureToolbar {
         panel.makeKey()
     }
 
-    private func fit() {
-        guard let panel, let host else { return }
-        let size = host.fittingSize
-        guard size != panel.frame.size, size.width > 0 else { return }
+    private func fit(_ size: CGSize) {
+        guard let panel, size.width > 0 else { return }
+        defer { panel.alphaValue = 1 }
+        guard size != panel.frame.size else { return }
         let frame = panel.frame
         panel.setFrame(NSRect(x: frame.midX - size.width / 2, y: frame.minY, width: size.width, height: size.height), display: true)
     }
 
     func hide() {
-        changes = nil
         panel?.orderOut(nil)
         panel = nil
         host = nil
@@ -68,6 +69,8 @@ final class CaptureToolbar {
 
 struct CaptureToolbarView: View {
     @ObservedObject var capture: CaptureController
+    /// Its size whenever it changes, for the panel around it.
+    var onSize: (CGSize) -> Void = { _ in }
 
     var body: some View {
         HStack(spacing: 4) {
@@ -96,6 +99,7 @@ struct CaptureToolbarView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
         .fixedSize()
+        .onGeometryChange(for: CGSize.self, of: { $0.size }, action: onSize)
     }
 
     private var captureTitle: LocalizedStringKey {

@@ -67,7 +67,7 @@ extension MixerController {
                          _ element: UInt32, _ value: inout T) -> Bool {
             var address = AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: element)
             var size = UInt32(MemoryLayout<T>.size)
-            return AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr
+            return withUnsafeMutablePointer(to: &value) { AudioObjectGetPropertyData(id, &address, 0, nil, &size, $0) } == noErr
         }
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal,
                                                  mElement: kAudioObjectPropertyElementMain)
@@ -84,8 +84,7 @@ extension MixerController {
             for element: UInt32 in [0, 1] {
                 var range = AudioValueRange()
                 guard property(device, kAudioDevicePropertyVolumeRangeDecibels, output, element, &range) else { continue }
-                var name: CFString = "" as CFString
-                _ = property(device, kAudioObjectPropertyName, kAudioObjectPropertyScopeGlobal, 0, &name)
+                let name = device.readString(kAudioObjectPropertyName) ?? ""
                 var worst = 0.0, at = 0
                 for step in 1...16 {
                     var db = Float32(step) / 16
@@ -97,7 +96,7 @@ extension MixerController {
                     if off > worst { (worst, at) = (off, step) }
                 }
                 print(String(format: "%@ the software volume against %@ (%.1f to %.1f dB): at most %.2f dB apart%@",
-                             worst < 1 ? "ok  " : "DIFF", name as String, range.mMinimum, range.mMaximum, worst,
+                             worst < 1 ? "ok  " : "DIFF", name, range.mMinimum, range.mMaximum, worst,
                              worst < 1 ? "" : " (at \(at)/16)"))
                 return
             }
@@ -134,8 +133,9 @@ extension MixerController {
                 let saved = await recorder.stop()
                 let asset = AVURLAsset(url: url)
                 let tracks = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
+                let peak = tracks.first.flatMap { loudest(in: asset, track: $0) }
                 lines.append("microphone recording: saved \(saved), \(tracks.count) audio track(s), "
-                    + "loudest \(String(format: "%.4f", tracks.first.map { loudest(in: asset, track: $0) } ?? 0)) (0 is silence: blocked)")
+                    + "loudest \(peak.map { String(format: "%.4f", $0) } ?? "unreadable") (0 is silence: blocked)")
             } catch {
                 lines.append("microphone recording: FAILED \(error.localizedDescription)")
             }
@@ -145,13 +145,15 @@ extension MixerController {
     }
 
     /// The loudest sample in an audio track: a microphone that's blocked still
-    /// gives a track, of silence.
-    private static func loudest(in asset: AVAsset, track: AVAssetTrack) -> Float {
-        guard let reader = try? AVAssetReader(asset: asset) else { return 0 }
+    /// gives a track, of silence. Nil when the track can't be read as samples:
+    /// adding an output the reader can't take throws, and that ended the app.
+    private static func loudest(in asset: AVAsset, track: AVAssetTrack) -> Float? {
+        guard let reader = try? AVAssetReader(asset: asset) else { return nil }
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
             AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true,
             AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false,
         ])
+        guard reader.canAdd(output) else { return nil }
         reader.add(output)
         reader.startReading()
         var peak: Float = 0

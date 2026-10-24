@@ -206,7 +206,8 @@ struct LayoutSettingsView: View {
     var body: some View {
         Page {
             ToolHeader(section: .layout, subtitle: "Snap windows to halves, quarters and thirds, or place them on a grid.",
-                       enabled: $layout.config.enabled)
+                       enabled: $layout.config.enabled,
+                       menuBar: MenuBarSwitch(isOn: $layout.config.menuBarIcon, caption: "A click places the window in front."))
 
             if config.enabled {
                 if !mouse.accessibilityGranted {
@@ -236,7 +237,7 @@ struct LayoutSettingsView: View {
             }
 
             WhenEnabled(enabled: config.enabled) {
-                Picker("Page", selection: $page.value) {
+                Picker("Page", selection: $page.value.afterUpdate) {
                     ForEach(LayoutPage.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)

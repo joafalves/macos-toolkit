@@ -27,6 +27,21 @@ struct AwakeConfig: Codable, Equatable {
     }
     /// The look it had when last in the menu bar, for when it's put back.
     var shownIcon = AwakeMenuBarIcon.pill
+
+    /// For the header's switch: in the menu bar or not, in the last look.
+    var inMenuBar: Bool {
+        get { menuBarIcon != .none }
+        set { menuBarIcon = newValue ? shownIcon : .none }
+    }
+
+    /// The look, whether it's shown now or not.
+    var look: AwakeMenuBarIcon {
+        get { shownIcon }
+        set {
+            shownIcon = newValue
+            if menuBarIcon != .none { menuBarIcon = newValue }
+        }
+    }
     /// With no end, the menu bar counts up how long it's been on.
     var showElapsed = false
     /// Turns it on or off, with no end. None until one is set.

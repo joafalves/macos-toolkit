@@ -106,6 +106,21 @@ struct MixerConfig: Codable, Equatable {
     }
     /// The look it had when last in the menu bar, for when it's put back.
     var shownIcon = MixerMenuBarIcon.volume
+
+    /// For the header's switch: in the menu bar or not, in the last look.
+    var inMenuBar: Bool {
+        get { menuBarIcon != .none }
+        set { menuBarIcon = newValue ? shownIcon : .none }
+    }
+
+    /// The look, whether it's shown now or not.
+    var look: MixerMenuBarIcon {
+        get { shownIcon }
+        set {
+            shownIcon = newValue
+            if menuBarIcon != .none { menuBarIcon = newValue }
+        }
+    }
     /// For outputs with no volume control of their own (most monitors over
     /// HDMI or DisplayPort): the main slider and the volume keys lower the
     /// sound in software instead.

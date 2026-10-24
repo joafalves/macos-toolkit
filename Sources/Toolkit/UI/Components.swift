@@ -179,7 +179,7 @@ struct OptionRow<Value: Hashable, Extra: View>: View {
                 .labelsHidden()
                 .fixedSize()
             } else {
-                Picker(title, selection: $selection) {
+                Picker(title, selection: $selection.afterUpdate) {
                     ForEach(options, id: \.0) { Text($0.1).tag($0.0) }
                 }
                 .pickerStyle(.segmented)
@@ -290,37 +290,77 @@ struct Banner: View {
 
 /// The top of a tool's page: what the tool is, and the switch that turns it
 /// on and off. The same on every tool, so "on" always looks the same.
+/// A tool's own part of the menu bar item, switched on and off from its
+/// header: what it does when clicked, under "Show in the menu bar".
+struct MenuBarSwitch {
+    let isOn: Binding<Bool>
+    let caption: LocalizedStringKey
+}
+
 struct ToolHeader: View {
     let section: AppSection
     var title: LocalizedStringKey?
     let subtitle: LocalizedStringKey
     @Binding var enabled: Bool
+    /// The same for every tool that can be in the menu bar: a quieter strip
+    /// along the bottom of the header, below the switch that matters more.
+    var menuBar: MenuBarSwitch?
 
     private var name: Text { title.map { Text($0) } ?? Text(section.title) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 14) {
-                // Grey rather than `.saturation(0)`, a filter `--snapshot` leaves out.
-                IconTile(symbol: section.symbol, color: enabled ? section.color : .gray, size: 46)
-                    .opacity(enabled ? 1 : 0.6)
-                VStack(alignment: .leading, spacing: 3) {
-                    name.font(.title2.weight(.semibold))
-                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 14) {
+                    // Grey rather than `.saturation(0)`, a filter `--snapshot` leaves out.
+                    IconTile(symbol: section.symbol, color: enabled ? section.color : .gray, size: 46)
+                        .opacity(enabled ? 1 : 0.6)
+                    VStack(alignment: .leading, spacing: 3) {
+                        name.font(.title2.weight(.semibold))
+                        Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 12)
+                    // On and Off, as on Overview and in the menus.
+                    Text(enabled ? "On" : "Off")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(enabled ? Color.accentColor : .secondary)
+                    Toggle(enabled ? "On" : "Off", isOn: $enabled)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .controlSize(.large)
                 }
-                Spacer(minLength: 12)
-                // On and Off, as on Overview and in the menus.
-                Text(enabled ? "On" : "Off")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(enabled ? Color.accentColor : .secondary)
-                Toggle(enabled ? "On" : "Off", isOn: $enabled)
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .controlSize(.large)
+                .padding(.vertical, 14)
+                if let menuBar {
+                    Rectangle()
+                        .fill(enabled ? section.color.opacity(0.22) : Color.primary.opacity(0.08))
+                        .frame(height: 1)
+                        .padding(.horizontal, -16)
+                    HStack(spacing: 10) {
+                        Image(systemName: "menubar.rectangle")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 46)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Show in the menu bar").font(.callout)
+                            // One line on every page, a little smaller where a word is long.
+                            Text(menuBar.caption).font(.caption).foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                        }
+                        Spacer(minLength: 12)
+                        Toggle("Show in the menu bar", isOn: menuBar.isOn)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                            .controlSize(.small)
+                    }
+                    .padding(.vertical, 9)
+                    // Only a tool that's on has a part to show.
+                    .disabled(!enabled)
+                    .opacity(enabled ? 1 : 0.5)
+                }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
             .background(enabled ? section.color.opacity(0.09) : Color.primary.opacity(0.045),
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -440,6 +480,19 @@ struct KitIcon: View {
 final class ViewState<Value>: ObservableObject {
     @Published var value: Value
     init(_ value: Value) { self.value = value }
+}
+
+extension Binding {
+    /// For a segmented picker: it sets its value from inside SwiftUI's update
+    /// of the view, where changing a published one is undefined (and logged
+    /// as such), so the value is set straight after instead
+    /// (`--test-publishing`).
+    var afterUpdate: Binding<Value> {
+        let binding = self
+        return Binding(get: { binding.wrappedValue }, set: { value in
+            DispatchQueue.main.async { binding.wrappedValue = value }
+        })
+    }
 }
 
 extension LocalizedStringKey {

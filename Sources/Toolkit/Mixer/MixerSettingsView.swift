@@ -8,7 +8,8 @@ struct MixerSettingsView: View {
     var body: some View {
         Page {
             ToolHeader(section: .mixer, subtitle: "Volume per app, an equalizer, and the volume keys.",
-                       enabled: $mixer.config.enabled)
+                       enabled: $mixer.config.enabled,
+                       menuBar: MenuBarSwitch(isOn: $mixer.config.inMenuBar, caption: "A click opens the mixer."))
 
             if mixer.config.enabled, mixer.permission != .granted {
                 Banner(text: mixer.permission == .denied
@@ -27,7 +28,7 @@ struct MixerSettingsView: View {
                 Card {
                     SettingRow(title: "Volumes and equalizer",
                                caption: mixer.config.menuBarIcon == .none
-                                   ? "In the mixer, which opens from the menu bar. Choose how it shows there below."
+                                   ? "In the mixer, which opens from the toolkit's panel, or in one click once it's in the menu bar."
                                    : "In the mixer, which opens from its part of the toolkit's menu bar item.") {
                         Button("Open the Mixer") { mixer.openMixer?() }
                             .disabled(mixer.config.menuBarIcon == .none)
@@ -36,9 +37,8 @@ struct MixerSettingsView: View {
 
                 Card(title: "Options") {
                     // A pop-up rather than segments: four choices don't fit beside a caption.
-                    SettingRow(title: "In the menu bar", caption: "Shown in the toolkit's menu bar item; opens the mixer in one click.") {
-                        Picker("Menu bar icon", selection: $mixer.config.menuBarIcon) {
-                            Text("None").tag(MixerMenuBarIcon.none)
+                    SettingRow(title: "Look in the menu bar", caption: "Shown when it's in the menu bar, which is set at the top of the page.") {
+                        Picker("Menu bar icon", selection: $mixer.config.look) {
                             Text("Mixer").tag(MixerMenuBarIcon.mixer)
                             Text("Volume").tag(MixerMenuBarIcon.volume)
                             Text("Volume and percentage").tag(MixerMenuBarIcon.volumePercent)

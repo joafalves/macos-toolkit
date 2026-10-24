@@ -1,34 +1,40 @@
 import SwiftUI
 
-/// The "Mouse" section. The mouse chosen in the header is the one
-/// every control below it edits.
+/// The "Mouse" section: the list of mice and the settings for all of them,
+/// or, once one is clicked, that mouse's own page, as System Settings does
+/// for a Bluetooth device.
 struct MouseSettingsView: View {
     @ObservedObject var mouse: MouseController
 
     var body: some View {
-        Page {
-            ToolHeader(section: .mouse, subtitle: "Cursor and wheel settings for each mouse.", enabled: $mouse.config.enabled)
-
-            WhenEnabled(enabled: mouse.config.enabled) {
-                if let device = mouse.devices.first(where: { $0.id == mouse.selectedID }) {
-                    DeviceHeader(mouse: mouse, device: device)
-                    ProfileEditor(mouse: mouse, device: device)
-                } else {
-                    EmptyState()
+        Group {
+            if mouse.config.enabled, let device = mouse.devices.first(where: { $0.id == mouse.openID }) {
+                Page {
+                    MousePage(mouse: mouse, device: device)
                 }
+            } else {
+                Page {
+                    ToolHeader(section: .mouse, subtitle: "Cursor and wheel settings for each mouse.", enabled: $mouse.config.enabled,
+                               menuBar: MenuBarSwitch(isOn: $mouse.config.menuBarIcon, caption: "A click shows each mouse and its charge."))
 
-                Card(title: "All Mice") {
-                    ToggleRow(title: "Restore macOS behavior on quit",
-                              caption: "When off, cursor settings stay applied after the app quits, until the mouse reconnects.",
-                              isOn: $mouse.config.restoreOnQuit)
-                    RowDivider()
-                    ToggleRow(title: "Show all pointing devices",
-                              caption: "Also list trackpads and keyboards that report a pointer.",
-                              isOn: $mouse.config.showAllPointingDevices)
+                    WhenEnabled(enabled: mouse.config.enabled) {
+                        MiceList(mouse: mouse)
+
+                        Card(title: "All Mice") {
+                            ToggleRow(title: "Restore macOS behavior on quit",
+                                      caption: "When off, cursor settings stay applied after the app quits, until the mouse reconnects.",
+                                      isOn: $mouse.config.restoreOnQuit)
+                            RowDivider()
+                            ToggleRow(title: "Show all pointing devices",
+                                      caption: "Also list trackpads and keyboards that report a pointer.",
+                                      isOn: $mouse.config.showAllPointingDevices)
+                        }
+                    }
                 }
-                .padding(.top, 6)
             }
         }
+        // Coming back to the section starts at the list.
+        .onDisappear { if !mouse.isPreview { mouse.openID = nil } }
     }
 }
 
@@ -74,6 +80,52 @@ private struct AutoscrollExceptions: View {
     }
 }
 
+/// Every mouse the toolkit knows: those connected, then those it keeps
+/// settings for while they're away. A click on one opens its page.
+private struct MiceList: View {
+    @ObservedObject var mouse: MouseController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Mice").font(.headline)
+                Spacer()
+                Button {
+                    mouse.refresh(force: false)
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .controlSize(.small)
+                .help("Look for connected mice again")
+            }
+            .padding(.leading, 2)
+
+            Card(footnote: mouse.devices.isEmpty ? nil : "Click a mouse to change its settings.") {
+                if mouse.devices.isEmpty {
+                    EmptyState()
+                } else {
+                    // As tall as its rows up to five, then it scrolls, with
+                    // half the sixth showing there's more.
+                    ViewThatFits(in: .vertical) {
+                        rows
+                        ScrollView { rows }
+                    }
+                    .frame(maxHeight: 5.5 * (MouseRow.height + 1))
+                }
+            }
+        }
+    }
+
+    private var rows: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(mouse.devices.enumerated()), id: \.element.id) { index, device in
+                if index > 0 { RowDivider() }
+                MouseRow(mouse: mouse, device: device)
+            }
+        }
+    }
+}
+
 private struct EmptyState: View {
     var body: some View {
         VStack(spacing: 8) {
@@ -84,82 +136,158 @@ private struct EmptyState: View {
             Text("Connect a mouse to set it up.").foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 36)
+        .padding(.vertical, 28)
     }
 }
 
-/// Shows which mouse is being edited, and lets you switch to another.
-private struct DeviceHeader: View {
-    @ObservedObject var mouse: MouseController
+/// Whether a mouse is connected, and how.
+struct MouseConnection: View {
     let device: MouseDevice
+    var font: Font = .caption
 
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Menu {
-                    ForEach(mouse.devices) { other in
-                        Button {
-                            mouse.selectedID = other.id
-                        } label: {
-                            if other.id == device.id {
-                                Label(mouse.label(for: other), systemImage: "checkmark")
-                            } else {
-                                Text(mouse.label(for: other))
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 5) {
-                        Text(device.name).font(.title3.weight(.semibold))
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .help("Choose which mouse to edit")
-
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(device.connected ? Color.green : Color.secondary.opacity(0.5))
-                        .frame(width: 7, height: 7)
-                    Text(device.connected ? "Connected · \(Self.shortTransport(device.transport))" : "Not connected")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer(minLength: 0)
-
-            if let level = mouse.battery(for: device) {
-                HStack(spacing: 5) {
-                    Image(systemName: Self.batterySymbol(level))
-                    Text("\(level)%").monospacedDigit()
-                }
-                .font(.callout)
-                .foregroundStyle(level <= 20 ? Color.red : Color.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.primary.opacity(0.07), in: Capsule())
-                .help("Battery level")
-            }
+        HStack(spacing: 5) {
+            Circle()
+                .fill(device.connected ? Color.green : Color.secondary.opacity(0.5))
+                .frame(width: 6, height: 6)
+            Text(device.connected ? "Connected · \(MouseController.shortTransport(device.transport))" : "Not connected")
+                .font(font)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
     }
+}
 
-    private static func shortTransport(_ transport: String) -> String {
-        transport.hasPrefix("Bluetooth") ? "Bluetooth" : transport
+/// A mouse's charge, red when it's low.
+struct MouseBattery: View {
+    let level: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: Self.symbol(level))
+            Text(verbatim: "\(level)%").monospacedDigit()
+        }
+        .font(.caption)
+        .foregroundStyle(level <= 20 ? Color.red : Color.primary)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(Color.primary.opacity(0.07), in: Capsule())
+        .help("Battery level")
     }
 
-    private static func batterySymbol(_ level: Int) -> String {
+    private static func symbol(_ level: Int) -> String {
         switch level {
         case ..<13: return "battery.0percent"
         case ..<38: return "battery.25percent"
         case ..<63: return "battery.50percent"
         case ..<88: return "battery.75percent"
         default: return "battery.100percent"
+        }
+    }
+}
+
+/// One mouse in the list, the whole row a button to its page, lit while
+/// the pointer is on it.
+private struct MouseRow: View {
+    /// Fixed, so the list knows how tall five are.
+    static let height: CGFloat = 54
+    @ObservedObject var mouse: MouseController
+    let device: MouseDevice
+    @StateObject private var hovered = ViewState(false)
+
+    var body: some View {
+        Button {
+            mouse.openID = device.id
+        } label: {
+            HStack(spacing: 12) {
+                IconTile(symbol: AppSection.mouse.symbol, color: device.connected ? AppSection.mouse.color : .gray, size: 30)
+                    .opacity(device.connected ? 1 : 0.6)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(verbatim: mouse.label(for: device))
+                        .font(.body.weight(.medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    MouseConnection(device: device)
+                }
+                Spacer(minLength: 0)
+                if let level = mouse.battery(for: device) {
+                    MouseBattery(level: level)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(hovered.value ? .secondary : .tertiary)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: Self.height)
+            .background(hovered.value ? Color.primary.opacity(0.05) : Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered.value = $0 }
+        .help("Show this mouse's settings")
+    }
+}
+
+/// One mouse's page: back to the list, its name, its settings, and what
+/// can be done with it.
+private struct MousePage: View {
+    @ObservedObject var mouse: MouseController
+    let device: MouseDevice
+    @StateObject private var renaming = ViewState(false)
+    @StateObject private var newName = ViewState("")
+    @StateObject private var forgetting = ViewState(false)
+
+    var body: some View {
+        // As System Settings heads a device's page: the toolbar has its name,
+        // and the card on top says what it is and how it's doing.
+        HStack(spacing: 12) {
+            IconTile(symbol: AppSection.mouse.symbol, color: device.connected ? AppSection.mouse.color : .gray, size: 40)
+                .opacity(device.connected ? 1 : 0.6)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(verbatim: mouse.label(for: device))
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                MouseConnection(device: device, font: .subheadline)
+            }
+            Spacer(minLength: 0)
+            if let level = mouse.battery(for: device) {
+                MouseBattery(level: level)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
+
+        ProfileEditor(mouse: mouse, device: device)
+
+        HStack(spacing: 10) {
+            Button("Reset to macOS") { mouse.reset(device) }
+                .disabled(mouse.profile(for: device).isAllMacOS)
+            Button("Rename…") {
+                newName.value = device.name
+                renaming.value = true
+            }
+            Spacer()
+            Button("Forget This Mouse…", role: .destructive) { forgetting.value = true }
+                .disabled(mouse.config.profiles[device.id] == nil)
+        }
+        .alert("Rename Mouse", isPresented: $renaming.value) {
+            TextField("Name", text: $newName.value)
+            Button("Rename") { mouse.rename(device, to: newName.value) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Leave it empty for the name macOS gives it, \(mouse.systemName(of: device)).")
+        }
+        .confirmationDialog(Text("Forget \(mouse.label(for: device))?"), isPresented: $forgetting.value) {
+            Button("Forget", role: .destructive) {
+                mouse.openID = nil
+                mouse.forget(device)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(device.connected ? "Its settings go back to macOS's." : "Its settings go back to macOS's, and it leaves this list.")
         }
     }
 }
@@ -233,7 +361,7 @@ private struct ProfileEditor: View {
                         Text("Shape")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Picker("Shape", selection: p.scrollCurve) {
+                        Picker("Shape", selection: p.scrollCurve.afterUpdate) {
                             Text("Linear").tag(ScrollCurve.linear)
                             Text("Curve").tag(ScrollCurve.curve)
                         }
@@ -266,12 +394,5 @@ private struct ProfileEditor: View {
             }
         }
 
-        HStack(spacing: 10) {
-            Button("Reset \(device.name) to macOS") { p.wrappedValue.resetToMacOS() }
-                .disabled(p.wrappedValue.isAllMacOS)
-            if !device.connected {
-                Button("Forget This Mouse", role: .destructive) { mouse.forget(device) }
-            }
-        }
     }
 }

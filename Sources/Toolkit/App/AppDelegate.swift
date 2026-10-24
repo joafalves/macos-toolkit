@@ -73,6 +73,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             awake.$session.sink { _ in redraw() },
             awake.$minute.sink { _ in redraw() },
             stats.$config.sink { _ in redraw() },
+            mouse.$config.sink { _ in redraw() },
+            layout.$config.sink { _ in redraw() },
             stats.live.$tick.sink { _ in redraw() },
             model.$general.sink { [weak self] general in
                 self?.menuBar.spacing = general.menuBarSpacing
@@ -195,6 +197,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 break
             }
         }
+        if mouse.config.enabled, mouse.config.menuBarIcon {
+            segments.append(MenuBarSegment(kind: .mouse, glyph: MenuBarArt.glyph(AppSection.mouse.symbol), label: AppSection.mouse.title))
+        }
+        if layout.config.enabled, layout.config.menuBarIcon {
+            segments.append(MenuBarSegment(kind: .layout, glyph: MenuBarArt.glyph(AppSection.layout.symbol), label: AppSection.layout.title))
+        }
         // In the order set in Settings; each tool's own parts stay together.
         let order = model.general.menuBarOrder
         segments = order.flatMap { tool in segments.filter { $0.kind.tool == tool } }
@@ -233,6 +241,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             popUp(menu, from: .recording, at: rect)
         case .awake:
             showAwake(from: .awake)
+        case .mouse:
+            showMouse(from: .mouse)
+        case .layout:
+            showLayout(from: .layout)
         case .mixer:
             if mixerPopover != nil {
                 mixerPopover?.performClose(nil)
@@ -263,6 +275,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }
     }
 
+    /// The mice and their charge, read afresh; one opens its own page.
+    private func showMouse(from kind: MenuBarSegment.Kind) {
+        mouse.refresh(force: false)
+        panel.show(from: kind) {
+            MousePanelView(mouse: mouse, open: { [weak self] device in
+                self?.panel.close()
+                self?.mouse.openID = device.id
+                self?.show(.mouse)
+            }) { [weak self] in
+                self?.panel.close()
+                self?.mouse.openID = nil
+                self?.show(.mouse)
+            }
+        }
+    }
+
+    /// For the app in front as the panel opens: the panel doesn't take the
+    /// focus, so its window is still the one acted on once it closes.
+    private func showLayout(from kind: MenuBarSegment.Kind) {
+        let front = NSWorkspace.shared.frontmostApplication
+        let app = front.map { ($0.localizedName ?? "", $0.icon ?? NSImage()) }
+        panel.show(from: kind) {
+            LayoutPanelView(layout: layout, app: app, run: { [weak self] command in
+                self?.panel.close()
+                // Once the panel has gone, as after a shortcut.
+                DispatchQueue.main.async { self?.layout.perform(command) }
+            }) { [weak self] in
+                self?.panel.close()
+                self?.show(.layout)
+            }
+        }
+    }
+
     /// As the item's own menu, so macOS keeps the item lit while it's open.
     private func popUp(_ menu: NSMenu, from kind: MenuBarSegment.Kind, at rect: NSRect) {
         menuBar.open(menu, for: kind)
@@ -286,7 +331,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 self?.panel.close()
                 self?.showMixer(from: .toolkit)
             },
-            openAwake: { [weak self] in self?.showAwake(from: .toolkit) })
+            openAwake: { [weak self] in self?.showAwake(from: .toolkit) },
+            openMouse: { [weak self] in self?.showMouse(from: .toolkit) },
+            openLayout: { [weak self] in self?.showLayout(from: .toolkit) })
         panel.show(from: .toolkit) {
             ToolkitPanelView(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder,
                              capture: capture, awake: awake, stats: stats, actions: actions)
@@ -440,10 +487,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private func show(_ section: AppSection) {
         model.section = section
         if window == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)))
-            window.title = "MacOS Toolkit"
-            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-            window.setContentSize(NSSize(width: 780, height: 640))
+            let window = MainWindow.make(MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats))
+            window.setContentSize(NSSize(width: 860, height: 640))
             window.isReleasedWhenClosed = false
             window.delegate = self
             window.center()
@@ -484,7 +529,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             self.show(.mouse)
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                 note("settings window open")
-                weak var closed = self.window
+                weak let closed = self.window
                 self.window?.close()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
                     note("after closing it")

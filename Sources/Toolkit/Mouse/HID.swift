@@ -3,13 +3,54 @@ import IOKit
 import IOKit.hid
 import IOKit.hidsystem
 
-/// What a saved profile is keyed by: the mouse model plus how it is connected.
+/// What a saved profile is keyed by: the mouse itself, so two of the same
+/// model each have their own, and one keeps its own on the cable too.
 struct MouseIdentity: Hashable {
     let vendorID: Int
     let productID: Int
     let transport: String
+    /// The mouse's Bluetooth address, which it also reports over USB, or else
+    /// its serial number. Nil for a mouse with neither.
+    let unit: String?
+    /// What the charge in the power-source registry is listed under: the
+    /// address over Bluetooth, the serial number over USB.
+    let batteryIDs: Set<String>
 
-    var key: String { "\(vendorID):\(productID):\(transport)" }
+    var key: String { unit.map { "unit:\($0)" } ?? modelKey }
+    /// The model plus how it is connected: the key before 0.20.0, and still
+    /// the one for a mouse that has no address or serial number.
+    var modelKey: String { "\(vendorID):\(productID):\(transport)" }
+
+    /// From a device's or a service's properties, which hold the same keys,
+    /// and its place in the I/O Registry, where the rest is.
+    init?(_ prop: (String) -> Any?, entry: io_registry_entry_t) {
+        guard let vendor = (prop(kIOHIDVendorIDKey) as? NSNumber)?.intValue,
+              let product = (prop(kIOHIDProductIDKey) as? NSNumber)?.intValue
+        else { return nil }
+        vendorID = vendor
+        productID = product
+        transport = prop(kIOHIDTransportKey) as? String ?? "Unknown"
+        // Over Bluetooth the serial number is the address.
+        let ids = HID.ids(of: entry)
+        let serial = ids.serial.flatMap(Self.normalized)
+        let address = ids.address.flatMap(Self.normalized)
+        unit = address ?? serial
+        batteryIDs = Set([address, serial].compactMap { $0 })
+    }
+
+    /// One spelling for an address however it's written ("7c-f3-…" over USB,
+    /// "7C:F3:…" over Bluetooth and in the power-source registry).
+    static func normalized(_ id: String) -> String? {
+        let trimmed = id.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? nil : trimmed.uppercased().replacingOccurrences(of: "-", with: ":")
+    }
+
+    /// The end of the address or serial number, to tell apart two mice
+    /// with the same name.
+    var shortUnit: String? {
+        guard let unit else { return nil }
+        return unit.contains(":") ? unit.split(separator: ":").suffix(2).joined(separator: ":") : String(unit.suffix(4))
+    }
 }
 
 /// One HID event service belonging to a pointing device. Pointer speed and
@@ -74,19 +115,18 @@ enum HID {
             guard isMouse || isPointer else { return nil }
 
             func prop(_ key: String) -> Any? { IOHIDServiceClientCopyProperty(service, key as CFString) }
-            guard let vendor = (prop(kIOHIDVendorIDKey) as? NSNumber)?.intValue,
-                  let product = (prop(kIOHIDProductIDKey) as? NSNumber)?.intValue
-            else { return nil }
-            let transport = prop(kIOHIDTransportKey) as? String ?? "Unknown"
+            let registryID = (IOHIDServiceClientGetRegistryID(service) as? NSNumber)?.uint64Value ?? 0
+            let entry = IOServiceGetMatchingService(kIOMainPortDefault, IORegistryEntryIDMatching(registryID))
+            defer { IOObjectRelease(entry) }
+            guard let identity = MouseIdentity(prop, entry: entry) else { return nil }
             let name = prop(kIOHIDProductKey) as? String ?? String(localized: "Mouse")
             let builtIn = (prop(kIOHIDBuiltInKey) as? NSNumber)?.boolValue ?? false
             let isTrackpad = (prop("HIDPointerAccelerationType") as? String) == "HIDTrackpadAcceleration"
-            let registryID = (IOHIDServiceClientGetRegistryID(service) as? NSNumber)?.uint64Value ?? 0
 
             return PointerService(
                 client: service,
                 registryID: registryID,
-                identity: MouseIdentity(vendorID: vendor, productID: product, transport: transport),
+                identity: identity,
                 name: name,
                 looksLikeMouse: !builtIn && !isTrackpad && !nameLooksLikeKeyboard(name)
             )
@@ -98,6 +138,34 @@ enum HID {
     static func nameLooksLikeKeyboard(_ name: String) -> Bool {
         let lower = name.lowercased()
         return ["keyboard", "keys", "keypad", "numpad"].contains { lower.contains($0) }
+    }
+
+    /// Walks up from a HID service (or device) to the serial number of its
+    /// HID device and, for a mouse on its cable, on to its USB device, under
+    /// which Apple's mice also report their Bluetooth address. No further:
+    /// above are hubs, or over Bluetooth a node every device shares, whose
+    /// numbers aren't the mouse's.
+    static func ids(of entry: io_registry_entry_t) -> (serial: String?, address: String?) {
+        guard entry != 0 else { return (nil, nil) }
+        var serial: String?
+        var current = entry
+        IOObjectRetain(current)
+        defer { IOObjectRelease(current) }
+        for _ in 0..<8 {
+            if serial == nil, IOObjectConformsTo(current, kIOHIDDeviceKey) != 0 {
+                serial = IORegistryEntryCreateCFProperty(current, kIOHIDSerialNumberKey as CFString, nil, 0)?.takeRetainedValue() as? String
+            }
+            if IOObjectConformsTo(current, "IOUSBHostDevice") != 0 {
+                let address = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "DeviceAddress" as CFString, nil,
+                                                              IOOptionBits(kIORegistryIterateRecursively)) as? String
+                return (serial, address)
+            }
+            var parent: io_registry_entry_t = 0
+            guard IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent) == KERN_SUCCESS else { break }
+            IOObjectRelease(current)
+            current = parent
+        }
+        return (serial, nil)
     }
 
     static func globalDefault(_ key: String) -> Double? {
@@ -138,14 +206,11 @@ final class ActivityMonitor {
     private func added(_ device: IOHIDDevice) {
         defer { onDevicesChanged?() }
         func prop(_ key: String) -> Any? { IOHIDDeviceGetProperty(device, key as CFString) }
-        guard let vendor = (prop(kIOHIDVendorIDKey) as? NSNumber)?.intValue,
-              let product = (prop(kIOHIDProductIDKey) as? NSNumber)?.intValue
-        else { return }
+        guard let identity = MouseIdentity(prop, entry: IOHIDDeviceGetService(device)) else { return }
         let builtIn = (prop(kIOHIDBuiltInKey) as? NSNumber)?.boolValue ?? false
         let name = prop(kIOHIDProductKey) as? String ?? ""
         guard !builtIn, !HID.nameLooksLikeKeyboard(name) else { return }
 
-        let identity = MouseIdentity(vendorID: vendor, productID: product, transport: prop(kIOHIDTransportKey) as? String ?? "Unknown")
         guard IOHIDDeviceOpen(device, IOOptionBits(kIOHIDOptionsTypeNone)) == kIOReturnSuccess else {
             listeningDenied = true
             return

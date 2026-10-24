@@ -51,10 +51,25 @@ struct MainView: View {
         }
     }
 
+    @StateObject private var navigator = Navigator()
+    @StateObject private var swipes = SwipeNavigation()
+
+    /// What's shown: the section, and on Mouse the mouse whose page is open.
+    private var place: Place {
+        let section = model.section ?? .welcome
+        return Place(section: section, mouse: section == .mouse ? mouse.openID : nil)
+    }
+
+    /// The section's name, beside back and forward; on a mouse's page, what
+    /// the page is, as its card names the mouse.
+    private var title: String {
+        place.mouse == nil ? place.section.title : String(localized: "Mouse Settings")
+    }
+
     var body: some View {
-        // A plain split rather than NavigationSplitView: that one runs the
-        // sidebar up into the title bar, leaving the bar two-toned.
-        HStack(spacing: 0) {
+        // As System Settings: the sidebar runs the window's full height, and
+        // the toolbar over the page has back, forward and the page's title.
+        NavigationSplitView {
             List(selection: $model.section) {
                 // Overview and the app's own settings, then the tools.
                 SidebarRow(section: .welcome).tag(AppSection.welcome)
@@ -72,12 +87,14 @@ struct MainView: View {
                 ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0)).tag($0) }
             }
             .listStyle(.sidebar)
-            .frame(width: 200)
-
-            Divider()
-
+            // Wide enough for the longest name, in Portuguese too. The column
+            // width alone isn't kept in a window that isn't a SwiftUI scene.
+            .frame(minWidth: 230)
+            .navigationSplitViewColumnWidth(230)
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
             Group {
-                switch model.section ?? .welcome {
+                switch place.section {
                 case .welcome: WelcomeView(model: model, mouse: mouse, mixer: mixer, capture: capture, enabled: enabled,
                                             switcherShortcut: switcher.config.shortcut.active?.display ?? "⌘Tab")
                 case .mouse: MouseSettingsView(mouse: mouse)
@@ -93,8 +110,44 @@ struct MainView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .toolbar {
+                ToolbarItemGroup(placement: .navigation) {
+                    Button(action: goBack) { Image(systemName: "chevron.left") }
+                        .help("Back")
+                        .keyboardShortcut("[", modifiers: .command)
+                        .disabled(navigator.back.isEmpty)
+                    Button(action: goForward) { Image(systemName: "chevron.right") }
+                        .help("Forward")
+                        .keyboardShortcut("]", modifiers: .command)
+                        .disabled(navigator.forward.isEmpty)
+                }
+            }
         }
-        .frame(minWidth: 720, minHeight: 560)
+        .navigationTitle(title)
+        // A window that isn't a SwiftUI scene doesn't take the title from it,
+        // so it's set here; the toolbar shows it beside back and forward.
+        .background(WindowTitle(title: title))
+        .frame(minWidth: 760, minHeight: 560)
+        .onAppear {
+            navigator.moved(to: place)
+            swipes.start(back: goBack, forward: goForward)
+        }
+        .onDisappear { swipes.stop() }
+        .onChange(of: place) { _, place in navigator.moved(to: place) }
+    }
+
+    private func goBack() {
+        if let place = navigator.goBack() { go(to: place) }
+    }
+
+    private func goForward() {
+        if let place = navigator.goForward() { go(to: place) }
+    }
+
+    /// The mouse first: the Mouse page shows whichever is open as it appears.
+    private func go(to place: Place) {
+        mouse.openID = place.mouse
+        model.section = place.section
     }
 }
 
@@ -116,8 +169,10 @@ private struct GeneralView: View {
         case .toolkit: return .always
         case .stats: return .shown(stats.config.enabled && !stats.config.shown.isEmpty)
         case .capture: return capture.config.enabled ? .shown(capture.config.standaloneIcon) : .toolOff
-        case .awake: return awake.config.enabled ? .shown(awake.config.menuBarIcon != .none) : .toolOff
-        case .mixer: return mixer.config.enabled ? .shown(mixer.config.menuBarIcon != .none) : .toolOff
+        case .awake: return awake.config.enabled ? .shown(awake.config.inMenuBar) : .toolOff
+        case .mixer: return mixer.config.enabled ? .shown(mixer.config.inMenuBar) : .toolOff
+        case .mouse: return mouse.config.enabled ? .shown(mouse.config.menuBarIcon) : .toolOff
+        case .layout: return layout.config.enabled ? .shown(layout.config.menuBarIcon) : .toolOff
         }
     }
 
@@ -132,8 +187,10 @@ private struct GeneralView: View {
                 stats.config.set(.memory) { $0.shown = true }
             }
         case .capture: capture.config.standaloneIcon = shown
-        case .awake: awake.config.menuBarIcon = shown ? awake.config.shownIcon : .none
-        case .mixer: mixer.config.menuBarIcon = shown ? mixer.config.shownIcon : .none
+        case .awake: awake.config.inMenuBar = shown
+        case .mixer: mixer.config.inMenuBar = shown
+        case .mouse: mouse.config.menuBarIcon = shown
+        case .layout: layout.config.menuBarIcon = shown
         }
     }
 

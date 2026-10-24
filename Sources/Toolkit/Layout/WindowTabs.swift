@@ -244,7 +244,7 @@ final class WindowTabs {
                 window.setFrame(frame, within: area, afterDrag: member == raising)
                 labels[member.id] = Self.label(member, window)
             }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [self] in
                 // Done moving them: a move from here on is someone else's,
                 // after the notifications of the last of ours have come in.
                 let settled = Date().addingTimeInterval(0.5)

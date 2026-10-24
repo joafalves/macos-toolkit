@@ -2,7 +2,7 @@ import Foundation
 
 /// What can have a place in the menu bar item, in the order it's set.
 enum MenuBarTool: String, Codable, CaseIterable {
-    case toolkit, stats, capture, awake, mixer
+    case toolkit, stats, capture, awake, mixer, mouse, layout
 
     /// The order before it could be set.
     static let defaultOrder: [MenuBarTool] = allCases

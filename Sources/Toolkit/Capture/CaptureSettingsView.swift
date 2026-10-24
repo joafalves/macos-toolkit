@@ -31,7 +31,9 @@ struct CaptureSettingsView: View {
 
     var body: some View {
         Page {
-            ToolHeader(section: .capture, subtitle: "Screenshots and small screen recordings.", enabled: $capture.config.enabled)
+            ToolHeader(section: .capture, subtitle: "Screenshots and small screen recordings.", enabled: $capture.config.enabled,
+                       menuBar: MenuBarSwitch(isOn: $capture.config.standaloneIcon,
+                                              caption: "A click opens the capture toolbar."))
 
             if capture.config.enabled, !capture.screenPermission {
                 Banner(text: "Screen Capture needs the Screen Recording permission. macOS asks for it once; after that it's in System Settings, under Privacy & Security.",
@@ -75,12 +77,6 @@ struct CaptureSettingsView: View {
                                     shortcut: $capture.config.textShortcut, defaultValue: CaptureConfig.defaultTextShortcut,
                                     taken: others(than: capture.config.textShortcut))
                     }
-                }
-
-                Card(title: "Menu Bar") {
-                    ToggleRow(title: "In the menu bar",
-                              caption: "A camera in the toolkit's menu bar item opens the toolbar with one click. While recording, the stop button is there either way.",
-                              isOn: $capture.config.standaloneIcon)
                 }
 
                 Card(title: "Screenshots") {

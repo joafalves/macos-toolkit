@@ -469,6 +469,12 @@ final class LayoutController: ObservableObject {
 
     // MARK: - Shortcuts
 
+    /// From the menu bar's panel, as the shortcut would.
+    func perform(_ command: LayoutKeys.Command) {
+        guard !isPreview, config.enabled else { return }
+        handle(command)
+    }
+
     private func handle(_ command: LayoutKeys.Command) {
         switch command {
         case .action(let action) where action.isTabs:

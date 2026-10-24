@@ -244,6 +244,8 @@ enum DragModifier: String, Codable, CaseIterable {
 struct LayoutConfig: Codable, Equatable {
     /// When off, no shortcuts, no snapping, and macOS's own tiling is back.
     var enabled = true
+    /// A part in the menu bar, whose panel places the front window.
+    var menuBarIcon = false
     /// Only the changed ones, by action; the rest are the defaults.
     var shortcuts: [String: Shortcut] = [:]
     var gridShortcut = Self.defaultGridShortcut
@@ -288,6 +290,7 @@ struct LayoutConfig: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        menuBarIcon = (try? c.decodeIfPresent(Bool.self, forKey: .menuBarIcon)) ?? false
         shortcuts = (try? c.decodeIfPresent([String: Shortcut].self, forKey: .shortcuts)) ?? [:]
         gridShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .gridShortcut)) ?? Self.defaultGridShortcut
         grids = (try? c.decodeIfPresent([String: GridSize].self, forKey: .grids)) ?? [:]

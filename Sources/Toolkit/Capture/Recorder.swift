@@ -317,6 +317,10 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
             for (input, output, label) in [(videoIn, videoOut as AVAssetReaderOutput, "video"), (audioIn, audioOut, "audio")] {
                 group.enter()
                 let pump = DispatchQueue(label: "dev.jalves.macos-toolkit.mix.\(label)")
+                // Each pair is handed to its own queue and touched only there
+                // until the group is done.
+                nonisolated(unsafe) let input = input
+                nonisolated(unsafe) let output = output
                 input.requestMediaDataWhenReady(on: pump) {
                     while input.isReadyForMoreMediaData {
                         guard let sample = output.copyNextSampleBuffer() else {
@@ -338,3 +342,8 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         }
     }
 }
+
+// SCStream calls the outputs on `queue`, where the recording's state lives.
+// What `start` sets up is only read there while the stream runs, and `stop`
+// reaches the rest through `queue` or `stopRequested`.
+extension Recorder: @unchecked Sendable {}

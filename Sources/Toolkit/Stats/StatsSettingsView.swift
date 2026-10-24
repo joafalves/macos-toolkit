@@ -19,7 +19,7 @@ struct StatsSettingsView: View {
                               options: [(.separate, "Separate"), (.compact, "Compact")])
                     RowDivider()
                     SettingRow(title: "Update every", caption: "Reading is cheap; this is how lively the numbers are.") {
-                        Picker("Update every", selection: $stats.config.interval) {
+                        Picker("Update every", selection: $stats.config.interval.afterUpdate) {
                             ForEach(StatsConfig.intervals, id: \.self) { Text("\(Int($0)) s").tag($0) }
                         }
                         .pickerStyle(.segmented)

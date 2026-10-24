@@ -63,8 +63,8 @@
     <td align="center" width="50%">
       <a href="#mouse">
         <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="docs/images/mouse-dark.png">
-          <img src="docs/images/mouse-light.png" width="380" alt="Mouse settings: cursor speed and acceleration, wheel direction, speed and smoothing">
+          <source media="(prefers-color-scheme: dark)" srcset="docs/images/mouse-device-dark.png">
+          <img src="docs/images/mouse-device-light.png" width="380" alt="Mouse settings: cursor speed and acceleration, wheel direction, speed and smoothing">
         </picture><br>
         <b>Mouse</b>
       </a>
@@ -162,8 +162,8 @@ every app that has sound gets its own slider.
 - **Reset** puts every app back to 100%, so they all follow the main volume again.
 - Volumes are remembered per app. Right-click an app to hide it until it plays again, or to
   **Exclude** it: excluded apps are left out of the mixer and always play at the main volume.
-- A place in the **menu bar**, one click away, set in the mixer's settings: none, the mixer glyph,
-  **Volume**, a speaker that follows the volume and shows when it's muted, **Volume and
+- A place in the **menu bar**, one click away, with **Show in the menu bar** at the top of its page,
+  in a look set in the options: the mixer glyph, **Volume**, a speaker that follows the volume and shows when it's muted, **Volume and
   percentage**, or **Volume pill**, a pill that fills with the volume like the battery, with the
   speaker and the number cut out of it. It starts on **Volume**.
 - **The volume keys** go through the mixer on every output while it's on, so they always behave the
@@ -322,6 +322,11 @@ Snaps the focused window to part of its display. Each key can be changed or clea
 | ⌃⌥⌘ ← → | Previous, next display. A snapped window stays snapped the same way |
 | ⌃⌥⌘D | Show the desktop, as with macOS's own gesture: every window slides aside, and the same keys (or a click on one) bring them back where they were, snapped ones still snapped |
 
+With **Show in the menu bar** on, its part of the menu bar opens a panel for the window in front:
+halves, quarters, thirds and maximize drawn as small screens, then Restore, the grid, Show the
+desktop and, with more than one display, the next display. The panel doesn't take the focus, so
+the window in front stays the one it acts on.
+
 The arrows go by where the window is, however it got there: a window you maximized yourself goes
 straight to the display above with ⌃⌥↑, and one already at the left half moves on to the display on
 the left with ⌃⌥←.
@@ -452,13 +457,22 @@ two would fight over the same keys and drags.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/mouse-dark.png">
-    <img src="docs/images/mouse-light.png" width="520" alt="Mouse settings: cursor speed and acceleration, wheel direction, speed, acceleration and smoothing">
+    <img src="docs/images/mouse-light.png" width="520" alt="The Mouse page: the list of mice with their connection and charge, and the settings for all mice">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mouse-device-dark.png">
+    <img src="docs/images/mouse-device-light.png" width="520" alt="One mouse's page: cursor speed and acceleration, wheel direction, distance and smoothing, and its buttons">
   </picture>
 </p>
 
 Every setting has a **macOS** choice, meaning the toolkit leaves that behaviour to System Settings.
-Profiles are per mouse, keyed by vendor ID, product ID and transport, so your settings come back as
-soon as the same mouse is connected.
+The page lists every mouse: those connected, with their charge, then those the toolkit keeps
+settings for while they're away. Click one for its own page, with its settings and buttons to reset,
+rename or forget it. Back in the toolbar, ⌘[ or a two-finger swipe to the right goes back to the
+list. With **Show in the menu bar** on, its part of the menu bar
+opens a panel with each connected mouse and its charge; a mouse there opens its page. Settings are per mouse, by its Bluetooth address or serial number, so two of the same
+model each have their own, and an Apple mouse keeps its settings on its cable. They come back as
+soon as the mouse is connected again.
 
 | Setting | Options | How |
 | --- | --- | --- |
@@ -578,7 +592,8 @@ changed or cleared in the settings, and ⌃ added to the display or area shortcu
   `~/Movies/Capture` (or a folder you pick) and put on the clipboard as a file, ready to paste.
 - The toolbar remembers the last area. The toolkit's own toolbar, outline and thumbnails never show
   up in a capture.
-- Optionally gets a **camera in the menu bar**, which opens the toolbar.
+- Optionally gets a **camera in the menu bar** (**Show in the menu bar** at the top of its page),
+  which opens the toolbar.
 - **Text** (off until **Copy text from the screen** is turned on): ⇧⌘2 copies the text in the area
   you drag out, or in the window you click, to the clipboard. A sentence that wraps on screen comes
   out whole, a gap between paragraphs becomes a blank line, lists and lines of code keep their
@@ -613,9 +628,10 @@ set. The panel shows the session, turned on or off with a click anywhere on it, 
 the usual lengths are a click each, with the rest under More, and Until sets an end time a quarter
 of an hour at a time. Keep the display on and Stay available are switches at the bottom. A session carries on if the app is restarted or the Mac reboots, until its time is up.
 
-- **In the menu bar** it's a cup. While a session is on it becomes a **pill that empties as the time
-  runs out**, with the time left in it (full, with no time, when it has no end), the cup with the
-  time beside it, or only the cup, filled while it's on. With none, it sits in the toolkit panel: the cup turns it on or off, its name opens its panel. **Count up with no end**, off by
+- **In the menu bar** (**Show in the menu bar** at the top of its page) it's a cup. While a session
+  is on it becomes a **pill that empties as the time runs out**, with the time left in it (full, with
+  no time, when it has no end), the cup with the time beside it, or only the cup, filled while it's
+  on, as picked in its options. Not in the menu bar, it sits in the toolkit panel: the cup turns it on or off, its name opens its panel. **Count up with no end**, off by
   default, shows how long a session with no end has been on instead.
 - **Keep the display on** is the default. Turned off, only the Mac stays awake: the display sleeps,
   and downloads and long jobs go on.
@@ -736,9 +752,11 @@ To remove it, quit the app, delete it from `/Applications`, and delete
   </picture>
 </p>
 
-The toolkit has one item in the menu bar. The toolkit's mark is always there, and Screen Capture, Keep
-Awake and the Audio Mixer join it when their settings put them in the menu bar, side by side with the same
-size and spacing and a hairline between them. While recording, Screen Capture's place shows a red
+The toolkit has one item in the menu bar. The toolkit's mark is always there, and System Stats, Screen
+Capture, Keep Awake, the Audio Mixer, Mouse and Window Layout join it when they're put there, side by side
+with the same size and spacing and a hairline between them. Each of those has **Show in the menu bar**
+at the top of its page, under its On switch, saying what a click on it does (System Stats is in the
+menu bar whenever it's on). While recording, Screen Capture's place shows a red
 stop button with the time and size. Each part opens its own menu or panel, and while one is open
 the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
 and other apps' icons can't end up between them. **Settings → Space between items** sets how far apart the parts sit, and **Order** which comes
@@ -748,13 +766,14 @@ each puts it in the menu bar or takes it out; a tool that's off opens its page i
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/toolkit-panel-dark.png">
-    <img src="docs/images/toolkit-panel-light.png" width="300" alt="The toolkit panel: Screen Capture, Audio Mixer and Keep Awake as tiles at the top, then every tool with a switch, two of them off, then Quit, About and Settings">
+    <img src="docs/images/toolkit-panel-light.png" width="300" alt="The toolkit panel: Screen Capture, Audio Mixer, Keep Awake, Mouse and Window Layout as icons at the top, then every tool with a switch, two of them off, then Quit, About and Settings">
   </picture>
 </p>
 
-The toolkit's mark opens its panel. At the top are the tools that have no part of their own in the
-menu bar: Screen Capture opens its toolbar (or stops a recording), the Audio Mixer opens the mixer,
-and Keep Awake's cup turns it on with no end, or off, while its name opens its panel for a set time.
+The toolkit's mark opens its panel. At the top, as a row of icons with their name and state on hover,
+are the tools that have no part of their own in the menu bar: Screen Capture opens its toolbar (or
+stops a recording), the Audio Mixer opens the mixer, Keep Awake's cup opens its panel (filled while
+it's on), and Mouse and Window Layout open their panels.
 Then every tool, with a switch that turns it on or off and leaves the panel open, so you can set
 several at once; a tool's name opens its settings. Quit, About and Settings are at the bottom.
 
@@ -765,6 +784,9 @@ The app is in English and Portuguese (Portugal). It follows the order of your la
 it too.
 
 ## Good to know
+
+- The settings window works like System Settings: back and forward in the toolbar retrace the
+  pages you've seen, as do ⌘[ and ⌘] and a two-finger swipe right or left on the trackpad.
 
 - It uses **private macOS APIs** (window discovery for the switcher, the permission check for the
   mixer, grouping helper processes under their app, switching off the system's ⌘Tab and screenshot

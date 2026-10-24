@@ -56,7 +56,13 @@ enum ScrollCurve: String, Codable, CaseIterable {
 /// Per-mouse settings. Every field defaults to "macOS", meaning the toolkit leaves
 /// that behaviour to System Settings.
 struct Profile: Codable, Equatable {
+    /// What macOS calls the mouse.
     var name: String
+    /// A name given to it in the toolkit, over `name`.
+    var label: String?
+    /// How it was connected, and the end of its address, to show while it's away.
+    var transport: String?
+    var shortUnit: String?
 
     // Cursor
     var cursorSpeedMode: ValueMode = .macOS
@@ -104,6 +110,9 @@ struct Profile: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Mouse"
+        label = try? c.decodeIfPresent(String.self, forKey: .label)
+        transport = try? c.decodeIfPresent(String.self, forKey: .transport)
+        shortUnit = try? c.decodeIfPresent(String.self, forKey: .shortUnit)
         cursorSpeedMode = try c.decodeIfPresent(ValueMode.self, forKey: .cursorSpeedMode) ?? .macOS
         // Kept to what the sliders offer: a value from a file edited by hand
         // or another version reaches the mouse's own settings.
@@ -188,15 +197,23 @@ struct Profile: Codable, Equatable {
             && !autoscroll
     }
 
+    /// Every setting back to macOS; which mouse it is, and its name, stay.
     mutating func resetToMacOS() {
-        self = Profile(name: name)
+        var reset = Profile(name: name)
+        reset.label = label
+        reset.transport = transport
+        reset.shortUnit = shortUnit
+        self = reset
     }
 }
 
 struct MouseConfig: Codable, Equatable {
     /// When off, every mouse is left to macOS, whatever its profile says.
     var enabled = true
-    /// Keyed by `MouseIdentity.key` (vendor:product:transport).
+    /// A part in the menu bar, whose panel lists the mice and their charge.
+    var menuBarIcon = false
+    /// Keyed by `MouseIdentity.key`: "unit:" and the mouse's address or serial
+    /// number, or vendor:product:transport for a mouse with neither.
     var profiles: [String: Profile] = [:]
     var restoreOnQuit = true
     var showAllPointingDevices = false
@@ -211,6 +228,7 @@ struct MouseConfig: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        menuBarIcon = (try? c.decodeIfPresent(Bool.self, forKey: .menuBarIcon)) ?? false
         profiles = try c.decodeIfPresent([String: Profile].self, forKey: .profiles) ?? [:]
         restoreOnQuit = try c.decodeIfPresent(Bool.self, forKey: .restoreOnQuit) ?? true
         showAllPointingDevices = try c.decodeIfPresent(Bool.self, forKey: .showAllPointingDevices) ?? false

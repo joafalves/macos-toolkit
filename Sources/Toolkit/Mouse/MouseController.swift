@@ -6,9 +6,15 @@ import IOKit.ps
 /// mouse is currently away.
 struct MouseDevice: Identifiable, Equatable {
     let id: String
+    /// What macOS calls it, or the name given in the toolkit.
     var name: String
     var transport: String
     var connected: Bool
+    /// The end of its address or serial number, for telling apart mice with
+    /// the same name.
+    var shortUnit: String?
+    /// What its charge is listed under (`MouseIdentity.batteryIDs`).
+    var batteryIDs: Set<String> = []
 }
 
 final class MouseController: ObservableObject {
@@ -22,9 +28,11 @@ final class MouseController: ObservableObject {
     }
 
     @Published private(set) var devices: [MouseDevice] = []
-    /// The mouse being edited in the settings window.
-    @Published var selectedID: String?
-    /// Battery charge (0...100) by "vendor:product", for mice that report one.
+    /// The mouse whose page is open in the settings window; nil for the list.
+    @Published var openID: String?
+    /// Battery charge (0...100), for mice that report one: by the identifier
+    /// the power-source registry gives (`MouseIdentity.batteryIDs`), and by
+    /// "vendor:product" for mice that have none.
     @Published private(set) var batteries: [String: Int] = [:]
     @Published private(set) var accessibilityGranted = false
     /// Accessibility is granted but macOS still refused the event tap; this
@@ -41,10 +49,12 @@ final class MouseController: ObservableObject {
     /// For `--snapshot`: a made-up mouse, with nothing read from or written
     /// to the real ones.
     private(set) var isPreview = false
+    /// For `--snapshot mouse device`: the made-up mouse's own page.
+    static var previewOpen = false
 
     static func preview() -> MouseController {
         let mouse = MouseController(preview: true)
-        let id = "1:2:Bluetooth Low Energy"
+        let id = "unit:00:00:00:00:00:01"
         var profile = Profile(name: "Wireless Mouse")
         profile.cursorSpeedMode = .custom
         profile.cursorSpeed = 1.2
@@ -53,9 +63,15 @@ final class MouseController: ObservableObject {
         profile.smoothScrolling = true
         mouse.config = MouseConfig()
         mouse.config.profiles[id] = profile
-        mouse.devices = [MouseDevice(id: id, name: "Wireless Mouse", transport: "Bluetooth Low Energy", connected: true)]
-        mouse.selectedID = id
-        mouse.batteries = ["1:2": 80]
+        mouse.config.profiles["unit:00:00:00:00:00:03"] = Profile(name: "Travel Mouse")
+        mouse.devices = [
+            MouseDevice(id: id, name: "Wireless Mouse", transport: "Bluetooth Low Energy", connected: true,
+                        shortUnit: "00:01", batteryIDs: ["00:00:00:00:00:01"]),
+            MouseDevice(id: "unit:00:00:00:00:00:02", name: "Wireless Mouse", transport: "USB", connected: true, shortUnit: "00:02"),
+            MouseDevice(id: "unit:00:00:00:00:00:03", name: "Travel Mouse", transport: "Bluetooth", connected: false, shortUnit: "00:03"),
+        ]
+        if previewOpen { mouse.openID = id }
+        mouse.batteries = ["00:00:00:00:00:01": 80]
         mouse.accessibilityGranted = true
         return mouse
     }
@@ -107,24 +123,26 @@ final class MouseController: ObservableObject {
     /// settings left on "macOS" are actively put back to the system value.
     func refresh(force: Bool) {
         services = HID.pointerServices().filter { $0.looksLikeMouse || config.showAllPointingDevices }
+        if adoptModelProfiles() { return }
 
         var list: [MouseDevice] = []
         for service in services where !list.contains(where: { $0.id == service.identity.key }) {
-            list.append(MouseDevice(id: service.identity.key, name: service.name, transport: service.identity.transport, connected: true))
+            let identity = service.identity
+            list.append(MouseDevice(id: identity.key, name: config.profiles[identity.key]?.label ?? service.name,
+                                    transport: identity.transport, connected: true,
+                                    shortUnit: identity.shortUnit, batteryIDs: identity.batteryIDs))
         }
         list.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         let away = config.profiles
             .filter { key, _ in !list.contains { $0.id == key } }
             .map { key, profile in
-                MouseDevice(id: key, name: profile.name, transport: key.split(separator: ":").dropFirst(2).joined(separator: ":"), connected: false)
+                MouseDevice(id: key, name: profile.label ?? profile.name, transport: profile.transport ?? Self.transport(inModelKey: key),
+                            connected: false, shortUnit: profile.shortUnit)
             }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         list += away
         if list != devices { devices = list }
-        if selectedID == nil || !list.contains(where: { $0.id == selectedID }) {
-            let first = list.first?.id
-            if selectedID != first { selectedID = first }
-        }
+        if let openID, !list.contains(where: { $0.id == openID }) { self.openID = nil }
         let levels = Self.batteryLevels()
         if levels != batteries { batteries = levels }
         updateWheelChoice()
@@ -155,34 +173,74 @@ final class MouseController: ObservableObject {
     }
 
     func profile(for device: MouseDevice) -> Profile {
-        config.profiles[device.id] ?? Profile(name: device.name)
+        config.profiles[device.id] ?? newProfile(for: device)
     }
 
     func setProfile(_ profile: Profile, for device: MouseDevice) {
         config.profiles[device.id] = profile
     }
 
-    func forget(_ device: MouseDevice) {
-        if config.profiles[device.id] != nil {
-            config.profiles[device.id]?.resetToMacOS()
-            config.profiles[device.id] = nil
-        }
+    /// A profile that leaves everything to macOS, with what's needed to list
+    /// the mouse while it's away.
+    private func newProfile(for device: MouseDevice) -> Profile {
+        var profile = Profile(name: services.first { $0.identity.key == device.id }?.name ?? device.name)
+        profile.transport = device.transport
+        profile.shortUnit = device.shortUnit
+        return profile
     }
 
-    /// Name for the picker; the connection is only spelled out when two
-    /// entries would otherwise read the same.
+    /// Every setting of the mouse back to macOS's; its name stays.
+    func reset(_ device: MouseDevice) {
+        config.profiles[device.id]?.resetToMacOS()
+    }
+
+    /// Puts the mouse back to macOS and drops what's saved for it. A connected
+    /// one stays in the list, with nothing changed.
+    func forget(_ device: MouseDevice) {
+        guard config.profiles[device.id] != nil else { return }
+        // Two steps: the reset is applied while the profile is still there.
+        config.profiles[device.id]?.resetToMacOS()
+        config.profiles[device.id] = nil
+    }
+
+    /// A name of its own for the mouse, or back to what macOS calls it when empty.
+    func rename(_ device: MouseDevice, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var profile = profile(for: device)
+        profile.label = trimmed.isEmpty || trimmed == profile.name ? nil : trimmed
+        config.profiles[device.id] = profile
+    }
+
+    /// The name macOS gives the mouse, under any the toolkit gave it.
+    func systemName(of device: MouseDevice) -> String {
+        config.profiles[device.id]?.name ?? device.name
+    }
+
+    /// Name for a list; the connection, and then the end of its address, are
+    /// only spelled out when two entries would otherwise read the same.
     func label(for device: MouseDevice) -> String {
         var label = device.name
-        if devices.filter({ $0.name == device.name }).count > 1 {
-            let transport = device.transport.hasPrefix("Bluetooth") ? "Bluetooth" : device.transport
-            label += " (\(transport))"
+        let same = devices.filter { $0.name == device.name && $0.id != device.id }
+        if !same.isEmpty {
+            if same.allSatisfy({ Self.shortTransport($0.transport) != Self.shortTransport(device.transport) }) {
+                label += " (\(Self.shortTransport(device.transport)))"
+            } else if let unit = device.shortUnit {
+                label += " (\(unit))"
+            }
         }
-        return device.connected ? label : String(localized: "\(label) — not connected")
+        return label
+    }
+
+    static func shortTransport(_ transport: String) -> String {
+        transport.hasPrefix("Bluetooth") ? "Bluetooth" : transport
     }
 
     func battery(for device: MouseDevice) -> Int? {
         guard device.connected else { return nil }
-        return batteries[device.id.split(separator: ":").prefix(2).joined(separator: ":")]
+        if let level = device.batteryIDs.lazy.compactMap({ self.batteries[$0] }).first { return level }
+        // A mouse with nothing of its own to go by, by its model.
+        guard device.batteryIDs.isEmpty, let model = services.first(where: { $0.identity.key == device.id })?.identity else { return nil }
+        return batteries["\(model.vendorID):\(model.productID)"]
     }
 
     /// Reads the charge of wireless accessories from the power-source registry,
@@ -195,14 +253,58 @@ final class MouseController: ObservableObject {
         var levels: [String: Int] = [:]
         for source in sources {
             guard let info = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue() as? [String: Any],
-                  let vendor = info["Vendor ID"] as? Int, let product = info["Product ID"] as? Int,
                   let current = info[kIOPSCurrentCapacityKey] as? Int
             else { continue }
             let max = info[kIOPSMaxCapacityKey] as? Int ?? 100
-            levels["\(vendor):\(product)"] = max > 0 ? current * 100 / max : current
+            let level = max > 0 ? current * 100 / max : current
+            // Over Bluetooth its address, over USB its serial number.
+            if let id = (info["Accessory Identifier"] as? String).flatMap(MouseIdentity.normalized) { levels[id] = level }
+            if let vendor = info["Vendor ID"] as? Int, let product = info["Product ID"] as? Int {
+                levels["\(vendor):\(product)"] = level
+            }
         }
         return levels
     }
+
+    /// Before 0.20.0, mice were saved by model and connection, so two of the
+    /// same shared one profile. A mouse now saved by its own address that has
+    /// none yet takes its model's, and once one has, the model's goes.
+    /// Returns true when it changed the config, which refreshes again.
+    private func adoptModelProfiles() -> Bool {
+        var profiles = config.profiles
+        var adopted: Set<String> = []
+        for service in services {
+            let identity = service.identity
+            guard identity.unit != nil, profiles[identity.key] == nil,
+                  var profile = profiles[identity.modelKey] else { continue }
+            profile.transport = identity.transport
+            profile.shortUnit = identity.shortUnit
+            profiles[identity.key] = profile
+            adopted.insert(identity.modelKey)
+        }
+        guard !adopted.isEmpty else { return false }
+        for key in adopted { profiles[key] = nil }
+        config.profiles = profiles
+        return true
+    }
+
+    /// The connection in a key saved by model ("vendor:product:transport").
+    private static func transport(inModelKey key: String) -> String {
+        key.split(separator: ":").dropFirst(2).joined(separator: ":")
+    }
+
+    #if TOOLKIT_DEV
+    /// `--list-mice`: what the Mouse tool sees, and what each is saved under.
+    static func dumpMice() {
+        let levels = batteryLevels()
+        for service in HID.pointerServices() {
+            let id = service.identity
+            let battery = id.batteryIDs.compactMap { levels[$0] }.first.map { "\($0)%" } ?? "-"
+            print("\(service.name) [\(id.transport)] mouse=\(service.looksLikeMouse) key=\(id.key) model=\(id.modelKey) battery=\(battery)")
+        }
+        print("saved: " + MouseConfig.load().profiles.keys.sorted().joined(separator: ", "))
+    }
+    #endif
 
     var connectedCount: Int { devices.filter(\.connected).count }
 

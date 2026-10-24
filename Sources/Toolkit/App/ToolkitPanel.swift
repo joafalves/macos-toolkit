@@ -9,6 +9,9 @@ struct ToolkitPanelActions {
     var openMixer: () -> Void = {}
     /// Keep Awake's own panel, for its lengths.
     var openAwake: () -> Void = {}
+    /// The Mouse and Window Layout panels, as their own parts open them.
+    var openMouse: () -> Void = {}
+    var openLayout: () -> Void = {}
 }
 
 /// The panel the toolkit's mark opens: up top, the tools that have no part
@@ -53,9 +56,12 @@ struct ToolkitPanelView: View {
             }
             let modules = self.modules
             if !modules.isEmpty {
-                HStack(spacing: 8) {
+                // Icons only, in one row: the name and how it is are in the
+                // tooltip, so many fit.
+                HStack(spacing: 10) {
                     ForEach(modules) { ModuleTile(module: $0) }
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.bottom, 12)
             }
             HStack(alignment: .firstTextBaseline) {
@@ -149,6 +155,16 @@ struct ToolkitPanelView: View {
                                   action: { [awake] in awake.isOn ? awake.turnOff() : awake.turnOn(for: nil) },
                                   more: actions.openAwake))
         }
+        if mouse.config.enabled, !mouse.config.menuBarIcon {
+            // The lowest charge, the one to keep an eye on.
+            let levels = mouse.devices.filter(\.connected).compactMap { mouse.battery(for: $0) }
+            modules.append(Module(id: "mouse", symbol: AppSection.mouse.symbol, title: AppSection.mouse.title, detail: levels.min().map { "\($0)%" },
+                                  tint: AppSection.mouse.color, lit: false, action: actions.openMouse))
+        }
+        if layout.config.enabled, !layout.config.menuBarIcon {
+            modules.append(Module(id: "layout", symbol: AppSection.layout.symbol, title: AppSection.layout.title, detail: nil,
+                                  tint: AppSection.layout.color, lit: false, action: actions.openLayout))
+        }
         return modules
     }
 
@@ -172,46 +188,26 @@ private struct Module: Identifiable {
     var more: (() -> Void)?
 }
 
-/// A tile like Control Center's: a circle to click, the name and a word on
-/// how it is under it.
+/// A round icon to click, filled with its colour while on or under way; its
+/// name and how it is show on hover. One with more to it (Keep Awake's
+/// lengths) opens that, where its switch also is.
 private struct ModuleTile: View {
     let module: Module
+    @StateObject private var hovered = ViewState(false)
 
     var body: some View {
-        VStack(spacing: 4) {
-            Button(action: module.action) {
-                Circle()
-                    .fill(module.lit ? AnyShapeStyle(module.tint.gradient) : AnyShapeStyle(Color.primary.opacity(0.09)))
-                    .frame(width: 26, height: 26)
-                    .overlay(Image(systemName: module.symbol)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(module.lit ? AnyShapeStyle(.white) : AnyShapeStyle(module.tint)))
-            }
-            .buttonStyle(.plain)
-            Button(action: module.more ?? module.action) {
-                VStack(spacing: 1) {
-                    HStack(spacing: 2) {
-                        // Two lines for a long name in another language, rather than cut.
-                        Text(module.title).lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.85)
-                        if module.more != nil {
-                            Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary)
-                        }
-                    }
-                    .font(.caption.weight(.medium))
-                    Text(module.detail ?? " ")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+        Button(action: module.more ?? module.action) {
+            Circle()
+                .fill(module.lit ? AnyShapeStyle(module.tint.gradient) : AnyShapeStyle(Color.primary.opacity(hovered.value ? 0.14 : 0.09)))
+                .frame(width: 36, height: 36)
+                .overlay(Image(systemName: module.symbol)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(module.lit ? AnyShapeStyle(.white) : AnyShapeStyle(module.tint)))
         }
-        .padding(.vertical, 7)
-        .padding(.horizontal, 4)
-        .frame(maxWidth: .infinity)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .buttonStyle(.plain)
+        .onHover { hovered.value = $0 }
+        .help(module.detail.map { "\(module.title): \($0)" } ?? module.title)
+        .accessibilityLabel(module.title)
     }
 }
 

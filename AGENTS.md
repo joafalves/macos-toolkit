@@ -205,6 +205,7 @@ swift build                                  # compile check
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
 ./scripts/build.sh --dev [--install]         # with the development flags, for the tests run through the app bundle
 .build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general] [light]
+.build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
@@ -215,6 +216,8 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
 .build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power ...] [light]
 .build/debug/Toolkit --snapshot out.png toolkit-panel [light]   # the panel the toolkit's mark opens, from the tools' previews
+.build/debug/Toolkit --snapshot out.png mouse-panel [light]     # the Mouse panel, with the made-up mice
+.build/debug/Toolkit --snapshot out.png layout-panel [light]    # the Window Layout panel, for a TextEdit window
 .build/debug/Toolkit --snapshot out.png awake-panel [light] [off]   # Keep Awake's panel, part way through a session or off
 .build/debug/Toolkit --snapshot out.png menu-bar-strip [light]  # the item in a drawn menu bar, for the top of the README
 .build/debug/Toolkit --snapshot out.png layout-grid [light]     # the Window Layout grid over a drawn desktop
@@ -257,6 +260,8 @@ swift build                                  # compile check
 .build/debug/Toolkit --list-suggestions [file]  # per display, what Window Layout would offer for the rest
 .build/debug/Toolkit --dump-menus <app> [file]  # an app's menu items with key equivalents and identifiers
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
+.build/debug/Toolkit --list-mice             # the mice the Mouse tool sees, what each is saved under, and its charge
+.build/debug/Toolkit --test-publishing       # each control on the made-up mouse's page, changed in code in a window never shown: no SwiftUI publishing-in-update issue, and the setting changes
 .build/debug/Toolkit --test-audio-access <report>   # the microphone and an audio tap work as signed (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-volume           # the volume keys' steps, and saved software volumes on the even scale
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
@@ -273,6 +278,13 @@ python3 scripts/strings.py update            # adds the missing keys to the tabl
 python3 scripts/strings.py audit             # literals that look shown but are never looked up (noisy)
 "build/MacOS Toolkit.app/Contents/MacOS/Toolkit" --snapshot out.png general -AppleLanguages '(pt-PT)'  # a page in Portuguese (after build.sh --dev: the tables are in the bundle)
 ```
+
+`Package.swift` links with `-platform_version macos 15.0 27.0`: the Command Line Tools otherwise
+record the deployment target as the SDK, and macOS then draws the app in its pre-26 style (old window
+buttons, toolbar, sidebar and controls). Keep the second number at the SDK in use. Window snapshots
+(`--snapshot` of a page) are taken with `screencapture -l` of a window ordered in far off screen,
+since the sidebar and toolbar are glass the window server draws; that needs Screen Recording for
+whatever runs it.
 
 There is no test suite. Check UI changes by rendering `--snapshot` images in both light and dark and
 looking at them (in Portuguese too, where words run longer), and check behaviour by running the installed app. Keep idle CPU near zero: a hidden

@@ -61,6 +61,14 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeStatsPanel(to: rest[0], light: rest.contains("light"), kinds: kinds.isEmpty ? StatKind.allCases : kinds)
         exit(0)
     }
+    if rest.contains("mouse-panel") {
+        Snapshot.writeMousePanel(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
+    if rest.contains("layout-panel") {
+        Snapshot.writeLayoutPanel(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
     if rest.contains("awake-panel") {
         Snapshot.writeAwakePanel(to: rest[0], light: rest.contains("light"), off: rest.contains("off"))
         exit(0)
@@ -101,8 +109,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeCaptureToolbar(to: rest[0], light: rest.contains("light"), video: rest.contains("video"))
         exit(0)
     }
-    // `layout tabs` or `layout keyboard`: that tab of the Window Layout page.
+    // `layout tabs` or `layout keyboard`: that tab of the Window Layout page;
+    // `mouse device`: the made-up mouse's own page.
     CaptureController.previewText = rest.contains("text")
+    MouseController.previewOpen = rest.contains("device")
     LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
     Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"))
     exit(0)
@@ -145,6 +155,21 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-audio-access"), Comma
 }
 if CommandLine.arguments.contains("--list-audio") {
     MixerController.dumpApps()
+    exit(0)
+}
+
+// Development aid: `--test-publishing` changes the Mouse page's controls, as
+// a click would, in a window that's never shown, and reports SwiftUI's
+// "Publishing changes from within view updates" for each.
+if CommandLine.arguments.contains("--test-publishing") {
+    PublishingProbe.run()
+    exit(0)
+}
+
+// Development aid: `--list-mice` prints the mice the Mouse tool sees, with
+// what each is keyed by and its charge.
+if CommandLine.arguments.contains("--list-mice") {
+    MouseController.dumpMice()
     exit(0)
 }
 

@@ -8,17 +8,36 @@ enum Snapshot {
         model.persists = false
         model.general = GeneralConfig()
         model.section = section
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController.preview(), switcher: SwitcherController.preview(), layout: LayoutController.preview(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview(), awake: AwakeController.preview(), stats: StatsController.preview())))
-        window.title = "MacOS Toolkit"
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        let window = MainWindow.make(MainView(model: model, mouse: MouseController.preview(), switcher: SwitcherController.preview(), layout: LayoutController.preview(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview(), awake: AwakeController.preview(), stats: StatsController.preview()))
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
-        window.setContentSize(NSSize(width: 780, height: 760))
+        window.setContentSize(NSSize(width: 860, height: 760))
         onRetina(window)
+        // The sidebar's glass shows what's behind the window, and off screen
+        // that's nothing: the window's own background stands in for a desktop.
+        window.isOpaque = true
+        window.backgroundColor = .windowBackgroundColor
+        // In, but far off any screen: the toolbar and its title are only
+        // drawn as they look for a window that's shown.
+        window.setFrameOrigin(NSPoint(x: -30000, y: -30000))
+        window.orderFrontRegardless()
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(1.0))
 
+        // The sidebar and toolbar are glass, which the window server draws,
+        // not the views: macOS's own capture of the window has them.
+        if capture(window, to: path) { return }
         guard let view = window.contentView?.superview ?? window.contentView else { return }
         save(view, to: path)
+    }
+
+    /// The window as the window server shows it, without its shadow.
+    private static func capture(_ window: NSWindow, to path: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        process.arguments = ["-x", "-o", "-l", String(window.windowNumber), path]
+        guard (try? process.run()) != nil else { return false }
+        process.waitUntilExit()
+        return process.terminationStatus == 0 && FileManager.default.fileExists(atPath: path)
     }
 
     /// The window switcher's list, or with `grid` its previews, filled with
@@ -324,6 +343,31 @@ enum Snapshot {
         let awake = AwakeController.preview()
         if off { awake.turnOff() }
         let host = NSHostingController(rootView: AwakePanelView(awake: awake).background(Color(nsColor: .windowBackgroundColor)))
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.borderless]
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.setContentSize(host.view.fittingSize)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        if let view = window.contentView { save(view, to: path) }
+    }
+
+    /// The Mouse panel, with the made-up mice.
+    static func writeMousePanel(to path: String, light: Bool) {
+        writePanel(MousePanelView(mouse: .preview()), to: path, light: light)
+    }
+
+    /// The Window Layout panel, for a window of TextEdit (macOS's own, the
+    /// same on any Mac), with two displays so every command shows.
+    static func writeLayoutPanel(to path: String, light: Bool) {
+        let icon = NSWorkspace.shared.icon(forFile: "/System/Applications/TextEdit.app")
+        writePanel(LayoutPanelView(layout: .preview(), app: ("TextEdit", icon)), to: path, light: light)
+    }
+
+    private static func writePanel(_ panel: some View, to path: String, light: Bool) {
+        _ = NSApplication.shared
+        let host = NSHostingController(rootView: panel.background(Color(nsColor: .windowBackgroundColor)))
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.borderless]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)

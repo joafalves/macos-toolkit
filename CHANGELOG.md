@@ -3,6 +3,39 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.20.0 (unreleased)
+
+### Added
+
+- **Menu bar:** Mouse and Window Layout can have a part in the menu bar too. Mouse's panel lists each
+  connected mouse with its charge and opens its settings. Window Layout's places the window in front
+  (halves, quarters, thirds, maximize), restores it, opens the grid, shows the desktop, or moves it to
+  the next display.
+- **Mouse:** the page lists every mouse, connected ones first, with its charge and a Refresh button
+  to look for them again. Clicking one opens its own page, with its settings and buttons to reset,
+  rename or forget it; forgetting puts it back to macOS's settings.
+
+### Changed
+
+- **All tools:** the app looks as apps built for the current macOS do: the settings window, its
+  toolbar and sidebar, the panels and the controls. The build named an old macOS as the one it was
+  made for, so macOS drew everything in the style from before macOS 26.
+- **Settings:** the window is laid out like System Settings: the sidebar runs its full height, and
+  the toolbar has back and forward beside the page's title. They retrace every page shown, from the
+  sidebar, a link or the menu bar, as do ⌘[ and ⌘] and a two-finger swipe right or left.
+- **Menu bar:** every tool that can be in the menu bar has **Show in the menu bar** in the same place,
+  under its On switch at the top of its page, with what a click on it does. Keep Awake and the Audio
+  Mixer keep their look in their options; Screen Capture's Menu Bar section is gone.
+- **Menu bar:** the toolkit panel's quick tools are a row of icons, with the name and how it is on
+  hover, so more fit. Keep Awake's opens its panel, where its switch is.
+
+### Fixed
+
+- **Mouse:** two mice of the same model are told apart, each with its own settings and charge. They
+  were one entry, and one's settings went to both. A mouse is known by its Bluetooth address or
+  serial number now, so an Apple mouse keeps its settings on its cable too. Settings saved for a
+  model go to each mouse of it connected the first time the app starts after the update.
+
 ## 0.19.4 (2026-10-24)
 
 ### Fixed

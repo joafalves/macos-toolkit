@@ -49,7 +49,7 @@ final class SwitcherPreviews {
                 for await (id, image) in group {
                     guard !Task.isCancelled else { return }
                     guard let image else { continue }
-                    await MainActor.run {
+                    await MainActor.run { [weak self] in
                         self?.cache[id] = image
                         self?.onUpdate?(id, image)
                     }
