@@ -44,6 +44,13 @@ struct PanelFooter: View {
     }
 }
 
+extension NSEvent {
+    /// In one of Screen Capture's windows (its overlay, toolbar or thumbnail).
+    /// A panel from the menu bar stays open through them, as it's often what's
+    /// being captured, and leaves them their Esc.
+    var inCapturePanel: Bool { window is CapturePanel }
+}
+
 extension NSPopover {
     /// A popover's window is a panel that activates the app when clicked in,
     /// and an active app brings every one of its windows forward: a click in
@@ -144,6 +151,7 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
             monitors.append(monitor)
         }
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown], handler: { [weak self] event in
+            if event.inCapturePanel { return event }
             if event.type == .keyDown, event.keyCode == 53 {
                 close()
                 return nil
