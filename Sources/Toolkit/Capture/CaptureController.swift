@@ -347,9 +347,10 @@ final class CaptureController: ObservableObject {
 
     // MARK: - Screenshots
 
-    /// Our capture windows, kept out of every capture.
+    /// Our capture windows, kept out of every capture: those on screen, and
+    /// those just hidden, which may not be gone from it yet.
     private var ownWindows: Set<CGWindowID> {
-        Set(NSApp.windows.compactMap { $0 is CapturePanel && $0.isVisible ? $0.windowID : nil })
+        Set(NSApp.windows.compactMap { $0 is CapturePanel && $0.isVisible ? $0.windowID : nil }).union(CapturePanel.lingering)
     }
 
     private func takeScreenshot(_ target: CaptureTarget, copy: Bool, screen: NSScreen?) {

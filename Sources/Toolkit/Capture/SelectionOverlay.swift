@@ -32,6 +32,22 @@ class CapturePanel: NSPanel {
     }
 
     override func cancelOperation(_ sender: Any?) {}
+
+    /// When each panel was last taken off screen. The window server can still
+    /// show it for a moment, and a capture made right after (the toolbar's
+    /// Capture closes the overlay first) took the area's knobs along with it.
+    private static var hidden: [CGWindowID: Date] = [:]
+
+    /// Panels hidden in the last second, to leave out of a capture as well.
+    static var lingering: Set<CGWindowID> {
+        hidden = hidden.filter { Date().timeIntervalSince($0.value) < 1 }
+        return Set(hidden.keys)
+    }
+
+    override func orderOut(_ sender: Any?) {
+        if isVisible, let id = windowID { Self.hidden[id] = Date() }
+        super.orderOut(sender)
+    }
 }
 
 /// Picks what to capture: an area dragged out, a window clicked, or a whole
@@ -101,9 +117,13 @@ final class SelectionOverlay {
         updateHover()
         redraw()
         cursorUpdate()
-        // Moves over the toolbar may go to the toolbar or to us, depending on
-        // macOS; either way the cursor is decided in one place.
-        let follow: (NSEvent) -> Void = { [weak self] _ in self?.cursorUpdate() }
+        // The app being captured keeps focus, so most moves go to it, and only
+        // some reach the overlay's own views: every move, wherever it went,
+        // moves the coordinates, and the cursor is decided in one place.
+        let follow: (NSEvent) -> Void = { [weak self] event in
+            if event.type == .mouseMoved { self?.mouseMoved(to: NSEvent.mouseLocation) }
+            self?.cursorUpdate()
+        }
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: { follow($0); return $0 }) {
             moveMonitors.append(local)
         }
@@ -304,7 +324,9 @@ final class SelectionOverlay {
         }
     }
 
+    /// From the overlay's views and from the monitors, often for the same move.
     fileprivate func mouseMoved(to point: NSPoint) {
+        guard point != mouse else { return }
         mouse = point
         updateHover()
         if mode == .area { redraw() }

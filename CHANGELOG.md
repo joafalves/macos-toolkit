@@ -3,6 +3,15 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.19.4 (unreleased)
+
+### Fixed
+
+- **Screen Capture:** the coordinates beside the pointer follow it as it moves. They lagged behind
+  and caught up only every few seconds, since most moves go to the app being captured.
+- **Screen Capture:** a shot taken with the toolbar's Capture no longer shows the area's knobs and
+  outline along its edges.
+
 ## 0.19.3 (2026-10-24)
 
 ### Changed
