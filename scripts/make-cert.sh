@@ -3,8 +3,8 @@
 # permissions across rebuilds (ad-hoc signatures change on every build, which
 # makes TCC forget the app). Installed copies only take updates signed with it.
 #
-# It goes in a keychain of its own, with its own password, kept locked except
-# while build.sh signs (scripts/signing.sh). An identity already in the login
+# It goes in a keychain of its own, with its own password, which build.sh
+# unlocks for a day at a time (scripts/signing.sh). An identity already in the login
 # keychain, as this script used to put it, is moved there: the same
 # certificate and key, so installed copies and their permissions keep working.
 # macOS asks for the login password to let it out, and it's taken out of the
@@ -88,13 +88,13 @@ CNF
 fi
 
 if [[ ! -f "$SIGNING_KEYCHAIN" ]]; then
-  echo "Choose a password for the signing keychain (build.sh asks for it at each build)."
+  echo "Choose a password for the signing keychain (build.sh asks for it about once a day)."
   security create-keychain "$SIGNING_KEYCHAIN"
 else
   security unlock-keychain "$SIGNING_KEYCHAIN"
 fi
-# Locks itself after 5 minutes and when the Mac sleeps, should a build not lock it.
-security set-keychain-settings -l -u -t 300 "$SIGNING_KEYCHAIN"
+# Locks itself after a day without a build.
+security set-keychain-settings -u -t "$SIGNING_UNLOCKED_FOR" "$SIGNING_KEYCHAIN"
 security import "$TMP/id.p12" -k "$SIGNING_KEYCHAIN" -P "$PASS" -T /usr/bin/codesign
 NEW="$(sha1 "$SIGNING_KEYCHAIN")"
 security lock-keychain "$SIGNING_KEYCHAIN"

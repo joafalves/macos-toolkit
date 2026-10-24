@@ -60,7 +60,6 @@ codesign --force --sign "$IDENTITY" ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} --options 
   --entitlements Resources/FinderExtension/FinderExtension.entitlements "$APPEX"
 codesign --force --sign "$IDENTITY" ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} --options runtime --identifier "$BUNDLE_ID" \
   --entitlements Resources/Toolkit.entitlements "$APP"
-signing_end
 echo "Built $APP$($DEV && echo " (dev build, with the development flags)")"
 
 if $INSTALL; then

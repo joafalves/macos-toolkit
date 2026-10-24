@@ -58,7 +58,7 @@ tool; keep it in step with the code.
 - `CHANGELOG.md`: what each version adds, changes and fixes (see Versions and releases).
 - `LICENSE`: the Apache License 2.0, unchanged; the copyright line is in the README and on About.
 - `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `signing.sh` (unlocks its keychain
-  for `build.sh` and `test-update.sh`), `test-update.sh` (the updater
+  for `build.sh` and `test-update.sh`, for a day), `test-update.sh` (the updater
   against made-up releases), `test-persist.sh` (snaps kept across restarts), `strings.py` (the translations'
   check), `make-icon.swift` (the app icon;
   `KitIcon` in `Components.swift` and `MenuBarArt.toolkit` draw it too, keep them in step).
@@ -184,8 +184,9 @@ tool; keep it in step with the code.
   (`pluginkit -e use -i dev.jalves.macos-toolkit.finder`, which the Finder page's button runs).
   The app is signed with a local self-signed identity (`MacOS Toolkit Dev`) so macOS keeps the grants
   across rebuilds; ad-hoc signing makes macOS forget them. The identity is in a keychain of its own
-  (`~/Library/Keychains/macos-toolkit-signing.keychain-db`), with its own password, locked except
-  while `build.sh` signs: anything that can sign with it gets the toolkit's permissions, and installed
+  (`~/Library/Keychains/macos-toolkit-signing.keychain-db`), with its own password, which `build.sh`
+  asks for when it's locked; it then stays unlocked until 24 hours pass without a build
+  (`scripts/signing.sh`). Anything that can sign with it gets the toolkit's permissions, and installed
   copies take updates signed with it. Never make a new one: every installed copy would refuse its
   updates, and macOS would forget the grants.
 - **Development flags** (`--test-*`, `--list-*`, `--dump-*`, `--snapshot`, `--measure-idle`, the

@@ -706,7 +706,7 @@ already works).
 ```bash
 git clone https://github.com/joafalves/macos-toolkit.git && cd macos-toolkit
 ./scripts/make-cert.sh          # once per Mac: a local signing identity, in a keychain of its own with its own password, so macOS keeps the permissions across rebuilds
-./scripts/build.sh --install    # builds, copies to /Applications and launches (asks for that keychain's password)
+./scripts/build.sh --install    # builds, copies to /Applications and launches (asks for that keychain's password about once a day)
 ```
 
 To update later: `git pull && ./scripts/build.sh --install`.
