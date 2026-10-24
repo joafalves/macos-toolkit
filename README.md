@@ -1,18 +1,17 @@
-<h1 align="center">
+<h1>
   <img src="Resources/AppIcon-preview.png" width="112" alt=""><br>
   MacOS Toolkit
 </h1>
 
-<p align="center">
-  <b>The little things macOS never shipped, in one menu bar app.</b><br>
-  A volume slider for every app. A ⌘Tab that lists windows. Windows snapped to halves or a grid,
-  from the keyboard or by dragging. Mouse settings that stick, per mouse.
-  ⌘X, swipe back and forward, and a better right-click menu in Finder. Screenshots and small screen recordings on ⇧⌘3/4/5, and the text on screen with ⇧⌘2 if you like.
-  A Mac that stays awake for as long as you need. CPU, memory and more in the menu bar, with memory that
-  means something.
-</p>
+**The little things macOS never shipped, in one menu bar app.**
 
-<p align="center">
+A volume slider for every app. A ⌘Tab that lists windows. Windows snapped to halves or a grid,
+from the keyboard or by dragging. Mouse settings that stick, per mouse.
+⌘X, swipe back and forward, and a better right-click menu in Finder. Screenshots and small screen
+recordings on ⇧⌘3/4/5, and the text on screen with ⇧⌘2 if you like. A Mac that stays awake for as
+long as you need. CPU, memory and more in the menu bar, with memory that means something.
+
+<p>
   <a href="https://github.com/joafalves/macos-toolkit/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/joafalves/macos-toolkit?label=release&color=3478f6"></a>
   <img alt="macOS 15 or later" src="https://img.shields.io/badge/macOS-15%2B-555">
   <img alt="Swift, no dependencies" src="https://img.shields.io/badge/Swift-no%20dependencies-f05138">
