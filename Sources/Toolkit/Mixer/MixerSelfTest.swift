@@ -1,3 +1,5 @@
+import AppKit
+import AVFoundation
 import CoreAudio
 import Foundation
 
@@ -101,5 +103,67 @@ extension MixerController {
             }
         }
         print("     no built-in output with a volume of its own here, so nothing to compare with")
+    }
+}
+
+extension MixerController {
+    /// `--test-audio-access <report>`: what the hardened runtime could block.
+    /// A listening tap on everything (nothing is muted) and two seconds of
+    /// a small area recorded with the microphone, which is then deleted. Run
+    /// the app bundle with `open -n`, so the permissions are the app's own.
+    static func accessTest(into path: String) {
+        _ = NSApplication.shared
+        var lines = ["microphone: \(AVCaptureDevice.authorizationStatus(for: .audio).rawValue) (3 = allowed), "
+            + "screen recording: \(CGPreflightScreenCaptureAccess()), system audio: \(AudioPermission.status)"]
+        let output = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown
+        if let uid = output.readString(kAudioDevicePropertyDeviceUID),
+           let tap = AppTap(objects: [], deviceUID: uid, gain: 1, controlsVolume: false, isGlobal: true) {
+            RunLoop.main.run(until: Date().addingTimeInterval(2))
+            lines.append("tap: started, loudest \(String(format: "%.3f", tap.takePeak())) (0 when nothing plays)")
+        } else {
+            lines.append("tap: FAILED (see the log for the step)")
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("toolkit-access-\(UUID().uuidString).mp4")
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            defer { try? FileManager.default.removeItem(at: url); done.signal() }
+            do {
+                let recorder = Recorder(url: url)
+                try await recorder.start(.area(CGRect(x: 0, y: 0, width: 64, height: 64)), options: .init(frameRate: 15, microphone: true), excluding: [])
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+                let saved = await recorder.stop()
+                let asset = AVURLAsset(url: url)
+                let tracks = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
+                lines.append("microphone recording: saved \(saved), \(tracks.count) audio track(s), "
+                    + "loudest \(String(format: "%.4f", tracks.first.map { loudest(in: asset, track: $0) } ?? 0)) (0 is silence: blocked)")
+            } catch {
+                lines.append("microphone recording: FAILED \(error.localizedDescription)")
+            }
+        }
+        while done.wait(timeout: .now()) == .timedOut { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+        try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8)
+    }
+
+    /// The loudest sample in an audio track: a microphone that's blocked still
+    /// gives a track, of silence.
+    private static func loudest(in asset: AVAsset, track: AVAssetTrack) -> Float {
+        guard let reader = try? AVAssetReader(asset: asset) else { return 0 }
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false,
+        ])
+        reader.add(output)
+        reader.startReading()
+        var peak: Float = 0
+        while let sample = output.copyNextSampleBuffer(), let block = CMSampleBufferGetDataBuffer(sample) {
+            var length = 0
+            var data: UnsafeMutablePointer<CChar>?
+            guard CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: &length, dataPointerOut: &data) == noErr,
+                  let data else { continue }
+            data.withMemoryRebound(to: Float.self, capacity: length / 4) { floats in
+                for i in 0..<length / 4 { peak = max(peak, abs(floats[i])) }
+            }
+        }
+        return peak
     }
 }

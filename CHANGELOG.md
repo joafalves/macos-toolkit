@@ -3,6 +3,15 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.19.2 (unreleased)
+
+### Fixed
+
+- **Security:** other apps on this Mac can no longer use the toolkit's permissions (Accessibility,
+  Screen Recording, the microphone) to capture the screen, read window titles or send input. The
+  development flags that allowed it are left out of released builds, and the app is signed with
+  macOS's hardened runtime, which keeps other processes from loading code into it.
+
 ## 0.19.1 (2026-10-24)
 
 ### Fixed

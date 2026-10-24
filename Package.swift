@@ -8,6 +8,9 @@ let package = Package(
         .executableTarget(
             name: "Toolkit",
             path: "Sources/Toolkit",
+            // The development flags (main.swift): in debug builds, and in
+            // `build.sh --dev`, which passes it itself. Never in a release.
+            swiftSettings: [.define("TOOLKIT_DEV", .when(configuration: .debug))],
             // SkyLight is private; the window switcher uses it to focus single windows.
             linkerSettings: [.unsafeFlags(["-F/System/Library/PrivateFrameworks", "-framework", "SkyLight"])]
         ),

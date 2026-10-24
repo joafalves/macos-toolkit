@@ -705,8 +705,8 @@ already works).
 
 ```bash
 git clone https://github.com/joafalves/macos-toolkit.git && cd macos-toolkit
-./scripts/make-cert.sh          # once per Mac: a local signing identity, so macOS keeps the permissions across rebuilds
-./scripts/build.sh --install    # builds, copies to /Applications and launches
+./scripts/make-cert.sh          # once per Mac: a local signing identity, in a keychain of its own with its own password, so macOS keeps the permissions across rebuilds
+./scripts/build.sh --install    # builds, copies to /Applications and launches (asks for that keychain's password)
 ```
 
 To update later: `git pull && ./scripts/build.sh --install`.
@@ -794,12 +794,12 @@ Sources/Toolkit
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu
 Resources      Info.plist, the icon, and the translations (pt-PT.lproj)
-scripts        build.sh, make-cert.sh, make-icon.swift, strings.py, test-update.sh, test-persist.sh
+scripts        build.sh, signing.sh, make-cert.sh, make-icon.swift, strings.py, test-update.sh, test-persist.sh
 docs/images    the screenshots above
 ```
 
 What each version added and fixed is in [`CHANGELOG.md`](CHANGELOG.md). A tool is a controller plus a config, stored as JSON. [`AGENTS.md`](AGENTS.md) has the conventions,
-the dev flags (`--snapshot` renders any page to an image, `--list-windows` and `--list-audio` print
+the dev flags (only in dev builds, from `swift build` or `build.sh --dev`: `--snapshot` renders any page to an image, `--list-windows` and `--list-audio` print
 what the tools see, `--test-capture` runs the screenshot and recording code without the UI, `--test-layout` places a helper's windows), and how versions and releases are made.
 
 ## License

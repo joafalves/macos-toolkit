@@ -4,7 +4,12 @@ import Foundation
 /// (read at launch), the drag path's decisions are added to that file, from
 /// any thread. Off, and costing nothing, otherwise.
 enum LayoutTrace {
+    // Dev builds only: any process can set a default, and the trace names windows.
+    #if TOOLKIT_DEV
     private static let path = UserDefaults.standard.string(forKey: "layoutTrace")
+    #else
+    private static let path: String? = nil
+    #endif
     private static let queue = DispatchQueue(label: "dev.jalves.macos-toolkit.layout-trace")
 
     static func log(_ text: @autoclosure () -> String) {

@@ -19,6 +19,11 @@ if CommandLine.arguments.contains("--register-login-item") {
 
 AppLanguage.apply(GeneralConfig.load().language)
 
+// The development flags below are only in dev builds (`swift build`, or
+// `build.sh --dev`). Started through `open`, the app is the one macOS asks
+// about, so any process could use them to capture the screen, read window
+// titles or post input with the app's permissions, without a prompt.
+#if TOOLKIT_DEV
 // Development aid: `--snapshot <png> [section] [light]` renders the main window
 // to an image without showing it, so layout can be checked from the terminal.
 // `switcher-list` in place of a section renders the window switcher's list,
@@ -130,6 +135,12 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-update"), CommandLine
 // software volumes read onto the even scale.
 if CommandLine.arguments.contains("--test-volume") {
     MixerController.volumeTest()
+    exit(0)
+}
+// `--test-audio-access <report>`: the microphone and an audio tap work as
+// signed (the hardened runtime). Run the app bundle with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-audio-access"), CommandLine.arguments.count > flag + 1 {
+    MixerController.accessTest(into: CommandLine.arguments[flag + 1])
     exit(0)
 }
 if CommandLine.arguments.contains("--list-audio") {
@@ -316,6 +327,9 @@ if CommandLine.arguments.contains("--show-hud") {
 let measureIdlePath: String? = CommandLine.arguments.firstIndex(of: "--measure-idle").flatMap {
     CommandLine.arguments.count > $0 + 1 ? CommandLine.arguments[$0 + 1] : nil
 }
+#else
+let measureIdlePath: String? = nil
+#endif
 
 // A fresh install starts with every tool off, to be turned on as wanted.
 // Saved straight away, so it holds later; a Mac that has run the toolkit

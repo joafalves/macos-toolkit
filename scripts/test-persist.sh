@@ -2,11 +2,18 @@
 # Window Layout keeps what it snapped across a restart of the app: a quit,
 # a kill, and a crash (kill -9). Uses the installed app, which it restarts,
 # and a helper's windows, which it drags (leave the mouse alone).
-#   ./scripts/build.sh --install && ./scripts/test-persist.sh
+#   ./scripts/build.sh --dev --install && ./scripts/test-persist.sh
+# Then ./scripts/build.sh --install, so the dev build doesn't stay installed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 APP="build/MacOS Toolkit.app"
 INSTALLED="/Applications/MacOS Toolkit.app"
+# --test-persist and the trace are development flags, in both copies.
+for app in "$APP" "$INSTALLED"; do
+  if [[ "$(/usr/libexec/PlistBuddy -c "Print :ToolkitDev" "$app/Contents/Info.plist" 2>/dev/null)" != true ]]; then
+    echo "$app isn't a dev build: ./scripts/build.sh --dev --install first." >&2; exit 1
+  fi
+done
 BUNDLE_ID=dev.jalves.macos-toolkit
 OUT="$(mktemp -d -t macos-toolkit-persist-test)"
 TRACE="$OUT/trace.txt"

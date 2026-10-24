@@ -1,16 +1,28 @@
 #!/bin/bash
 # Builds "MacOS Toolkit.app" into ./build. Pass --install to copy it to
-# /Applications and (re)launch it.
+# /Applications and (re)launch it, and --dev for a build with the development
+# flags (main.swift), which the tests run through the app bundle need. Never
+# publish or keep one installed: any process can use those flags with the
+# app's permissions.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/signing.sh
 
-IDENTITY="${TOOLKIT_IDENTITY:-MacOS Toolkit Dev}"
+INSTALL=false DEV=false
+for arg in "$@"; do
+  case "$arg" in
+    --install) INSTALL=true ;;
+    --dev) DEV=true ;;
+    *) echo "usage: $0 [--dev] [--install]" >&2; exit 1 ;;
+  esac
+done
+
 BUNDLE_ID="dev.jalves.macos-toolkit"
 APP="build/MacOS Toolkit.app"
 APPEX="$APP/Contents/PlugIns/FinderExtension.appex"
 INSTALLED="/Applications/MacOS Toolkit.app"
 
-swift build -c release
+if $DEV; then swift build -c release -Xswiftc -DTOOLKIT_DEV; else swift build -c release; fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -23,6 +35,8 @@ if COMMIT="$(git rev-parse --short HEAD 2>/dev/null)"; then
   [ -n "$(git status --porcelain)" ] && MODIFIED=true || MODIFIED=false
   /usr/libexec/PlistBuddy -c "Add :ToolkitModified bool $MODIFIED" "$APP/Contents/Info.plist"
 fi
+# For the test scripts, which need the flags.
+$DEV && /usr/libexec/PlistBuddy -c "Add :ToolkitDev bool true" "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # The translations; English is the code's own text.
 cp -R Resources/*.lproj "$APP/Contents/Resources/"
@@ -38,17 +52,19 @@ for key in CFBundleShortVersionString CFBundleVersion; do
   /usr/libexec/PlistBuddy -c "Set :$key $value" "$APPEX/Contents/Info.plist"
 done
 
-if ! security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
-  echo "warning: identity '$IDENTITY' not found (run scripts/make-cert.sh); signing ad-hoc." >&2
-  IDENTITY="-"
-fi
-# Inside out: the extension first, since the app's signature covers it.
-codesign --force --sign "$IDENTITY" --identifier "$BUNDLE_ID.finder" \
+signing_start
+# Inside out: the extension first, since the app's signature covers it. The
+# hardened runtime keeps other processes from loading code into the app
+# (DYLD_INSERT_LIBRARIES, a debugger) and using its permissions.
+codesign --force --sign "$IDENTITY" ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} --options runtime --identifier "$BUNDLE_ID.finder" \
   --entitlements Resources/FinderExtension/FinderExtension.entitlements "$APPEX"
-codesign --force --sign "$IDENTITY" --identifier "$BUNDLE_ID" "$APP"
-echo "Built $APP"
+codesign --force --sign "$IDENTITY" ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} --options runtime --identifier "$BUNDLE_ID" \
+  --entitlements Resources/Toolkit.entitlements "$APP"
+signing_end
+echo "Built $APP$($DEV && echo " (dev build, with the development flags)")"
 
-if [[ "${1:-}" == "--install" ]]; then
+if $INSTALL; then
+  $DEV && echo "warning: installing a dev build: other processes can use its flags with the app's permissions. Install a plain build when done." >&2
   pkill -x Toolkit 2>/dev/null && sleep 0.5 || true
   rm -rf "$INSTALLED"
   ditto "$APP" "$INSTALLED"

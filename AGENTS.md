@@ -11,7 +11,8 @@ tool; keep it in step with the code.
   `FinderExtension` (a Finder Sync extension, linked with `NSExtensionMain` as its entry point).
 - Built with the Command Line Tools only (`swift build`), then wrapped into an app bundle by
   `scripts/build.sh`, which also puts the extension in `Contents/PlugIns` with the app's version and
-  signs it (sandboxed, with its entitlements) before the app. It also writes the short commit
+  signs it (sandboxed, with its entitlements) before the app, both with the hardened runtime
+  (`Resources/Toolkit.entitlements` has the microphone, which the runtime blocks otherwise). It also writes the short commit
   (`ToolkitCommit`, and `ToolkitModified` if the tree had changes) into the app's Info.plist for About. The app runs as an accessory (menu bar) app and only shows a Dock icon while its
   main window is open.
 - Uses private APIs on purpose: SkyLight and others for the Window Switcher, TCC for the audio
@@ -56,7 +57,8 @@ tool; keep it in step with the code.
   `replaceItemAt` and relaunched by a small shell that waits for this process to end.
 - `CHANGELOG.md`: what each version adds, changes and fixes (see Versions and releases).
 - `LICENSE`: the Apache License 2.0, unchanged; the copyright line is in the README and on About.
-- `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `test-update.sh` (the updater
+- `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `signing.sh` (unlocks its keychain
+  for `build.sh` and `test-update.sh`), `test-update.sh` (the updater
   against made-up releases), `test-persist.sh` (snaps kept across restarts), `strings.py` (the translations'
   check), `make-icon.swift` (the app icon;
   `KitIcon` in `Components.swift` and `MenuBarArt.toolkit` draw it too, keep them in step).
@@ -180,7 +182,17 @@ tool; keep it in step with the code.
   until it is turned on
   (`pluginkit -e use -i dev.jalves.macos-toolkit.finder`, which the Finder page's button runs).
   The app is signed with a local self-signed identity (`MacOS Toolkit Dev`) so macOS keeps the grants
-  across rebuilds; ad-hoc signing makes macOS forget them.
+  across rebuilds; ad-hoc signing makes macOS forget them. The identity is in a keychain of its own
+  (`~/Library/Keychains/macos-toolkit-signing.keychain-db`), with its own password, locked except
+  while `build.sh` signs: anything that can sign with it gets the toolkit's permissions, and installed
+  copies take updates signed with it. Never make a new one: every installed copy would refuse its
+  updates, and macOS would forget the grants.
+- **Development flags** (`--test-*`, `--list-*`, `--dump-*`, `--snapshot`, `--measure-idle`, the
+  `layoutTrace` default) are compiled in only with `TOOLKIT_DEV`: debug builds, and `build.sh --dev`.
+  Started through `open`, the app is the one macOS asks about, so in a released build any process
+  could use them to capture the screen or post input with the app's permissions. A new flag or
+  dev-only default goes inside `#if TOOLKIT_DEV`. Tests run through the app bundle need
+  `build.sh --dev` (and `--install` for the installed app's); install a plain build afterwards.
 
 ## Building and checking
 
@@ -188,6 +200,7 @@ tool; keep it in step with the code.
 swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
+./scripts/build.sh --dev [--install]         # with the development flags, for the tests run through the app bundle
 .build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general] [light]
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
@@ -241,6 +254,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --list-suggestions [file]  # per display, what Window Layout would offer for the rest
 .build/debug/Toolkit --dump-menus <app> [file]  # an app's menu items with key equivalents and identifiers
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
+.build/debug/Toolkit --test-audio-access <report>   # the microphone and an audio tap work as signed (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-volume           # the volume keys' steps, and saved software volumes on the even scale
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
 ```
@@ -254,7 +268,7 @@ happen, with `--test-snap` or by hand.
 python3 scripts/strings.py check             # every text has its pt-PT, none left over, the same %@ in each
 python3 scripts/strings.py update            # adds the missing keys to the tables, in English, to translate
 python3 scripts/strings.py audit             # literals that look shown but are never looked up (noisy)
-"build/MacOS Toolkit.app/Contents/MacOS/Toolkit" --snapshot out.png general -AppleLanguages '(pt-PT)'  # a page in Portuguese (after build.sh: the tables are in the bundle)
+"build/MacOS Toolkit.app/Contents/MacOS/Toolkit" --snapshot out.png general -AppleLanguages '(pt-PT)'  # a page in Portuguese (after build.sh --dev: the tables are in the bundle)
 ```
 
 There is no test suite. Check UI changes by rendering `--snapshot` images in both light and dark and
@@ -314,8 +328,9 @@ gh release create vX.Y.Z "MacOS-Toolkit-X.Y.Z.zip" --title "X.Y.Z" --notes-file 
 
 The installed apps update themselves from this: the zip must be named `MacOS-Toolkit-X.Y.Z.zip`,
 hold `MacOS Toolkit.app` at its top, and be built by `build.sh` with the `MacOS Toolkit Dev`
-identity. Check `codesign -dv` on the built app first: `build.sh` falls back to ad-hoc signing when
-the identity is missing, and an ad-hoc build is refused by every installed copy.
+identity, without `--dev`. Check `codesign -dv` on the built app first: `build.sh` falls back to
+ad-hoc signing when the identity is missing, and an ad-hoc build is refused by every installed copy;
+`flags=0x10000(runtime)` should show, and `ToolkitDev` must not be in its Info.plist.
 
 The release is named `X.Y.Z` with tag `vX.Y.Z`. Its notes are the version's `CHANGELOG.md` entry
 (without the heading), then the install block from the previous release (unzip into
