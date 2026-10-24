@@ -305,7 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private func showStats(_ kinds: [StatKind], from kind: MenuBarSegment.Kind) {
         stats.panel = kinds
         panel.show(from: kind) {
-            StatsPanelView(stats: stats, kinds: kinds, close: { [weak self] in self?.panel.close() }) { [weak self] in
+            StatsPanelView(stats: stats, kinds: kinds, maxHeight: panel.room, close: { [weak self] in self?.panel.close() }) { [weak self] in
                 self?.panel.close()
                 self?.show(.stats)
             }
