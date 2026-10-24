@@ -144,7 +144,7 @@ itself is put back when it quits. No accounts, no telemetry, no network code. Se
   &nbsp;&nbsp;
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/mixer-equalizer-dark.png">
-    <img src="docs/images/mixer-equalizer-light.png" width="300" alt="The same panel with the five-band equalizer open">
+    <img src="docs/images/mixer-equalizer-light.png" width="300" alt="The same panel with the ten-band equalizer and its preamp open">
   </picture>
 </p>
 
