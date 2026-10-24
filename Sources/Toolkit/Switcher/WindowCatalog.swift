@@ -57,6 +57,7 @@ final class WindowCatalog {
     /// `lastUsed` for the toolkit's own window, which has no entry.
     private var ownLastUsed: UInt64 = 0
     private var tokens: [NSObjectProtocol] = []
+    private var trustTimer: Timer?
     private let work = DispatchQueue(label: "dev.jalves.macos-toolkit.windows", qos: .userInitiated, attributes: .concurrent)
 
     private static let appNotifications = [
@@ -87,6 +88,10 @@ final class WindowCatalog {
 
     func start() {
         guard tokens.isEmpty else { return }
+        // Without Accessibility no app answers, and one given up on isn't
+        // tried again: Window Layout's suggestions start this at launch, so
+        // a grant made later left the switcher with an empty list.
+        guard AXIsProcessTrusted() else { return waitForAccess() }
         // An app that has hung should cost us a moment, not the default six seconds.
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.5)
 
@@ -118,9 +123,27 @@ final class WindowCatalog {
         }
 
         for app in NSWorkspace.shared.runningApplications { watch(app) }
+        // Started late (Accessibility granted with our window in front): its
+        // activation came before anything was listening.
+        if NSApp.isActive { touchOwn() }
+    }
+
+    /// Checks every couple of seconds, only while nothing can be listed.
+    private func waitForAccess() {
+        guard trustTimer == nil else { return }
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] timer in
+            guard let self, AXIsProcessTrusted() else { return }
+            timer.invalidate()
+            self.trustTimer = nil
+            if !self.users.isEmpty { self.start() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        trustTimer = timer
     }
 
     func stop() {
+        trustTimer?.invalidate()
+        trustTimer = nil
         for token in tokens { NSWorkspace.shared.notificationCenter.removeObserver(token) }
         tokens = []
         for pid in Array(watches.keys) { unwatch(pid) }
@@ -367,7 +390,7 @@ final class WindowCatalog {
         let unseen = Self.invisible(windows.filter { !$0.minimized }.map(\.id))
         windows.removeAll { unseen.contains($0.id) }
         // Until a window has been seen in use, its place in the stack is the best guess.
-        let stack = windows.contains { $0.lastUsed == 0 } ? Self.stackingOrder() : [:]
+        let stack = windows.contains { $0.lastUsed == 0 } || ownLastUsed == 0 ? Self.stackingOrder() : [:]
         windows.sort { a, b in
             if a.minimized != b.minimized { return b.minimized }
             if a.lastUsed != b.lastUsed { return a.lastUsed > b.lastUsed }
@@ -394,7 +417,15 @@ final class WindowCatalog {
 
         if let own = ownItem() {
             if own.state == .window {
-                let index = windows.firstIndex { $0.minimized || $0.lastUsed < ownLastUsed } ?? windows.count
+                let index: Int
+                if ownLastUsed > 0 {
+                    index = windows.firstIndex { $0.minimized || $0.lastUsed < ownLastUsed } ?? windows.count
+                } else {
+                    // Not seen in use since the list started: by its place in
+                    // the stack, as the others not seen yet, rather than last.
+                    let z = own.window.flatMap { stack[$0] } ?? .max
+                    index = windows.firstIndex { $0.minimized || ($0.lastUsed == 0 && (stack[$0.id] ?? .max) > z) } ?? windows.count
+                }
                 items.insert(own, at: index)
             } else {
                 items.append(own)

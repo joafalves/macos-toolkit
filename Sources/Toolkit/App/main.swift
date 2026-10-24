@@ -73,6 +73,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeAwakePanel(to: rest[0], light: rest.contains("light"), off: rest.contains("off"))
         exit(0)
     }
+    if rest.contains("permissions-sheet") {
+        Snapshot.writePermissionsSheet(to: rest[0], light: rest.contains("light"), done: rest.contains("done"), restart: rest.contains("restart"))
+        exit(0)
+    }
     if rest.contains("toolkit-panel") {
         Snapshot.writeToolkitPanel(to: rest[0], light: rest.contains("light"))
         exit(0)
@@ -115,7 +119,8 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     MouseController.previewOpen = rest.contains("device")
     MainView.previewSearch = rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) } ?? ""
     LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
-    Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"))
+    Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"),
+                   noAccess: rest.contains("no-access"))
     exit(0)
 }
 

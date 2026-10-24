@@ -4,6 +4,7 @@ import SwiftUI
 struct SwitcherSettingsView: View {
     @ObservedObject var switcher: SwitcherController
     @ObservedObject var mouse: MouseController
+    @ObservedObject private var permissions = Permissions.shared
     /// Screen Recording, checked again when the app comes back to the front.
     @StateObject private var recording = ViewState(SwitcherPreviews.permitted)
 
@@ -51,7 +52,7 @@ struct SwitcherSettingsView: View {
             ToolHeader(section: .switcher, subtitle: "\(shortcut.display) through windows instead of apps.", enabled: $switcher.config.enabled)
 
             if switcher.config.enabled {
-                if !mouse.accessibilityGranted {
+                if !permissions.isGranted(.accessibility) {
                     Banner(text: "The switcher is not active yet. It needs the Accessibility permission to see \(shortcut.display) and your windows.",
                            button: "Grant Access…") { mouse.requestAccessibility() }
                 } else if switcher.tapFailed {
@@ -60,17 +61,20 @@ struct SwitcherSettingsView: View {
                 }
             }
 
-            if switcher.config.enabled, switcher.config.style == .previews, !recording.value, !switcher.isPreview {
+            // Granted since launch: only a restart lets this process use it.
+            if switcher.config.enabled, switcher.config.style == .previews, !recording.value, !switcher.isPreview,
+               permissions.state(.screenRecording) == .needsRestart {
+                RestartBanner()
+            } else if switcher.config.enabled, switcher.config.style == .previews, !recording.value, !switcher.isPreview {
                 Banner(text: "Previews need the Screen Recording permission. Until then the switcher shows the list.",
                        button: "Allow…") {
-                    if !CGRequestScreenCaptureAccess() {
-                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-                    }
+                    Permissions.shared.request(.screenRecording)
                     recording.value = SwitcherPreviews.permitted
                 }
             }
 
-            WhenEnabled(enabled: switcher.config.enabled) {
+            // Locked, as when off, until it has what it needs.
+            WhenEnabled(enabled: switcher.config.enabled && permissions.ready(switcher.permissionNeeds)) {
                 Card(title: "Appearance") {
                     OptionRow(title: "Style", caption: "A list of rows, or a grid with a picture of each window.",
                               selection: $switcher.config.style,

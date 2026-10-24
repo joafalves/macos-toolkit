@@ -27,11 +27,4 @@ enum AudioPermission {
             DispatchQueue.main.async { completion(granted) }
         }
     }
-
-    /// Once denied, macOS won't ask again; the switch is in System Settings.
-    static func openSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture") {
-            NSWorkspace.shared.open(url)
-        }
-    }
 }

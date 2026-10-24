@@ -32,7 +32,7 @@ tool; keep it in step with the code.
 - `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (the menu
   bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing and order),
-  `MenuBarOrderView` (the order list on the Settings page), `ToolkitPanel` (the panel the toolkit's mark opens: every tool with its switch),
+  `MenuBarOrderView` (the order list on the Settings page), `Permissions`/`PermissionsView`/`PermissionsSheet` (see Permissions below), `ToolkitPanel` (the panel the toolkit's mark opens: every tool with its switch),
   `SettingsTransfer` (export and import of all settings), `Snapshot`, `WindowUnderPointer`
   (which app owns the window under a point, for tools that act on it), `Navigator` (the settings
   window: `MainWindow.make`, its history, `WindowTitle`, `SwipeNavigation`), `MenuBarPopover` (the
@@ -208,7 +208,17 @@ tool; keep it in step with the code.
   short, no marketing words.
 - Permissions: Accessibility (mouse wheel and buttons, switcher, Window Layout, Finder cut and swipes, the capture's Content
   Only window style, Keep Awake's Stay available, whose posted events macOS drops without it), System Audio Recording (mixer), Screen Recording (capture, and the switcher's
-  previews) and Microphone (capture). The Finder extension is a separate switch macOS keeps off
+  previews) and Microphone (capture). Not Input Monitoring: Mouse listens to each mouse to tell them
+  apart, which macOS allows with Accessibility, and no app can ask for it alone. `App/Permissions.swift`
+  reads and asks for them, and says what each tool needs with its settings as they are
+  (`permissionNeeds`): turning a tool on shows `PermissionsSheet` for what's missing, and Overview
+  warns from the same lists. A tool that comes to need a new permission adds it there, as
+  `.required` (what the tool is for: its page's settings stay locked, through `WhenEnabled` and
+  `Permissions.ready`, until it's granted) or `.optional` (one feature, which says so itself).
+  Anything that uses a permission must pick it up when it's granted while the app runs, by
+  checking again on a timer or at each use, never once at launch. Screen
+  Recording granted after launch reads as `needsRestart` (TCC's record says yes, the process
+  still no) until the app restarts itself with `Relaunch`. The Finder extension is a separate switch macOS keeps off
   until it is turned on
   (`pluginkit -e use -i dev.jalves.macos-toolkit.finder`, which the Finder page's button runs).
   The app is signed with a local self-signed identity (`MacOS Toolkit Dev`) so macOS keeps the grants
@@ -249,6 +259,9 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
 .build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power ...] [light]
 .build/debug/Toolkit --snapshot out.png toolkit-panel [light]   # the panel the toolkit's mark opens, from the tools' previews
+.build/debug/Toolkit --snapshot out.png permissions [light]     # the Permissions page, every one granted
+.build/debug/Toolkit --snapshot out.png switcher no-access [light]   # any page as without Accessibility: locked settings, sidebar warnings
+.build/debug/Toolkit --snapshot out.png permissions-sheet [light] [done|restart]   # the sheet a tool shows as it's turned on
 .build/debug/Toolkit --snapshot out.png mouse-panel [light]     # the Mouse panel, with the made-up mice
 .build/debug/Toolkit --snapshot out.png layout-panel [light]    # the Window Layout panel, for a TextEdit window
 .build/debug/Toolkit --snapshot out.png awake-panel [light] [off]   # Keep Awake's panel, part way through a session or off

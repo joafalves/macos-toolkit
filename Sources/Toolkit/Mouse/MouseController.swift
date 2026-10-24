@@ -116,6 +116,7 @@ final class MouseController: ObservableObject {
             let levels = Self.batteryLevels()
             if levels != batteries { batteries = levels }
         }
+        monitor.retryRefused()
         reapply(force: false)
     }
 
@@ -314,7 +315,6 @@ final class MouseController: ObservableObject {
     var connectedCount: Int { devices.filter(\.connected).count }
 
     /// With several mice attached we need to know which one is scrolling.
-    var needsInputMonitoring: Bool { connectedCount > 1 && monitor.listeningDenied }
 
     // MARK: - Applying settings
 
@@ -408,12 +408,7 @@ final class MouseController: ObservableObject {
     // MARK: - Permissions and login item
 
     func requestAccessibility() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(options)
-    }
-
-    func requestInputMonitoring() {
-        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+        Permissions.shared.request(.accessibility)
     }
 
 }

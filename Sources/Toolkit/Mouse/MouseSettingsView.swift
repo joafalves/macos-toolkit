@@ -5,6 +5,7 @@ import SwiftUI
 /// for a Bluetooth device.
 struct MouseSettingsView: View {
     @ObservedObject var mouse: MouseController
+    @ObservedObject private var permissions = Permissions.shared
 
     var body: some View {
         Group {
@@ -16,6 +17,11 @@ struct MouseSettingsView: View {
                 Page {
                     ToolHeader(section: .mouse, subtitle: "Cursor and wheel settings for each mouse.", enabled: $mouse.config.enabled,
                                menuBar: MenuBarSwitch(isOn: $mouse.config.menuBarIcon, caption: "A click shows each mouse and its charge."))
+
+                    if mouse.config.enabled, !permissions.isGranted(.accessibility) {
+                        Banner(text: "Wheel and button settings are not active yet. They need the Accessibility permission.",
+                               button: "Grant Access…") { mouse.requestAccessibility() }
+                    }
 
                     WhenEnabled(enabled: mouse.config.enabled) {
                         MiceList(mouse: mouse)
@@ -295,6 +301,7 @@ private struct MousePage: View {
 /// Cursor and wheel settings for one mouse.
 private struct ProfileEditor: View {
     @ObservedObject var mouse: MouseController
+    @ObservedObject private var permissions = Permissions.shared
     let device: MouseDevice
 
     private var profile: Binding<Profile> {
@@ -312,17 +319,13 @@ private struct ProfileEditor: View {
     var body: some View {
         let p = profile
 
-        if p.wrappedValue.needsEventTap {
-            if !mouse.accessibilityGranted {
-                Banner(text: "Wheel and button settings are not active yet. They need the Accessibility permission.",
-                       button: "Grant Access…") { mouse.requestAccessibility() }
-            } else if mouse.wheelTapFailed {
-                Banner(text: "Accessibility is granted, but the app has to restart before wheel and button settings take effect.",
-                       button: "Restart") { Relaunch.now() }
-            } else if mouse.needsInputMonitoring {
-                Banner(text: "With several mice connected, Input Monitoring lets the toolkit tell which one is being used.",
-                       button: "Allow…") { mouse.requestInputMonitoring() }
-            }
+        // Locked below until granted; cursor settings work without it.
+        if !permissions.isGranted(.accessibility) {
+            Banner(text: "Wheel and button settings are not active yet. They need the Accessibility permission.",
+                   button: "Grant Access…") { mouse.requestAccessibility() }
+        } else if p.wrappedValue.needsEventTap, mouse.wheelTapFailed {
+            Banner(text: "Accessibility is granted, but the app has to restart before wheel and button settings take effect.",
+                   button: "Restart") { Relaunch.now() }
         }
 
         Card(title: "Cursor") {
@@ -341,58 +344,61 @@ private struct ProfileEditor: View {
             }
         }
 
-        Card(title: "Wheel", footnote: "Trackpad scrolling is never changed. Fixed and Curve set how far the wheel scrolls up and down; sideways, a tilt scrolls a line at a time.") {
-            OptionRow(title: "Vertical direction", selection: p.verticalInverted, options: [(false, "macOS"), (true, "Inverted")])
-            RowDivider()
-            OptionRow(title: "Horizontal direction", caption: "Tilt wheel or side scrolling.",
-                      selection: p.horizontalInverted, options: [(false, "macOS"), (true, "Inverted")])
-            RowDivider()
-            OptionRow(title: "Distance", caption: Self.distanceCaption(p.wrappedValue.scrollMode),
-                      selection: p.scrollMode, options: [(.macOS, "macOS"), (.fixed, "Fixed"), (.curve, "Curve")]) {
-                switch p.wrappedValue.scrollMode {
-                case .macOS:
-                    ValueSlider(value: p.scrollSpeed, range: 0.25...5, step: 0.05, low: "Short", high: "Long") { String(format: "%.2f×", locale: .current, $0) }
-                case .fixed:
-                    ValueSlider(value: p.scrollLines, range: Profile.scrollLinesRange, step: 1, low: "Short", high: "Long") {
-                        $0 == 1 ? String(localized: "1 line") : String(localized: "\(Int($0)) lines")
-                    }
-                case .curve:
-                    HStack {
-                        Text("Shape")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Picker("Shape", selection: p.scrollCurve.afterUpdate) {
-                            Text("Linear").tag(ScrollCurve.linear)
-                            Text("Curve").tag(ScrollCurve.curve)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
-                    WheelCurveEditor(start: p.scrollCurveStart, end: p.scrollCurveEnd, bend: p.scrollCurveBend,
-                                     curved: p.wrappedValue.scrollCurve == .curve)
-                }
-            }
-            RowDivider()
-            OptionRow(title: "Smoothing", caption: "Glide each notch instead of jumping.",
-                      selection: p.smoothScrolling, options: [(false, "macOS"), (true, "Smooth")])
-        }
-
-        Card(title: "Buttons", footnote: "Other apps receive the back and forward buttons unchanged; most browsers and editors already handle them. A wheel click without moving stays a normal middle click.") {
-            OptionRow(title: "Back and forward buttons", caption: "Go back and forward in Finder, Safari and other Apple apps.",
-                      selection: p.navigationButtons, options: [(false, "macOS"), (true, "Navigate")])
-            RowDivider()
-            OptionRow(title: "Wheel button", caption: "Hold it and move the mouse to scroll, faster the farther you move, in any app.",
-                      selection: p.autoscroll, options: [(false, "macOS"), (true, "Autoscroll")]) {
-                if p.wrappedValue.autoscroll {
-                    ValueSlider(value: p.autoscrollPace, range: Profile.autoscrollPaceRange, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", locale: .current, $0) }
-                }
-            }
-            if p.wrappedValue.autoscroll {
+        // Every wheel and button setting goes through the event tap, which
+        // needs Accessibility: locked, as when the tool is off, until then.
+        WhenEnabled(enabled: permissions.isGranted(.accessibility)) {
+            Card(title: "Wheel", footnote: "Trackpad scrolling is never changed. Fixed and Curve set how far the wheel scrolls up and down; sideways, a tilt scrolls a line at a time.") {
+                OptionRow(title: "Vertical direction", selection: p.verticalInverted, options: [(false, "macOS"), (true, "Inverted")])
                 RowDivider()
-                AutoscrollExceptions(mouse: mouse)
+                OptionRow(title: "Horizontal direction", caption: "Tilt wheel or side scrolling.",
+                          selection: p.horizontalInverted, options: [(false, "macOS"), (true, "Inverted")])
+                RowDivider()
+                OptionRow(title: "Distance", caption: Self.distanceCaption(p.wrappedValue.scrollMode),
+                          selection: p.scrollMode, options: [(.macOS, "macOS"), (.fixed, "Fixed"), (.curve, "Curve")]) {
+                    switch p.wrappedValue.scrollMode {
+                    case .macOS:
+                        ValueSlider(value: p.scrollSpeed, range: 0.25...5, step: 0.05, low: "Short", high: "Long") { String(format: "%.2f×", locale: .current, $0) }
+                    case .fixed:
+                        ValueSlider(value: p.scrollLines, range: Profile.scrollLinesRange, step: 1, low: "Short", high: "Long") {
+                            $0 == 1 ? String(localized: "1 line") : String(localized: "\(Int($0)) lines")
+                        }
+                    case .curve:
+                        HStack {
+                            Text("Shape")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Picker("Shape", selection: p.scrollCurve.afterUpdate) {
+                                Text("Linear").tag(ScrollCurve.linear)
+                                Text("Curve").tag(ScrollCurve.curve)
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                        WheelCurveEditor(start: p.scrollCurveStart, end: p.scrollCurveEnd, bend: p.scrollCurveBend,
+                                         curved: p.wrappedValue.scrollCurve == .curve)
+                    }
+                }
+                RowDivider()
+                OptionRow(title: "Smoothing", caption: "Glide each notch instead of jumping.",
+                          selection: p.smoothScrolling, options: [(false, "macOS"), (true, "Smooth")])
+            }
+
+            Card(title: "Buttons", footnote: "Other apps receive the back and forward buttons unchanged; most browsers and editors already handle them. A wheel click without moving stays a normal middle click.") {
+                OptionRow(title: "Back and forward buttons", caption: "Go back and forward in Finder, Safari and other Apple apps.",
+                          selection: p.navigationButtons, options: [(false, "macOS"), (true, "Navigate")])
+                RowDivider()
+                OptionRow(title: "Wheel button", caption: "Hold it and move the mouse to scroll, faster the farther you move, in any app.",
+                          selection: p.autoscroll, options: [(false, "macOS"), (true, "Autoscroll")]) {
+                    if p.wrappedValue.autoscroll {
+                        ValueSlider(value: p.autoscrollPace, range: Profile.autoscrollPaceRange, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", locale: .current, $0) }
+                    }
+                }
+                if p.wrappedValue.autoscroll {
+                    RowDivider()
+                    AutoscrollExceptions(mouse: mouse)
+                }
             }
         }
-
     }
 }

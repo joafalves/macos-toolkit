@@ -724,15 +724,22 @@ To update later: `git pull && ./scripts/build.sh --install`.
 
 The window opens on **Overview**, with a tile for each tool and a warning while a permission one of
 them needs is missing. It opens there again after an update; otherwise on the page you left.
-**Settings**, under it, has the app's own settings, and **About** the version, updates, who made it,
+**Settings**, under it, has the app's own settings, **Permissions** what macOS lets it do, and
+**About** the version, updates, who made it,
 and links to the project on GitHub.
 
 - Every tool starts off. Click its tile, or its name in the sidebar, and turn it on with the switch
   at the top of its page.
-- **Settings → Grant Access…** and enable *MacOS Toolkit* under System Settings → Privacy & Security →
-  Accessibility. This is for the window switcher, Window Layout, the Finder cut and swipes, and the mouse wheel and button settings.
-- System Audio Recording is asked for later, the first time you turn an app down in the mixer, and
-  Screen Recording the first time you take a screenshot.
+- A tool that needs a permission asks as you turn it on: a short sheet lists what it needs and why,
+  and its button asks for each in turn, with macOS's prompt or System Settings → Privacy &
+  Security, where you turn on *MacOS Toolkit*. **Not Now** leaves the tool on; its page says what's
+  still missing. Until a tool has what it can't work without, its settings stay locked; a permission
+  only one feature needs is marked *Optional* and locks nothing.
+- **Permissions**, in the sidebar, lists Accessibility, System Audio Recording, Screen Recording
+  and Microphone, with what uses each. **Revoke…** resets one and **Revoke All…**
+  every one (macOS asks again next time), then the app restarts; where macOS won't, it says where to
+  turn it off. Screen Recording turned on while the app runs only takes effect after a restart: the
+  page, Overview and the sheet say so, with a **Restart** button.
 - For the Finder right-click menu, press **Turn On** in the Finder settings.
 - Turn on **Launch at login** if you want it always there.
 - To carry your settings to another Mac, use **Settings → Export…** and **Import…**.

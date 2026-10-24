@@ -5,6 +5,7 @@ import SwiftUI
 struct AwakeSettingsView: View {
     @ObservedObject var awake: AwakeController
     @ObservedObject var mouse: MouseController
+    @ObservedObject private var permissions = Permissions.shared
 
     /// Rows that linked settings go to.
     private enum Anchor {
@@ -18,7 +19,7 @@ struct AwakeSettingsView: View {
                        enabled: $awake.config.enabled,
                        menuBar: MenuBarSwitch(isOn: $awake.config.inMenuBar, caption: "A click opens its panel, to pick how long."))
 
-            if awake.config.enabled, awake.config.stayAvailable, !awake.accessibility {
+            if awake.config.enabled, awake.config.stayAvailable, !permissions.isGranted(.accessibility) {
                 Banner(text: "Stay available needs the Accessibility permission.",
                        button: "Grant Access…") { mouse.requestAccessibility() }
             }

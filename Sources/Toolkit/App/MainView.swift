@@ -1,10 +1,13 @@
 import SwiftUI
 
 /// A sidebar row as System Settings has them: a small coloured tile, then the
-/// name. A tool that's off is greyed, as on Overview.
+/// name. A tool that's off is greyed, as on Overview; one that's on without a
+/// permission it can't work without has a warning at the end.
 private struct SidebarRow: View {
     let section: AppSection
     var on = true
+    var needs: [PermissionNeed] = []
+    @ObservedObject private var permissions = Permissions.shared
 
     var body: some View {
         // Not a Label: its icon slot is sized for a sidebar's small symbols,
@@ -20,6 +23,13 @@ private struct SidebarRow: View {
             }
             Text(section.title)
                 .foregroundStyle(on ? .primary : .secondary)
+            if on, !permissions.ready(needs) {
+                Spacer(minLength: 4)
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .help("Missing a permission it needs to work")
+                    .accessibilityLabel(Text("Missing a permission it needs to work"))
+            }
         }
         .padding(.vertical, 2)
     }
@@ -98,7 +108,7 @@ struct MainView: View {
         case .capture: return capture.config.enabled
         case .awake: return awake.config.enabled
         case .stats: return stats.config.enabled
-        case .welcome, .general, .about: return true
+        case .welcome, .general, .permissions, .about: return true
         }
     }
 
@@ -139,11 +149,22 @@ struct MainView: View {
         }
         .frame(minWidth: 760, minHeight: 560)
         .onAppear {
+            Permissions.shared.refresh()
             navigator.moved(to: place)
             swipes.start(back: goBack, forward: goForward)
         }
         .onDisappear { swipes.stop() }
-        .onChange(of: place) { _, place in navigator.moved(to: place) }
+        .onChange(of: place) { _, place in
+            navigator.moved(to: place)
+            // Each page shows them as they are now: macOS says nothing when
+            // one changes.
+            Permissions.shared.refresh()
+        }
+        .sheet(item: $model.askingPermissions) { section in
+            PermissionsSheet(section: section, needs: model.permissionNeeds(section), restartNeeded: { model.restartNeeded(section) }) {
+                model.askingPermissions = nil
+            }
+        }
     }
 
     /// As System Settings: the sidebar runs the window's full height, and
@@ -234,7 +255,7 @@ struct MainView: View {
     /// selection in a window that isn't active is drawn black.
     private var drawnSections: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach([AppSection.welcome, .general, .about], id: \.self) { drawnRow($0) }
+            ForEach([AppSection.welcome, .general, .permissions, .about], id: \.self) { drawnRow($0) }
             Text("Tools")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -248,7 +269,7 @@ struct MainView: View {
     }
 
     private func drawnRow(_ section: AppSection) -> some View {
-        SidebarRow(section: section, on: enabled(section))
+        SidebarRow(section: section, on: enabled(section), needs: model.permissionNeeds(section))
             .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
             .background(place.section == section ? Color.primary.opacity(0.1) : .clear,
@@ -269,7 +290,7 @@ struct MainView: View {
     private var detail: some View {
         Group {
             switch place.section {
-            case .welcome: WelcomeView(model: model, mouse: mouse, mixer: mixer, capture: capture, enabled: enabled,
+            case .welcome: WelcomeView(model: model, enabled: enabled,
                                         switcherShortcut: switcher.config.shortcut.active?.display ?? "⌘Tab")
             case .mouse: MouseSettingsView(mouse: mouse)
             case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
@@ -279,12 +300,14 @@ struct MainView: View {
             case .capture: CaptureSettingsView(capture: capture)
             case .awake: AwakeSettingsView(awake: awake, mouse: mouse)
             case .stats: StatsSettingsView(stats: stats)
+            case .permissions: PermissionsView()
             case .about: AboutView(model: model)
             case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .environment(\.pageGoTo, $model.goTo)
+        .environment(\.toolTurnedOn) { model.turnedOn($0) }
     }
 
     /// Overview and the app's own settings, then the tools.
@@ -292,6 +315,7 @@ struct MainView: View {
         List(selection: $model.section) {
             SidebarRow(section: .welcome).tag(AppSection.welcome)
             SidebarRow(section: .general).tag(AppSection.general)
+            SidebarRow(section: .permissions).tag(AppSection.permissions)
             SidebarRow(section: .about).tag(AppSection.about)
             // A header of its own rather than a section's: a sidebar section
             // hides its rows on a click of its header and shows an arrow for
@@ -302,7 +326,7 @@ struct MainView: View {
                 .padding(.top, 10)
                 .padding(.leading, -2)
                 .selectionDisabled()
-            ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0)).tag($0) }
+            ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0), needs: model.permissionNeeds($0)).tag($0) }
         }
         .listStyle(.sidebar)
     }
@@ -385,7 +409,7 @@ private struct GeneralView: View {
 
     var body: some View {
         Page {
-            PageHeader(section: .general, subtitle: "The app's own settings: startup, language, the menu bar, backups and permissions.")
+            PageHeader(section: .general, subtitle: "The app's own settings: startup, language, the menu bar and backups.")
 
             Card(title: "Startup") {
                 ToggleRow(title: "Launch at login",
@@ -434,46 +458,6 @@ private struct GeneralView: View {
                     }
                 }
             }
-
-            Card(title: "Permissions") {
-                SettingRow(title: "Accessibility", caption: "Used by Mouse, the Window Switcher, Window Layout, Finder, Screen Capture and Keep Awake.") {
-                    if mouse.accessibilityGranted {
-                        Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    } else {
-                        Button("Grant Access…") { mouse.requestAccessibility() }
-                    }
-                }
-                RowDivider()
-                SettingRow(title: "System Audio Recording", caption: "Used by the Audio Mixer to change the volume of each app.") {
-                    if mixer.permission == .granted {
-                        Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    } else {
-                        Button(mixer.permission == .denied ? "Open System Settings…" : "Grant Access…") { mixer.requestPermission() }
-                    }
-                }
-                RowDivider()
-                SettingRow(title: "Screen Recording", caption: "Used by Screen Capture, and for the pictures of windows in the Window Switcher and Window Layout.") {
-                    if capture.screenPermission {
-                        Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    } else {
-                        Button("Grant Access…") { capture.requestScreenPermission() }
-                    }
-                }
-                RowDivider()
-                SettingRow(title: "Microphone", caption: "Used by Screen Capture to record your voice. Only needed for that.") {
-                    if capture.micPermission == .authorized {
-                        Label("Granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    } else {
-                        Button(capture.micPermission == .notDetermined ? "Grant Access…" : "Open System Settings…") { capture.requestMicrophonePermission() }
-                    }
-                }
-            }
-            .settingAnchor(WelcomeView.permissionsAnchor)
-        }
-        // Granted in System Settings meanwhile: shown when coming back.
-        .onAppear { capture.refreshPermissions() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            capture.refreshPermissions()
         }
     }
 }

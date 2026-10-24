@@ -4,6 +4,7 @@ import SwiftUI
 /// The "Screen Capture" section.
 struct CaptureSettingsView: View {
     @ObservedObject var capture: CaptureController
+    @ObservedObject private var permissions = Permissions.shared
 
     /// Every capture shortcut but `own`, so one can't be set to another's keys.
     private func others(than own: Shortcut) -> [Shortcut] {
@@ -35,12 +36,20 @@ struct CaptureSettingsView: View {
                        menuBar: MenuBarSwitch(isOn: $capture.config.standaloneIcon,
                                               caption: "A click opens the capture toolbar."))
 
-            if capture.config.enabled, !capture.screenPermission {
+            if capture.config.enabled, permissions.state(.screenRecording) == .needsRestart {
+                RestartBanner()
+            } else if capture.config.enabled, !capture.screenPermission {
                 Banner(text: "Screen Capture needs the Screen Recording permission. macOS asks for it once; after that it's in System Settings, under Privacy & Security.",
                        button: "Allow…") { capture.requestScreenPermission() }
             }
 
-            WhenEnabled(enabled: capture.config.enabled) {
+            if capture.config.enabled, capture.config.windowStyle == .content, !permissions.isGranted(.accessibility), !capture.isPreview {
+                Banner(text: "Content Only needs the Accessibility permission to find where a window's title bar ends. Until then, window screenshots keep it.",
+                       button: "Grant Access…") { permissions.request(.accessibility) }
+            }
+
+            // Locked, as when off, until it has what it needs.
+            WhenEnabled(enabled: capture.config.enabled && permissions.ready(capture.permissionNeeds)) {
                 Card(title: "Shortcuts",
                      footnote: "macOS's own screenshot shortcuts are off only where they clash with these. ⌃ counts if it's held when the capture happens: at the end of the drag, or at the click on a window.") {
                     ShortcutRow(title: "Screenshot of the display", caption: "The display under the pointer.",

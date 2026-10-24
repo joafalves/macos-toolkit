@@ -3,6 +3,47 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.21.0 (unreleased)
+
+### Added
+
+- **Permissions:** turning a tool on, from its page or the toolkit panel, opens a short sheet listing
+  the permissions it needs and what each is for. Its button asks for the next one missing, with
+  macOS's own prompt or System Settings, and each turns green once granted. One that only works
+  after a restart (Screen Recording) is left for the end, with one Restart button for all of them.
+  If the app restarts part way through (macOS's own Quit & Reopen), the sheet comes back.
+- **Permissions:** a tool's settings stay locked, as when it's off, until it has the permissions it
+  can't work without: Accessibility for the Window Switcher and Window Layout, System Audio
+  Recording for the Audio Mixer, Screen Recording for Screen Capture. One that only a feature needs
+  is marked Optional in the sheet and locks nothing; the feature says so on its own. A tool that's
+  on without one it can't work without has a warning beside its name in the sidebar.
+- **Permissions:** a page of its own in the sidebar, under Settings, with every permission, what
+  uses it and whether it's granted. Revoke… resets one, Revoke All… every one, and the app
+  restarts; where macOS doesn't allow it, it says where to turn it off.
+
+### Fixed
+
+- **Permissions:** Screen Recording turned on in System Settings no longer shows as missing until
+  the app restarts: it says it's waiting for a restart, with a button for it, on Overview, the
+  Permissions page, the sheet, and the Window Switcher's and Window Layout's previews.
+- **Permissions:** every Grant Access… or Open System Settings… button asks macOS first, which puts
+  the app back in System Settings' list after a refusal or a revoke, so it's always there to turn
+  on; System Settings opens too only once it was refused.
+- **Overview:** the warning about missing permissions follows each tool's settings: the mixer's
+  volume keys, Keep Awake's Stay available and Screen Capture's Content Only and microphone count,
+  and Finder doesn't ask for Accessibility with Cut and swipes off. The names are in Portuguese too.
+- **Screen Capture:** Content Only says when it needs Accessibility. Asking for Screen Recording
+  shows macOS's prompt while it has no answer, which also puts the app back in System Settings'
+  list after a revoke, and opens System Settings only once it was refused, rather than both at once.
+- **Window Switcher:** granting Accessibility while the app was running left the switcher with no
+  windows until a restart, when Window Layout's suggestions were on; and the toolkit's own window,
+  in front at the time, was listed last instead of first.
+- **Mouse:** without Accessibility, the list of mice says so, and a mouse's wheel and button
+  settings are locked until it's granted; cursor settings still work.
+- **Mouse:** no longer asks for Input Monitoring to tell several mice apart: macOS gives it with
+  Accessibility, which the wheel and button settings need anyway, and lets no app ask for it alone.
+  Granted while the app runs, it's used straight away; before, each mouse waited for a reconnect.
+
 ## 0.20.1 (2026-10-24)
 
 ### Changed

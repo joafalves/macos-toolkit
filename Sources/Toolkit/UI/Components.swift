@@ -326,8 +326,16 @@ struct ToolHeader: View {
     /// The same for every tool that can be in the menu bar: a quieter strip
     /// along the bottom of the header, below the switch that matters more.
     var menuBar: MenuBarSwitch?
+    @Environment(\.toolTurnedOn) private var turnedOn
 
     private var name: Text { title.map { Text($0) } ?? Text(section.title) }
+
+    private var isOn: Binding<Bool> {
+        Binding(get: { enabled }, set: { on in
+            enabled = on
+            if on { turnedOn(section) }
+        })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -346,7 +354,7 @@ struct ToolHeader: View {
                     Text(enabled ? "On" : "Off")
                         .font(.callout.weight(.medium))
                         .foregroundStyle(enabled ? Color.accentColor : .secondary)
-                    Toggle(enabled ? "On" : "Off", isOn: $enabled)
+                    Toggle(enabled ? "On" : "Off", isOn: isOn)
                         .toggleStyle(.switch)
                         .labelsHidden()
                         .controlSize(.large)

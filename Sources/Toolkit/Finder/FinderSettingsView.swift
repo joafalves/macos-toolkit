@@ -4,6 +4,7 @@ import SwiftUI
 struct FinderSettingsView: View {
     @ObservedObject var finder: FinderController
     @ObservedObject var mouse: MouseController
+    @ObservedObject private var permissions = Permissions.shared
 
     /// What's installed here; the preview lists every known terminal, so
     /// images don't show what's on this Mac.
@@ -24,7 +25,7 @@ struct FinderSettingsView: View {
             ToolHeader(section: .finder, subtitle: "Cut and paste files, swipe back and forward, and more in the right-click menu.", enabled: $finder.config.enabled)
 
             if finder.config.enabled, finder.config.cut || finder.config.swipe, !finder.isPreview {
-                if !mouse.accessibilityGranted {
+                if !permissions.isGranted(.accessibility) {
                     Banner(text: "Cut and swiping are not active yet. They need the Accessibility permission to see the keys you press and the swipes you make in Finder.",
                            button: "Grant Access…") { mouse.requestAccessibility() }
                 } else if finder.tapFailed {

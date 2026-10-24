@@ -2,30 +2,23 @@ import SwiftUI
 
 /// The front page: what the toolkit is, its version, a tile for each tool
 /// with whether it's on, and a warning only while a permission a tool needs
-/// is missing, which leads to the list of them in Settings.
+/// is missing, which leads to the Permissions page.
 struct WelcomeView: View {
     @ObservedObject var model: AppModel
-    @ObservedObject var mouse: MouseController
-    @ObservedObject var mixer: MixerController
-    @ObservedObject var capture: CaptureController
+    @ObservedObject var permissions = Permissions.shared
     let enabled: (AppSection) -> Bool
     /// The switcher's real shortcut, which may not be ⌘Tab.
     let switcherShortcut: String
-
-    static let permissionsAnchor = "general.permissions"
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
 
-    /// The permissions that an enabled tool needs and doesn't have.
+    /// The permissions that a tool that's on needs, with its settings as
+    /// they are, and doesn't have. One waiting for a restart has its own banner.
     private var missing: [String] {
-        var missing: [String] = []
-        let needsAccess: [AppSection] = [.mouse, .switcher, .layout, .finder]
-        if !mouse.accessibilityGranted, needsAccess.contains(where: enabled) { missing.append("Accessibility") }
-        if enabled(.capture), !capture.screenPermission { missing.append("Screen Recording") }
-        if enabled(.mixer), mixer.permission != .granted { missing.append("System Audio Recording") }
-        return missing
+        let needed = Set(AppSection.tools.filter(enabled).flatMap { model.permissionNeeds($0) }.map(\.permission))
+        return Permission.allCases.filter { needed.contains($0) && ![.granted, .needsRestart].contains(permissions.state($0)) }.map(\.title)
     }
 
     var body: some View {
@@ -43,11 +36,9 @@ struct WelcomeView: View {
 
             if !missing.isEmpty {
                 Banner(text: "Missing: \(ListFormatter.localizedString(byJoining: missing)). The tools that need it won't work fully until it's granted.",
-                       button: "Permissions…") {
-                    model.goTo = Self.permissionsAnchor
-                    model.section = .general
-                }
+                       button: "Permissions…") { model.section = .permissions }
             }
+            RestartBanner()
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Tools").font(.headline).padding(.leading, 2)

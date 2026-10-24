@@ -256,8 +256,8 @@ final class MixerController: ObservableObject {
     /// Shows the macOS prompt, or opens System Settings once it was denied.
     func requestPermission() {
         guard permission != .granted else { return }
-        if permission == .denied { return AudioPermission.openSettings() }
-        AudioPermission.request { [weak self] _ in self?.refreshPermission() }
+        // The app delegate refreshes this when the state changes.
+        Permissions.shared.request(.systemAudio)
     }
 
     func refreshPermission() {
@@ -373,8 +373,7 @@ final class MixerController: ObservableObject {
     }
 
     func requestAccessibility() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(options)
+        Permissions.shared.request(.accessibility)
     }
 
     func setOutput(_ device: OutputDevice) {

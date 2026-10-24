@@ -18,6 +18,7 @@ INDEX = ROOT / "Sources/Toolkit/App/SettingsIndex.swift"
 # Each page's file, and the section it is.
 PAGES = {
     "Sources/Toolkit/App/MainView.swift": "general",
+    "Sources/Toolkit/App/PermissionsView.swift": "permissions",
     "Sources/Toolkit/App/AboutView.swift": "about",
     "Sources/Toolkit/Mouse/MouseSettingsView.swift": "mouse",
     "Sources/Toolkit/Switcher/SwitcherSettingsView.swift": "switcher",

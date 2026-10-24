@@ -134,25 +134,13 @@ final class CaptureController: ObservableObject {
     }
 
     func requestScreenPermission() {
-        // Asks once; after that, only System Settings can change it.
-        if !CGRequestScreenCaptureAccess() {
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-        }
+        Permissions.shared.request(.screenRecording)
         refreshPermissions()
     }
 
     /// From the Permissions list: asks, or opens System Settings once it was refused.
     func requestMicrophonePermission() {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .audio) { _ in
-                DispatchQueue.main.async { self.refreshPermissions() }
-            }
-        case .denied, .restricted:
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
-        default:
-            break
-        }
+        Permissions.shared.request(.microphone)
     }
 
     func setMicrophone(_ on: Bool) {

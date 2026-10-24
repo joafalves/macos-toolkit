@@ -2,17 +2,34 @@ import AppKit
 import SwiftUI
 
 enum Snapshot {
-    static func write(to path: String, section: AppSection, light: Bool) {
+    /// `noAccess`: as without Accessibility, for the tools' locked pages and
+    /// the sidebar's warnings.
+    static func write(to path: String, section: AppSection, light: Bool, noAccess: Bool = false) {
         _ = NSApplication.shared
         let model = AppModel()
         model.persists = false
         model.general = GeneralConfig()
         model.section = section
+        Permissions.shared.preview(missing: noAccess ? [.accessibility: .notAsked] : [:])
+        let (mouse, switcher, layout, mixer) = (MouseController.preview(), SwitcherController.preview(), LayoutController.preview(), MixerController.preview())
+        let (finder, capture, awake) = (FinderController.preview(), CaptureController.preview(), AwakeController.preview())
+        model.permissionNeeds = { section in
+            switch section {
+            case .mouse: return mouse.permissionNeeds
+            case .switcher: return switcher.permissionNeeds
+            case .layout: return layout.permissionNeeds
+            case .mixer: return mixer.permissionNeeds
+            case .finder: return finder.permissionNeeds
+            case .capture: return capture.permissionNeeds
+            case .awake: return awake.permissionNeeds
+            default: return []
+            }
+        }
         // Never shown, and drawn by its views: nothing on screen, and nothing
         // read from it. The glass sidebar and toolbar are drawn by the window
         // server, not the views, so the page draws stand-ins for them here.
         MainView.drawnChrome = true
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: MouseController.preview(), switcher: SwitcherController.preview(), layout: LayoutController.preview(), mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview(), awake: AwakeController.preview(), stats: StatsController.preview())))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: StatsController.preview())))
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -337,6 +354,15 @@ enum Snapshot {
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         if let view = window.contentView { save(view, to: path) }
+    }
+
+    /// The sheet a tool turned on shows, for Window Layout with grid
+    /// suggestions: one permission granted, the other next; with `done`,
+    /// both; with `restart`, Screen Recording waiting for a restart.
+    static func writePermissionsSheet(to path: String, light: Bool, done: Bool, restart: Bool) {
+        Permissions.shared.preview(missing: restart ? [.screenRecording: .needsRestart] : done ? [:] : [.accessibility: .notAsked])
+        let needs = LayoutController.preview().permissionNeeds
+        writePanel(PermissionsSheet(section: .layout, needs: needs, restartNeeded: { false }) {}, to: path, light: light)
     }
 
     /// The Mouse panel, with the made-up mice.

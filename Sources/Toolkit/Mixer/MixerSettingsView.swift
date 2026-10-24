@@ -4,6 +4,7 @@ import SwiftUI
 /// The "Audio Mixer" section.
 struct MixerSettingsView: View {
     @ObservedObject var mixer: MixerController
+    @ObservedObject private var permissions = Permissions.shared
 
     var body: some View {
         Page {
@@ -23,7 +24,8 @@ struct MixerSettingsView: View {
                        button: "Grant Access…") { mixer.requestAccessibility() }
             }
 
-            WhenEnabled(enabled: mixer.config.enabled) {
+            // Locked, as when off, until it has what it needs.
+            WhenEnabled(enabled: mixer.config.enabled && permissions.ready(mixer.permissionNeeds)) {
                 // The volumes and the equalizer live in the menu bar's mixer, not here.
                 Card {
                     SettingRow(title: "Volumes and equalizer",

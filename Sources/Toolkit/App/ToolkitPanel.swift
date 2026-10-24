@@ -12,6 +12,8 @@ struct ToolkitPanelActions {
     /// The Mouse and Window Layout panels, as their own parts open them.
     var openMouse: () -> Void = {}
     var openLayout: () -> Void = {}
+    /// A tool turned on with its switch here.
+    var turnedOn: (AppSection) -> Void = { _ in }
 }
 
 /// The panel the toolkit's mark opens: up top, the tools that have no part
@@ -77,7 +79,7 @@ struct ToolkitPanelView: View {
             .padding(.bottom, 4)
             VStack(spacing: 0) {
                 ForEach(AppSection.tools) { section in
-                    ToolRow(section: section, on: isOn(section)) { actions.open(section) }
+                    ToolRow(section: section, on: turningOn(section)) { actions.open(section) }
                 }
             }
             Divider().padding(.top, 10).padding(.bottom, 8)
@@ -115,6 +117,16 @@ struct ToolkitPanelView: View {
 
     // MARK: - Tools
 
+    /// The switch, which also tells whoever shows the panel that a tool was
+    /// turned on, to ask for what it needs.
+    private func turningOn(_ section: AppSection) -> Binding<Bool> {
+        let on = isOn(section)
+        return Binding(get: { on.wrappedValue }, set: { value in
+            on.wrappedValue = value
+            if value { actions.turnedOn(section) }
+        })
+    }
+
     private func isOn(_ section: AppSection) -> Binding<Bool> {
         switch section {
         case .mouse: return $mouse.config.enabled
@@ -125,7 +137,7 @@ struct ToolkitPanelView: View {
         case .capture: return $capture.config.enabled
         case .awake: return $awake.config.enabled
         case .stats: return $stats.config.enabled
-        case .welcome, .general, .about: return .constant(true)
+        case .welcome, .general, .permissions, .about: return .constant(true)
         }
     }
 

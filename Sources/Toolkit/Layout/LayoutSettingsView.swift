@@ -5,6 +5,7 @@ import SwiftUI
 struct LayoutSettingsView: View {
     @ObservedObject var layout: LayoutController
     @ObservedObject var mouse: MouseController
+    @ObservedObject private var permissions = Permissions.shared
 
     private var config: LayoutConfig { layout.config }
     /// Screen Recording, checked again when the app comes back to the front.
@@ -209,7 +210,7 @@ struct LayoutSettingsView: View {
                        menuBar: MenuBarSwitch(isOn: $layout.config.menuBarIcon, caption: "A click places the window in front."))
 
             if config.enabled {
-                if !mouse.accessibilityGranted {
+                if !permissions.isGranted(.accessibility) {
                     Banner(text: "Window Layout needs the Accessibility permission to move windows and to notice them being dragged.",
                            button: "Grant Access…") { mouse.requestAccessibility() }
                 } else if layout.tapFailed {
@@ -220,12 +221,14 @@ struct LayoutSettingsView: View {
                     Banner(text: "\(rival) is running. It has the same shortcuts and snaps windows too, so the two get in each other's way.",
                            button: "Quit \(rival)") { layout.quitRival() }
                 }
-                if config.suggest == .previews, !recording.value, !layout.isPreview {
+                // Granted since launch: only a restart lets this process use it.
+                if config.suggest == .previews, !recording.value, !layout.isPreview,
+                   permissions.state(.screenRecording) == .needsRestart {
+                    RestartBanner()
+                } else if config.suggest == .previews, !recording.value, !layout.isPreview {
                     Banner(text: "Suggestions show pictures of your windows with the Screen Recording permission. Until then they show the list.",
                            button: "Allow…") {
-                        if !CGRequestScreenCaptureAccess() {
-                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-                        }
+                        Permissions.shared.request(.screenRecording)
                         recording.value = SwitcherPreviews.permitted
                     }
                 }
@@ -235,7 +238,8 @@ struct LayoutSettingsView: View {
                 }
             }
 
-            WhenEnabled(enabled: config.enabled) {
+            // Locked, as when off, until it has what it needs.
+            WhenEnabled(enabled: config.enabled && permissions.ready(layout.permissionNeeds)) {
                 Picker("Page", selection: $layout.page.afterUpdate) {
                     ForEach(LayoutPage.allCases, id: \.self) { Text($0.title).tag($0) }
                 }

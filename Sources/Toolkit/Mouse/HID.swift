@@ -1,3 +1,4 @@
+import ApplicationServices
 import Foundation
 import IOKit
 import IOKit.hid
@@ -182,9 +183,10 @@ final class ActivityMonitor {
     /// Read by the wheel tap on its own thread.
     private let active = Locked<String?>(nil)
     var lastActiveKey: String? { active.value }
-    /// True when macOS refused to let us listen to at least one mouse
-    /// (it requires Input Monitoring for devices that also report keys).
-    private(set) var listeningDenied = false
+    /// The mice macOS refused to let us listen to (it requires Input
+    /// Monitoring for devices that also report keys), tried again once
+    /// that's granted (`retryRefused`).
+    private var refused: [UnsafeMutableRawPointer: (IOHIDDevice, String)] = [:]
     var onDevicesChanged: (() -> Void)?
 
     init() {
@@ -211,11 +213,28 @@ final class ActivityMonitor {
         let name = prop(kIOHIDProductKey) as? String ?? ""
         guard !builtIn, !HID.nameLooksLikeKeyboard(name) else { return }
 
+        listen(device, key: identity.key)
+    }
+
+    /// Input Monitoring, which macOS gives with Accessibility, granted while
+    /// the app runs: the mice refused at connection would otherwise wait for
+    /// a reconnect.
+    func retryRefused() {
+        // Accessibility brings it with it, as macOS has it.
+        guard !refused.isEmpty,
+              IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted || AXIsProcessTrusted() else { return }
+        for (device, key) in refused.values { listen(device, key: key) }
+        onDevicesChanged?()
+    }
+
+    private func listen(_ device: IOHIDDevice, key: String) {
+        let id = Unmanaged.passUnretained(device).toOpaque()
         guard IOHIDDeviceOpen(device, IOOptionBits(kIOHIDOptionsTypeNone)) == kIOReturnSuccess else {
-            listeningDenied = true
+            refused[id] = (device, key)
             return
         }
-        keys[Unmanaged.passUnretained(device).toOpaque()] = identity.key
+        refused[id] = nil
+        keys[id] = key
         IOHIDDeviceRegisterInputValueCallback(device, { context, _, sender, _ in
             guard let context, let sender else { return }
             let monitor = Unmanaged<ActivityMonitor>.fromOpaque(context).takeUnretainedValue()
@@ -225,6 +244,7 @@ final class ActivityMonitor {
 
     private func removed(_ device: IOHIDDevice) {
         keys[Unmanaged.passUnretained(device).toOpaque()] = nil
+        refused[Unmanaged.passUnretained(device).toOpaque()] = nil
         onDevicesChanged?()
     }
 }

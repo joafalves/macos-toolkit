@@ -54,6 +54,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             stats.config.enabled = false
         }
         stats.start()
+        model.permissionNeeds = { [unowned self] section in
+            switch section {
+            case .mouse: return mouse.permissionNeeds
+            case .switcher: return switcher.permissionNeeds
+            case .layout: return layout.permissionNeeds
+            case .mixer: return mixer.permissionNeeds
+            case .finder: return finder.permissionNeeds
+            case .capture: return capture.permissionNeeds
+            case .awake: return awake.permissionNeeds
+            case .stats, .welcome, .general, .permissions, .about: return []
+            }
+        }
+
+        model.restartNeeded = { [unowned self] section in
+            switch section {
+            case .mouse: return mouse.wheelTapFailed
+            case .switcher: return switcher.tapFailed
+            case .layout: return layout.tapFailed
+            case .finder: return finder.tapFailed
+            default: return false
+            }
+        }
 
         menuBar = MenuBarItem()
         menuBar.onClick = { [weak self] kind, rect, right in self?.menuBarClicked(kind, at: rect, right: right) }
@@ -76,6 +98,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             mouse.$config.sink { _ in redraw() },
             layout.$config.sink { _ in redraw() },
             stats.live.$tick.sink { _ in redraw() },
+            // Mouse checks Accessibility every couple of seconds anyway: a
+            // change it sees updates the pages' locks, banners and warnings.
+            mouse.$accessibilityGranted.removeDuplicates().dropFirst().sink { _ in
+                DispatchQueue.main.async { Permissions.shared.refresh() }
+            },
+            // Granted from a sheet or the Permissions list: the tools' own
+            // checks, for their banners, without waiting for their timers.
+            Permissions.shared.$states.removeDuplicates().dropFirst().sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.capture.refreshPermissions()
+                    self?.mixer.refreshPermission()
+                }
+            },
             model.$general.sink { [weak self] general in
                 self?.menuBar.spacing = general.menuBarSpacing
                 // Not for a `--measure-idle` run, which should do nothing.
@@ -94,11 +129,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         source.resume()
         termSource = source
 
+        // Read at every launch, so one at login doesn't leave it for later.
+        let pending = model.pendingPermissions()
         // A launch from the login item should stay in the background.
         if let path = measureIdlePath {
             measureIdle(into: path)
         } else if !Self.launchedAsLoginItem {
-            show(model.launchSection())
+            // Restarted while a tool's permissions sheet was open (macOS's
+            // Quit & Reopen, or the sheet's own Restart): back to its page,
+            // and the sheet while the tool still lacks something.
+            if let section = pending {
+                show(section)
+                if !model.missingPermissions(section).isEmpty || model.restartNeeded(section) {
+                    DispatchQueue.main.async { self.model.askingPermissions = section }
+                }
+            } else {
+                show(model.launchSection())
+            }
         }
     }
 
@@ -336,7 +383,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             },
             openAwake: { [weak self] in self?.showAwake(from: .toolkit) },
             openMouse: { [weak self] in self?.showMouse(from: .toolkit) },
-            openLayout: { [weak self] in self?.showLayout(from: .toolkit) })
+            openLayout: { [weak self] in self?.showLayout(from: .toolkit) },
+            turnedOn: { [weak self] section in
+                // Its page, with the sheet over it, for what it's missing.
+                guard let self, !model.missingPermissions(section).isEmpty || model.restartNeeded(section) else { return }
+                panel.close()
+                show(section)
+                DispatchQueue.main.async { self.model.askingPermissions = section }
+            })
         panel.show(from: .toolkit) {
             ToolkitPanelView(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder,
                              capture: capture, awake: awake, stats: stats, actions: actions)
@@ -520,6 +574,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     }
 
     func windowWillClose(_ notification: Notification) {
+        // Closed by hand, not by a restart: the sheet isn't wanted back.
+        model.askingPermissions = nil
         NSApp.setActivationPolicy(.accessory)
         // Let go of it: kept, its views held on to their memory while
         // nothing showed them. It's quick to make again.
