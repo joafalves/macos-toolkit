@@ -414,3 +414,7 @@ The next change starts the next version: bump `Resources/Info.plist` to the next
 Conventional commit subjects (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`), lowercase, no period;
 a body when the why isn't obvious. Commit to `main` directly for this personal repo, unless asked for
 a branch. Don't push, tag-and-push or publish a release without being asked.
+
+Several agents may work in this same worktree at once, each on a different feature. Changes you
+didn't make (modified or untracked files in `git status`) are another agent's work in progress:
+ignore them, don't revert, stash, reformat or commit them, and stage only the files you changed.
