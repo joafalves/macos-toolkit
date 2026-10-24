@@ -33,11 +33,18 @@ tool; keep it in step with the code.
   bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing and order),
   `MenuBarOrderView` (the order list on the Settings page), `ToolkitPanel` (the panel the toolkit's mark opens: every tool with its switch),
-  `SettingsTransfer` (export and import of all settings), `Snapshot`, and `WindowUnderPointer`
-  (which app owns the window under a point, for tools that act on it).
+  `SettingsTransfer` (export and import of all settings), `Snapshot`, `WindowUnderPointer`
+  (which app owns the window under a point, for tools that act on it), `Navigator` (the settings
+  window: `MainWindow.make`, its history, `WindowTitle`, `SwipeNavigation`), `MenuBarPopover` (the
+  panels that hang from the menu bar item), and `SettingsSearch`/`SettingsIndex` (see Search).
 - `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
   ⇧⌘2/3/4/5, Vision for the text in an area (`TextReader`), and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
+  Mouse tells mice apart by `MouseIdentity` (`Mouse/HID.swift`): the Bluetooth address, or the serial
+  number over USB, read from the I/O Registry, so two of the same model are two mice with their own
+  settings, as the Bluetooth settings show them. A mouse with neither falls back to its model and
+  transport (`modelKey`, the key before 0.20.0); a profile saved under that is copied to each
+  connected mouse of the model that has an address or serial number, then dropped.
 - `Sources/FinderExtension`: the Finder extension. It is sandboxed, so it only builds the right-click
   menu (reading `finder.json`, which its entitlements allow) and opens a `macos-toolkit://` URL that
   `FinderController.handle` acts on. Its `Info.plist` and entitlements are in `Resources/FinderExtension`.
@@ -94,7 +101,20 @@ tool; keep it in step with the code.
   A tool's page starts with `ToolHeader` (its name and the Enabled switch, bound to the config's
   `enabled`) and wraps the rest in `WhenEnabled`. Shortcuts are `Shortcut` values set with
   `ShortcutRow` (`UI/Shortcut.swift`); a tool lets its own shortcuts through while
-  `ShortcutRecording.active`, so they can be recorded.
+  `ShortcutRecording.active`, so they can be recorded. A tool that can be in the menu bar passes
+  `menuBar: MenuBarSwitch(...)` to `ToolHeader`, which puts "Show in the menu bar" under the
+  Enabled switch, smaller, as the one place to turn it on. Its panel there is built like the others
+  (header, rows, `PanelFooter`) and shown through `MenuBarPopover`, never a system menu.
+- **The settings window** is laid out as System Settings: a `NavigationSplitView` in an
+  `NSHostingController` with the toolbar and title bridged from SwiftUI (`MainWindow.make`), and one
+  history for the whole window (`Navigator`): every change of place, from the sidebar, a link, a
+  search result or a menu bar panel, goes through `moved(to:)`, so back and forward (the toolbar's
+  capsule, ⌘[ ⌘], a two-finger swipe) retrace it. A page within a page (a mouse's) is a place of its
+  own, not a back button on the page.
+- **Segmented pickers** bind through `.afterUpdate` (`Components.swift`): their selection is set
+  during the view update, and setting a published config there is SwiftUI's "publishing changes
+  from within view updates", which can leave the setting unapplied. `--test-publishing` checks the
+  Mouse page's controls for it.
 - **Linked settings** (`UI/LinkedSettings.swift`): when one setting holds another (Stay available
   keeps the display on), pass a `SettingLink` to both rows while it's in force, `.heldBy(...)` on the
   held one, which locks its control, and `.holds(...)` on the holder, and mark each row with
@@ -198,6 +218,10 @@ tool; keep it in step with the code.
   (`scripts/signing.sh`). Anything that can sign with it gets the toolkit's permissions, and installed
   copies take updates signed with it. Never make a new one: every installed copy would refuse its
   updates, and macOS would forget the grants.
+  An agent can't type that password. Before a `build.sh` (an install, a publish), check without a
+  prompt whether it's unlocked: `source scripts/signing.sh; signing_unlocked && echo unlocked`.
+  If it's locked, run the build in the user's Terminal panel, where they type the password; never
+  call `security unlock-keychain` yourself or let a build fall back to ad-hoc signing.
 - **Development flags** (`--test-*`, `--list-*`, `--dump-*`, `--snapshot`, `--measure-idle`, the
   `layoutTrace` default) are compiled in only with `TOOLKIT_DEV`: debug builds, and `build.sh --dev`.
   Started through `open`, the app is the one macOS asks about, so in a released build any process
@@ -357,6 +381,9 @@ hold `MacOS Toolkit.app` at its top, and be built by `build.sh` with the `MacOS 
 identity, without `--dev`. Check `codesign -dv` on the built app first: `build.sh` falls back to
 ad-hoc signing when the identity is missing, and an ad-hoc build is refused by every installed copy;
 `flags=0x10000(runtime)` should show, and `ToolkitDev` must not be in its Info.plist.
+`Authority=MacOS Toolkit Dev` should show for the app and for `Contents/PlugIns/FinderExtension.appex`
+alike, `ToolkitCommit` should be the tagged commit, and `ToolkitModified` should be false (built
+from a clean tree).
 
 The release is named `X.Y.Z` with tag `vX.Y.Z`. Its notes are the version's `CHANGELOG.md` entry
 (without the heading), then the install block from the previous release (unzip into
