@@ -25,7 +25,7 @@ worked on; it gets its date when it's released.
 
 - **Finder:** the extension behind the right-click menu is turned on with the menu: as the tool or
   a first item in it is turned on, and once for a setup that already had items on with it off.
-  Turned off in System Settings later, it stays off.
+  Turned off in System Settings later, a relaunch leaves it off.
 
 ### Fixed
 
