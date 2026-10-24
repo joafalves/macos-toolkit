@@ -41,10 +41,12 @@ release() {
 JSON
 }
 signing_start
+trap 'signing_end; rm -rf "$OUT"' EXIT
 release good 0.99.0 "$IDENTITY" no
 release tampered 0.99.1 "$IDENTITY" yes
 release adhoc 0.99.2 - no
 release old 0.17.0 "$IDENTITY" no
+signing_end
 ditto "$APP" "$OUT/target/MacOS Toolkit.app"
 
 (cd "$OUT/feeds" && exec python3 -m http.server "$PORT" --bind 127.0.0.1 >/dev/null 2>&1) &
