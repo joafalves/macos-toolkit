@@ -11,6 +11,10 @@ struct LayoutPanelView: View {
     /// The app in front when the panel opened, with its icon.
     let app: (name: String, icon: NSImage)?
     var run: (LayoutKeys.Command) -> Void = { _ in }
+    /// A picture: the window exactly there, not as the shortcut would cycle.
+    var snap: (LayoutAction) -> Void = { _ in }
+    /// Where the window in front is now, lit among the pictures.
+    @StateObject private var current = ViewState<LayoutAction?>(nil)
     var openSettings: () -> Void = {}
 
     /// The ones used most, four to a row; the rest have their shortcuts.
@@ -42,8 +46,8 @@ struct LayoutPanelView: View {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
                 ForEach(Self.places, id: \.self) { action in
-                    PlaceTile(action: action, shortcut: layout.config.shortcut(action).active?.display) {
-                        run(.action(action))
+                    PlaceTile(action: action, shortcut: layout.config.shortcut(action).active?.display, current: current.value == action) {
+                        snap(action)
                     }
                 }
             }
@@ -66,6 +70,7 @@ struct LayoutPanelView: View {
         }
         .padding(10)
         .frame(width: 300)
+        .onAppear { layout.frontPlace(among: Self.places) { current.value = $0 } }
     }
 
     private func help(_ action: LayoutAction) -> String {
@@ -78,6 +83,8 @@ struct LayoutPanelView: View {
 private struct PlaceTile: View {
     let action: LayoutAction
     let shortcut: String?
+    /// Where the window is now: the part in the accent colour, framed.
+    let current: Bool
     let run: () -> Void
     @StateObject private var hovered = ViewState(false)
 
@@ -92,13 +99,16 @@ private struct PlaceTile: View {
                         .offset(x: screen.minX, y: screen.minY)
                     let part = Self.part(of: action).insetBy(dx: 0.035, dy: 0.05)
                     RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(hovered.value ? Color.accentColor : Color.primary.opacity(0.55))
+                        .fill(hovered.value || current ? Color.accentColor : Color.primary.opacity(0.55))
                         .frame(width: part.width * screen.width, height: part.height * screen.height)
                         .offset(x: screen.minX + part.minX * screen.width, y: screen.minY + part.minY * screen.height)
                 }
             }
             .frame(height: 44)
-            .background(Color.primary.opacity(hovered.value ? 0.09 : 0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(current ? Color.accentColor.opacity(0.16) : Color.primary.opacity(hovered.value ? 0.09 : 0.05),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(current ? 0.7 : 0), lineWidth: 1.5))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

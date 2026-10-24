@@ -3,6 +3,21 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.20.1 (unreleased)
+
+### Changed
+
+- **Window Layout:** the menu bar panel lights up the picture of where Window Layout put the window
+  in front, while it's still there.
+
+### Fixed
+
+- **Menu bar:** clicking in a panel from the menu bar (the toolkit panel's quick buttons, the mixer,
+  System Stats, Keep Awake, Mouse, Window Layout) no longer brings the settings window forward,
+  then or when the panel closes for the next one.
+- **Window Layout:** the menu bar panel's pictures put the window in front exactly where they show.
+  Top half on a maximized window moved it to the display above instead, as ⌃⌥↑ does.
+
 ## 0.20.0 (2026-10-24)
 
 ### Added

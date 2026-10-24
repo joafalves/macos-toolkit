@@ -478,6 +478,44 @@ final class LayoutController: ObservableObject {
         handle(command)
     }
 
+    /// From the menu bar panel's pictures: the window in front exactly where
+    /// the picture puts it, on the display it's on. Not as the shortcuts, whose
+    /// halves go on from where the window is (up from maximized moves it to
+    /// the display above): a picture of the top half means the top half.
+    func snapFront(_ action: LayoutAction) {
+        guard !isPreview, config.enabled else { return }
+        closeGrid()
+        assist.dismiss()
+        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        let displays = self.displays, gap = CGFloat(config.gap), cycle = config.cycleAtEdge
+        work.async {
+            guard let window = LayoutWindow.focused(pid: pid), let frame = window.frame,
+                  let display = LayoutGeometry.display(of: frame, in: displays) else { return Self.beep() }
+            self.place(window, .snap(action, display), displays: displays, gap: gap, cycle: cycle)
+        }
+    }
+
+    /// For the menu bar panel, which of `actions` the window in front was put
+    /// at by Window Layout, while it's still where it was put. Nothing for a
+    /// window placed any other way. On the main thread; the window is looked
+    /// at on `work`, where the placements are kept.
+    func frontPlace(among actions: [LayoutAction], _ found: @escaping (LayoutAction?) -> Void) {
+        guard !isPreview else { return found(Self.previewFrontPlace) }
+        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        work.async {
+            var place: LayoutAction?
+            if let window = LayoutWindow.focused(pid: pid), let frame = window.frame,
+               let record = self.placements[window.id], LayoutWindow.close(record.applied, frame),
+               let action = record.action, actions.contains(action) {
+                place = action
+            }
+            DispatchQueue.main.async { found(place) }
+        }
+    }
+
+    /// For `--snapshot layout-panel`: the made-up window is at the left half.
+    static var previewFrontPlace: LayoutAction? = .leftHalf
+
     private func handle(_ command: LayoutKeys.Command) {
         switch command {
         case .action(let action) where action.isTabs:

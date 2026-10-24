@@ -301,6 +301,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 self?.panel.close()
                 // Once the panel has gone, as after a shortcut.
                 DispatchQueue.main.async { self?.layout.perform(command) }
+            }, snap: { [weak self] action in
+                self?.panel.close()
+                DispatchQueue.main.async { self?.layout.snapFront(action) }
             }) { [weak self] in
                 self?.panel.close()
                 self?.show(.layout)
@@ -365,6 +368,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             // the front, the settings window included. The popover works
             // without it, and closing is watched for below.
             popover.show(relativeTo: rect, of: button, preferredEdge: .minY)
+            popover.keepsAppInactive()
             watchForDismissal()
             // After showing, so creating the listening taps doesn't hold up the panel.
             DispatchQueue.main.async { self.mixer.panelOpen = true }

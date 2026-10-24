@@ -19,7 +19,8 @@ tool; keep it in step with the code.
   permission check, `responsibility_get_pid_responsible_for_pid` for grouping helper processes,
   `CGSSetSymbolicHotKeyEnabled` to take ⌘Tab and ⇧⌘3/4/5 from macOS, the Dock's
   `CoreDockSendNotification` (through `dlsym`) for Window Layout's Show the desktop, `SetsCursorInBackground`
-  so the capture overlay can set the cursor without activating the app, and IOReport (through
+  so the capture overlay can set the cursor without activating the app, AppKit's
+  `_setPreventsActivation:` so a click in a menu bar panel (a popover) doesn't activate the app, and IOReport (through
   `dlopen`) for System Stats' CPU and GPU watts, subscribed to only while the power stat is read.
 - Nothing runs as root. Keep Awake's lid-closed option did before 0.19.3, through a rule in
   `/etc/sudoers.d` for `pmset -a disablesleep`; sudo can't tell which program asks, so any process

@@ -44,6 +44,27 @@ struct PanelFooter: View {
     }
 }
 
+extension NSPopover {
+    /// A popover's window is a panel that activates the app when clicked in,
+    /// and an active app brings every one of its windows forward: a click in
+    /// a panel from the menu bar raised the settings window. The style flag
+    /// for a non-activating panel only counts when the panel is made, and a
+    /// popover makes its own; AppKit's own call sets what the window server
+    /// goes by (its prevents-activation tag, measured). Never the key window
+    /// either, as none of the panels' controls needs the keyboard: closing a
+    /// key one handed the keyboard to the settings window, bringing it up.
+    /// Once shown, when it has its window.
+    func keepsAppInactive() {
+        guard let panel = contentViewController?.view.window as? NSPanel else { return }
+        panel.styleMask.insert(.nonactivatingPanel)
+        panel.becomesKeyOnlyIfNeeded = true
+        let preventsActivation = Selector(("_setPreventsActivation:"))
+        guard let method = class_getInstanceMethod(type(of: panel), preventsActivation) else { return }
+        typealias Set = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(method_getImplementation(method), to: Set.self)(panel, preventsActivation, true)
+    }
+}
+
 final class MenuBarPopover: NSObject, NSPopoverDelegate {
     var onClose: (() -> Void)?
     private let menuBar: MenuBarItem
@@ -84,6 +105,7 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
             self.popover = popover
             shownFor = kind
             popover.show(relativeTo: rect, of: button, preferredEdge: .minY)
+            popover.keepsAppInactive()
             watch()
         }
     }
