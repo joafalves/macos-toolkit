@@ -117,8 +117,25 @@ final class MouseController: ObservableObject {
             if levels != batteries { batteries = levels }
         }
         monitor.retryRefused()
+        // A mouse that came back (Bluetooth LE ones drop off when idle) whose
+        // event service hadn't shown up yet at the rescan its arrival set off:
+        // counted as away, the other mouse's settings took its clicks, until
+        // the next full rescan or a change of setting. A few tries for each
+        // change, as one saved while every pointing device was listed is heard
+        // but left out of the list on purpose, and would rescan for good.
+        let connected = Set(devices.filter(\.connected).map(\.id))
+        let missing = monitor.presentKeys.intersection(config.profiles.keys).subtracting(connected)
+        if missing != lastMissing { lastMissing = missing; missingRescans = 0 }
+        if !missing.isEmpty, missingRescans < 5 {
+            missingRescans += 1
+            return refresh(force: false)
+        }
         reapply(force: false)
     }
+
+    /// The saved mice last heard but counted away, and the rescans made for them.
+    private var lastMissing: Set<String> = []
+    private var missingRescans = 0
 
     /// Rescans connected mice and applies their profiles. With `force`,
     /// settings left on "macOS" are actively put back to the system value.
@@ -311,10 +328,6 @@ final class MouseController: ObservableObject {
         print("saved: " + MouseConfig.load().profiles.keys.sorted().joined(separator: ", "))
     }
     #endif
-
-    var connectedCount: Int { devices.filter(\.connected).count }
-
-    /// With several mice attached we need to know which one is scrolling.
 
     // MARK: - Applying settings
 

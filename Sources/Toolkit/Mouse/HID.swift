@@ -188,6 +188,8 @@ final class ActivityMonitor {
     /// that's granted (`retryRefused`).
     private var refused: [UnsafeMutableRawPointer: (IOHIDDevice, String)] = [:]
     var onDevicesChanged: (() -> Void)?
+    /// Every mouse macOS has announced, listened to or not.
+    var presentKeys: Set<String> { Set(keys.values).union(refused.values.map(\.1)) }
 
     init() {
         let matching: [[String: Any]] = [

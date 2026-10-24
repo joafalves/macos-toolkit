@@ -40,6 +40,9 @@ worked on; it gets its date when it's released.
   in front at the time, was listed last instead of first.
 - **Mouse:** without Accessibility, the list of mice says so, and a mouse's wheel and button
   settings are locked until it's granted; cursor settings still work.
+- **Mouse:** with two mice, one that reconnected (Bluetooth LE mice drop off when idle) could be
+  counted as away for up to a minute, and the other mouse's settings took its clicks: back and
+  forward stopped navigating until a setting was changed. It's counted again within two seconds.
 - **Mouse:** no longer asks for Input Monitoring to tell several mice apart: macOS gives it with
   Accessibility, which the wheel and button settings need anyway, and lets no app ask for it alone.
   Granted while the app runs, it's used straight away; before, each mouse waited for a reconnect.
