@@ -151,7 +151,9 @@ itself is put back when it quits. No accounts, no telemetry, no network code. Se
 macOS has one volume for everything. The mixer adds the missing part: open it from the menu bar and
 every app that has sound gets its own slider.
 
-- **Main volume and output device** at the top, so it replaces a trip to Control Center.
+- **Main volume and output device** at the top, so it replaces a trip to Control Center. The
+  volume stays the same when you switch outputs; with **Volume for each output** on in the
+  settings, each output keeps its own, as macOS does.
 - **A row per app**: every Dock app that has sound open (so Spotify is there before you press play),
   and menu bar apps once they've actually played. Apps making sound right now come first, with
   moving bars. Browser and Electron helpers are folded into their app.
@@ -171,11 +173,19 @@ every app that has sound gets its own slider.
   toolkit's own on-screen bar in place of macOS's. On outputs with a volume of their own that volume is set directly; on the rest it's the
   software volume. ⌥ with a volume key still opens Sound settings. Needs **Accessibility**.
 - **Software volume** for outputs that have no volume control of their own (see below).
-- An **equalizer** under the main volume: five bands (60 Hz to 12 kHz, ±12 dB) with presets such as
-  Bass Boost, Vocal, Loudness and Late Night. Drag a band, or double-click it for 0 dB. While it's on
-  and not flat, all sound goes through the toolkit, the same way as the software volume, so macOS
-  shows its recording indicator. Strong boosts are kept from clipping with a little headroom and a
-  soft limiter.
+- An **equalizer** under the main volume: ten bands an octave apart, 32 Hz to 16 kHz, ±12 dB, as
+  in the Music app, with presets such as Bass Boost, Vocal, Loudness, Small Speakers and Late Night.
+  Drag a band, or double-click it for 0 dB.
+  - Each slider is what the sound gets at its band. Neighbouring bands overlap, so the filters are
+    set to land on the sliders rather than add up past them.
+  - A band boosted plays louder at its frequencies, and the rest stays as it was. The **Preamp**, on
+    the left as in the Music app, sets the volume of everything; it starts at 0 dB.
+  - Boosts can take loud music past full scale. Rather than clipping, a look-ahead limiter just
+    below full scale turns those moments down smoothly, 1.5 ms ahead. If big boosts make loud
+    music sound squashed, lower the Preamp by about as much as the largest boost.
+  - Changes glide, and turning it on or off fades, so nothing clicks.
+  - With **Equalizer for each output** on in the settings, each output keeps its own, so headphones
+    and speakers can sound different. Off, one equalizer is used for all of them.
 
 ### Outputs with no volume control
 
@@ -192,14 +202,11 @@ out and the volume keys show a "not allowed" icon. For those outputs the mixer t
 - The **main slider** works there too, marked with a small chip icon.
 - Its scale is even in decibels from top to bottom, like macOS's own outputs, so each press of a
   volume key sounds the same change at any level.
-- It lowers the sound in software: one tap on everything that plays to that output, scaled down and
-  played again. Per-app volumes keep working on top. Each output remembers its own volume.
-- The tap stays up at 100%, passing the sound through untouched, because taking it down there would
-  reroute the audio mid-playback and click. So for as long as it is on, macOS shows its purple
-  recording indicator and the sound is delayed by about one audio buffer.
+- It lowers the sound in software, in the taps all sound goes through while the mixer is on (see
+  below). Per-app volumes keep working on top. It follows **Volume for each output** like any other
+  output: the same volume as the rest, or its own.
 - It needs the **System Audio Recording** permission and, for the keys, **Accessibility**. It is
   built for macOS 26 and later; on macOS 15 it may not start.
-- Turn it off in the mixer's settings under **Software volume**.
 
 <details>
 <summary><b>How it works, and what it costs</b></summary>
@@ -208,16 +215,20 @@ out and the volume keys show a "not allowed" icon. For those outputs the mixer t
 
 macOS has no setting for one app's volume, so the mixer uses Core Audio *process taps*: it captures
 an app's sound (which silences the original) and plays it again at the volume you chose. That needs
-the **System Audio Recording** permission, which macOS asks for the first time you turn an app down.
+the **System Audio Recording** permission, which is asked for as the mixer is turned on.
 
-- Apps at 100% and not muted are never rerouted. They play exactly as before. An app put back to
-  100% keeps its tap until its sound stops, because removing a tap mid-playback reroutes the audio
-  and clicks. The equalizer's goes as soon as it's turned off, with a small pop like the one when
-  it's turned on.
+- While the mixer is on, all sound goes through it: each app with sound open through a tap of its
+  own, everything else through one more tap, which also applies the software volume. Each tap runs
+  the equalizer. An app at 100% plays as it would without the toolkit, passed through.
+- Sound moved from one tap to another while it plays clicks, so an app only moves into its own tap
+  while it's quiet; until then both ways sound the same. An app with a volume of its own is tapped
+  as it opens, before it plays (macOS 26 and later). Turning down an app that has played without a
+  pause since the mixer started moves it at once, which can click that one time.
 - To tell real sound from an app that keeps its output open in silence (a paused Safari tab, Discord,
-  games), the panel listens to each running app, but only while it is open.
-- macOS shows its purple recording indicator whenever a tap runs. Outside the panel that means only
-  while an app you turned down or muted is making sound.
+  games), each tap measures what goes through it.
+- A tap waits, costing nothing, until something plays to it, and goes back to waiting two seconds
+  after the sound stops, so the output and the Mac can sleep as they would without the toolkit.
+- macOS shows its purple recording indicator while the mixer is on.
 - A tapped app's sound is delayed by about one audio buffer, a few milliseconds on built-in and wired
   outputs. The real figure is logged when a tap starts
   (`log stream --predicate 'process == "Toolkit"'`). Bluetooth outputs may add more; I haven't

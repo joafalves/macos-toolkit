@@ -6,24 +6,31 @@ import Synchronization
 /// the app's output is captured with a process tap, which also silences the
 /// original, and played again on the output device with the gain applied.
 ///
-/// Without `controlsVolume` the tap only listens: the app plays as usual and
-/// the tap measures how loud it is, to tell real sound from an app that keeps
-/// its output running in silence (paused Safari, Discord, games).
+/// A tap takes `objects` and every process of `bundleIDs`; a global tap takes
+/// everything but those. The mixer keeps one global tap for whatever has no
+/// tap of its own, which gives outputs with no volume control of their own a
+/// software volume and runs the equalizer on everything.
 ///
-/// A global tap takes everything except `objects` instead of only `objects`.
-/// It gives outputs with no volume control of their own a software volume.
+/// Its device only runs while something it takes has its output running, so
+/// a tap made ahead costs nothing until then. Once running it never stops by
+/// itself, which keeps the output and the Mac awake: `rearm` puts it back to
+/// waiting once that sound has stopped.
+///
+/// Without `controlsVolume` the tap only listens: the app plays as usual and
+/// the tap measures how loud it is.
 final class AppTap {
     /// Our aggregate devices carry this in their UID, so leftovers from a
     /// crash can be found and removed.
     static let uidPrefix = "dev.jalves.macos-toolkit.mixer."
     static let tapName = "MacOS Toolkit Mixer"
 
-    let objects: [AudioObjectID]
+    private(set) var objects: [AudioObjectID]
+    /// Taken (or, global, left out) by bundle ID, which works before they have played anything.
+    private(set) var bundleIDs: [String]
     let deviceUID: String
+    private let stereo: (Int, Int)
     let controlsVolume: Bool
     let isGlobal: Bool
-    /// For a global tap: apps left out by bundle ID, which works before they have played anything.
-    private let excludedBundleIDs: [String]
     /// Applied to what this tap plays, when it is on.
     private let equalizer: EqualizerState?
 
@@ -36,7 +43,11 @@ final class AppTap {
     private final class Shared: Sendable {
         let gainBits = Atomic<UInt32>(0)
         let peakBits = Atomic<UInt32>(0)
+        let callbacks = Atomic<UInt32>(0)
     }
+
+    /// Goes up with every buffer while the device runs.
+    var callbacks: UInt32 { shared.callbacks.load(ordering: .relaxed) }
 
     /// The loudest sample since the last call, 0 to 1.
     func takePeak() -> Float {
@@ -50,14 +61,17 @@ final class AppTap {
     }
 
     /// Nil when macOS refuses any step, for example without the permission.
+    /// `stereo`: the output's channels for left and right, from 0, as it
+    /// prefers them (Audio MIDI Setup's Configure Speakers).
     init?(objects: [AudioObjectID], deviceUID: String, gain: Float, controlsVolume: Bool = true,
-          isGlobal: Bool = false, excludedBundleIDs: [String] = [], equalizer: EqualizerState? = nil) {
+          isGlobal: Bool = false, bundleIDs: [String] = [], stereo: (Int, Int) = (0, 1), equalizer: EqualizerState? = nil) {
+        self.stereo = stereo
         self.objects = objects
+        self.bundleIDs = bundleIDs
         self.equalizer = equalizer
         self.deviceUID = deviceUID
         self.controlsVolume = controlsVolume
         self.isGlobal = isGlobal
-        self.excludedBundleIDs = excludedBundleIDs
         self.gain = gain
         guard start() else {
             stop()
@@ -72,8 +86,8 @@ final class AppTap {
             ? CATapDescription(stereoGlobalTapButExcludeProcesses: objects)
             : CATapDescription(stereoMixdownOfProcesses: objects)
         description.name = Self.tapName
-        if isGlobal, !excludedBundleIDs.isEmpty, #available(macOS 26.0, *) {
-            description.bundleIDs = excludedBundleIDs
+        if !bundleIDs.isEmpty, #available(macOS 26.0, *) {
+            description.bundleIDs = bundleIDs
         }
         description.uuid = UUID()
         description.isPrivate = true
@@ -132,6 +146,37 @@ final class AppTap {
             AudioHardwareDestroyProcessTap(tapID)
             tapID = .unknown
         }
+    }
+
+    /// Changes what the tap takes while it runs, with no new device: an app
+    /// moved this way between two running taps doesn't click, where a new
+    /// tap made for it plays it twice for a moment. False when macOS refuses.
+    func update(objects: [AudioObjectID], bundleIDs: [String]) -> Bool {
+        guard objects != self.objects || bundleIDs != self.bundleIDs else { return true }
+        guard let current = tapID.read(kAudioTapPropertyDescription, as: Unmanaged<CATapDescription>?.self) ?? nil else { return false }
+        // Unretained, as in `removeLeftovers`.
+        let description = current.takeUnretainedValue()
+        description.processes = objects
+        if #available(macOS 26.0, *) { description.bundleIDs = bundleIDs }
+        var address = AudioObjectPropertyAddress(mSelector: kAudioTapPropertyDescription, mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var reference = description
+        let status = withUnsafeMutablePointer(to: &reference) {
+            AudioObjectSetPropertyData(tapID, &address, 0, nil, UInt32(MemoryLayout<CATapDescription>.size), $0)
+        }
+        guard status == noErr else { return log("change tap", status) }
+        self.objects = objects
+        self.bundleIDs = bundleIDs
+        return true
+    }
+
+    /// Stopped and started again, the device waits for sound as a new one
+    /// does, and lets the output and the Mac sleep. Only once what it takes
+    /// has stopped: during the moment it's stopped, an app would play unmuted.
+    func rearm() {
+        guard let procID else { return }
+        AudioDeviceStop(aggregateID, procID)
+        AudioDeviceStart(aggregateID, procID)
     }
 
     /// What the detour adds on top of the app's normal path: one buffer, plus
@@ -195,9 +240,11 @@ final class AppTap {
         let controlsVolume = self.controlsVolume
         let equalizer = self.equalizer
         let filters = EqualizerFilters(sampleRate: format.mSampleRate)
+        let stereo = self.stereo
         var current = gain
 
         return { _, inputList, _, outputList, _ in
+            shared.callbacks.add(1, ordering: .relaxed)
             let inputs = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputList))
             let outputs = UnsafeMutableAudioBufferListPointer(outputList)
             let target = Float(bitPattern: shared.gainBits.load(ordering: .relaxed))
@@ -233,31 +280,27 @@ final class AppTap {
                 totalOutputs += Int(output.mNumberChannels)
                 frames = min(frames, Int(output.mDataByteSize) / MemoryLayout<Float>.size / Int(output.mNumberChannels))
             }
+            // The first two when the preferred pair isn't there.
+            let (leftChannel, rightChannel) = max(stereo.0, stereo.1) < totalOutputs ? stereo : (0, 1)
             if let equalizer { filters.update(equalizer.load()) }
-            let eq = equalizer != nil && filters.isOn
-            let preamp = filters.preamp
+            let eq = equalizer != nil
             let step = frames > 0 ? (target - current) / Float(frames) : 0
 
             for frame in 0..<frames {
                 let g = current + step * Float(frame)
                 // The tap is a stereo mix: left and right.
-                var left = sample(frame, 0)
-                var right = channels > 1 ? sample(frame, 1) : left
-                if eq {
-                    left = EqualizerFilters.limit(filters.process(left * preamp, channel: 0) * g)
-                    right = EqualizerFilters.limit(filters.process(right * preamp, channel: 1) * g)
-                } else {
-                    left *= g
-                    right *= g
-                }
-                // Left and right go to the first two outputs, other speakers stay silent.
+                var left = sample(frame, 0) * g
+                var right = (channels > 1 ? sample(frame, 1) : sample(frame, 0)) * g
+                // Equalized or not, through the same 1.5 ms, so every tap's delay is the same.
+                if eq { filters.process(&left, &right) }
+                // Left and right go to the output's stereo pair, other speakers stay silent.
                 var base = 0
                 for output in outputs {
                     let outChannels = Int(output.mNumberChannels)
                     guard let out = output.mData?.assumingMemoryBound(to: Float.self), outChannels > 0 else { continue }
                     for c in 0..<outChannels {
                         let channel = base + c
-                        let value: Float = totalOutputs == 1 ? (left + right) / 2 : channel == 0 ? left : channel == 1 ? right : 0
+                        let value: Float = totalOutputs == 1 ? (left + right) / 2 : channel == leftChannel ? left : channel == rightChannel ? right : 0
                         out[frame * outChannels + c] = value
                     }
                     base += outChannels

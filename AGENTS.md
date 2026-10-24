@@ -40,6 +40,22 @@ tool; keep it in step with the code.
 - `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
   ⇧⌘2/3/4/5, Vision for the text in an area (`TextReader`), and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
+  The Audio Mixer sends all sound through Core Audio process taps while it's on (`MixerController.applyTaps`):
+  one per app with sound open, by bundle ID, and a global one for the rest (software volume), each
+  running the equalizer. Sound moved between two taps while it plays clicks unless both are already
+  running, and a new tap never is: so a process only moves while it's quiet (heard by a listen-only
+  tap meanwhile), unless its app has a volume of its own, and every change is made in place
+  (`AppTap.update`), the taking tap first. A tap's device starts by itself when what it takes plays,
+  but never stops by itself, which keeps the output and the Mac awake: `rearm` puts it back to
+  waiting once nothing it takes has its output running. `--test-mixer-engine` checks all of it.
+  Its equalizer is ten overlapping peaks an octave apart: `EqualizerCurve` sets them on the main
+  thread so the curve meets each slider at its band (an accurate cascade graphic equalizer); the
+  preamp is the user's, 0 dB to start, as in the Music app, and nothing is turned down on its own.
+  Each tap's `EqualizerFilters` glides to it in double precision, then a look-ahead `PeakLimiter`
+  just below full scale. Every sound through a tap is held back by that
+  look-ahead (1.5 ms), equalized or not, so taps stay in line. `--test-equalizer` checks the curves,
+  the filters and the limiter; `--measure-headroom <folder>` measures on real music how far each
+  curve lifts peaks and how the limiter works (keep the music out of the repo).
   Mouse tells mice apart by `MouseIdentity` (`Mouse/HID.swift`): the Bluetooth address, or the serial
   number over USB, read from the I/O Registry, so two of the same model are two mice with their own
   settings, as the Bluetooth settings show them. A mouse with neither falls back to its model and
@@ -250,7 +266,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
 .build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
-.build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer]
+.build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer] [per-output]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
 .build/debug/Toolkit --snapshot out.png capture-text [light] [none|reading]   # the card after ⇧⌘2, with made-up text
 .build/debug/Toolkit --snapshot out.png volume-hud [light]      # the volume keys' bar: whole steps, part of one, muted
@@ -309,7 +325,10 @@ swift build                                  # compile check
 .build/debug/Toolkit --list-mice             # the mice the Mouse tool sees, what each is saved under, and its charge
 .build/debug/Toolkit --test-publishing       # each control on the made-up mouse's page, changed in code in a window never shown: no SwiftUI publishing-in-update issue, and the setting changes
 .build/debug/Toolkit --test-audio-access <report>   # the microphone and an audio tap work as signed (build.sh --dev; open -n the bundle)
+.build/debug/Toolkit --test-mixer-engine <report>   # the mixer on a quiet tone from a helper app: clicks when it pauses, has its volume changed or the equalizer switched, and sleep once it stops (build.sh --dev; open -n the bundle; nothing else using the mixer, so quit the installed app)
 .build/debug/Toolkit --test-volume           # the volume keys' steps, and saved software volumes on the even scale
+build/MacOS\ Toolkit.app/Contents/MacOS/Toolkit --measure-headroom <folder>   # each curve on the music in a folder: how far it lifts peaks, and the limiter's work (build.sh --dev, release speed)
+.build/debug/Toolkit --test-equalizer        # each preset's curve against its sliders, tones through the filters, the limiter at full scale, a preset change mid-tone, five-band equalizers read into ten
 .build/debug/Toolkit --show-hud              # the volume bar, for a few seconds
 ```
 
@@ -336,8 +355,8 @@ drawn by the window server, not the views, so `MainView.drawnChrome` draws stand
 
 There is no test suite. Check UI changes by rendering `--snapshot` images in both light and dark and
 looking at them (in Portuguese too, where words run longer), and check behaviour by running the installed app. Keep idle CPU near zero: a hidden
-SwiftUI view that animates still costs CPU, and Core Audio taps show macOS's purple recording
-indicator, so run them only when needed.
+SwiftUI view that animates still costs CPU. The mixer's Core Audio taps stay up while it's on (see
+the Audio Mixer note above) and must stay idle in silence.
 
 ## Versions and releases
 

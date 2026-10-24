@@ -121,10 +121,14 @@ struct MixerConfig: Codable, Equatable {
             if menuBarIcon != .none { menuBarIcon = newValue }
         }
     }
+    /// Each output keeps its own volume, as macOS does. Off, one volume goes
+    /// with whichever output is in use: switching sets the new one to it.
+    var volumePerOutput = false
+    /// That one volume, and whether it's muted, where the slider is.
+    var sharedVolume: SoftwareVolume?
     /// For outputs with no volume control of their own (most monitors over
-    /// HDMI or DisplayPort): the main slider and the volume keys lower the
-    /// sound in software instead.
-    var softwareVolume = true
+    /// HDMI or DisplayPort), the main slider and the volume keys lower the
+    /// sound in software instead; with a volume for each output, theirs.
     /// Keyed by the output device's UID.
     var software: [String: SoftwareVolume] = [:]
     var keyStep = VolumeKeyStep.standard
@@ -132,8 +136,15 @@ struct MixerConfig: Codable, Equatable {
     /// 36): for small changes.
     var fineStep = 1
     static let fineStepRange = 1...5
-    /// When on and not flat, all sound goes through the toolkit to be equalized.
+    /// The equalizer for every output, or, with `equalizerPerOutput`, for an
+    /// output that has none of its own yet.
     var equalizer = EqualizerConfig()
+    /// Headphones and speakers can want different curves: each output keeps
+    /// its own, made the first time it's changed there. Off, the per-output
+    /// ones are kept for when it's on again.
+    var equalizerPerOutput = false
+    /// By the output device's UID.
+    var equalizers: [String: EqualizerConfig] = [:]
     /// Keyed by bundle ID.
     var apps: [String: AppVolume] = [:]
     /// Apps the mixer never lists or taps: bundle ID to name.
@@ -161,11 +172,14 @@ struct MixerConfig: Codable, Equatable {
         // A file from before this was kept has the look in use, if any.
         let shown = (try? c.decodeIfPresent(MixerMenuBarIcon.self, forKey: .shownIcon)) ?? nil
         shownIcon = menuBarIcon != .none ? menuBarIcon : shown.flatMap { $0 == .none ? nil : $0 } ?? .volume
-        softwareVolume = try c.decodeIfPresent(Bool.self, forKey: .softwareVolume) ?? true
         software = (try? c.decodeIfPresent([String: SoftwareVolume].self, forKey: .software)) ?? [:]
+        volumePerOutput = try c.decodeIfPresent(Bool.self, forKey: .volumePerOutput) ?? false
+        sharedVolume = try? c.decodeIfPresent(SoftwareVolume.self, forKey: .sharedVolume)
         keyStep = (try? c.decodeIfPresent(VolumeKeyStep.self, forKey: .keyStep)) ?? .standard
         fineStep = min(max(try c.decodeIfPresent(Int.self, forKey: .fineStep) ?? 1, Self.fineStepRange.lowerBound), Self.fineStepRange.upperBound)
         equalizer = (try? c.decodeIfPresent(EqualizerConfig.self, forKey: .equalizer)) ?? EqualizerConfig()
+        equalizerPerOutput = try c.decodeIfPresent(Bool.self, forKey: .equalizerPerOutput) ?? false
+        equalizers = (try? c.decodeIfPresent([String: EqualizerConfig].self, forKey: .equalizers)) ?? [:]
         apps = (try? c.decodeIfPresent([String: AppVolume].self, forKey: .apps)) ?? [:]
         ignored = (try? c.decodeIfPresent([String: String].self, forKey: .ignored)) ?? [:]
         played = (try? c.decodeIfPresent(Set<String>.self, forKey: .played)) ?? []

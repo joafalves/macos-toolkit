@@ -38,7 +38,7 @@ struct MixerPopoverView: View {
                 }
                 .padding(.horizontal, 4)
 
-                if mixer.permission != .granted, mixer.needsAudioPermission {
+                if mixer.permission != .granted {
                     PermissionNotice(denied: mixer.permission == .denied) { mixer.requestPermission() }
                 }
 
@@ -143,8 +143,10 @@ struct MixerPopoverView: View {
 private struct EqualizerModule: View {
     @ObservedObject var mixer: MixerController
     @ObservedObject var expanded: ViewState<Bool>
+    /// A band column's slider, value and label.
+    private static let bandsHeight: CGFloat = 112
 
-    private var eq: EqualizerConfig { mixer.config.equalizer }
+    private var eq: EqualizerConfig { mixer.equalizer }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -172,14 +174,35 @@ private struct EqualizerModule: View {
                 Toggle("Equalizer", isOn: Binding(get: { eq.enabled }, set: { mixer.setEqualizerEnabled($0) }))
                     .toggleStyle(PanelSwitch())
                     .labelsHidden()
-                    .help("While it's on and not flat, all sound goes through the toolkit to be equalized.")
+                    .help(mixer.config.equalizerPerOutput ? "On or off for this output. Each output keeps its own equalizer." : "On or off for every output.")
             }
 
             if expanded.value {
                 VStack(spacing: 8) {
-                    HStack(alignment: .bottom, spacing: 0) {
+                    if mixer.config.equalizerPerOutput, let output = mixer.currentOutput {
+                        Text("For \(output.name)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    // Lined up at the top: a name that takes two lines ("Pré-amplificador") only grows down.
+                    HStack(alignment: .top, spacing: 0) {
+                        // The volume of everything, apart from the bands, as in the Music app.
+                        BandColumn(gain: eq.preamp, label: String(localized: "Preamp"), dimmed: !eq.enabled,
+                                   help: String(localized: "The volume of everything. Lower it if boosts make loud music sound squashed; double-click for 0 dB."),
+                                   accessibilityName: String(localized: "Preamp")) {
+                            mixer.setPreamp($0)
+                        }
+                        .frame(width: 66)
+                        Divider()
+                            .frame(height: Self.bandsHeight)
+                            .padding(.horizontal, 2)
                         ForEach(0..<EqualizerConfig.frequencies.count, id: \.self) { band in
-                            BandColumn(gain: eq.gains[band], label: EqualizerConfig.labels[band], dimmed: !eq.enabled) {
+                            let label = EqualizerConfig.labels[band]
+                            BandColumn(gain: eq.gains[band], label: label, dimmed: !eq.enabled,
+                                       help: String(localized: "\(label) Hz. Drag to boost or cut; double-click for 0 dB."),
+                                       accessibilityName: String(localized: "\(label) hertz")) {
                                 mixer.setBand(band, gain: $0)
                             }
                             .frame(maxWidth: .infinity)
@@ -219,11 +242,14 @@ private struct EqualizerModule: View {
     }
 }
 
-/// One band: its gain on top, a vertical slider from -12 to +12 dB, the frequency below.
+/// One band, or the preamp: its gain on top, a vertical slider from -12 to
+/// +12 dB, its name below.
 private struct BandColumn: View {
     let gain: Double
     let label: String
     let dimmed: Bool
+    let help: String
+    let accessibilityName: String
     let change: (Double) -> Void
 
     private static let height: CGFloat = 76
@@ -234,6 +260,11 @@ private struct BandColumn: View {
             Text(verbatim: gain == 0 ? "0" : gain == gain.rounded() ? String(format: "%+d", Int(gain)) : String(format: "%+.1f", locale: .current, gain))
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
                 .foregroundStyle(gain == 0 ? .tertiary : .secondary)
+                // "+0,5" is wider than a band's column in some languages: a little smaller, not cut.
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                // The same height when it shrinks, so every slider stays in line.
+                .frame(height: 13)
             GeometryReader { geo in
                 let range = EqualizerConfig.range
                 let mid = geo.size.height / 2
@@ -271,11 +302,14 @@ private struct BandColumn: View {
             Text(label)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .opacity(dimmed ? 0.6 : 1)
-        .help("\(label) Hz. Drag to boost or cut; double-click for 0 dB.")
+        .help(help)
         .accessibilityElement()
-        .accessibilityLabel("\(label) hertz")
+        .accessibilityLabel(accessibilityName)
         .accessibilityValue("\(gain, specifier: "%.1f") decibels")
         .accessibilityAdjustableAction { direction in
             switch direction {
@@ -616,8 +650,8 @@ private struct PermissionNotice: View {
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 6) {
                 Text(denied
-                     ? "System Audio Recording is off for MacOS Toolkit, so volume changes have no effect."
-                     : "Volume changes need the System Audio Recording permission.")
+                     ? "System Audio Recording is turned off for MacOS Toolkit, so the mixer can't change the sound."
+                     : "The mixer needs the System Audio Recording permission.")
                     .font(.system(size: 12))
                     .fixedSize(horizontal: false, vertical: true)
                 Button(denied ? "Open System Settings…" : "Allow…", action: action)

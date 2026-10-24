@@ -14,8 +14,8 @@ struct MixerSettingsView: View {
 
             if mixer.config.enabled, mixer.permission != .granted {
                 Banner(text: mixer.permission == .denied
-                       ? "System Audio Recording is turned off for MacOS Toolkit, so volume changes made here have no effect."
-                       : "Volume changes need the System Audio Recording permission. macOS asks for it the first time you turn an app down.",
+                       ? "System Audio Recording is turned off for MacOS Toolkit, so the mixer can't change the sound."
+                       : "The mixer needs the System Audio Recording permission: every app's volume, the equalizer and the software volume go through it.",
                        button: mixer.permission == .denied ? "Open System Settings…" : "Allow…") { mixer.requestPermission() }
             }
 
@@ -52,9 +52,13 @@ struct MixerSettingsView: View {
                         .fixedSize()
                     }
                     RowDivider()
-                    ToggleRow(title: "Software volume",
-                              caption: "Lets the toolkit control the sound itself when an output has no volume control of its own, as many monitors don't.",
-                              isOn: $mixer.config.softwareVolume)
+                    ToggleRow(title: "Volume for each output",
+                              caption: "Each output keeps its own volume, as macOS does. Off, the volume stays the same when you switch outputs.",
+                              isOn: $mixer.config.volumePerOutput)
+                    RowDivider()
+                    ToggleRow(title: "Equalizer for each output",
+                              caption: "Each output keeps its own equalizer, so headphones and speakers can sound different. Off, one equalizer for all of them.",
+                              isOn: $mixer.config.equalizerPerOutput)
                 }
 
                 Card(title: "Volume Keys") {

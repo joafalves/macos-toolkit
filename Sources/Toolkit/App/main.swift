@@ -27,7 +27,7 @@ AppLanguage.apply(GeneralConfig.load().language)
 // Development aid: `--snapshot <png> [section] [light]` renders the main window
 // to an image without showing it, so layout can be checked from the terminal.
 // `switcher-list` in place of a section renders the window switcher's list,
-// `mixer-popover [outputs] [software] [equalizer]` the menu bar mixer,
+// `mixer-popover [outputs] [software] [equalizer] [per-output]` the menu bar mixer,
 // `capture-toolbar [video]` the Screen Capture toolbar, `layout-grid` the
 // Window Layout grid over a drawn desktop, `layout-slots` its drag layouts,
 // `layout-suggest` the windows it offers for the rest of a display.
@@ -49,7 +49,7 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         exit(0)
     }
     if rest.contains("mixer-popover") {
-        Snapshot.writeMixer(to: rest[0], light: rest.contains("light"), outputs: rest.contains("outputs"), software: rest.contains("software"), equalizer: rest.contains("equalizer"))
+        Snapshot.writeMixer(to: rest[0], light: rest.contains("light"), outputs: rest.contains("outputs"), software: rest.contains("software"), equalizer: rest.contains("equalizer"), perOutput: rest.contains("per-output"))
         exit(0)
     }
     if rest.contains("stats-bar") {
@@ -149,6 +149,18 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-update"), CommandLine
 // Development aid: `--list-audio` prints the apps the audio mixer sees.
 // Development aid: `--test-volume`, the volume keys' steps and saved
 // software volumes read onto the even scale.
+// `--test-equalizer`: the presets' curves, tones through the filters, the
+// limiter, a preset change mid-tone, and five-band equalizers read into ten.
+// `--measure-headroom <folder>`: how far each equalizer curve lifts real
+// music's peaks, and how the limiter would work with less headroom.
+if let flag = CommandLine.arguments.firstIndex(of: "--measure-headroom"), CommandLine.arguments.count > flag + 1 {
+    MixerController.measureHeadroom(CommandLine.arguments[flag + 1])
+    exit(0)
+}
+if CommandLine.arguments.contains("--test-equalizer") {
+    MixerController.equalizerTest()
+    exit(0)
+}
 if CommandLine.arguments.contains("--test-volume") {
     MixerController.volumeTest()
     exit(0)
@@ -157,6 +169,18 @@ if CommandLine.arguments.contains("--test-volume") {
 // signed (the hardened runtime). Run the app bundle with `open -n`.
 if let flag = CommandLine.arguments.firstIndex(of: "--test-audio-access"), CommandLine.arguments.count > flag + 1 {
     MixerController.accessTest(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+// `--test-mixer-engine <report>`: the mixer run for real on a tone from a
+// helper app: clicks as it pauses, has its volume changed and the equalizer
+// switched, and whether the Mac can sleep once it stops. Run with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-mixer-engine"), CommandLine.arguments.count > flag + 1 {
+    MixerEngineTest.run(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+// The helper that test starts: a copy of this app playing a tone.
+if let flag = CommandLine.arguments.firstIndex(of: "--play-tone") {
+    MixerEngineTest.playTone(Array(CommandLine.arguments[(flag + 1)...]))
     exit(0)
 }
 if CommandLine.arguments.contains("--list-audio") {

@@ -20,15 +20,43 @@ worked on; it gets its date when it's released.
 - **Permissions:** a page of its own in the sidebar, under Settings, with every permission, what
   uses it and whether it's granted. Revoke… resets one, Revoke All… every one, and the app
   restarts; where macOS doesn't allow it, it says where to turn it off.
+- **Audio Mixer:** **Equalizer for each output**, in the settings: each output keeps its own
+  equalizer, so headphones and speakers can sound different.
+- **Audio Mixer:** **Volume for each output**, in the settings, for each output to keep its own
+  volume, as macOS does.
 
 ### Changed
 
 - **Finder:** the extension behind the right-click menu is turned on with the menu: as the tool or
   a first item in it is turned on, and once for a setup that already had items on with it off.
   Turned off in System Settings later, a relaunch leaves it off.
+- **Audio Mixer:** the equalizer has ten bands an octave apart, 32 Hz to 16 kHz, as the Music app's,
+  and each slider is what the sound gets at its band; before, the outer two worked mostly below
+  45 Hz and above 14 kHz. A Preamp beside them sets the volume of everything, as in the Music app.
+  The presets are redone for the new bands, with Treble Reducer added. An equalizer set before
+  keeps its sound.
+- **Audio Mixer:** dragging an equalizer band or picking a preset glides, without clicks.
+- **Audio Mixer:** while it's on, all sound goes through it, each app through a tap of its own that
+  it moves into while it's quiet. Changing an app's volume, putting it back to 100% and turning the
+  equalizer on or off no longer click or pop while something plays; the equalizer fades in and out.
+- **Audio Mixer:** the software volume is always on for outputs with no volume control of their
+  own, and its setting is gone. macOS shows its recording indicator while the mixer is on.
+- **Audio Mixer:** System Audio Recording is asked for as the mixer is turned on, no longer the first
+  time an app is turned down.
+- **Audio Mixer:** the volume stays the same when you switch outputs, unless **Volume for each
+  output** is on: headphones that connect are set to the volume in use, not left at their own.
 
 ### Fixed
 
+- **Audio Mixer:** once sound had gone through the mixer (an app turned down, the equalizer, or the
+  software volume), the output kept running after it stopped, which kept the Mac from sleeping and
+  Core Audio busy until the output changed. It's let go two seconds after the sound stops.
+- **Audio Mixer:** on an output whose stereo pair isn't its first two channels (as set in Audio
+  MIDI Setup), sound through the mixer came out of the first two.
+- **Audio Mixer:** the equalizer distorted loud music: everything over 80% of full scale was
+  rounded off, even with every band cut, and a peak over full scale was turned down on the spot,
+  which crackled. A look-ahead limiter now turns down only what would go over, smoothly, 1.5 ms
+  ahead.
 - **Permissions:** Screen Recording turned on in System Settings no longer shows as missing until
   the app restarts: it says it's waiting for a restart, with a button for it, on Overview, the
   Permissions page, the sheet, and the Window Switcher's and Window Layout's previews.
