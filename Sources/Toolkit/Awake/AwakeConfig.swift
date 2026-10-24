@@ -34,8 +34,6 @@ struct AwakeConfig: Codable, Equatable {
     /// Off keeps only the system awake: the display may sleep while
     /// downloads and jobs go on.
     var keepDisplayOn = true
-    /// Awake with the lid closed, on battery too. Needs the admin rule.
-    var lidClosed = false
     /// On battery, a session ends below this charge, and none starts. 0 is never.
     var batteryFloor = 0
     var notifyAtEnd = false
@@ -62,7 +60,6 @@ struct AwakeConfig: Codable, Equatable {
         showElapsed = try c.decodeIfPresent(Bool.self, forKey: .showElapsed) ?? false
         shortcut = try c.decodeIfPresent(Shortcut.self, forKey: .shortcut) ?? .none
         keepDisplayOn = try c.decodeIfPresent(Bool.self, forKey: .keepDisplayOn) ?? true
-        lidClosed = try c.decodeIfPresent(Bool.self, forKey: .lidClosed) ?? false
         batteryFloor = try c.decodeIfPresent(Int.self, forKey: .batteryFloor) ?? 0
         notifyAtEnd = try c.decodeIfPresent(Bool.self, forKey: .notifyAtEnd) ?? false
         soundAtEnd = try c.decodeIfPresent(Bool.self, forKey: .soundAtEnd) ?? true

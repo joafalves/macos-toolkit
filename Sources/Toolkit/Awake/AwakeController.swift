@@ -19,8 +19,6 @@ final class AwakeController: ObservableObject {
     @Published private(set) var session: AwakeSession?
     /// Goes up as the minutes left (or, with no end, on) change, for what the menu bar shows.
     @Published private(set) var minute = 0
-    /// The rule for the lid-closed option is installed.
-    @Published private(set) var lidReady = false
     @Published private(set) var accessibility = AXIsProcessTrusted()
     @Published private(set) var shortcutFailed = false
     /// On battery below the stop level: a session can't start.
@@ -34,14 +32,13 @@ final class AwakeController: ObservableObject {
     static func title(hours: Int) -> String { hours == 1 ? String(localized: "1 Hour") : String(localized: "\(hours) Hours") }
 
     enum Ending {
-        case byHand, ranOut, battery(Int), hot
+        case byHand, ranOut, battery(Int)
     }
 
     var persists = true
     private var isPreview = false
     private var assertion: IOPMAssertionID?
     private var assertionKeepsDisplay = false
-    private var sleepDisabled = false
     private var tick: Timer?
     private var power: CFRunLoopSource?
     private var stayParameters: (StayAvailableMethod, TimeInterval)?
@@ -66,16 +63,11 @@ final class AwakeController: ObservableObject {
     }
 
     func start() {
-        // Left on by a crash.
-        LidSleep.restore()
-        refreshLidRule()
+        LidSleep.removeLeftovers()
         key.onPress = { [weak self] in self?.toggle() }
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: ShortcutRecording.changed, object: nil, queue: .main) { [weak self] _ in
             self?.key.suspend(ShortcutRecording.active)
-        })
-        observers.append(center.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.checkHeat()
         })
         // A timer doesn't run while the Mac sleeps: the time may be up on waking.
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
@@ -97,8 +89,6 @@ final class AwakeController: ObservableObject {
         tick?.invalidate()
         tick = nil
         stopPowerWatch()
-        if sleepDisabled { LidSleep.restore() }
-        sleepDisabled = false
         key.set(nil)
     }
 
@@ -149,7 +139,6 @@ final class AwakeController: ObservableObject {
         case .byHand: break
         case .ranOut: notify("Its time is up.")
         case .battery(let percent): notify("The battery is at \(percent)%.")
-        case .hot: notify("The Mac got too hot with the lid closed.")
         }
     }
 
@@ -167,14 +156,6 @@ final class AwakeController: ObservableObject {
 
         if on { holdAssertion(keepingDisplay: config.displayStaysOn) } else { releaseAssertion() }
 
-        let wantsLid = on && config.lidClosed && lidReady
-        if wantsLid, !sleepDisabled {
-            sleepDisabled = LidSleep.disableSleep()
-        } else if !wantsLid, sleepDisabled {
-            LidSleep.restore()
-            sleepDisabled = false
-        }
-
         // Off too, so the menus know whether a session can start.
         if config.enabled, config.batteryFloor > 0 { startPowerWatch() } else { stopPowerWatch() }
 
@@ -189,33 +170,6 @@ final class AwakeController: ObservableObject {
         shortcutFailed = key.failed
         scheduleTick()
         checkBattery()
-    }
-
-    // MARK: - Lid closed
-
-    /// Turning the option on installs the rule first, which asks for an admin
-    /// password; cancelled, it stays off.
-    func setLidClosed(_ on: Bool) {
-        if on {
-            guard LidSleep.ready || LidSleep.install() else { return }
-            lidReady = true
-            config.lidClosed = true
-        } else {
-            config.lidClosed = false
-            sleepDisabled = false
-            LidSleep.uninstall()
-            lidReady = false
-        }
-    }
-
-    /// The option may be on without the rule, if it was taken out by hand; it
-    /// then counts as off until it's turned on again.
-    private func refreshLidRule() {
-        lidReady = config.lidClosed && LidSleep.ready
-    }
-
-    private func checkHeat() {
-        if sleepDisabled, ProcessInfo.processInfo.thermalState == .critical { end(.hot) }
     }
 
     // MARK: - The assertion

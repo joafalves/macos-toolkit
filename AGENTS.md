@@ -21,9 +21,10 @@ tool; keep it in step with the code.
   `CoreDockSendNotification` (through `dlsym`) for Window Layout's Show the desktop, `SetsCursorInBackground`
   so the capture overlay can set the cursor without activating the app, and IOReport (through
   `dlopen`) for System Stats' CPU and GPU watts, subscribed to only while the power stat is read.
-- Root only through one narrow rule: Keep Awake's lid-closed option asks for the admin password once
-  and installs `/etc/sudoers.d/macos-toolkit`, which allows `pmset -a disablesleep 0/1` and removing
-  itself, checked with `visudo` first (`LidSleep.swift`). Nothing runs as root otherwise.
+- Nothing runs as root. Keep Awake's lid-closed option did before 0.19.3, through a rule in
+  `/etc/sudoers.d` for `pmset -a disablesleep`; sudo can't tell which program asks, so any process
+  could use it, and it was taken out. `LidSleep.swift` now only removes that rule at launch, putting
+  sleep back on first. Don't bring back a sudoers rule or anything else another process could use.
 
 ## Layout
 
@@ -79,8 +80,8 @@ tool; keep it in step with the code.
 - **Adding a tool:** a case in `AppSection` (title, symbol, colour), a view in `MainView`, a field in
   `SettingsFile` (optional, so old exports still import), a section in `README.md`.
 - **Import merges, setting by setting** (`SettingsTransfer.merge`): what a file lacks stays as it is
-  here. A setting that only holds on this Mac, because it goes with a grant made here (the lid-closed
-  admin rule), goes in `SettingsTransfer.localOnly`: never exported, never imported.
+  here. A setting that only holds on this Mac, because it goes with a grant made here, goes in
+  `SettingsTransfer.localOnly`: never exported, never imported (none at the moment).
 - **Settings pages** use `Page` and `Card`. Controls that change behaviour go through the config.
   A tool's page starts with `ToolHeader` (its name and the Enabled switch, bound to the config's
   `enabled`) and wraps the rest in `WhenEnabled`. Shortcuts are `Shortcut` values set with
@@ -154,7 +155,7 @@ tool; keep it in step with the code.
 - **Memory and CPU:** the settings window is released when it closes. Background work runs on
   change or on a slow timer, not on a fast poll; check with `--measure-idle` and `footprint`.
 - Clean up after yourself: anything the app changes outside itself (Cmd-Tab, the screenshot keys,
-  macOS's window tiling, device properties, Core Audio taps, `pmset disablesleep`) is restored on quit, on `kill`, and at the next launch if the
+  macOS's window tiling, device properties, Core Audio taps) is restored on quit, on `kill`, and at the next launch if the
   app crashed.
 - **Languages:** English (the code's own text, no table) and Portuguese (Portugal), `pt-PT`. The app
   follows macOS unless Settings picks one (`GeneralConfig.language`, applied as the app's
@@ -240,7 +241,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)
-.build/debug/Toolkit --test-awake <report>   # Keep Awake's assertion, times, lid rule (visudo) and one mouse drift (open -n)
+.build/debug/Toolkit --test-awake <report>   # Keep Awake's assertion, times and one mouse drift (open -n)
 .build/debug/Toolkit --test-nudge <report>   # which posted input resets the idle time chat apps read (open -n; leave the mouse alone)
 .build/debug/Toolkit --test-settings        # export leaves out local-only settings; import merges and keeps the rest
 .build/debug/Toolkit --test-shortcuts        # config migration, and which macOS screenshot shortcuts clash

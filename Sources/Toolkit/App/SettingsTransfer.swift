@@ -24,10 +24,11 @@ struct SettingsFile: Codable {
 }
 
 enum SettingsTransfer {
-    /// Settings that only hold on the Mac they were set on, so they're never
-    /// exported and an import leaves them alone: the lid-closed option goes
-    /// with an admin rule installed with a password on that Mac.
-    static let localOnly: [String: Set<String>] = ["awake": ["lidClosed"]]
+    /// Settings that only hold on the Mac they were set on, because they go
+    /// with something granted there, so they're never exported and an import
+    /// leaves them alone. None now: Keep Awake's lid-closed option, with its
+    /// admin rule, was the one.
+    static let localOnly: [String: Set<String>] = [:]
 
     static func exportSettings(model: AppModel, mouse: MouseController, switcher: SwitcherController, layout: LayoutController, mixer: MixerController, finder: FinderController, capture: CaptureController, awake: AwakeController, stats: StatsController) {
         let panel = NSSavePanel()
@@ -113,8 +114,8 @@ enum SettingsTransfer {
 }
 
 extension SettingsTransfer {
-    /// `--test-settings`: an export leaves out the local-only settings, and
-    /// an import keeps what the file doesn't have.
+    /// `--test-settings`: an export has every setting, and an import keeps
+    /// what the file doesn't have.
     static func selfTest() {
         var failures = 0
         func check(_ ok: Bool, _ what: String) {
@@ -122,21 +123,19 @@ extension SettingsTransfer {
             if !ok { failures += 1 }
         }
         var awake = AwakeConfig()
-        awake.lidClosed = true
         awake.batteryFloor = 30
         let file = SettingsFile(mouse: MouseConfig(), awake: awake)
         let json = (try? exported(file)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         let exportedAwake = json?["awake"] as? [String: Any]
-        check(exportedAwake?["lidClosed"] == nil && exportedAwake?["batteryFloor"] as? Int == 30, "export: lid closed left out, the rest kept")
+        check(exportedAwake?["batteryFloor"] as? Int == 30, "export: the settings are in it")
 
         var local = AwakeConfig()
-        local.lidClosed = true
         local.batteryFloor = 10
         local.soundAtEnd = false
-        merge(&local, ["batteryFloor": 50, "lidClosed": false], tool: "awake")
-        check(local.batteryFloor == 50, "import: a setting in the file is taken")
+        // Files exported before 0.19.3 can have the lid-closed option, which is gone.
+        merge(&local, ["batteryFloor": 50, "lidClosed": true], tool: "awake")
+        check(local.batteryFloor == 50, "import: a setting in the file is taken, one that's gone ignored")
         check(local.soundAtEnd == false, "import: a setting missing from the file stays as it is here")
-        check(local.lidClosed == true, "import: a local-only setting in the file is ignored")
 
         // This Mac's own settings, merged with nothing, come back the same.
         func same<Config: Codable & Equatable>(_ config: Config, _ name: String) {

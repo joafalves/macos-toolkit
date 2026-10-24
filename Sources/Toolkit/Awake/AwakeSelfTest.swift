@@ -3,8 +3,8 @@ import IOKit.pwr_mgt
 
 extension AwakeController {
     /// `--test-awake <report>`: a session holds the right power assertion and
-    /// lets go of it, the time left reads right, the battery can be read, the
-    /// lid rule passes visudo, and one mouse drift lands where it should. Run
+    /// lets go of it, the time left reads right, the battery can be read, and
+    /// one mouse drift lands where it should. Run
     /// the app bundle with `open -n`, so Accessibility is the app's own;
     /// sessions here aren't saved, so the app's own is left alone.
     static func selfTest(into path: String) {
@@ -73,22 +73,6 @@ extension AwakeController {
         } else {
             print("      no battery")
         }
-
-        // visudo runs as anyone for a syntax check.
-        if let rule = LidSleep.rule(for: NSUserName()) {
-            let file = FileManager.default.temporaryDirectory.appendingPathComponent("toolkit-rule-\(getpid())")
-            try? (rule + "\n").write(to: file, atomically: true, encoding: .utf8)
-            let visudo = Process()
-            visudo.executableURL = URL(fileURLWithPath: "/usr/sbin/visudo")
-            visudo.arguments = ["-cf", file.path]
-            visudo.standardOutput = FileHandle.nullDevice
-            visudo.standardError = FileHandle.nullDevice
-            try? visudo.run()
-            visudo.waitUntilExit()
-            try? FileManager.default.removeItem(at: file)
-            check(visudo.terminationStatus == 0, "lid rule passes visudo: \(rule)")
-        }
-        check(LidSleep.rule(for: "a b") == nil && LidSleep.rule(for: "x;rm") == nil, "lid rule refuses odd user names")
 
         // One drift, when the mouse is left alone for a moment.
         if AXIsProcessTrusted() {

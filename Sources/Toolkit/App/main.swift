@@ -283,7 +283,7 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-nudge"), CommandLine.
     AwakeProbe.run(into: CommandLine.arguments[flag + 1])
     exit(0)
 }
-// `--test-awake <report>`: Keep Awake's assertion, times, lid rule and a
+// `--test-awake <report>`: Keep Awake's assertion, times and a
 // mouse drift. Run the app bundle with `open -n`.
 if let flag = CommandLine.arguments.firstIndex(of: "--test-awake"), CommandLine.arguments.count > flag + 1 {
     AwakeController.selfTest(into: CommandLine.arguments[flag + 1])

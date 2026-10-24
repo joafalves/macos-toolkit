@@ -1180,9 +1180,6 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:161 */
 "On" = "Ativado";
 
-/* Sources/Toolkit/Awake/AwakeSettingsView.swift:92 */
-"On battery too. Asks for your password once, to allow it. A closed Mac in a bag can get hot; Keep Awake stops if it does." = "Também com bateria. Pede a sua palavra-passe uma vez, para o permitir. Um Mac fechado numa mala pode aquecer; se isso acontecer, o Keep Awake para.";
-
 /* Sources/Toolkit/Awake/AwakeController.swift:299 */
 "On until %@, %@ left" = "Ativo até às %@ (falta %@)";
 
@@ -1717,9 +1714,6 @@
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:21 */
 "Stay available needs the Accessibility permission." = "Manter disponível precisa da permissão de Acessibilidade.";
 
-/* Sources/Toolkit/Awake/AwakeSettingsView.swift:91 */
-"Stay awake with the lid closed" = "Manter ativo com a tampa fechada";
-
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:133 */
 "Still rough in places. The windows not shown wait behind the shown one, at the same size. One dragged out, resized so it no longer fits, closed or minimized leaves the stack; with one left, it gets the whole slot back." = "Ainda pouco polido em alguns pontos. As janelas não mostradas esperam atrás da mostrada, com o mesmo tamanho. Uma arrastada para fora, redimensionada de forma a já não caber, fechada ou minimizada sai da pilha; quando sobra uma, volta a ter a zona inteira.";
 
@@ -1863,9 +1857,6 @@
 
 /* Sources/Toolkit/App/AboutView.swift:25 */
 "The little things macOS never shipped, in one menu bar app." = "As pequenas coisas que o macOS nunca trouxe, numa aplicação da barra de menus.";
-
-/* Sources/Toolkit/Awake/AwakeController.swift:152 */
-"The Mac got too hot with the lid closed." = "O Mac aqueceu demasiado com a tampa fechada.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:102 */
 "The main display" = "O monitor principal";
@@ -2141,7 +2132,7 @@
 "When it's on until you turn it off, the menu bar shows how long it's been on." = "Quando está ativo até o desativar, a barra de menus mostra há quanto tempo está ativo.";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:106 */
-"When its time is up, or the battery or the heat stops it. Not when you turn it off." = "Quando o tempo acaba, ou a bateria ou o calor o param. Não quando o desativa.";
+"When its time is up, or the battery stops it. Not when you turn it off." = "Quando o tempo acaba, ou a bateria o para. Não quando o desativa.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:22 */
 "When off, cursor settings stay applied after the app quits, until the mouse reconnects." = "Se desativado, as definições do cursor ficam aplicadas depois de sair da aplicação, até o rato voltar a ligar-se.";

@@ -88,10 +88,6 @@ struct AwakeSettingsView: View {
                               link: awake.config.stayAvailable ? .heldBy("On while Stay available is on", anchor: Anchor.stayAvailable) : nil)
                         .settingAnchor(Anchor.keepDisplayOn)
                     RowDivider()
-                    ToggleRow(title: "Stay awake with the lid closed",
-                              caption: "On battery too. Asks for your password once, to allow it. A closed Mac in a bag can get hot; Keep Awake stops if it does.",
-                              isOn: Binding(get: { awake.config.lidClosed && awake.lidReady }, set: { awake.setLidClosed($0) }))
-                    RowDivider()
                     SettingRow(title: "Stop on battery below", caption: "And don't start below it. Charging never stops it.") {
                         Picker("Stop on battery below", selection: $awake.config.batteryFloor) {
                             Text("Never").tag(0)
@@ -103,7 +99,7 @@ struct AwakeSettingsView: View {
                     }
                 }
 
-                Card(title: "When It Ends", footnote: "When its time is up, or the battery or the heat stops it. Not when you turn it off.") {
+                Card(title: "When It Ends", footnote: "When its time is up, or the battery stops it. Not when you turn it off.") {
                     ToggleRow(title: "Notification", isOn: $awake.config.notifyAtEnd)
                     RowDivider()
                     ToggleRow(title: "Sound", isOn: $awake.config.soundAtEnd)

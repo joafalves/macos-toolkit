@@ -95,7 +95,7 @@
       <a href="#keep-awake">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="docs/images/awake-dark.png">
-          <img src="docs/images/awake-light.png" width="520" alt="Keep Awake settings: the session, menu bar look, shortcut, display, lid closed and battery">
+          <img src="docs/images/awake-light.png" width="520" alt="Keep Awake settings: the session, menu bar look, shortcut, display and battery">
         </picture><br>
         <b>Keep Awake</b>
       </a>
@@ -128,7 +128,7 @@ section in the sidebar and (where it makes sense) an entry in the menu bar.
 | 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings, with window backdrops and small H.264 files, and ⇧⌘2 to copy the text on screen. |
 | 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar, with a memory figure that leaves out what macOS only caches. |
-| ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off, with the lid closed if you like. |
+| ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off. |
 
 Each tool can be turned off or left on its macOS defaults, and anything the app changes outside
 itself is put back when it quits. No accounts, no telemetry, no network code. Settings are plain JSON in
@@ -619,12 +619,6 @@ of an hour at a time. Keep the display on and Stay available are switches at the
   default, shows how long a session with no end has been on instead.
 - **Keep the display on** is the default. Turned off, only the Mac stays awake: the display sleeps,
   and downloads and long jobs go on.
-- **Stay awake with the lid closed**, on battery too, is off by default. macOS only allows that to an
-  admin, so turning it on asks for your password once and adds a rule to `/etc/sudoers.d` that lets
-  the toolkit run `pmset -a disablesleep` and nothing else. Turning it off removes the rule. Sleep is
-  put back when a session ends, when the app quits or is killed, and at the next launch after a
-  crash. If the Mac gets too hot with the lid closed, the session ends. Being tied to this Mac, it's
-  left out of exported settings.
 - **On battery below a level you pick** (never, by default) a session ends, and none starts. Charging
   never ends one.
 - **When it ends** on its own, a sound (the default), a notification, both or neither.
@@ -729,7 +723,9 @@ and links to the project on GitHub.
 - To carry your settings to another Mac, use **Settings → Export…** and **Import…**.
 
 To remove it, quit the app, delete it from `/Applications`, and delete
-`~/Library/Application Support/MacOS Toolkit`.
+`~/Library/Application Support/MacOS Toolkit`. If you turned on Keep Awake's lid-closed option in
+0.19.2 or earlier, update first, which removes the rule it added; or remove it yourself with
+`sudo rm /etc/sudoers.d/macos-toolkit` and `sudo pmset -a disablesleep 0`.
 
 ## The menu bar
 
@@ -776,7 +772,7 @@ it too.
   is a personal tool, so expect to rebuild when they do.
 - It is **not notarized**, which is why the install steps above remove the quarantine flag.
 - Anything the toolkit changes outside itself (⌘Tab, the screenshot keys, macOS's window tiling and its margins,
-  device properties, audio taps, sleep with the lid closed) is put back when it quits, when it is killed, and at the next launch if it crashed.
+  device properties, audio taps) is put back when it quits, when it is killed, and at the next launch if it crashed.
 
 ## Project layout
 

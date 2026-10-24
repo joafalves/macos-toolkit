@@ -3,6 +3,15 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.19.3 (unreleased)
+
+### Changed
+
+- **Keep Awake:** Stay awake with the lid closed is gone. It ran macOS's sleep setting as an admin
+  through a rule that any app on this Mac could use too, to keep the Mac from sleeping with the lid
+  closed. On a Mac that had it, the rule is removed and sleep turned back on when the app starts.
+  With power and a display connected, macOS already keeps a closed Mac awake.
+
 ## 0.19.2 (2026-10-24)
 
 ### Added
