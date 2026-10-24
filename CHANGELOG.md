@@ -3,6 +3,14 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.25.0 (unreleased)
+
+### Added
+
+- **Screen Capture:** Menu Bar While Recording picks what shows beside the stop button: the time,
+  the size, both or neither, and both on one line or on two of small text, which take less room
+  beside the notch.
+
 ## 0.24.4 (2026-10-28)
 
 ### Fixed

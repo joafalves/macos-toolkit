@@ -165,6 +165,19 @@ struct CaptureSettingsView: View {
                         }
                     }
                 }
+
+                Card(title: "Menu Bar While Recording",
+                     footnote: "The stop button is always there: a click stops the recording, a right-click pauses it.") {
+                    ToggleRow(title: "Duration", caption: "How long it's been recording.", isOn: $capture.config.recordingTime)
+                    RowDivider()
+                    ToggleRow(title: "File size", caption: "How big the recording is so far.", isOn: $capture.config.recordingSize)
+                    if capture.config.recordingTime, capture.config.recordingSize {
+                        RowDivider()
+                        OptionRow(title: "Layout", caption: "Two lines, the time above the size, take less room in the menu bar.",
+                                  selection: $capture.config.recordingLayout,
+                                  options: [(.oneLine, "One line"), (.twoLines, "Two lines")])
+                    }
+                }
             }
         }
         .onAppear { capture.refreshPermissions() }

@@ -69,6 +69,14 @@ enum ImageFormat: String, Codable, CaseIterable {
     var fileExtension: String { self == .jpeg ? "jpg" : rawValue }
 }
 
+/// How the recording's time and size sit beside its stop button in the menu bar.
+enum RecordingLayout: String, Codable, CaseIterable {
+    /// "0:42 · 3,1 MB".
+    case oneLine
+    /// The time above the size, in small text, as System Stats' compact layout.
+    case twoLines
+}
+
 struct CaptureConfig: Codable, Equatable {
     /// When off, the tool is gone: no shortcuts, no menu entry, and macOS's own
     /// screenshot keys work again.
@@ -126,6 +134,10 @@ struct CaptureConfig: Codable, Equatable {
     var microphoneID = ""
     /// Empty means ~/Movies/Capture.
     var recordingFolder = ""
+    /// What the menu bar shows beside the stop button while recording.
+    var recordingTime = true
+    var recordingSize = true
+    var recordingLayout = RecordingLayout.oneLine
 
     init() {}
 
@@ -167,6 +179,9 @@ struct CaptureConfig: Codable, Equatable {
         microphone = try c.decodeIfPresent(Bool.self, forKey: .microphone) ?? false
         microphoneID = try c.decodeIfPresent(String.self, forKey: .microphoneID) ?? ""
         recordingFolder = try c.decodeIfPresent(String.self, forKey: .recordingFolder) ?? ""
+        recordingTime = try c.decodeIfPresent(Bool.self, forKey: .recordingTime) ?? true
+        recordingSize = try c.decodeIfPresent(Bool.self, forKey: .recordingSize) ?? true
+        recordingLayout = (try? c.decodeIfPresent(RecordingLayout.self, forKey: .recordingLayout)) ?? .oneLine
     }
 
     static let defaultScreenshotDirectory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Pictures/Capture")

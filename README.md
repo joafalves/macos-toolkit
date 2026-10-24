@@ -620,7 +620,9 @@ changed or cleared in the settings, and ⌃ added to the display or area shortcu
   track), cursor and click rings. A window recording follows the window when it moves, and windows
   on top of it don't show.
 - While recording, the menu bar shows a **stop button with the time and size** so far. Right-click
-  it to pause, resume or discard. ⇧⌘5 stops too. When it stops, the file is saved to
+  it to pause, resume or discard. ⇧⌘5 stops too. **Menu Bar While Recording** on its page picks
+  which of the two show, and whether they're on one line or on two of small text, which take less
+  room beside the notch. When it stops, the file is saved to
   `~/Movies/Capture` (or a folder you pick) and put on the clipboard as a file, ready to paste.
 - The toolbar remembers the last area. The toolkit's own toolbar, outline and thumbnails never show
   up in a capture.

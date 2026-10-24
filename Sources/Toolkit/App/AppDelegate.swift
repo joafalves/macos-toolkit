@@ -206,10 +206,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         var segments = [MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")]
         segments += stats.segments()
         if let state = capture.recording {
-            let time = MenuBarArt.duration(state.elapsed) + (state.bytes > 0 ? " · " + MenuBarArt.bytes(state.bytes) : "")
-            segments.append(MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: state.paused), text: time,
-                                           label: state.paused ? String(localized: "Recording paused. Click to stop, right-click for more.")
-                                                               : String(localized: "Recording. Click to stop, right-click to pause.")))
+            let config = capture.config
+            // Two lines only for both: the time alone stays on one.
+            segments.append(.recording(time: config.recordingTime ? MenuBarArt.duration(state.elapsed) : nil,
+                                       size: config.recordingSize && state.bytes > 0 ? MenuBarArt.bytes(state.bytes) : nil,
+                                       twoLines: config.recordingLayout == .twoLines && config.recordingTime && config.recordingSize,
+                                       paused: state.paused,
+                                       label: state.paused ? String(localized: "Recording paused. Click to stop, right-click for more.")
+                                                           : String(localized: "Recording. Click to stop, right-click to pause.")))
         } else if capture.config.enabled, capture.config.standaloneIcon {
             segments.append(MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: AppSection.capture.title))
         }

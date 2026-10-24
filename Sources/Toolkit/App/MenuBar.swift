@@ -43,6 +43,20 @@ struct MenuBarSegment: Equatable {
     /// For VoiceOver and the tooltip.
     var label: String
 
+    /// A recording's stop button, with what's chosen of its time and size
+    /// beside it: on one line, or in two of small text, as System Stats'
+    /// compact layout, which take less room.
+    static func recording(time: String?, size: String?, twoLines: Bool, paused: Bool, label: String) -> MenuBarSegment {
+        var segment = MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: paused), label: label)
+        let parts = [time, size].compactMap { $0 }
+        if twoLines, !parts.isEmpty {
+            segment.columns = [MenuBarArt.column(parts.map { MenuBarArt.Line(text: $0) })]
+        } else if !parts.isEmpty {
+            segment.text = parts.joined(separator: " · ")
+        }
+        return segment
+    }
+
     static func == (a: MenuBarSegment, b: MenuBarSegment) -> Bool {
         a.kind == b.kind && a.glyph === b.glyph && a.colored === b.colored && a.text == b.text && a.dimText == b.dimText
             && a.tint == b.tint && a.columns == b.columns && a.widthOf == b.widthOf && a.fitted == b.fitted && a.label == b.label
