@@ -11,6 +11,8 @@ worked on; it gets its date when it's released.
 
 ### Changed
 
+- **Audio Mixer:** turned on for the first time, it's in the menu bar, as Volume, rather than only in
+  the toolkit panel. Settings already made are kept.
 - **Settings window:** in Portuguese, About is now called Sobre.
 
 ### Fixed
@@ -19,6 +21,8 @@ worked on; it gets its date when it's released.
   Screen Recording, the microphone) to capture the screen, read window titles or send input. The
   development flags that allowed it are left out of released builds, and the app is signed with
   macOS's hardened runtime, which keeps other processes from loading code into it.
+- **Audio Mixer:** Volume and percentage in the menu bar keeps one width, at 0% and 100% too, so the
+  item no longer shifts as the volume changes.
 
 ## 0.19.1 (2026-10-24)
 

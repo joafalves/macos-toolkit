@@ -100,7 +100,8 @@ struct MixerConfig: Codable, Equatable {
     /// The whole tool: when off, every app plays at the main volume, the keys
     /// are macOS's, and the menu has no mixer.
     var enabled = true
-    var menuBarIcon = MixerMenuBarIcon.none {
+    /// In the menu bar from the start: turned on, the mixer is one click away.
+    var menuBarIcon = MixerMenuBarIcon.volume {
         didSet { if menuBarIcon != .none { shownIcon = menuBarIcon } }
     }
     /// The look it had when last in the menu bar, for when it's put back.
@@ -138,7 +139,9 @@ struct MixerConfig: Codable, Equatable {
         } else {
             // Before the choice of icons there was only an on/off switch.
             let legacy = try decoder.container(keyedBy: LegacyKeys.self)
-            menuBarIcon = (try? legacy.decodeIfPresent(Bool.self, forKey: .standaloneIcon)) == true ? .mixer : .none
+            if let standalone = try? legacy.decodeIfPresent(Bool.self, forKey: .standaloneIcon) {
+                menuBarIcon = standalone ? .mixer : .none
+            }
         }
         // A file from before this was kept has the look in use, if any.
         let shown = (try? c.decodeIfPresent(MixerMenuBarIcon.self, forKey: .shownIcon)) ?? nil

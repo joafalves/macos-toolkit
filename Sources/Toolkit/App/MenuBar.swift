@@ -34,12 +34,16 @@ struct MenuBarSegment: Equatable {
     /// The widest `text` can get ("100%"): the part keeps that width, the text
     /// to its right edge, so a digit more or less doesn't shift the menu bar.
     var widthOf: String?
+    /// Text wider than `widthOf` ("100%" in the room of "99%") is fitted into
+    /// that width, a little tighter and into its margins, rather than
+    /// widening the part.
+    var fitted = false
     /// For VoiceOver and the tooltip.
     var label: String
 
     static func == (a: MenuBarSegment, b: MenuBarSegment) -> Bool {
         a.kind == b.kind && a.glyph === b.glyph && a.colored === b.colored && a.text == b.text && a.dimText == b.dimText
-            && a.tint == b.tint && a.columns == b.columns && a.widthOf == b.widthOf && a.label == b.label
+            && a.tint == b.tint && a.columns == b.columns && a.widthOf == b.widthOf && a.fitted == b.fitted && a.label == b.label
     }
 }
 
@@ -403,12 +407,13 @@ final class MenuBarPartView: NSView {
         shown = segment
         if before?.colored !== segment.colored { dot.image = segment.colored }
         if before?.glyph !== segment.glyph { icon.image = segment.glyph }
-        if before?.text != segment.text || before?.dimText != segment.dimText || before?.tint != segment.tint || before?.widthOf != segment.widthOf {
+        if before?.text != segment.text || before?.dimText != segment.dimText || before?.tint != segment.tint || before?.widthOf != segment.widthOf
+            || before?.fitted != segment.fitted {
             let style = NSMutableParagraphStyle()
             style.alignment = segment.widthOf == nil ? .left : .right
             label.text = NSAttributedString(string: segment.text ?? "", attributes: [
                 .font: Self.font, .foregroundColor: segment.tint ?? (segment.dimText ? NSColor.secondaryLabelColor : .labelColor),
-                .paragraphStyle: style,
+                .paragraphStyle: style, .kern: Self.overflows(segment) ? Self.fittedKern : 0,
             ])
         }
         if before?.tint != segment.tint { icon.tint = segment.tint }
@@ -440,12 +445,23 @@ final class MenuBarPartView: NSView {
         for image in [segment.colored, segment.glyph].compactMap({ $0 }) { width += image.size.width }
         if let text = segment.text {
             // A label keeps a couple of points inside each edge.
-            width += (width > 0 ? textGap : 0) + widest(text, segment.widthOf, font) + labelInset * 2
+            let widest = segment.fitted ? widest(segment.widthOf ?? text, nil, font) : widest(text, segment.widthOf, font)
+            width += (width > 0 ? textGap : 0) + widest + labelInset * 2
         }
         if let columns = segment.columns, !columns.isEmpty {
             width += (width > 0 ? textGap : 0) + columns.map(columnWidth).reduce(0, +) + columnGap * CGFloat(columns.count - 1)
         }
         return ceil(width)
+    }
+
+    /// How much tighter fitted text is set when it's wider than its template.
+    private static let fittedKern: CGFloat = -0.5
+
+    /// Fitted text wider than its template: "100%" where "99%" is the widest
+    /// that has room.
+    private static func overflows(_ segment: MenuBarSegment) -> Bool {
+        guard segment.fitted, let text = segment.text, let template = segment.widthOf else { return false }
+        return widest(text, nil, font) > widest(template, nil, font)
     }
 
     /// Text as wide as it can get: its digits at their widest, and no
@@ -509,7 +525,8 @@ final class MenuBarPartView: NSView {
             x += image.size.width
         }
         if segment.text != nil {
-            if segment.colored != nil || segment.glyph != nil { x += Self.textGap }
+            // Fitted text that's too wide takes the gap as well as its margins.
+            if segment.colored != nil || segment.glyph != nil, !Self.overflows(segment) { x += Self.textGap }
             let size = label.size
             label.frame = NSRect(x: x, y: ((height - size.height) / 2).rounded(), width: bounds.width - x - insets.trailing, height: size.height)
             x += size.width
@@ -605,6 +622,8 @@ final class MenuBarText: NSView {
     /// From the top left of a flipped context `size` big. Into a template
     /// drawing, the label colours become black at their opacity.
     static func draw(_ text: NSAttributedString, size: NSSize, template: Bool) {
+        // Fitted text too wide for its margins (MenuBarSegment.fitted) uses them.
+        let inset = ceil(text.size().width) > size.width - Self.inset * 2 ? 0 : Self.inset
         (template ? MenuBarDrawing.black(text) : text)
             .draw(with: NSRect(x: inset, y: 0, width: size.width - inset * 2, height: size.height), options: [.usesLineFragmentOrigin])
     }
@@ -1251,6 +1270,9 @@ extension MenuBarRow {
         let alone = MenuBarArt.column([.init(text: "A 1", widthOf: "A 888")])
         widths("a column of two like lines", [MenuBarSegment(kind: .stats, columns: [same], label: ""), MenuBarSegment(kind: .stats, columns: [alone], label: "")])
         widths("keep awake, 10 h", ["10:00", "9:59", "0:05"].map { MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: true, beforeText: true), text: $0, widthOf: "10:00", label: "") })
+        widths("volume and percentage", [(0.0, true), (0.05, false), (0.62, false), (1.0, false)].map { volume, muted in
+            MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: muted), text: "\(Int(volume * 100))%", widthOf: "99%", fitted: true, label: "")
+        })
         widths("keep awake pill, 10 h", ["10:00", "9:59", "0:05"].map { MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.5, time: $0, widthOf: "10:00"), label: "") })
         print(failures == 0 ? "all ok" : "\(failures) failed")
     }

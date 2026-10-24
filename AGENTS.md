@@ -134,7 +134,8 @@ tool; keep it in step with the code.
   - **Parts don't change width** as their figures change: a segment's `widthOf` (or a column line's)
     is the widest its text gets, and the part keeps that width with the text against its right edge
     (`--test-menu-bar-widths`). Keep templates as small as what's really shown (stats stop at 99%).
-    The volume is the exception: it changes only when you change it, and room for "100%" left a gap.
+    The volume keeps the width of "99%" (room for "100%" left a gap): `fitted` sets "100%" a little
+    tighter, into the label's margins and the gap after the speaker.
   - The spacing setting goes between parts only, not at the item's two ends, where macOS leaves its
     own gap as for any item.
   - An update costs about 5 ms (`--test-menu-bar`, release build), most of it macOS's, so only

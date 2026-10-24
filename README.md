@@ -165,7 +165,7 @@ every app that has sound gets its own slider.
 - A place in the **menu bar**, one click away, set in the mixer's settings: none, the mixer glyph,
   **Volume**, a speaker that follows the volume and shows when it's muted, **Volume and
   percentage**, or **Volume pill**, a pill that fills with the volume like the battery, with the
-  speaker and the number cut out of it.
+  speaker and the number cut out of it. It starts on **Volume**.
 - **The volume keys** go through the mixer on every output while it's on, so they always behave the
   same: 16 presses from silent to full, as macOS's own keys (**Each press** in the settings makes it
   32, 20 at 5% a press, or 10), ⇧⌥ for small changes (1 point of the volume, or up to 5 as set), mute toggles, and the
