@@ -10,6 +10,9 @@ worked on; it gets its date when it's released.
 - **System Stats:** the panel with every stat (the compact layout) no longer runs off a display
   too short for it: it stops above the Dock and scrolls, with Activity Monitor and Settings kept
   at the bottom.
+- **Screen Capture:** a panel from the menu bar (System Stats, the mixer, the others) stays open
+  while you pick an area or window to capture it, and Esc cancels the capture rather than closing
+  the panel.
 
 ## 0.21.0 (2026-10-24)
 

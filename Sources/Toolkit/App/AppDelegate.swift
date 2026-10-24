@@ -449,6 +449,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             popoverMonitors.append(monitor)
         }
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown], handler: { [weak self] event in
+            if event.inCapturePanel { return event }
             if event.type == .keyDown, event.keyCode == 53 {
                 close()
                 return nil
