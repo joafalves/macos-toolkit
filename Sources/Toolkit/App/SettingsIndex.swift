@@ -91,7 +91,7 @@ extension SettingsIndex {
         SettingsEntry(.finder, "Trackpad", name: "Trackpad in Finder", caption: "Scrolling is never changed: a swipe over something that can still scroll sideways, like the column view, scrolls it. The swipe goes back or forward once it's at the edge."),
         SettingsEntry(.finder, "Swipe back and forward", caption: "Two fingers to the right go back, to the left go forward, as in a browser. In System Settings too."),
         SettingsEntry(.finder, "Right-Click Menu", name: "Finder's right-click menu", caption: "Cut is in the menu too while it's on. Changes show the next time you right-click."),
-        SettingsEntry(.finder, "Finder extension", caption: "Adds these items to Finder's right-click menu. macOS keeps it off until you turn it on."),
+        SettingsEntry(.finder, "Finder extension", caption: "Adds these items to Finder's right-click menu. It's turned on with them."),
         SettingsEntry(.finder, "New Text File", name: "New text file from the right-click menu", caption: "Creates an empty untitled.txt in the folder and starts renaming it."),
         SettingsEntry(.finder, "Terminal", name: "Terminal to open folders in", caption: "Automatic picks the first installed of Ghostty, iTerm and Terminal."),
         SettingsEntry(.capture, "Shortcuts", name: "Screen capture shortcuts", caption: "macOS's own screenshot shortcuts are off only where they clash with these. ⌃ counts if it's held when the capture happens: at the end of the drag, or at the click on a window."),

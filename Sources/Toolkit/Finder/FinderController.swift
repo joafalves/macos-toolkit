@@ -13,6 +13,10 @@ final class FinderController: ObservableObject {
             if persists { config.save() }
             if !config.enabled || !config.cut { cutMark.value = nil }
             apply()
+            // Wanted where it wasn't: its switch too, rather than a button
+            // to find. Only on the change, so one turned off in System
+            // Settings later stays off.
+            if config.wantsMenu, !oldValue.wantsMenu, !extensionEnabled, !isPreview { enableExtension() }
         }
     }
 
@@ -25,6 +29,9 @@ final class FinderController: ObservableObject {
     @Published private(set) var extensionEnabled = false
 
     private static let extensionID = "dev.jalves.macos-toolkit.finder"
+    /// Set once the app has turned the extension on, by itself or by its
+    /// button: after that, off means someone turned it off.
+    private static let turnedOnKey = "finderExtensionTurnedOn"
 
     /// False for `--snapshot`, which shows default settings and a working
     /// setup without reading or writing anything of the user's.
@@ -91,7 +98,11 @@ final class FinderController: ObservableObject {
             let listing = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             let enabled = listing.hasPrefix("+")
             DispatchQueue.main.async {
-                if self?.extensionEnabled != enabled { self?.extensionEnabled = enabled }
+                guard let self else { return }
+                if self.extensionEnabled != enabled { self.extensionEnabled = enabled }
+                // Items on from before this was automatic, with the
+                // extension never turned on: once, as if they'd just been.
+                if !enabled, self.config.wantsMenu, !UserDefaults.standard.bool(forKey: Self.turnedOnKey) { self.enableExtension() }
             }
         }
         try? process.run()
@@ -99,6 +110,7 @@ final class FinderController: ObservableObject {
 
     /// The same switch as the one in System Settings, which is hard to find.
     func enableExtension() {
+        UserDefaults.standard.set(true, forKey: Self.turnedOnKey)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pluginkit")
         process.arguments = ["-e", "use", "-i", Self.extensionID]

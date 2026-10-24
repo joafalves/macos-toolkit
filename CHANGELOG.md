@@ -21,6 +21,12 @@ worked on; it gets its date when it's released.
   uses it and whether it's granted. Revoke… resets one, Revoke All… every one, and the app
   restarts; where macOS doesn't allow it, it says where to turn it off.
 
+### Changed
+
+- **Finder:** the extension behind the right-click menu is turned on with the menu: as the tool or
+  a first item in it is turned on, and once for a setup that already had items on with it off.
+  Turned off in System Settings later, it stays off.
+
 ### Fixed
 
 - **Permissions:** Screen Recording turned on in System Settings no longer shows as missing until

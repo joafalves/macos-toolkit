@@ -19,6 +19,9 @@ struct FinderConfig: Codable, Equatable {
 
     init() {}
 
+    /// Whether anything goes in Finder's right-click menu: Cut is there too.
+    var wantsMenu: Bool { enabled && (cut || newTextFile || openInTerminal) }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true

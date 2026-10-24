@@ -51,7 +51,7 @@ struct FinderSettingsView: View {
 
                 Card(title: "Right-Click Menu",
                      footnote: "Cut is in the menu too while it's on. Changes show the next time you right-click.") {
-                    SettingRow(title: "Finder extension", caption: "Adds these items to Finder's right-click menu. macOS keeps it off until you turn it on.") {
+                    SettingRow(title: "Finder extension", caption: "Adds these items to Finder's right-click menu. It's turned on with them.") {
                         if finder.extensionEnabled {
                             Label("On", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                         } else {

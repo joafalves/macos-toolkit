@@ -214,8 +214,8 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:144 */
 "Address" = "Endereço";
 
-/* Sources/Toolkit/App/SettingsIndex.swift:95 */
-"Adds these items to Finder's right-click menu. macOS keeps it off until you turn it on." = "Adiciona estes itens ao menu de atalhos do Finder (clique com o botão direito). O macOS mantém a extensão desativada até a ativar.";
+/* Sources/Toolkit/App/SettingsIndex.swift:94 */
+"Adds these items to Finder's right-click menu. It's turned on with them." = "Adiciona estes itens ao menu de atalhos do Finder. É ativada com eles.";
 
 /* Sources/Toolkit/App/PermissionsSheet.swift:109 */
 "After a restart" = "Após reiniciar";
