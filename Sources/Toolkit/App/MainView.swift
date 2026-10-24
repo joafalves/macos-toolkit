@@ -124,60 +124,19 @@ struct MainView: View {
         return String(localized: "Mouse Settings")
     }
 
+    /// For `--snapshot`: the sidebar, search field and toolbar drawn by the
+    /// page rather than as glass, which only the window server draws, so the
+    /// image is made without the window ever being shown.
+    static var drawnChrome = false
+
     var body: some View {
-        // As System Settings: the sidebar runs the window's full height, and
-        // the toolbar over the page has back, forward and the page's title.
-        NavigationSplitView {
-            Group {
-                if query.value.trimmingCharacters(in: .whitespaces).isEmpty {
-                    sections
-                } else {
-                    SearchResults(hits: SettingsIndex.search(query.value), enabled: enabled, open: open)
-                }
-            }
-            // Wide enough for the longest name, in Portuguese too. The column
-            // width alone isn't kept in a window that isn't a SwiftUI scene.
-            .frame(minWidth: 230)
-            .navigationSplitViewColumnWidth(230)
-            .toolbar(removing: .sidebarToggle)
-        } detail: {
-            Group {
-                switch place.section {
-                case .welcome: WelcomeView(model: model, mouse: mouse, mixer: mixer, capture: capture, enabled: enabled,
-                                            switcherShortcut: switcher.config.shortcut.active?.display ?? "⌘Tab")
-                case .mouse: MouseSettingsView(mouse: mouse)
-                case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
-                case .layout: LayoutSettingsView(layout: layout, mouse: mouse)
-                case .mixer: MixerSettingsView(mixer: mixer)
-                case .finder: FinderSettingsView(finder: finder, mouse: mouse)
-                case .capture: CaptureSettingsView(capture: capture)
-                case .awake: AwakeSettingsView(awake: awake, mouse: mouse)
-                case .stats: StatsSettingsView(stats: stats)
-                case .about: AboutView(model: model)
-                case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .environment(\.pageGoTo, $model.goTo)
-            .toolbar {
-                ToolbarItemGroup(placement: .navigation) {
-                    Button(action: goBack) { Image(systemName: "chevron.left") }
-                        .help("Back")
-                        .keyboardShortcut("[", modifiers: .command)
-                        .disabled(navigator.back.isEmpty)
-                    Button(action: goForward) { Image(systemName: "chevron.right") }
-                        .help("Forward")
-                        .keyboardShortcut("]", modifiers: .command)
-                        .disabled(navigator.forward.isEmpty)
-                }
+        Group {
+            if Self.drawnChrome {
+                drawnWindow
+            } else {
+                window
             }
         }
-        // As in System Settings, at the top of the sidebar.
-        .searchable(text: $query.value, placement: .sidebar, prompt: Text("Search"))
-        .navigationTitle(title)
-        // A window that isn't a SwiftUI scene doesn't take the title from it,
-        // so it's set here; the toolbar shows it beside back and forward.
-        .background(WindowTitle(title: title))
         .frame(minWidth: 760, minHeight: 560)
         .onAppear {
             navigator.moved(to: place)
@@ -185,6 +144,147 @@ struct MainView: View {
         }
         .onDisappear { swipes.stop() }
         .onChange(of: place) { _, place in navigator.moved(to: place) }
+    }
+
+    /// As System Settings: the sidebar runs the window's full height, and
+    /// the toolbar over the page has back, forward and the page's title.
+    private var window: some View {
+        NavigationSplitView {
+            sidebar
+                // Wide enough for the longest name, in Portuguese too. The column
+                // width alone isn't kept in a window that isn't a SwiftUI scene.
+                .frame(minWidth: 230)
+                .navigationSplitViewColumnWidth(230)
+                .toolbar(removing: .sidebarToggle)
+        } detail: {
+            detail
+                .toolbar {
+                    ToolbarItemGroup(placement: .navigation) {
+                        Button(action: goBack) { Image(systemName: "chevron.left") }
+                            .help("Back")
+                            .keyboardShortcut("[", modifiers: .command)
+                            .disabled(navigator.back.isEmpty)
+                        Button(action: goForward) { Image(systemName: "chevron.right") }
+                            .help("Forward")
+                            .keyboardShortcut("]", modifiers: .command)
+                            .disabled(navigator.forward.isEmpty)
+                    }
+                }
+        }
+        // As in System Settings, at the top of the sidebar.
+        .searchable(text: $query.value, placement: .sidebar, prompt: Text("Search"))
+        .navigationTitle(title)
+        // A window that isn't a SwiftUI scene doesn't take the title from it,
+        // so it's set here; the toolbar shows it beside back and forward.
+        .background(WindowTitle(title: title))
+    }
+
+    /// The same window for `--snapshot`, with the glass parts drawn plainly.
+    private var drawnWindow: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                // Room for the window's buttons.
+                Color.clear.frame(height: 38)
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    if query.value.isEmpty {
+                        Text("Search").foregroundStyle(.tertiary)
+                    } else {
+                        Text(verbatim: query.value)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .background(Color.primary.opacity(0.08), in: Capsule())
+                .padding(.horizontal, 10)
+                if query.value.trimmingCharacters(in: .whitespaces).isEmpty {
+                    drawnSections
+                } else {
+                    sidebar.scrollContentBackground(.hidden)
+                }
+            }
+            .frame(width: 230)
+            .background(Color.primary.opacity(0.035))
+            Divider()
+            VStack(spacing: 0) {
+                HStack(spacing: 14) {
+                    HStack(spacing: 0) {
+                        Image(systemName: "chevron.left").frame(width: 34, height: 30)
+                        Rectangle().fill(Color.primary.opacity(0.15)).frame(width: 1, height: 16)
+                        Image(systemName: "chevron.right").frame(width: 34, height: 30)
+                    }
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .background(Color.primary.opacity(0.07), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1)))
+                    Text(verbatim: title).font(.title3.weight(.semibold))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 52)
+                detail
+            }
+        }
+        // Up to the window's top edge, under its buttons, as the real one.
+        .ignoresSafeArea()
+    }
+
+    /// The sidebar's rows for `--snapshot`, the one shown lit in grey: a list's
+    /// selection in a window that isn't active is drawn black.
+    private var drawnSections: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach([AppSection.welcome, .general, .about], id: \.self) { drawnRow($0) }
+            Text("Tools")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 12)
+                .padding(.bottom, 2)
+                .padding(.leading, 18)
+            ForEach(AppSection.tools) { drawnRow($0) }
+            Spacer()
+        }
+        .padding(.top, 4)
+    }
+
+    private func drawnRow(_ section: AppSection) -> some View {
+        SidebarRow(section: section, on: enabled(section))
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+            .background(place.section == section ? Color.primary.opacity(0.1) : .clear,
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .padding(.horizontal, 10)
+    }
+
+    private var sidebar: some View {
+        Group {
+            if query.value.trimmingCharacters(in: .whitespaces).isEmpty {
+                sections
+            } else {
+                SearchResults(hits: SettingsIndex.search(query.value), enabled: enabled, open: open)
+            }
+        }
+    }
+
+    private var detail: some View {
+        Group {
+            switch place.section {
+            case .welcome: WelcomeView(model: model, mouse: mouse, mixer: mixer, capture: capture, enabled: enabled,
+                                        switcherShortcut: switcher.config.shortcut.active?.display ?? "⌘Tab")
+            case .mouse: MouseSettingsView(mouse: mouse)
+            case .switcher: SwitcherSettingsView(switcher: switcher, mouse: mouse)
+            case .layout: LayoutSettingsView(layout: layout, mouse: mouse)
+            case .mixer: MixerSettingsView(mixer: mixer)
+            case .finder: FinderSettingsView(finder: finder, mouse: mouse)
+            case .capture: CaptureSettingsView(capture: capture)
+            case .awake: AwakeSettingsView(awake: awake, mouse: mouse)
+            case .stats: StatsSettingsView(stats: stats)
+            case .about: AboutView(model: model)
+            case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .environment(\.pageGoTo, $model.goTo)
     }
 
     /// Overview and the app's own settings, then the tools.

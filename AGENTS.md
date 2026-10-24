@@ -291,9 +291,10 @@ python3 scripts/strings.py audit             # literals that look shown but are 
 `Package.swift` links with `-platform_version macos 15.0 27.0`: the Command Line Tools otherwise
 record the deployment target as the SDK, and macOS then draws the app in its pre-26 style (old window
 buttons, toolbar, sidebar and controls). Keep the second number at the SDK in use. Window snapshots
-(`--snapshot` of a page) are taken with `screencapture -l` of a window ordered in far off screen,
-since the sidebar and toolbar are glass the window server draws; that needs Screen Recording for
-whatever runs it.
+(`--snapshot` of a page) are drawn by the views, in a window that's never shown, like every other
+snapshot: nothing appears on screen and nothing is read from it. The glass sidebar and toolbar are
+drawn by the window server, not the views, so `MainView.drawnChrome` draws stand-ins for them
+(the search field, the sidebar's rows, the back and forward capsule with the title).
 
 There is no test suite. Check UI changes by rendering `--snapshot` images in both light and dark and
 looking at them (in Portuguese too, where words run longer), and check behaviour by running the installed app. Keep idle CPU near zero: a hidden
