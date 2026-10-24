@@ -14,6 +14,10 @@ SIGNING_KEYCHAIN="${TOOLKIT_KEYCHAIN:-$HOME/Library/Keychains/macos-toolkit-sign
 SIGNING_UNLOCKED_FOR=86400
 # Passed to codesign; empty when signing ad hoc.
 SIGN_ARGS=()
+# The user's keychain search list before signing_start, and whether it added
+# the signing keychain to it.
+SIGNING_LIST=()
+SIGNING_LISTED=false
 
 # SecKeychainGetStatus, which `security` doesn't offer: unlock-keychain asks
 # for the password even when it's already unlocked.
@@ -37,11 +41,29 @@ signing_start() {
     # Not on sleep: every lid closed would ask again. Each build starts the 24 hours over.
     security set-keychain-settings -u -t "$SIGNING_UNLOCKED_FOR" "$SIGNING_KEYCHAIN"
     SIGN_ARGS=(--keychain "$SIGNING_KEYCHAIN")
+    # codesign only finds an identity in a keychain on the search list,
+    # --keychain or not (measured): it goes on the list while signing, and
+    # signing_end takes it off again.
+    local entry
+    while IFS= read -r entry; do SIGNING_LIST+=("$entry"); done \
+      < <(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"$//')
+    if ! printf '%s\n' ${SIGNING_LIST[@]+"${SIGNING_LIST[@]}"} | grep -qxF "$SIGNING_KEYCHAIN"; then
+      security list-keychains -d user -s ${SIGNING_LIST[@]+"${SIGNING_LIST[@]}"} "$SIGNING_KEYCHAIN"
+      SIGNING_LISTED=true
+    fi
   elif security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
     echo "warning: '$IDENTITY' is in the login keychain, where any process can sign with it." >&2
     echo "         Run scripts/make-cert.sh to move it to a keychain of its own." >&2
   else
     echo "warning: identity '$IDENTITY' not found (run scripts/make-cert.sh); signing ad-hoc." >&2
     IDENTITY="-"
+  fi
+}
+
+# The search list as it was, once the signing is done (and on exit, if it fails).
+signing_end() {
+  if $SIGNING_LISTED; then
+    security list-keychains -d user -s ${SIGNING_LIST[@]+"${SIGNING_LIST[@]}"}
+    SIGNING_LISTED=false
   fi
 }

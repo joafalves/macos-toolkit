@@ -53,6 +53,7 @@ for key in CFBundleShortVersionString CFBundleVersion; do
 done
 
 signing_start
+trap signing_end EXIT
 # Inside out: the extension first, since the app's signature covers it. The
 # hardened runtime keeps other processes from loading code into the app
 # (DYLD_INSERT_LIBRARIES, a debugger) and using its permissions.
@@ -60,6 +61,7 @@ codesign --force --sign "$IDENTITY" ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} --options 
   --entitlements Resources/FinderExtension/FinderExtension.entitlements "$APPEX"
 codesign --force --sign "$IDENTITY" ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} --options runtime --identifier "$BUNDLE_ID" \
   --entitlements Resources/Toolkit.entitlements "$APP"
+signing_end
 echo "Built $APP$($DEV && echo " (dev build, with the development flags)")"
 
 if $INSTALL; then
