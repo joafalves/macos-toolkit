@@ -3,6 +3,14 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.21.1 (unreleased)
+
+### Fixed
+
+- **System Stats:** the panel with every stat (the compact layout) no longer runs off a display
+  too short for it: it stops above the Dock and scrolls, with Activity Monitor and Settings kept
+  at the bottom.
+
 ## 0.21.0 (2026-10-24)
 
 ### Added

@@ -9,31 +9,44 @@ struct StatsPanelView: View {
     /// Watched for the readings, so the panel follows them.
     @ObservedObject private var live: StatsLive
     let kinds: [StatKind]
+    /// The display's room below the menu bar: the compact layout's panel,
+    /// with every stat, is taller than some displays, and scrolls there.
+    var maxHeight: CGFloat?
     var close: () -> Void
     var openSettings: () -> Void
 
-    init(stats: StatsController, kinds: [StatKind], close: @escaping () -> Void = {}, openSettings: @escaping () -> Void = {}) {
+    init(stats: StatsController, kinds: [StatKind], maxHeight: CGFloat? = nil, close: @escaping () -> Void = {}, openSettings: @escaping () -> Void = {}) {
         self.stats = stats
         live = stats.live
         self.kinds = kinds
+        self.maxHeight = maxHeight
         self.close = close
         self.openSettings = openSettings
     }
 
+    /// The scroll view is as tall as its content until the room runs out,
+    /// and only then scrolls; the footer stays below it.
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(kinds.enumerated()), id: \.element) { index, kind in
-                if index > 0 { Divider().padding(.vertical, 10) }
-                section(kind)
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(kinds.enumerated()), id: \.element) { index, kind in
+                        if index > 0 { Divider().padding(.vertical, 10) }
+                        section(kind)
+                    }
+                }
+                .padding([.horizontal, .top], 14)
             }
-            Divider().padding(.top, 12).padding(.bottom, 8)
+            .scrollBounceBehavior(.basedOnSize)
+            Divider().padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
             PanelFooter(app: PanelFooter.name(ofAppAt: "/System/Applications/Utilities/Activity Monitor.app"), openApp: {
                 close()
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
             }, openSettings: openSettings)
+            .padding([.horizontal, .bottom], 14)
         }
-        .padding(14)
         .frame(width: 320)
+        .frame(maxHeight: maxHeight)
     }
 
     @ViewBuilder

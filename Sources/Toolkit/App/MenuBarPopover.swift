@@ -114,6 +114,14 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
         popover?.performClose(nil)
     }
 
+    /// How tall a panel can be on the item's display, from under the menu
+    /// bar to above the Dock, less the popover's edge and a margin below.
+    /// Taller, macOS pushes it up over the menu bar and cuts it off.
+    var room: CGFloat? {
+        guard let screen = menuBar.button?.window?.screen ?? NSScreen.main else { return nil }
+        return screen.visibleFrame.height - 30
+    }
+
     /// Still hanging from its part, which moves as parts before it come or
     /// go: a switch in the toolkit panel adds or takes away a tool's part.
     func follow() {
