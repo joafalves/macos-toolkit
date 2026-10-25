@@ -490,7 +490,7 @@ two would fight over the same keys and drags.
 Every setting has a **macOS** choice, meaning the toolkit leaves that behaviour to System Settings.
 The page lists every mouse: those connected, with their charge, then those the toolkit keeps
 settings for while they're away. Click one for its own page, with its settings and buttons to reset,
-rename or forget it. Back in the toolbar, ⌘[ or a two-finger swipe to the right goes back to the
+rename or forget it. Back in the toolbar, ⌘[, a two-finger swipe to the right or the mouse's back button goes back to the
 list. With **Show in the menu bar** on, its part of the menu bar
 opens a panel with each connected mouse and its charge; a mouse there opens its page. Settings are per mouse, by its Bluetooth address or serial number, so two of the same
 model each have their own, and an Apple mouse keeps its settings on its cable. They come back as

@@ -14,6 +14,11 @@ worked on; it gets its date when it's released.
   toolkit.
 - **Finder:** its page links to Tweaks for Finder's own settings, such as hidden files.
 
+### Fixed
+
+- **Settings:** a mouse's back and forward buttons, and a three-finger swipe, go back and forward
+  in the settings window, as a two-finger swipe and ⌘[ ⌘] do.
+
 ## 0.23.0 (2026-10-25)
 
 ### Added
