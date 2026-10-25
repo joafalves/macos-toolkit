@@ -357,7 +357,7 @@ final class CaptureController: ObservableObject {
 
     private func deliver(_ image: CGImage, scale: CGFloat, copy: Bool, screen: NSScreen?) {
         NSLog("Toolkit: screenshot \(image.width)×\(image.height), \(copy ? "to the clipboard" : "to a file")\(copy && config.saveWhenCopying ? " and a file" : "")")
-        if config.shutterSound { Self.shutter?.play() }
+        if config.shutterSound { SystemSound.shutter?.play() }
         var file: URL?
         if copy, let png = Screenshotter.encode(image, as: .png, scale: scale) {
             let board = NSPasteboard.general
@@ -422,8 +422,6 @@ final class CaptureController: ObservableObject {
             return nil
         }
     }
-
-    private static let shutter = NSSound(contentsOfFile: "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif", byReference: true)
 
     // MARK: - Recording
 

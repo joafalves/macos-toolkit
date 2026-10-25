@@ -233,7 +233,7 @@ final class FinderController: ObservableObject {
                   pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
             else { return }
             self.cutMark.value = pasteboard.changeCount
-            NSSound(named: "Pop")?.play()
+            SystemSound.pop?.play()
         }
     }
 
