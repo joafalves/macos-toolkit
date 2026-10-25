@@ -469,6 +469,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                                                                 object: nil, queue: .main) { _ in close() }
     }
 
+    func popoverWillShow(_ notification: Notification) {
+        NSPopover.joinsFullScreen(notification)
+    }
+
     /// As it starts closing, not once its fade is over, it's no longer the
     /// open one: the next click opens.
     func popoverWillClose(_ notification: Notification) {

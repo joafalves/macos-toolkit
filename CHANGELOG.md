@@ -3,6 +3,13 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.22.1 (unreleased)
+
+### Fixed
+
+- **Menu bar:** while the settings window was open, a panel from the menu bar opened out of sight
+  when another app was in full screen. Panels now open over full-screen apps too.
+
 ## 0.22.0 (2026-10-25)
 
 ### Added

@@ -70,6 +70,15 @@ extension NSPopover {
         typealias Set = @convention(c) (AnyObject, Selector, Bool) -> Void
         unsafeBitCast(method_getImplementation(method), to: Set.self)(panel, preventsActivation, true)
     }
+
+    /// Over another app's full-screen window too. While the settings window
+    /// is open the app is a regular one, and a regular app's windows open on
+    /// a Space of their own, not over the full-screen app: the panel opened
+    /// out of sight. Only as it's about to show (the delegate's
+    /// `popoverWillShow`); set once it's shown, it stays where it opened.
+    static func joinsFullScreen(_ notification: Notification) {
+        (notification.object as? NSPopover)?.contentViewController?.view.window?.collectionBehavior.insert(.fullScreenAuxiliary)
+    }
 }
 
 final class MenuBarPopover: NSObject, NSPopoverDelegate {
@@ -168,6 +177,10 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
         }
         resignObserver = NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification,
                                                                 object: nil, queue: .main) { _ in close() }
+    }
+
+    func popoverWillShow(_ notification: Notification) {
+        NSPopover.joinsFullScreen(notification)
     }
 
     /// Only for the panel showing now: one closing as the next opens (a click
