@@ -56,6 +56,11 @@ struct GeneralConfig: Codable, Equatable {
     var menuBarSpacing: Double = 12
 
     static let menuBarSpacings: ClosedRange<Double> = 4...24
+    /// What goes between two tools in the menu bar item.
+    var menuBarSeparator = MenuBarSeparator.pipe
+    /// What goes between one tool's own parts (System Stats' stats): a dot
+    /// by default, so they read as one tool.
+    var menuBarToolSeparator = MenuBarToolSeparator.dot
     /// Left to right. Always every tool, shown or not, so each keeps its place.
     var menuBarOrder = MenuBarTool.defaultOrder
     /// Looks for a new version at launch and once a day; it only says so.
@@ -69,6 +74,8 @@ struct GeneralConfig: Codable, Equatable {
         // Within the slider's range: a file edited by hand can say anything.
         let spacing = try c.decodeIfPresent(Double.self, forKey: .menuBarSpacing) ?? 12
         menuBarSpacing = min(max(spacing, Self.menuBarSpacings.lowerBound), Self.menuBarSpacings.upperBound)
+        menuBarSeparator = (try? c.decodeIfPresent(MenuBarSeparator.self, forKey: .menuBarSeparator)) ?? .pipe
+        menuBarToolSeparator = (try? c.decodeIfPresent(MenuBarToolSeparator.self, forKey: .menuBarToolSeparator)) ?? .dot
         let order = (try? c.decodeIfPresent([String].self, forKey: .menuBarOrder)) ?? nil
         menuBarOrder = MenuBarTool.complete((order ?? []).compactMap(MenuBarTool.init(rawValue:)))
         checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? true

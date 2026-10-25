@@ -36,7 +36,7 @@ struct AwakePanelView: View {
                 // The whole header turns it on or off, not only the switch.
                 Button(action: flip) {
                     HStack(spacing: 10) {
-                        IconTile(symbol: awake.isOn ? "cup.and.saucer.fill" : "cup.and.saucer",
+                        IconTile(symbol: AwakeController.symbol(on: awake.isOn),
                                  color: awake.isOn ? AppSection.awake.color : .gray, size: 30)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(AppSection.awake.title)
@@ -203,7 +203,7 @@ struct AwakePanelView: View {
                 // Held on by Stay available, as on the settings page.
                 .disabled(awake.config.stayAvailable)
             OptionSwitch(title: "Stay available",
-                         caption: awake.config.stayAvailable && !awake.accessibility ? "Needs Accessibility" : "Your status stays available",
+                         caption: awake.config.stayAvailable && !awake.accessibility ? "Needs Accessibility" : nil,
                          isOn: Binding(get: { awake.config.stayAvailable }, set: { on in
                              awake.config.stayAvailable = on
                              // Without Accessibility its events are dropped: the settings page says so.

@@ -54,8 +54,8 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
     /// The looks that make sense for it: a pill needs a share of something.
     var looks: [StatLook] {
         switch self {
-        case .cpu, .memory, .gpu: return [.number, .pill, .chart]
-        case .disk: return [.number, .pill]
+        case .cpu, .memory, .gpu: return [.number, .pill, .smallPill, .chart]
+        case .disk: return [.number, .pill, .smallPill]
         case .network, .power: return [.number, .chart]
         }
     }
@@ -67,6 +67,8 @@ enum StatLook: String, Codable, CaseIterable {
     case number
     /// A pill that fills, like the volume badge.
     case pill
+    /// The pill without the number: the fill alone.
+    case smallPill
     /// The last minute as a small chart, and the number.
     case chart
 
@@ -74,6 +76,7 @@ enum StatLook: String, Codable, CaseIterable {
         switch self {
         case .number: return String(localized: "Number")
         case .pill: return String(localized: "Pill")
+        case .smallPill: return String(localized: "Small pill")
         case .chart: return String(localized: "Chart")
         }
     }

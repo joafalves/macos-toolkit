@@ -27,10 +27,17 @@ final class TopApps {
     private static let window: TimeInterval = 5
     /// Less than this behind it and there's no CPU to tell yet: over a
     /// moment, any spike reads as a lot.
-    private static let shortest: TimeInterval = 1
+    static let shortest: TimeInterval = 1
+    /// The toolkit's own CPU is told only from readings this long after the
+    /// panel opened: drawing it is a one-off, most of it in the first second
+    /// and done by two, and would put the toolkit on top of its own list.
+    /// Everything else is counted from the start.
+    private static let settle: TimeInterval = 2
+    private var settledAt: TimeInterval = 0
+    private static let own = getpid()
     /// Names and icons by process, looked up once: that lookup was most of a read.
     private var described: [pid_t: AppUsage] = [:]
-    /// No CPU before `restart`: until then the panel is still opening.
+    /// No CPU before `restart`.
     private var counting = false
     private static let timebase: Double = {
         var info = mach_timebase_info_data_t()
@@ -41,14 +48,15 @@ final class TopApps {
     /// Whether the last read had an earlier one to tell CPU time from.
     private(set) var cpuKnown = false
 
-    /// Starts counting afresh from now: the panel calls it once it has
-    /// drawn, so its own opening isn't counted as the toolkit's use.
+    /// Starts counting afresh from now, as the panel opens.
     func restart() {
         var times: [pid_t: UInt64] = [:]
         for pid in Self.pids() {
             if let usage = Self.usage(pid) { times[pid] = usage.ri_user_time + usage.ri_system_time }
         }
-        snapshots = [(ProcessInfo.processInfo.systemUptime, times)]
+        let now = ProcessInfo.processInfo.systemUptime
+        snapshots = [(now, times)]
+        settledAt = now + Self.settle
         counting = true
         cpuKnown = false
     }
@@ -61,6 +69,9 @@ final class TopApps {
         let anchor = snapshots.first
         let seconds = anchor.map { now - $0.at } ?? 0
         cpuKnown = counting && seconds >= Self.shortest
+        // The toolkit's own, from the first reading after the panel settled; none till then.
+        let ownAnchor = snapshots.first { $0.at >= settledAt }
+        let ownSeconds = ownAnchor.map { now - $0.at } ?? 0
         var times: [pid_t: UInt64] = [:]
         var byOwner: [pid_t: AppUsage] = [:]
         for pid in Self.pids() {
@@ -68,7 +79,9 @@ final class TopApps {
             let time = usage.ri_user_time + usage.ri_system_time
             times[pid] = time
             // Less than before: the number went to a new process since.
-            let cpu = cpuKnown ? anchor?.times[pid].map { time >= $0 ? Double(time - $0) * Self.timebase / 1e9 / seconds : 0 } ?? 0 : 0
+            let (from, span) = pid == Self.own ? (ownAnchor, ownSeconds) : (anchor, seconds)
+            let cpu = cpuKnown && span >= Self.shortest
+                ? from?.times[pid].map { time >= $0 ? Double(time - $0) * Self.timebase / 1e9 / span : 0 } ?? 0 : 0
             let owner = AudioProcesses.responsiblePID(of: pid) ?? pid
             var entry = byOwner[owner] ?? described[owner] ?? {
                 let entry = Self.describe(owner)

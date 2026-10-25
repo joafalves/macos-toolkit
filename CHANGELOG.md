@@ -3,6 +3,40 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.23.0 (unreleased)
+
+### Added
+
+- **Menu bar:** **Settings → Separator** picks what goes between two tools: a line (the default),
+  a dot or nothing. **Separator within a tool** does the same between one tool's own parts, as
+  System Stats' stats (a dot by default, or the same as between tools).
+- **System Stats:** a **Small pill** look for CPU, memory, GPU and disk: the pill without the
+  number, where the fill shows the share.
+- **Audio Mixer:** a **Small volume pill** look: the speaker and the fill, without the number.
+
+### Changed
+
+- **Menu bar:** every pill is drawn the same way and is the same width, whatever the tool or what
+  it shows, so pills side by side line up; the small pills share one width too. They're a little
+  smaller, with their symbol and text centred.
+- **System Stats:** a pill shows 100 at full rather than stopping at 99.
+- **System Stats:** the CPU and memory panels show the top apps' CPU about a second after they
+  open, rather than after three to five.
+- **Audio Mixer:** muted, the volume pill is empty with the speaker crossed out and keeps the
+  volume, rather than showing "off".
+- **Keep Awake:** its icon is macOS's wake symbol, and sleep while it's off, in place of the cup:
+  in the sidebar, its panel, the toolkit panel and the menu bar. **Cup and time** is now **Icon
+  and time**.
+- **Keep Awake:** the pill stays a pill when it's off, empty with the sleep symbol and zzz: ∞ with
+  no end, and whole hours (12h) for 10 hours and more. **Cup** is now **Small pill**: the same
+  pill without the time, where the fill shows what's left.
+- **Keep Awake:** in its panel, Stay available has no caption under it, like Keep the display on,
+  unless it needs Accessibility.
+
+### Fixed
+
+- **System Stats:** the dot between stats was darker than the line between tools; it's as faint now.
+
 ## 0.22.1 (2026-10-25)
 
 ### Fixed

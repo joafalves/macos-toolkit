@@ -165,14 +165,14 @@ final class StatsController: ObservableObject {
             timer = nil
             return
         }
-        if !added.isEmpty || newApps { read(added, apps: newApps) }
-        // Counted afresh once the panel has settled: its opening is a one-off,
-        // not the toolkit's use, and would put it on top of its own list.
-        // Measured, the opening costs most in its first second and is done by
-        // two.
+        // Counted from the moment the panel opens, and read again as soon as
+        // there's CPU to tell rather than at the next tick, so the top apps'
+        // CPU shows within a second.
         if newApps {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.topApps?.restart() }
+            topApps?.restart()
+            DispatchQueue.main.asyncAfter(deadline: .now() + TopApps.shortest) { [weak self] in self?.readApps() }
         }
+        if !added.isEmpty || newApps { read(added, apps: newApps) }
         let interval = max(1, config.interval)
         if timer?.timeInterval != interval {
             timer?.invalidate()
@@ -244,6 +244,14 @@ final class StatsController: ObservableObject {
         live.tick += 1
     }
 
+    /// Only the top apps, between the timer's readings.
+    private func readApps() {
+        guard let topApps else { return }
+        live.apps = topApps.read()
+        live.cpuOfAppsKnown = topApps.cpuKnown
+        live.tick += 1
+    }
+
     private func record(_ series: Series, _ value: Double, seconds: Double = 300) {
         let keep = Int(seconds / max(config.interval, 1))
         var values = live.history[series] ?? []
@@ -279,8 +287,9 @@ final class StatsController: ObservableObject {
                                   columns: [MenuBarArt.column([networkLine(\.up, "↑"), networkLine(\.down, "↓")])], label: label)
         case (.network, _):
             return MenuBarSegment(kind: .stat(kind), columns: [MenuBarArt.column([networkLine(\.up, "↑"), networkLine(\.down, "↓")])], label: label)
-        case (_, .pill):
-            return MenuBarSegment(kind: .stat(kind), glyph: MenuBarArt.fillBadge(symbol: kind.symbol, fraction: share(kind) ?? 0, text: pillText(kind)),
+        case (_, .pill), (_, .smallPill):
+            return MenuBarSegment(kind: .stat(kind), glyph: MenuBarArt.fillBadge(symbol: kind.symbol, fraction: share(kind) ?? 0, text: pillText(kind),
+                                                                                  small: look == .smallPill),
                                   tint: tint, label: label)
         case (_, .chart):
             let values = chartValues(kind)
@@ -329,8 +338,9 @@ final class StatsController: ObservableObject {
         }
     }
 
+    /// Up to 100: the pill has room for it, as wide as Keep Awake's times.
     private func pillText(_ kind: StatKind) -> String {
-        share(kind).map { "\(min(99, Int(($0 * 100).rounded())))" } ?? "–"
+        share(kind).map { "\(min(100, Int(($0 * 100).rounded())))" } ?? "–"
     }
 
     private func chartValues(_ kind: StatKind) -> (values: [Double], ceiling: Double?) {

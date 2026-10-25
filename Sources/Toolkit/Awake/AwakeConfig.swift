@@ -4,12 +4,14 @@ import Foundation
 enum AwakeMenuBarIcon: String, Codable, CaseIterable {
     /// No part of its own: a submenu in the toolkit menu.
     case none
-    /// A pill filled with the time left, like the battery's charge.
+    /// A pill filled with the time left, like the battery's charge, and the
+    /// time in it; empty with zzz while it's off.
     case pill
-    /// The cup, with the time left beside it.
-    case cupAndTime
-    /// Only the cup, filled while it's on: no time.
-    case cup
+    /// The icon, with the time left beside it. Saved by its name from when
+    /// the icon was a cup.
+    case iconAndTime = "cupAndTime"
+    /// The small pill: the pill without the time. Saved as `cup`, as before it was a pill.
+    case smallPill = "cup"
 }
 
 /// How Stay available keeps chat apps from marking you away.

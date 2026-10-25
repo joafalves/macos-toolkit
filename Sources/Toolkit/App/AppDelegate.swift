@@ -113,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             },
             model.$general.sink { [weak self] general in
                 self?.menuBar.spacing = general.menuBarSpacing
+                self?.menuBar.setSeparators(between: general.menuBarSeparator, within: general.menuBarToolSeparator.resolved(general.menuBarSeparator))
                 // Not for a `--measure-idle` run, which should do nothing.
                 Updater.shared.automatic = general.checkForUpdates && measureIdlePath == nil
                 redraw()
@@ -213,14 +214,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             segments.append(MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: AppSection.capture.title))
         }
         if awake.config.enabled, awake.config.menuBarIcon != .none {
-            let time = awake.config.menuBarIcon == .cup ? nil : awake.menuBarTime
-            let left = time?.text, widest = time?.widest
             let label = String(localized: "Keep Awake, \(awake.status.prefix(1).lowercased() + awake.status.dropFirst())")
-            if awake.config.menuBarIcon == .pill, awake.isOn, let session = awake.session {
-                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: session.fractionLeft(), time: left, widthOf: widest), label: label))
-            } else {
-                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: awake.isOn, beforeText: left != nil), text: left,
-                                               widthOf: widest, label: label))
+            let fraction = awake.isOn ? awake.session?.fractionLeft() : nil
+            switch awake.config.menuBarIcon {
+            case .pill:
+                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: fraction, time: awake.pillTime), label: label))
+            case .smallPill:
+                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: fraction, time: nil, small: true), label: label))
+            default:
+                let time = awake.menuBarTime
+                segments.append(MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeIcon(on: awake.isOn, beforeText: time != nil), text: time?.text,
+                                               widthOf: time?.widest, label: label))
             }
         }
         if mixer.config.enabled, mixer.config.menuBarIcon != .none {
@@ -238,8 +242,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 // gap after "50%", so "100%" is fitted into the room of "99%".
                 segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: muted),
                                                text: "\(Int((volume * 100).rounded()))%", dimText: mixer.mainMuted, widthOf: "99%", fitted: true, label: label))
-            case .volumeBadge:
-                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: volume, muted: muted), label: label))
+            case .volumeBadge, .volumeSmallPill:
+                segments.append(MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: volume, muted: muted, small: mixer.config.menuBarIcon == .volumeSmallPill),
+                                               label: label))
             case .none:
                 break
             }

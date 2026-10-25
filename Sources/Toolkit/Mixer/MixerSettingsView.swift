@@ -62,7 +62,7 @@ struct MixerSettingsView: View {
                 }
 
                 Card(title: "Options") {
-                    // A pop-up rather than segments: four choices don't fit beside a caption.
+                    // A pop-up rather than segments: five choices don't fit beside a caption.
                     SettingRow(title: "Look in the menu bar", caption: "Shown when it's in the menu bar, which is set at the top of the page.") {
                         Picker("Menu bar icon", selection: $mixer.config.look) {
                             Text("Mixer").tag(MixerMenuBarIcon.mixer)
@@ -70,6 +70,7 @@ struct MixerSettingsView: View {
                             Text("Volume and percentage").tag(MixerMenuBarIcon.volumePercent)
                             // "Pill", as Keep Awake and System Stats call this look.
                             Text("Volume pill").tag(MixerMenuBarIcon.volumeBadge)
+                            Text("Small volume pill").tag(MixerMenuBarIcon.volumeSmallPill)
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()

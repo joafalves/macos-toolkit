@@ -166,8 +166,9 @@ the menu bar, the same controls in both.
   **Exclude** it: excluded apps are left out of the mixer and always play at the main volume.
 - A place in the **menu bar**, one click away, with **Show in the menu bar** at the top of its page,
   in a look set in the options: the mixer glyph, **Volume**, a speaker that follows the volume and shows when it's muted, **Volume and
-  percentage**, or **Volume pill**, a pill that fills with the volume like the battery, with the
-  speaker and the number cut out of it. It starts on **Volume**.
+  percentage**, **Volume pill**, a pill that fills with the volume like the battery, with the
+  speaker and the number cut out of it (empty, with the speaker crossed out, while muted), or
+  **Small volume pill**, the same without the number. It starts on **Volume**.
 - **The volume keys** go through the mixer on every output while it's on, so they always behave the
   same: 16 presses from silent to full, as macOS's own keys (**Each press** in the settings makes it
   32, 20 at 5% a press, or 10), ⇧⌥ for small changes (1 point of the volume, or up to 5 as set), mute toggles, and the
@@ -644,10 +645,12 @@ set. The panel shows the session, turned on or off with a click anywhere on it, 
 the usual lengths are a click each, with the rest under More, and Until sets an end time a quarter
 of an hour at a time. Keep the display on and Stay available are switches at the bottom. A session carries on if the app is restarted or the Mac reboots, until its time is up.
 
-- **In the menu bar** (**Show in the menu bar** at the top of its page) it's a cup. While a session
-  is on it becomes a **pill that empties as the time runs out**, with the time left in it (full, with
-  no time, when it has no end), the cup with the time beside it, or only the cup, filled while it's
-  on, as picked in its options. Not in the menu bar, it sits in the toolkit panel: the cup turns it on or off, its name opens its panel. **Count up with no end**, off by
+- **In the menu bar** (**Show in the menu bar** at the top of its page) it's a **pill that empties as
+  the time runs out**, with macOS's wake symbol and the time left in it (whole hours from 10 hours
+  up), full with ∞ when the session has no end, and empty with the sleep symbol and zzz while it's
+  off, always the same width. Its options also have a **Small pill**, the same without the time,
+  and **Icon and time**, the symbol with the time beside it. Not in the menu bar, it sits in the
+  toolkit panel: its icon turns it on or off, its name opens its panel. **Count up with no end**, off by
   default, shows how long a session with no end has been on instead.
 - **Keep the display on** is the default. Turned off, only the Mac stays awake: the display sleeps,
   and downloads and long jobs go on.
@@ -660,7 +663,7 @@ of an hour at a time. Keep the display on and Stay available are switches at the
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/stats-bar-dark.png">
-    <img src="docs/images/stats-bar-light.png" width="520" alt="System Stats in the menu bar: as numbers, as pills, as small charts, and in the compact layout">
+    <img src="docs/images/stats-bar-light.png" width="520" alt="System Stats in the menu bar: as numbers, as pills, as small pills, as small charts, and in the compact layout">
   </picture>
   <br><br>
   <picture>
@@ -676,8 +679,9 @@ of an hour at a time. Keep the display on and Stay available are switches at the
 
 What the Mac is doing, in the menu bar: **CPU**, **memory**, **network**, **disk**, **GPU** and
 **power**. CPU and memory are on by default; turn on the others in the settings. Each stat is a
-number with its icon, a pill that fills, or a chart of the last minute, or they all go in one
-**compact** part as small labels. Click one for its last five minutes and the details.
+number with its icon, a pill that fills (up to 100), a small pill without the number, or a chart
+of the last minute, or they all go in one **compact** part as small labels. Pills are the same
+width as every other pill in the menu bar, Keep Awake's and the mixer's too, so they line up. Click one for its last five minutes and the details.
 
 - **Memory** shows what apps need: their memory, the kernel's, and what's compressed. Most monitors
   count everything that isn't free, but macOS fills spare memory with cached files it drops as soon
@@ -771,18 +775,20 @@ To remove it, quit the app, delete it from `/Applications`, and delete
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/menu-bar-dark.png">
-    <img src="docs/images/menu-bar-light.png" width="360" alt="The toolkit's menu bar item: the toolkit's mark, Screen Capture, Keep Awake and the mixer side by side with hairlines between them; with the mixer open and the others dimmed; while recording, with Keep Awake's cup and time; Keep Awake off; and on with no end">
+    <img src="docs/images/menu-bar-light.png" width="360" alt="The toolkit's menu bar item: the toolkit's mark, Screen Capture, Keep Awake and the mixer side by side with hairlines between them; with the mixer open and the others dimmed; while recording, with Keep Awake's icon and time; Keep Awake off, an empty pill with the sleep symbol and zzz; on with no end; and as the small pill">
   </picture>
 </p>
 
 The toolkit has one item in the menu bar. The toolkit's mark is always there, and System Stats, Screen
 Capture, Keep Awake, the Audio Mixer, Mouse and Window Layout join it when they're put there, side by side
-with the same size and spacing and a hairline between them. Each of those has **Show in the menu bar**
+with the same size and spacing and a line between them (a dot between System Stats' stats). Each of those has **Show in the menu bar**
 at the top of its page, under its On switch, saying what a click on it does (System Stats is in the
 menu bar whenever it's on). While recording, Screen Capture's place shows a red
 stop button with the time and size. Each part opens its own menu or panel, and while one is open
 the others dim. Being one item, they move together when you ⌘-drag it, share macOS's highlight,
-and other apps' icons can't end up between them. **Settings → Space between items** sets how far apart the parts sit, and **Order** which comes
+and other apps' icons can't end up between them. **Settings → Space between items** sets how far apart the parts sit, **Separator** whether a
+line, a dot or nothing goes between two tools, **Separator within a tool** the same between one tool's own
+parts (a dot by default, or the same as between tools), and **Order** which comes
 first: drag the tools, the toolkit's mark too, into the order you want, left to right. A switch on
 each puts it in the menu bar or takes it out; a tool that's off opens its page instead.
 
@@ -795,8 +801,8 @@ each puts it in the menu bar or takes it out; a tool that's off opens its page i
 
 The toolkit's mark opens its panel. At the top, as a row of icons with their name and state on hover,
 are the tools that have no part of their own in the menu bar: Screen Capture opens its toolbar (or
-stops a recording), the Audio Mixer opens the mixer, Keep Awake's cup opens its panel (filled while
-it's on), and Mouse and Window Layout open their panels.
+stops a recording), the Audio Mixer opens the mixer, Keep Awake's icon opens its panel (the wake
+symbol while it's on, sleep while it's off), and Mouse and Window Layout open their panels.
 Then every tool, with a switch that turns it on or off and leaves the panel open, so you can set
 several at once; a tool's name opens its settings. Quit, About and Settings are at the bottom.
 

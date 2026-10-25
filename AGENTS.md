@@ -180,9 +180,15 @@ tool; keep it in step with the code.
     button's appearance that draws again on every notice (setting the image sends one) loops.
   - **Parts don't change width** as their figures change: a segment's `widthOf` (or a column line's)
     is the widest its text gets, and the part keeps that width with the text against its right edge
-    (`--test-menu-bar-widths`). Keep templates as small as what's really shown (stats stop at 99%).
+    (`--test-menu-bar-widths`). Keep templates as small as what's really shown (stats stop at 99%,
+    except in a pill).
     The volume keeps the width of "99%" (room for "100%" left a gap): `fitted` sets "100%" a little
     tighter, into the label's margins and the gap after the speaker.
+  - **Pills are one design** (`MenuBarArt.pill`): System Stats, Keep Awake and the mixer all draw
+    through it, so every pill is one width (44 pt) and every small pill another (20 pt), whatever
+    it shows: 10 pt symbols and bold digits, room for "8:88", each part centred by its measured
+    ink, not its box. A tool's pill passes a symbol, a share (nil for empty: off, muted) and text,
+    a symbol, or nothing for the small one; never a pill of its own.
   - The spacing setting goes between parts only, not at the item's two ends, where macOS leaves its
     own gap as for any item.
   - An update costs about 5 ms (`--test-menu-bar`, release build), most of it macOS's, so only

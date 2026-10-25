@@ -230,7 +230,11 @@ final class AwakeController: ObservableObject {
         return String(format: "%d:%02d", minutes / 60, minutes % 60)
     }
 
-    /// What the menu bar shows beside the cup: the time left, or with no end
+    /// macOS's own pair for the two states: wake while it keeps the Mac
+    /// awake, and the tool's icon; sleep while it's off, the Mac sleeping as usual.
+    static func symbol(on: Bool) -> String { on ? "wake" : "sleep" }
+
+    /// What the menu bar shows beside the icon: the time left, or with no end
     /// and that turned on, how long it's been on. Nil for nothing.
     var menuBarTime: (text: String, widest: String)? {
         guard isOn, let session else { return nil }
@@ -241,6 +245,23 @@ final class AwakeController: ObservableObject {
         guard config.showElapsed else { return nil }
         // Up to 99 hours without shifting as it counts up.
         return (Self.elapsed(Date().timeIntervalSince(session.started)), "88:88")
+    }
+
+    /// What the pill shows after the icon: the time left, or with no end and
+    /// that turned on, how long it's been on; nil for ∞ (or off). Always as
+    /// short as "8:88", so the pill keeps one width: 10 hours and more are
+    /// whole hours, rounded up like the minutes counting down.
+    var pillTime: String? {
+        guard isOn, let session else { return nil }
+        if let until = session.until {
+            let seconds = until.timeIntervalSinceNow
+            guard seconds > 9 * 3600 + 59 * 60 else { return Self.left(seconds) }
+            return String(localized: "\(Int((seconds / 3600).rounded(.up)))h")
+        }
+        guard config.showElapsed else { return nil }
+        let seconds = Date().timeIntervalSince(session.started)
+        guard seconds >= 10 * 3600 else { return Self.elapsed(seconds) }
+        return String(localized: "\(min(99, Int(seconds / 3600)))h")
     }
 
     /// For the menu and the settings page.

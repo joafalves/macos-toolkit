@@ -94,6 +94,8 @@ enum MixerMenuBarIcon: String, Codable, CaseIterable {
     case volumePercent
     /// A solid pill with the speaker and the volume cut out of it.
     case volumeBadge
+    /// The same pill, small: the speaker and the fill, no number.
+    case volumeSmallPill
 }
 
 struct MixerConfig: Codable, Equatable {

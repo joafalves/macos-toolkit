@@ -136,6 +136,14 @@ final class MenuBarItem: NSObject {
         button?.toolTip = segments.count == 1 ? segments[0].label : nil
     }
 
+    /// Between two tools, and between one tool's own parts.
+    func setSeparators(between: MenuBarSeparator, within: MenuBarSeparator) {
+        guard row.separator != between || row.toolSeparator != within else { return }
+        row.separator = between
+        row.toolSeparator = within
+        render()
+    }
+
     /// Points between two parts; half of it on each side of every part.
     var spacing: CGFloat {
         get { row.padding * 2 }
@@ -242,7 +250,7 @@ final class MenuBarItem: NSObject {
     }
 }
 
-/// The parts side by side with a hairline between each, laid out by hand:
+/// The parts side by side with a separator between each, laid out by hand:
 /// each part as wide as its content, which for numbers means as wide as their
 /// widest digits, so the menu bar doesn't shift as they change.
 final class MenuBarRow: NSView {
@@ -265,6 +273,13 @@ final class MenuBarRow: NSView {
             parts.values.forEach { $0.needsLayout = true }
             layoutParts()
         }
+    }
+    /// Set in Settings: between two tools, and between one tool's own parts.
+    var separator = MenuBarSeparator.pipe {
+        didSet { if separator != oldValue { layoutParts() } }
+    }
+    var toolSeparator = MenuBarSeparator.dot {
+        didSet { if toolSeparator != oldValue { layoutParts() } }
     }
 
     init() {
@@ -322,8 +337,8 @@ final class MenuBarRow: NSView {
             guard let part = parts[kind] else { continue }
             elements += part.elements(offset: part.frame.origin, alpha: part.alphaValue)
         }
-        for divider in dividers where divider.superview != nil {
-            elements.append(.divider(dot: divider.dot, rect: divider.frame))
+        for divider in dividers where divider.superview != nil && divider.style != .none {
+            elements.append(.divider(divider.style, rect: divider.frame))
         }
         return MenuBarDrawing(size: frame.size, elements: elements)
     }
@@ -340,22 +355,24 @@ final class MenuBarRow: NSView {
         return order.min { distance($0) < distance($1) }
     }
 
-    /// Positions the parts; tells the item only if the width changed.
     private static func sameTool(_ a: MenuBarSegment.Kind, _ b: MenuBarSegment.Kind) -> Bool {
         if case .stat = a, case .stat = b { return true }
         return false
     }
 
+    /// Positions the parts; tells the item only if the width changed.
     func layoutParts() {
         var x: CGFloat = 0
         for (index, kind) in order.enumerated() {
             guard let part = parts[kind] else { continue }
             if index > 0 {
-                // A dot between two stats, as between a recording's time and
-                // size: one tool's parts, apart from the other tools.
                 let divider = dividers[index - 1]
-                divider.dot = Self.sameTool(order[index - 1], kind)
-                let size = divider.dot ? NSSize(width: 2, height: 2) : NSSize(width: 1, height: 12)
+                divider.style = Self.sameTool(order[index - 1], kind) ? toolSeparator : separator
+                let size = switch divider.style {
+                case .none: NSSize.zero
+                case .dot: NSSize(width: 2, height: 2)
+                case .pipe: NSSize(width: 1, height: 12)
+                }
                 divider.frame = NSRect(x: x, y: (Self.height - size.height) / 2, width: size.width, height: size.height)
                 x += size.width
             }
@@ -636,28 +653,50 @@ final class MenuBarText: NSView {
     }
 }
 
-/// The hairline between parts, in the menu bar's text colour, faint. Not
-/// vibrant, like the icons and text.
+/// What goes between two parts of the menu bar item.
+enum MenuBarSeparator: String, Codable, CaseIterable {
+    case none
+    case dot
+    /// A hairline.
+    case pipe
+}
+
+/// What goes between one tool's own parts: its own choice, or the one between tools.
+enum MenuBarToolSeparator: String, Codable, CaseIterable {
+    case same
+    case none
+    case dot
+    case pipe
+
+    func resolved(_ between: MenuBarSeparator) -> MenuBarSeparator {
+        switch self {
+        case .same: return between
+        case .none: return .none
+        case .dot: return .dot
+        case .pipe: return .pipe
+        }
+    }
+}
+
+/// The separator between parts, in the menu bar's text colour, faint: a dot
+/// or a hairline, the same faintness either way. Not vibrant, like the icons and text.
 final class MenuBarDivider: NSView {
     override var allowsVibrancy: Bool { false }
 
-    var dot = false {
-        didSet { if dot != oldValue { needsDisplay = true } }
+    var style = MenuBarSeparator.pipe {
+        didSet { if style != oldValue { needsDisplay = true } }
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        Self.draw(dot: dot, in: bounds, template: false)
+        Self.draw(style, in: bounds, template: false)
     }
 
-    static func draw(dot: Bool, in rect: NSRect, template: Bool) {
-        let color: NSColor = template ? .black : .labelColor
-        if dot {
-            // In the text's colour, like the recording's " · ".
-            color.setFill()
-            NSBezierPath(ovalIn: rect).fill()
-        } else {
-            color.withAlphaComponent(0.35).setFill()
-            rect.fill()
+    static func draw(_ style: MenuBarSeparator, in rect: NSRect, template: Bool) {
+        (template ? NSColor.black : .labelColor).withAlphaComponent(0.35).setFill()
+        switch style {
+        case .none: break
+        case .dot: NSBezierPath(ovalIn: rect).fill()
+        case .pipe: rect.fill()
         }
     }
 
@@ -675,7 +714,7 @@ struct MenuBarDrawing: Equatable {
     enum Element: Equatable {
         case image(NSImage, tint: NSColor?, rect: NSRect, alpha: CGFloat)
         case text(NSAttributedString, rect: NSRect, alpha: CGFloat)
-        case divider(dot: Bool, rect: NSRect)
+        case divider(MenuBarSeparator, rect: NSRect)
 
         static func == (a: Element, b: Element) -> Bool {
             switch (a, b) {
@@ -726,8 +765,8 @@ struct MenuBarDrawing: Equatable {
                     NSGraphicsContext.current = flipped
                     MenuBarText.draw(text, size: rect.size, template: template)
                     NSGraphicsContext.restoreGraphicsState()
-                case let .divider(dot, rect):
-                    MenuBarDivider.draw(dot: dot, in: rect, template: template)
+                case let .divider(style, rect):
+                    MenuBarDivider.draw(style, in: rect, template: template)
                 }
                 context.restoreGState()
             }
@@ -868,111 +907,185 @@ enum MenuBarArt {
         return cached("speaker \(symbol)") { image(symbol, widthOf: volumeSymbols) }
     }
 
-    /// A pill filled up to the volume, with the speaker and the number cut out
-    /// of it, like the battery's icon with its percentage inside. Always as wide as "100", so
-    /// the menu bar doesn't shift as the number changes.
-    static func volumeBadge(volume: Float, muted: Bool) -> NSImage {
+    /// The volume as a pill: filled up to the volume, like the battery's
+    /// charge, with the speaker and the number cut out. Muted, it's empty, with
+    /// the speaker crossed out and the volume kept, as with the percentage, so
+    /// you can see what unmuting brings back. `small` leaves the number out.
+    static func volumeBadge(volume: Float, muted: Bool, small: Bool = false) -> NSImage {
         // By whole percent, which is all it shows.
         let percent = Int((min(1, max(0, volume)) * 100).rounded())
-        return latest("volume", "\(percent) \(muted)") { makeBadge(volume: Float(percent) / 100, muted: muted) } ?? NSImage()
+        return pill("volume", symbol: muted ? "speaker.slash.fill" : "speaker.fill", fraction: muted ? nil : Double(percent) / 100,
+                    content: small ? nil : .text("\(percent)"))
     }
 
-    private static func makeBadge(volume: Float, muted: Bool) -> NSImage {
-        let font = NSFont.systemFont(ofSize: 11.5, weight: .bold)
-        let text = NSAttributedString(string: muted ? "off" : "\(Int((volume * 100).rounded()))",
-                                      attributes: [.font: font, .foregroundColor: NSColor.black])
-        let widest = NSAttributedString(string: "100", attributes: [.font: font]).size().width
-        let cone = NSImage(systemSymbolName: muted ? "speaker.slash.fill" : "speaker.fill", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 10.5, weight: .semibold))
-        let coneWidth = cone?.size.width ?? 8
-        // As tall as the other menu bar symbols, about 16pt of the 18pt box.
-        let pill = NSRect(x: 0, y: 1, width: ceil(3 + coneWidth + 1 + widest + 3), height: 16)
-        let image = NSImage(size: NSSize(width: pill.width, height: 18), flipped: false) { _ in
-            // Filled up to the volume like the battery's charge, the rest faint.
+    /// Keep Awake's icon: sleep while off, wake while on, in the room of
+    /// either. Against the time when there is one, which would otherwise sit after a gap.
+    static func awakeIcon(on: Bool, beforeText: Bool = false) -> NSImage? {
+        let symbol = AwakeController.symbol(on: on)
+        return cached("awake \(symbol) \(beforeText)") { image(symbol, widthOf: [false, true].map(AwakeController.symbol), alignRight: beforeText) }
+    }
+
+    /// Keep Awake as a pill: filled with the time left, macOS's wake symbol
+    /// and the time cut out. With no end it's full with ∞ (or the time it's
+    /// been on); off, it's empty, with macOS's sleep symbol, the same one in
+    /// its other state, and zzz, since the Mac sleeps as usual. `small` leaves
+    /// the time out: the fill alone tells it. `fraction` is nil while it's off.
+    static func awakeBadge(fraction: Double?, time: String?, small: Bool = false) -> NSImage {
+        let content: PillContent? = small ? nil : fraction == nil ? .symbol("zzz") : .text(time ?? "∞")
+        return pill("awake", symbol: AwakeController.symbol(on: fraction != nil), fraction: fraction, content: content)
+    }
+
+    // MARK: - Pills
+
+    /// What a pill shows after its symbol.
+    enum PillContent: Equatable {
+        case text(String)
+        case symbol(String)
+    }
+
+    /// The pill System Stats, Keep Awake and the mixer share, so they look
+    /// alike side by side: 16pt high, filled up to a share in the label colour
+    /// over a faint track, the symbol and text cut out. Every pill is one
+    /// width, whatever it shows, so the menu bar never shifts and pills line
+    /// up; without content it's the small pill, one width too. Each part is
+    /// centred by its ink, measured, not by its box: a symbol's box and a
+    /// font's metrics leave the ink up to a point off. `fraction` nil is
+    /// empty: off, muted, or nothing read.
+    static func pill(_ slot: String, symbol: String, fraction: Double?, content: PillContent?) -> NSImage {
+        // By whole percent: finer than anything it fills with.
+        let percent = fraction.map { Int((min(1, max(0, $0)) * 100).rounded()) }
+        let key = "\(symbol) \(percent.map(String.init) ?? "empty") \(String(describing: content))"
+        return latest("pill \(slot)", key) {
+            makePill(symbol: symbol, fraction: percent.map { Double($0) / 100 }, content: content)
+        } ?? NSImage()
+    }
+
+    private enum Pill {
+        static let height: CGFloat = 16
+        static let font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold)
+        static let symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+        // From the left end to the symbol's ink, from it to the text's, and
+        // from that to the right end. The symbol's side has a point more: a
+        // symbol is taller than the digits, so its corners come nearer the round end.
+        static let lead: CGFloat = 4.5, gap: CGFloat = 2.75, trail: CGFloat = 3.25
+        static let smallMargin: CGFloat = 4.5
+        /// The text's room: Keep Awake's longest time, which holds "100" too.
+        static let template = "8:88"
+        /// The symbol's room: the widest of these. A wider one (the disk)
+        /// grows toward the text rather than the edge.
+        static let slotSymbols = ["cpu", "memorychip", "cube", "wake"]
+        static let slot: CGFloat = slotSymbols.compactMap { name in MenuBarArt.pillSymbol(name).map { MenuBarArt.ink(of: $0, key: name).width } }.max() ?? 10
+    }
+
+    private static func pillSymbol(_ name: String) -> NSImage? {
+        NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(Pill.symbolConfiguration)
+    }
+
+    /// Where an image's ink is, in points within it: drawn once at 2x and
+    /// measured. Kept by `key`, which names one of a fixed set of symbols.
+    private static var inks: [String: CGRect] = [:]
+    private static func ink(of image: NSImage, key: String) -> CGRect {
+        if let ink = inks[key] { return ink }
+        let ink = measureInk(size: image.size) { image.draw(in: NSRect(origin: .zero, size: image.size)) }
+        inks[key] = ink
+        return ink
+    }
+
+    private static func measureInk(size: NSSize, _ draw: () -> Void) -> CGRect {
+        let scale = 2
+        let width = Int(ceil(size.width)) * scale, height = Int(ceil(size.height)) * scale
+        guard width > 0, height > 0,
+              let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4,
+                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let data = rep.bitmapData else { return NSRect(origin: .zero, size: size) }
+        rep.size = NSSize(width: ceil(size.width), height: ceil(size.height))
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        draw()
+        NSGraphicsContext.restoreGraphicsState()
+        var minX = width, maxX = -1, minY = height, maxY = -1
+        for y in 0..<height {
+            for x in 0..<width where data[y * rep.bytesPerRow + x * 4 + 3] > 100 {
+                minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= 0 else { return NSRect(origin: .zero, size: size) }
+        // Rows run top down; points up.
+        let s = CGFloat(scale)
+        return NSRect(x: CGFloat(minX) / s, y: CGFloat(height - 1 - maxY) / s, width: CGFloat(maxX - minX + 1) / s, height: CGFloat(maxY - minY + 1) / s)
+    }
+
+    /// Text's ink across, from the glyphs' outlines: where it starts after the pen, and how wide.
+    private static func textInk(_ text: NSAttributedString) -> (minX: CGFloat, width: CGFloat) {
+        let bounds = CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(text), .useGlyphPathBounds)
+        return (bounds.minX, bounds.width)
+    }
+
+    /// The template's ink, from where `draw(at:)` puts it: its width is the
+    /// text's room, and every text sits on its baseline, so "1:24" and "100" line up.
+    private static let templateRows: CGRect = {
+        let text = NSAttributedString(string: Pill.template, attributes: [.font: Pill.font, .foregroundColor: NSColor.black])
+        return measureInk(size: text.size()) { text.draw(at: .zero) }
+    }()
+
+    private static func makePill(symbol: String, fraction: Double?, content: PillContent?) -> NSImage {
+        let small = content == nil
+        let slot = Pill.slot
+        let rows = templateRows
+        let templateWidth = rows.width
+        let exact = small ? Pill.smallMargin * 2 + slot : Pill.lead + slot + Pill.gap + templateWidth + Pill.trail
+        let width = ceil(exact)
+        // What rounding up adds goes half to each end.
+        let extra = (width - exact) / 2
+        let slotX = (small ? Pill.smallMargin : Pill.lead) + extra
+        let textCentre = width - Pill.trail - extra - templateWidth / 2
+        let glyph = pillSymbol(symbol)
+        let glyphInk = glyph.map { ink(of: $0, key: symbol) } ?? .zero
+        let pill = NSRect(x: 0, y: 1, width: width, height: Pill.height)
+        let image = NSImage(size: NSSize(width: width, height: 18), flipped: false) { _ in
+            // On the display's pixels, so a half point rounds away on a 1x display rather than blurring.
+            let scale = NSGraphicsContext.current?.cgContext.userSpaceToDeviceSpaceTransform.a ?? 2
+            func snap(_ value: CGFloat) -> CGFloat { (value * scale).rounded() / scale }
             let shape = NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2)
             NSColor.black.withAlphaComponent(0.4).setFill()
             shape.fill()
-            if !muted {
+            if let fraction {
                 NSGraphicsContext.saveGraphicsState()
                 shape.addClip()
                 // Two lots of 40% would show where they overlap, so the fill replaces it.
                 NSGraphicsContext.current?.compositingOperation = .copy
                 NSColor.black.setFill()
-                NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(min(1, max(0, volume))), height: pill.height).fill()
+                NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(fraction), height: pill.height).fill()
                 NSGraphicsContext.restoreGraphicsState()
             }
-            if let cone {
-                cone.draw(in: NSRect(x: 3, y: (pill.midY - cone.size.height / 2).rounded(), width: cone.size.width, height: cone.size.height),
-                          from: .zero, operation: .destinationOut, fraction: 1)
+            if let glyph {
+                var x = slotX + (slot - glyphInk.width) / 2
+                if !small { x = max(x, slotX) }
+                glyph.draw(in: NSRect(x: snap(x - glyphInk.minX), y: snap(pill.midY - glyphInk.height / 2 - glyphInk.minY),
+                                      width: glyph.size.width, height: glyph.size.height), from: .zero, operation: .destinationOut, fraction: 1)
             }
-            // The number is cut out too, centred in the space after the speaker.
-            let size = text.size()
-            let area = NSRect(x: 3 + coneWidth + 1, y: pill.minY, width: widest, height: pill.height)
-            NSGraphicsContext.current?.compositingOperation = .destinationOut
-            text.draw(at: NSPoint(x: (area.midX - size.width / 2).rounded(), y: (area.midY - size.height / 2).rounded()))
-            NSGraphicsContext.current?.compositingOperation = .sourceOver
-            return true
-        }
-        image.isTemplate = true
-        return image
-    }
-
-    /// The same cup, filled while it's on: only the fill changes, not the shape.
-    static let cupSymbols = ["cup.and.saucer", "cup.and.saucer.fill"]
-
-    /// Keep Awake's cup: outline while off, filled while on. Against the
-    /// time when there is one, which would otherwise sit after a gap.
-    static func cup(on: Bool, beforeText: Bool = false) -> NSImage? {
-        let symbol = on ? cupSymbols[1] : cupSymbols[0]
-        return cached("cup \(symbol) \(beforeText)") { image(symbol, widthOf: cupSymbols, alignRight: beforeText) }
-    }
-
-    /// Keep Awake while on, like the volume badge: a pill filled with the time
-    /// left, the cup and the time cut out of it. With no end it's full and
-    /// holds only the cup. As wide as "8:88" with a time, so the menu bar
-    /// doesn't shift as it counts down.
-    static func awakeBadge(fraction: Double, time: String?, widthOf: String? = nil) -> NSImage {
-        // By whole percent: finer than the minutes it changes with.
-        let percent = Int((min(1, max(0, fraction)) * 100).rounded())
-        return latest("awake", "\(percent) \(time ?? "") \(widthOf ?? "")") {
-            makeAwakeBadge(fraction: Double(percent) / 100, time: time, widthOf: widthOf)
-        } ?? NSImage()
-    }
-
-    private static func makeAwakeBadge(fraction: Double, time: String?, widthOf: String?) -> NSImage {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .bold)
-        let text = time.map { NSAttributedString(string: $0, attributes: [.font: font, .foregroundColor: NSColor.black]) }
-        let widest = time.map { MenuBarPartView.widest($0, widthOf, font) } ?? 0
-        let cup = NSImage(systemSymbolName: "cup.and.heat.waves.fill", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 10.5, weight: .semibold))
-        let cupWidth = cup?.size.width ?? 10
-        let pill = NSRect(x: 0, y: 1, width: ceil(4 + cupWidth + (time == nil ? 0 : 2 + widest) + 4), height: 16)
-        let image = NSImage(size: NSSize(width: pill.width, height: 18), flipped: false) { _ in
-            let shape = NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2)
-            NSColor.black.withAlphaComponent(0.4).setFill()
-            shape.fill()
-            NSGraphicsContext.saveGraphicsState()
-            shape.addClip()
-            NSGraphicsContext.current?.compositingOperation = .copy
-            NSColor.black.setFill()
-            NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(fraction), height: pill.height).fill()
-            NSGraphicsContext.restoreGraphicsState()
-            if let cup {
-                cup.draw(in: NSRect(x: 4, y: (pill.midY - cup.size.height / 2).rounded(), width: cup.size.width, height: cup.size.height),
-                         from: .zero, operation: .destinationOut, fraction: 1)
-            }
-            if let text {
-                let size = text.size()
-                let area = NSRect(x: 4 + cupWidth + 2, y: pill.minY, width: widest, height: pill.height)
+            switch content {
+            case .symbol(let name):
+                if let mark = pillSymbol(name) {
+                    let markInk = ink(of: mark, key: name)
+                    mark.draw(in: NSRect(x: snap(textCentre - markInk.width / 2 - markInk.minX), y: snap(pill.midY - markInk.height / 2 - markInk.minY),
+                                         width: mark.size.width, height: mark.size.height), from: .zero, operation: .destinationOut, fraction: 1)
+                }
+            case .text(let string):
+                let text = NSAttributedString(string: string, attributes: [.font: Pill.font, .foregroundColor: NSColor.black])
+                let across = textInk(text)
                 NSGraphicsContext.current?.compositingOperation = .destinationOut
-                text.draw(at: NSPoint(x: (area.midX - size.width / 2).rounded(), y: (area.midY - size.height / 2).rounded()))
+                text.draw(at: NSPoint(x: snap(textCentre - across.width / 2 - across.minX), y: snap(pill.midY - rows.height / 2 - rows.minY)))
                 NSGraphicsContext.current?.compositingOperation = .sourceOver
+            case nil:
+                break
             }
             return true
         }
         image.isTemplate = true
         return image
     }
+
 
     // MARK: - System Stats
 
@@ -1003,46 +1116,12 @@ enum MenuBarArt {
         return text
     }
 
-    /// A pill filled to a share, the symbol and number cut out of it, like
-    /// the volume badge. As wide as two digits, which System Stats' figures
-    /// stop at, so it doesn't shift.
-    static func fillBadge(symbol: String, fraction: Double, text: String) -> NSImage {
-        let percent = Int((min(1, max(0, fraction)) * 100).rounded())
-        return latest("fill \(symbol)", "\(percent) \(text)") { makeFillBadge(symbol: symbol, fraction: Double(percent) / 100, text: text) } ?? NSImage()
+    /// A stat as a pill, filled to its share, its symbol and number cut out;
+    /// `small` leaves the number out.
+    static func fillBadge(symbol: String, fraction: Double, text: String, small: Bool = false) -> NSImage {
+        pill("stat \(symbol)", symbol: symbol, fraction: fraction, content: small ? nil : .text(text))
     }
 
-    private static func makeFillBadge(symbol: String, fraction: Double, text: String) -> NSImage {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .bold)
-        let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: NSColor.black])
-        let widest = NSAttributedString(string: "88", attributes: [.font: font]).size().width
-        let glyph = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
-        let glyphWidth = glyph?.size.width ?? 10
-        let pill = NSRect(x: 0, y: 1, width: ceil(4 + glyphWidth + 2 + widest + 4), height: 16)
-        let image = NSImage(size: NSSize(width: pill.width, height: 18), flipped: false) { _ in
-            let shape = NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2)
-            NSColor.black.withAlphaComponent(0.4).setFill()
-            shape.fill()
-            NSGraphicsContext.saveGraphicsState()
-            shape.addClip()
-            NSGraphicsContext.current?.compositingOperation = .copy
-            NSColor.black.setFill()
-            NSRect(x: pill.minX, y: pill.minY, width: pill.width * CGFloat(fraction), height: pill.height).fill()
-            NSGraphicsContext.restoreGraphicsState()
-            if let glyph {
-                glyph.draw(in: NSRect(x: 4, y: (pill.midY - glyph.size.height / 2).rounded(), width: glyph.size.width, height: glyph.size.height),
-                           from: .zero, operation: .destinationOut, fraction: 1)
-            }
-            let size = string.size()
-            let area = NSRect(x: 4 + glyphWidth + 2, y: pill.minY, width: widest, height: pill.height)
-            NSGraphicsContext.current?.compositingOperation = .destinationOut
-            string.draw(at: NSPoint(x: (area.midX - size.width / 2).rounded(), y: (area.midY - size.height / 2).rounded()))
-            NSGraphicsContext.current?.compositingOperation = .sourceOver
-            return true
-        }
-        image.isTemplate = true
-        return image
-    }
 
     /// The last readings as a small chart after the stat's own small symbol,
     /// so two charts side by side can be told apart: a faint area under a
@@ -1266,16 +1345,27 @@ extension MenuBarRow {
             MenuBarSegment(kind: .stats, columns: [MenuBarArt.column([.init(text: "CPU " + StatsController.percent(cpu), widthOf: "CPU 99%"),
                                                                       .init(text: "MEM " + StatsController.percent(memory), widthOf: "MEM 99%")])], label: "")
         })
-        widths("cpu pill", [0.05, 0.42, 1].map { MenuBarSegment(kind: .stat(.cpu), glyph: MenuBarArt.fillBadge(symbol: "cpu", fraction: $0, text: "\(min(99, Int($0 * 100)))"), label: "") })
         // Two lines with the same template are still measured one at a time.
         let same = MenuBarArt.column([.init(text: "A 1", widthOf: "A 888"), .init(text: "A 2", widthOf: "A 888")])
         let alone = MenuBarArt.column([.init(text: "A 1", widthOf: "A 888")])
         widths("a column of two like lines", [MenuBarSegment(kind: .stats, columns: [same], label: ""), MenuBarSegment(kind: .stats, columns: [alone], label: "")])
-        widths("keep awake, 10 h", ["10:00", "9:59", "0:05"].map { MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: true, beforeText: true), text: $0, widthOf: "10:00", label: "") })
+        widths("keep awake, 10 h", ["10:00", "9:59", "0:05"].map { MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeIcon(on: true, beforeText: true), text: $0, widthOf: "10:00", label: "") })
         widths("volume and percentage", [(0.0, true), (0.05, false), (0.62, false), (1.0, false)].map { volume, muted in
             MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: muted), text: "\(Int(volume * 100))%", widthOf: "99%", fitted: true, label: "")
         })
-        widths("keep awake pill, 10 h", ["10:00", "9:59", "0:05"].map { MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.5, time: $0, widthOf: "10:00"), label: "") })
+        // Every pill one width, whatever tool, figure or state, and every small pill another.
+        widths("pills", [
+            MenuBarArt.fillBadge(symbol: "cpu", fraction: 0.05, text: "5"), MenuBarArt.fillBadge(symbol: "memorychip", fraction: 1, text: "100"),
+            MenuBarArt.fillBadge(symbol: "internaldrive", fraction: 0.69, text: "69"), MenuBarArt.fillBadge(symbol: "cube", fraction: 0, text: "–"),
+            MenuBarArt.awakeBadge(fraction: nil, time: nil), MenuBarArt.awakeBadge(fraction: 0.5, time: "12h"), MenuBarArt.awakeBadge(fraction: 0.5, time: "0:05"),
+            MenuBarArt.awakeBadge(fraction: 1, time: nil), MenuBarArt.volumeBadge(volume: 0.6, muted: false), MenuBarArt.volumeBadge(volume: 1, muted: false),
+            MenuBarArt.volumeBadge(volume: 0.6, muted: true),
+        ].map { MenuBarSegment(kind: .awake, glyph: $0, label: "") })
+        widths("small pills", [
+            MenuBarArt.fillBadge(symbol: "cpu", fraction: 0.4, text: "40", small: true), MenuBarArt.fillBadge(symbol: "internaldrive", fraction: 1, text: "100", small: true),
+            MenuBarArt.awakeBadge(fraction: nil, time: nil, small: true), MenuBarArt.awakeBadge(fraction: 0.5, time: nil, small: true),
+            MenuBarArt.volumeBadge(volume: 0.6, muted: false, small: true), MenuBarArt.volumeBadge(volume: 0.6, muted: true, small: true),
+        ].map { MenuBarSegment(kind: .awake, glyph: $0, label: "") })
         print(failures == 0 ? "all ok" : "\(failures) failed")
     }
 }

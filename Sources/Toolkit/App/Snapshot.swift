@@ -193,16 +193,18 @@ enum Snapshot {
         let badge = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer")
         let percent = MenuBarSegment(kind: .mixer, glyph: MenuBarArt.plainSpeaker(muted: false), text: "60%", widthOf: "99%", fitted: true, label: "Audio Mixer")
         let recording = MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: false), text: "0:42 · 3.1 MB", label: "Recording")
-        let awake = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24", widthOf: "2:00"), label: "Keep Awake")
-        let awakeOff = MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: false), label: "Keep Awake")
-        let awakeTime = MenuBarSegment(kind: .awake, glyph: MenuBarArt.cup(on: true, beforeText: true), text: "1:24", widthOf: "2:00", label: "Keep Awake")
+        let awake = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24"), label: "Keep Awake")
+        let awakeOff = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: nil, time: nil), label: "Keep Awake")
+        let awakeTime = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeIcon(on: true, beforeText: true), text: "1:24", widthOf: "2:00", label: "Keep Awake")
         let awakeFull = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 1, time: nil), label: "Keep Awake")
+        let awakeSmall = MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: nil, small: true), label: "Keep Awake")
         let rows: [([MenuBarSegment], MenuBarSegment.Kind?)] = [
             ([toolkit, capture, awake, badge], nil),
             ([toolkit, capture, awake, badge], .mixer),
             ([toolkit, recording, awakeTime, percent], nil),
             ([toolkit, awakeOff], nil),
             ([toolkit, awakeFull], .toolkit),
+            ([toolkit, awakeSmall], nil),
         ]
         // The real views, as the menu bar item has them, on drawn strips of menu bar.
         let strip = NSSize(width: 360, height: 30)
@@ -240,7 +242,7 @@ enum Snapshot {
             MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit"),
         ] + StatsController.preview().segments() + [
             MenuBarSegment(kind: .capture, glyph: MenuBarArt.glyph(AppSection.capture.symbol), label: "Screen Capture"),
-            MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24", widthOf: "2:00"), label: "Keep Awake"),
+            MenuBarSegment(kind: .awake, glyph: MenuBarArt.awakeBadge(fraction: 0.7, time: "1:24"), label: "Keep Awake"),
             MenuBarSegment(kind: .mixer, glyph: MenuBarArt.volumeBadge(volume: 0.6, muted: false), label: "Audio Mixer"),
         ])
         let size = NSSize(width: 600, height: 30)
@@ -282,10 +284,11 @@ enum Snapshot {
         _ = NSApplication.shared
         let toolkit = MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")
         let all = StatKind.allCases
-        // The default, every stat as a number, then the pills, then the charts.
+        // The default, every stat as a number, then the pills, small and not, then the charts.
         let looks: [[StatKind: StatLook]] = [
             [.cpu: .number, .memory: .number, .network: .number, .power: .number],
             [.cpu: .pill, .memory: .pill, .gpu: .pill, .disk: .pill],
+            [.cpu: .smallPill, .memory: .smallPill, .gpu: .smallPill, .disk: .smallPill],
             [.cpu: .chart, .memory: .chart, .network: .chart, .power: .chart],
         ]
         var rows: [[MenuBarSegment]] = [[toolkit] + StatsController.preview().segments()]

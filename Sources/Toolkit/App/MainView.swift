@@ -375,6 +375,11 @@ private struct GeneralView: View {
     @ObservedObject var awake: AwakeController
     @ObservedObject var stats: StatsController
 
+    /// Masculine in Portuguese, for a separator, unlike a gap's None.
+    private static var noSeparator: LocalizedStringKey {
+        .verbatim(String(localized: "Separator.none", defaultValue: "None", comment: "No separator; masculine in Portuguese, unlike a gap's None"))
+    }
+
     /// Whether the tool has a part in the menu bar, as `updateMenuBar` decides.
     /// System Stats lives only there, so its switch is the tool's own.
     private func place(_ tool: MenuBarTool) -> MenuBarOrderList.Place {
@@ -439,6 +444,14 @@ private struct GeneralView: View {
                     ValueSlider(value: $model.general.menuBarSpacing, range: GeneralConfig.menuBarSpacings, step: 2,
                                 low: "Tight", high: "Roomy", format: { "\(Int($0)) pt" })
                 }
+                RowDivider()
+                OptionRow(title: "Separator", caption: "Between two tools in the menu bar.",
+                          selection: $model.general.menuBarSeparator,
+                          options: [(.none, Self.noSeparator), (.dot, "Dot"), (.pipe, "Line")])
+                RowDivider()
+                OptionRow(title: "Separator within a tool", caption: "Between one tool's own parts.",
+                          selection: $model.general.menuBarToolSeparator,
+                          options: [(.same, "Same"), (.none, Self.noSeparator), (.dot, "Dot"), (.pipe, "Line")])
                 RowDivider()
                 SettingRow(title: "Order", caption: "Left to right. Drag a tool to move it, and switch its place in the menu bar on or off; one that's off keeps its place.") {
                     Button("Default Order") { model.general.menuBarOrder = MenuBarTool.defaultOrder }

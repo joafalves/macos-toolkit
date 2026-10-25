@@ -55,18 +55,18 @@ struct AwakeSettingsView: View {
                 }
 
                 Card(title: "Options") {
-                    SettingRow(title: "Look in the menu bar", caption: "A pill fills with the time left; with no end it's full. The cup alone is filled while it's on.") {
+                    SettingRow(title: "Look in the menu bar", caption: "A pill fills with the time left; with no end it's full. The small pill shows the fill without the time.") {
                         Picker("Menu bar icon", selection: $awake.config.look) {
                             Text("Pill").tag(AwakeMenuBarIcon.pill)
-                            Text("Cup and time").tag(AwakeMenuBarIcon.cupAndTime)
-                            Text("Cup").tag(AwakeMenuBarIcon.cup)
+                            Text("Small pill").tag(AwakeMenuBarIcon.smallPill)
+                            Text("Icon and time").tag(AwakeMenuBarIcon.iconAndTime)
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()
                         .fixedSize()
                     }
-                    // The cup alone shows no time to count with.
-                    if awake.config.look != .cup {
+                    // The small pill shows no time to count with.
+                    if awake.config.look != .smallPill {
                         RowDivider()
                         ToggleRow(title: "Count up with no end",
                                   caption: "When it's on until you turn it off, the menu bar shows how long it's been on.",

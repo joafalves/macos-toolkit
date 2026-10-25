@@ -48,7 +48,10 @@ extension StatsController {
         for kind in StatKind.allCases { config.set(kind) { $0.shown = true } }
         stats.config = config
         stats.panel = [.cpu, .memory]
-        RunLoop.main.run(until: Date().addingTimeInterval(2.3))
+        RunLoop.main.run(until: Date().addingTimeInterval(1.2))
+        let busiest = stats.apps.max { $0.cpu < $1.cpu }
+        check(stats.live.cpuOfAppsKnown, "top apps' CPU known a second after the panel opens" + (busiest.map { String(format: " (busiest %@, %.0f%%)", $0.name, $0.cpu * 100) } ?? ""))
+        RunLoop.main.run(until: Date().addingTimeInterval(1.1))
         check(stats.timer != nil, "on: one timer")
         if let cpu = stats.cpu {
             check((0...1).contains(cpu.total) && abs(cpu.user + cpu.system - cpu.total) < 0.001, String(format: "cpu %.0f%% (user %.0f%%, system %.0f%%), %d cores in %@",

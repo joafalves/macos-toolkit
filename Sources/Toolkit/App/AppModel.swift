@@ -59,7 +59,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .mixer: return "slider.vertical.3"
         case .finder: return "folder"
         case .capture: return "camera.viewfinder"
-        case .awake: return "cup.and.saucer.fill"
+        case .awake: return AwakeController.symbol(on: true)
         case .stats: return "gauge.with.dots.needle.50percent"
         case .general: return "gearshape"
         case .permissions: return "hand.raised.fill"

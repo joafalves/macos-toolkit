@@ -162,7 +162,7 @@ struct ToolkitPanelView: View {
         if awake.config.enabled, awake.config.menuBarIcon == .none {
             // The circle turns it on until turned off, or off; the rest opens
             // its menu, for the durations.
-            modules.append(Module(id: "awake", symbol: awake.isOn ? "cup.and.saucer.fill" : "cup.and.saucer", title: AppSection.awake.title, detail: awakeDetail,
+            modules.append(Module(id: "awake", symbol: AwakeController.symbol(on: awake.isOn), title: AppSection.awake.title, detail: awakeDetail,
                                   tint: AppSection.awake.color, lit: awake.isOn,
                                   action: { [awake] in awake.isOn ? awake.turnOff() : awake.turnOn(for: nil) },
                                   more: actions.openAwake))
