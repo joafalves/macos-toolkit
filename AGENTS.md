@@ -84,7 +84,8 @@ tool; keep it in step with the code.
 - `LICENSE`: the Apache License 2.0, unchanged; the copyright line is in the README and on About.
 - `scripts`: `build.sh`, `make-cert.sh` (local signing identity), `signing.sh` (unlocks its keychain
   for `build.sh` and `test-update.sh`, for a day, and puts it on the search list only while they sign:
-  codesign finds no identity off it, so `signing_start` is always followed by `signing_end`), `test-update.sh` (the updater
+  codesign finds no identity off it, so `signing_start` is always followed by `signing_end`; one build
+  signs at a time, the others wait on a lock in `$TMPDIR`), `test-update.sh` (the updater
   against made-up releases), `test-persist.sh` (snaps kept across restarts), `strings.py` (the translations'
   check), `make-icon.swift` (the app icon;
   `KitIcon` in `Components.swift` and `MenuBarArt.toolkit` draw it too, keep them in step).

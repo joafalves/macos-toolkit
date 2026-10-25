@@ -66,7 +66,11 @@ echo "Built $APP$($DEV && echo " (dev build, with the development flags)")"
 
 if $INSTALL; then
   $DEV && echo "warning: installing a dev build: other processes can use its flags with the app's permissions. Install a plain build when done." >&2
-  pkill -x Toolkit 2>/dev/null && sleep 0.5 || true
+  # Only the installed app: a dev build running a test elsewhere is a Toolkit too.
+  RUNNING="^$INSTALLED/Contents/MacOS/Toolkit"
+  if pkill -f "$RUNNING" 2>/dev/null; then
+    for _ in {1..50}; do pgrep -qf "$RUNNING" || break; sleep 0.1; done
+  fi
   rm -rf "$INSTALLED"
   ditto "$APP" "$INSTALLED"
   # Finder keeps using the old extension, and replacing it under Finder can
