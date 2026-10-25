@@ -49,10 +49,8 @@ struct MenuBarSegment: Equatable {
     static func recording(time: String?, size: String?, twoLines: Bool, paused: Bool, label: String) -> MenuBarSegment {
         var segment = MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: paused), label: label)
         let parts = [time, size].compactMap { $0 }
-        if twoLines {
-            // Both lines from the start, the size's blank until it comes in:
-            // one line alone is centred, and the time would move up then.
-            segment.columns = [MenuBarArt.column([time, size].map { MenuBarArt.Line(text: $0 ?? "\u{00A0}") })]
+        if twoLines, !parts.isEmpty {
+            segment.columns = [MenuBarArt.column(parts.map { MenuBarArt.Line(text: $0) })]
         } else if !parts.isEmpty {
             segment.text = parts.joined(separator: " · ")
         }
@@ -1199,9 +1197,19 @@ enum MenuBarArt {
         return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
     }
 
+    /// "0 KB" from the start, not "Zero KB" or bytes, so the size reads the
+    /// same before the first frames are written as after.
     static func bytes(_ count: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: count, countStyle: .file)
+        byteFormatter.string(fromByteCount: count)
     }
+
+    private static let byteFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowsNonnumericFormatting = false
+        formatter.allowedUnits = [.useKB, .useMB, .useGB, .useTB]
+        return formatter
+    }()
 
     /// The recording's dot: red while it records, orange while paused.
     static func recordingDot(paused: Bool) -> NSImage? {

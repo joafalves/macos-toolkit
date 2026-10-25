@@ -209,7 +209,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             let config = capture.config
             // Two lines only with both settings on.
             segments.append(.recording(time: config.recordingTime ? MenuBarArt.duration(state.elapsed) : nil,
-                                       size: config.recordingSize && state.bytes > 0 ? MenuBarArt.bytes(state.bytes) : nil,
+                                       size: config.recordingSize ? MenuBarArt.bytes(state.bytes) : nil,
                                        twoLines: config.recordingLayout == .twoLines && config.recordingTime && config.recordingSize,
                                        paused: state.paused,
                                        label: state.paused ? String(localized: "Recording paused. Click to stop, right-click for more.")
