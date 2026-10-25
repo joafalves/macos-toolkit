@@ -1,4 +1,4 @@
-/* Sources/Toolkit/UI/Components.swift:539 */
+/* Sources/Toolkit/UI/Components.swift:540 */
 "%@" = "%@";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:372 */
@@ -52,7 +52,7 @@
 /* Sources/Toolkit/Awake/AwakeController.swift:32 */
 "%lld Hours" = "%lld horas";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:363 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:431 */
 "%lld lines" = "%lld linhas";
 
 /* Sources/Toolkit/Mouse/MousePanel.swift:48 */
@@ -100,7 +100,7 @@
 /* Sources/Toolkit/Awake/AwakeController.swift:32 */
 "1 Hour" = "1 hora";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:363 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:431 */
 "1 line" = "1 linha";
 
 /* Sources/Toolkit/Mouse/MousePanel.swift:47 */
@@ -172,7 +172,7 @@
 /* Sources/Toolkit/Mouse/WheelCurveEditor.swift:52 */
 "A single notch" = "Um só passo";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:315 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:383 */
 "A single notch goes one distance and fast spins further, along the graph." = "Um só passo desloca uma distância e rodar depressa vai mais longe, segundo o gráfico.";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:44 */
@@ -193,7 +193,7 @@
 /* Sources/Toolkit/App/AppDelegate.swift:537 */
 "About MacOS Toolkit" = "Acerca do MacOS Toolkit";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:339 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:407 */
 "Acceleration" = "Aceleração";
 
 /* Sources/Toolkit/App/Permissions.swift:15 */
@@ -208,7 +208,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:59 */
 "Accessibility is granted, but the app has to restart before the switcher takes effect." = "A Acessibilidade foi concedida, mas é preciso reiniciar a aplicação para que o Window Switcher funcione.";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:327 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:395 */
 "Accessibility is granted, but the app has to restart before wheel and button settings take effect." = "A Acessibilidade foi concedida, mas é preciso reiniciar a aplicação para que as definições da roda e dos botões funcionem.";
 
 /* Sources/Toolkit/Mixer/Equalizer.swift:144 */
@@ -322,7 +322,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:101 */
 "Automatic picks the first installed of Ghostty, iTerm and Terminal." = "Automático escolhe o primeiro instalado de entre Ghostty, iTerm e Terminal.";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:392 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:464 */
 "Autoscroll" = "Deslocação automática";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:52 */
@@ -331,7 +331,7 @@
 /* Sources/Toolkit/App/MainView.swift:185 */
 "Back" = "Anterior";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:388 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:456 */
 "Back and forward buttons" = "Botões de recuar e avançar";
 
 /* Sources/Toolkit/UI/Shortcut.swift:153 */
@@ -400,8 +400,11 @@
 /* Sources/Toolkit/Layout/LayoutConfig.swift:29 */
 "Bottom right" = "Canto inferior direito";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:387 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:455 */
 "Buttons" = "Botões";
+
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:316 */
+"Buttons %lld and %lld" = "Botões %lld e %lld";
 
 /* Sources/Toolkit/Switcher/SwitcherConfig.swift:63 */
 "Cached" = "Em cache";
@@ -435,6 +438,9 @@
 
 /* Sources/Toolkit/System/TweaksView.swift:126 */
 "Changed" = "Alterado";
+
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:318 */
+"Change…" = "Alterar…";
 
 /* Sources/Toolkit/Awake/AwakePanel.swift:82 */
 "Charge it, or lower the stop level." = "Carregue-a, ou baixe o nível em que para.";
@@ -471,6 +477,9 @@
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:187 */
 "Choose…" = "Escolher…";
+
+/* Sources/Toolkit/Mixer/Equalizer.swift:148 */
+"Classical" = "Clássica";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:109 */
 "Click a mouse to change its settings." = "Clique num rato para alterar as definições.";
@@ -589,7 +598,7 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:146 */
 "Critical" = "Crítica";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:331 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:399 */
 "Cursor" = "Cursor";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:44 */
@@ -604,7 +613,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:43 */
 "Cursor speed" = "Velocidade do cursor";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:357 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:425 */
 "Curve" = "Curva";
 
 /* Sources/Toolkit/Mixer/Equalizer.swift:28 */
@@ -673,7 +682,7 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:19 */
 "Displays" = "Ecrãs";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:356 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:424 */
 "Distance" = "Distância";
 
 /* Sources/Toolkit/System/TweaksView.swift:32 */
@@ -775,7 +784,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:117 */
 "Every display while it shows on the main display" = "Todos os monitores enquanto aparece no monitor principal";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:314 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:382 */
 "Every notch the same distance, however fast the wheel turns." = "Cada passo à mesma distância, seja qual for a rapidez com que a roda gira.";
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:24 */
@@ -817,7 +826,7 @@
 /* Sources/Toolkit/App/MainView.swift:494 */
 "Export…" = "Exportar…";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:335 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:403 */
 "Fast" = "Rápido";
 
 /* Sources/Toolkit/System/TweaksView.swift:54 */
@@ -868,7 +877,7 @@
 /* Sources/Toolkit/Switcher/SwitcherConfig.swift:37 */
 "Fit" = "Ajustar";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:357 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:425 */
 "Fixed" = "Fixa";
 
 /* Sources/Toolkit/Mixer/Equalizer.swift:133 */
@@ -949,10 +958,10 @@
 /* Sources/Toolkit/App/AboutView.swift:46 */
 "github.com/joafalves/macos-toolkit" = "github.com/joafalves/macos-toolkit";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:383 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:451 */
 "Glide each notch instead of jumping." = "Deslizar cada passo em vez de saltar.";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:388 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:456 */
 "Go back and forward in Finder, Safari and other Apple apps." = "Recuar e avançar no Finder, no Safari e noutras aplicações da Apple.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:23 */
@@ -1027,6 +1036,9 @@
 /* Sources/Toolkit/Capture/CaptureConfig.swift:41 */
 "High" = "Alta";
 
+/* Sources/Toolkit/Mixer/Equalizer.swift:149 */
+"Hip-Hop" = "Hip Hop";
+
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:100 */
 "Hold %@ to keep the list open and let go to switch." = "Mantenha %@ premido para manter a lista aberta e solte para mudar.";
 
@@ -1036,7 +1048,7 @@
 /* Sources/Toolkit/System/TweaksView.swift:69 */
 "Hold a key for accents" = "Manter uma tecla para acentos";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:391 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:463 */
 "Hold it and move the mouse to scroll, faster the farther you move, in any app." = "Mantenha-o premido e mova o rato para deslocar, mais depressa quanto mais longe mover, em qualquer aplicação.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:75 */
@@ -1060,7 +1072,7 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:298 */
 "Hold ⌥ while dragging a band to move the bands beside it too." = "Mantenha ⌥ premida ao arrastar uma banda para mover também as bandas ao lado.";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:353 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:421 */
 "Horizontal direction" = "Direção horizontal";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:42 */
@@ -1072,7 +1084,7 @@
 /* Sources/Toolkit/Stats/StatsConfig.swift:34 */
 "How busy the processor is." = "Quão ocupado está o processador.";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:332 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:400 */
 "How far the cursor travels for a given hand movement." = "Quanto o cursor anda para um dado movimento da mão.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:48 */
@@ -1084,7 +1096,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:90 */
 "How much each volume key press changes" = "Quanto muda cada toque nas teclas de volume";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:339 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:407 */
 "How much further the cursor goes when you move quickly. Off is 1:1." = "Quanto mais longe o cursor vai quando move depressa. Desativado é 1:1.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:141 */
@@ -1120,7 +1132,7 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:156 */
 "Interface" = "Interface";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:351 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:419 */
 "Inverted" = "Invertida";
 
 /* Sources/Toolkit/App/PermissionsSheet.swift:28 */
@@ -1249,7 +1261,7 @@
 /* Sources/Toolkit/App/MainView.swift:481 */
 "Left to right. Drag a tool to move it, and switch its place in the menu bar on or off; one that's off keeps its place." = "Da esquerda para a direita. Arraste uma ferramenta para a mover, e ative ou desative o seu lugar na barra de menus; uma desativada mantém o seu lugar.";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:342 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:410 */
 "Less" = "Menos";
 
 /* Sources/Toolkit/Layout/LayoutController.swift:1126 */
@@ -1270,7 +1282,7 @@
 /* Sources/Toolkit/App/MainView.swift:475 */
 "Line" = "Linha";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:371 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:439 */
 "Linear" = "Linear";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:131 */
@@ -1285,7 +1297,7 @@
 /* Sources/Toolkit/Switcher/SwitcherConfig.swift:65 */
 "Live" = "Em tempo real";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:360 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:428 */
 "Long" = "Longo";
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:62 */
@@ -1309,7 +1321,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:27 */
 "M" = "M";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:333 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:401 */
 "macOS" = "macOS";
 
 /* Sources/Toolkit/App/PermissionsSheet.swift:55 */
@@ -1345,7 +1357,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:102 */
 "macOS's own screenshot shortcuts are off only where they clash with these. ⌃ counts if it's held when the capture happens: at the end of the drag, or at the click on a window." = "Os atalhos de captura do próprio macOS só ficam desativados onde coincidem com estes. ⌃ conta se estiver premido no momento da captura: no fim do arrasto, ou no clique numa janela.";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:313 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:381 */
 "macOS's own: a slow notch barely moves, fast spins go further. The slider scales it." = "A do próprio macOS: um passo lento quase não desloca, rodar depressa vai mais longe. O nível ajusta-a.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:97 */
@@ -1429,7 +1441,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:85 */
 "Mixer options" = "Opções do misturador";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:342 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:410 */
 "More" = "Mais";
 
 /* Sources/Toolkit/Mouse/HID.swift:123 */
@@ -1459,7 +1471,7 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:283 */
 "Name" = "Nome";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:389 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:457 */
 "Navigate" = "Navegar";
 
 /* Sources/Toolkit/Awake/AwakePanel.swift:206 */
@@ -1546,7 +1558,7 @@
 /* Sources/Toolkit/Stats/StatsController.swift:413 */
 "Of the whole CPU, up to 100%" = "Da CPU inteira, até 100%";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:340 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:408 */
 "Off" = "Desativado";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:87 */
@@ -1660,7 +1672,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:19 */
 "Order of the tools in the menu bar" = "Ordem das ferramentas na barra de menus";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:387 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:455 */
 "Other apps receive the back and forward buttons unchanged; most browsers and editors already handle them. A wheel click without moving stays a normal middle click." = "As outras aplicações recebem os botões de recuar e avançar sem alterações; a maioria dos navegadores e editores já os trata. Um clique na roda sem mover continua a ser um clique do meio normal.";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:149 */
@@ -1762,6 +1774,9 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:113 */
 "PNG is lossless. JPEG and HEIC are much smaller. The clipboard always gets PNG." = "PNG não perde qualidade. JPEG e HEIC são muito mais pequenos. O clipboard recebe sempre PNG.";
 
+/* Sources/Toolkit/Mixer/Equalizer.swift:150 */
+"Pop" = "Pop";
+
 /* Sources/Toolkit/Stats/StatsConfig.swift:16 */
 "Power" = "Energia";
 
@@ -1770,6 +1785,12 @@
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:321 */
 "Presets" = "Predefinições";
+
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:314 */
+"Press the back button on the mouse." = "Prima o botão de recuar no rato.";
+
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:315 */
+"Press the forward button on the mouse." = "Prima o botão de avançar no rato.";
 
 /* Sources/Toolkit/UI/Shortcut.swift:149 */
 "Press the keys. Esc cancels, Delete clears." = "Prima as teclas. Esc cancela, Apagar limpa.";
@@ -1933,7 +1954,7 @@
 /* Sources/Toolkit/System/TweaksView.swift:133 */
 "Reset to macOS default" = "Repor a predefinição do macOS";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:328 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:396 */
 "Restart" = "Reiniciar";
 
 /* Sources/Toolkit/System/TweaksView.swift:110 */
@@ -2116,10 +2137,10 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:120 */
 "Shadow of window screenshots" = "Sombra das capturas de janelas";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:367 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:435 */
 "Shape" = "Forma";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:360 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:428 */
 "Short" = "Curto";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:76 */
@@ -2149,7 +2170,7 @@
 /* Sources/Toolkit/System/TweaksView.swift:54 */
 "Show hidden files" = "Mostrar ficheiros ocultos";
 
-/* Sources/Toolkit/UI/Components.swift:381 */
+/* Sources/Toolkit/UI/Components.swift:382 */
 "Show in the menu bar" = "Mostrar na barra de menus";
 
 /* Sources/Toolkit/App/SettingsSearch.swift:53 */
@@ -2215,7 +2236,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:81 */
 "Sizes at the outer edge" = "Tamanhos na margem exterior";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:335 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:403 */
 "Slow" = "Lento";
 
 /* Sources/Toolkit/Switcher/SwitcherConfig.swift:34 */
@@ -2233,13 +2254,13 @@
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:97 */
 "Smaller" = "Mais pequeno";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:384 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:452 */
 "Smooth" = "Suave";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:49 */
 "Smooth scrolling" = "Deslocação suave";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:383 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:451 */
 "Smoothing" = "Suavização";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:63 */
@@ -2293,7 +2314,7 @@
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:62 */
 "Space switches to clicking a window." = "Espaço muda para clicar numa janela.";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:332 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:400 */
 "Speed" = "Velocidade";
 
 /* Sources/Toolkit/Stats/StatsConfig.swift:26 */
@@ -2608,7 +2629,7 @@
 /* Sources/Toolkit/App/MainView.swift:470 */
 "Tight" = "Apertado";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:353 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:421 */
 "Tilt wheel or side scrolling." = "Roda inclinável ou deslocação lateral.";
 
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:154 */
@@ -2677,7 +2698,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:96 */
 "Trackpad in Finder" = "Trackpad no Finder";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:350 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:418 */
 "Trackpad scrolling is never changed. Fixed and Curve set how far the wheel scrolls up and down; sideways, a tilt scrolls a line at a time." = "A deslocação do trackpad nunca muda. Fixa e Curva definem quanto a roda desloca para cima e para baixo; na horizontal, uma inclinação desloca uma linha de cada vez.";
 
 /* Sources/Toolkit/Mixer/Equalizer.swift:66 */
@@ -2689,7 +2710,7 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:137 */
 "Treble Reducer" = "Agudos reduzidos";
 
-/* Sources/Toolkit/UI/Components.swift:400 */
+/* Sources/Toolkit/UI/Components.swift:401 */
 "Turn %@ on to use these settings." = "Ative %@ para usar estas definições.";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:32 */
@@ -2800,7 +2821,7 @@
 /* Sources/Toolkit/App/AboutView.swift:120 */
 "Version %@ is available" = "A versão %@ está disponível";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:351 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:419 */
 "Vertical direction" = "Direção vertical";
 
 /* Sources/Toolkit/App/AboutView.swift:41 */
@@ -2869,13 +2890,13 @@
 /* Sources/Toolkit/App/AboutView.swift:86 */
 "What's new since %@" = "Novidades desde a %@";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:350 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:418 */
 "Wheel" = "Roda";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:22 */
 "Wheel and button settings are not active yet. They need the Accessibility permission." = "As definições da roda e dos botões ainda não estão ativas. Precisam da permissão de Acessibilidade.";
 
-/* Sources/Toolkit/Mouse/MouseSettingsView.swift:391 */
+/* Sources/Toolkit/Mouse/MouseSettingsView.swift:463 */
 "Wheel button" = "Botão da roda";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:114 */

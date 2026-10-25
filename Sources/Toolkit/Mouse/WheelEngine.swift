@@ -185,23 +185,32 @@ final class WheelEngine {
     /// Side buttons whose press we swallowed, so the release goes the same way.
     private var swallowedButtons: Set<Int64> = []
 
-    /// Turns the back (3) and forward (4) buttons into navigation swipes for
-    /// Apple's apps, which ignore the buttons themselves. Other apps mostly
-    /// handle the buttons natively, so they get them unchanged.
-    /// Returns true when the event was consumed.
+    /// Turns the mouse's back and forward buttons (3 and 4 unless set) into
+    /// back and forward for the front app when it's one of Apple's, which
+    /// ignore the buttons themselves: as `AppNavigation` says each is told.
+    /// Other apps mostly handle the buttons natively, so they get them
+    /// unchanged. Returns true when the event was consumed.
     private func handleButton(type: CGEventType, event: CGEvent) -> Bool {
         let button = event.getIntegerValueField(.mouseEventButtonNumber)
-        guard button == 3 || button == 4 else { return false }
         if type == .otherMouseUp {
             return swallowedButtons.remove(button) != nil
         }
-        guard profileProvider()?.navigationButtons == true,
-              FrontApp.bundleID?.hasPrefix("com.apple.") == true
+        guard let profile = profileProvider(), profile.navigationButtons,
+              let decision = Self.navigation(button: button, profile: profile, frontApp: FrontApp.bundleID),
+              let pid = FrontApp.pid
         else { return false }
 
         swallowedButtons.insert(button)
-        Self.postNavigationSwipe(back: button == 3)
+        AppNavigation.go(back: decision.back, method: decision.method, pid: pid)
         return true
+    }
+
+    /// What a press of `button` does in the front app: nil leaves it as it is.
+    static func navigation(button: Int64, profile: Profile, frontApp: String?) -> (back: Bool, method: AppNavigation.Method)? {
+        guard button == Int64(profile.backButton) || button == Int64(profile.forwardButton),
+              let frontApp, frontApp.hasPrefix("com.apple.")
+        else { return nil }
+        return (button == Int64(profile.backButton), AppNavigation.method(for: frontApp))
     }
 
     /// Posts the same event a three-finger trackpad swipe produces. Apps read

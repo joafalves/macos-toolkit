@@ -95,6 +95,11 @@ struct Profile: Codable, Equatable {
     // Buttons
     /// Turns the side buttons into back/forward navigation in Apple's apps.
     var navigationButtons = false
+    /// Which buttons those are, as macOS numbers them from 0 (the left
+    /// button): 3 and 4 on most mice, the fourth and fifth buttons.
+    var backButton = 3
+    var forwardButton = 4
+    static let sideButtons: ClosedRange<Int> = 3...31
     /// Holding the wheel button and moving the mouse scrolls, faster the
     /// farther it moves.
     var autoscroll = false
@@ -139,6 +144,12 @@ struct Profile: Codable, Equatable {
         scrollCurveBend = within(try c.decodeIfPresent(Double.self, forKey: .scrollCurveBend), 1...4, 2)
         smoothScrolling = try c.decodeIfPresent(Bool.self, forKey: .smoothScrolling) ?? false
         navigationButtons = try c.decodeIfPresent(Bool.self, forKey: .navigationButtons) ?? false
+        let back = try c.decodeIfPresent(Int.self, forKey: .backButton) ?? 3
+        let forward = try c.decodeIfPresent(Int.self, forKey: .forwardButton) ?? 4
+        // Two different buttons past the wheel button (2); else the defaults.
+        if Self.sideButtons.contains(back), Self.sideButtons.contains(forward), back != forward {
+            (backButton, forwardButton) = (back, forward)
+        }
         autoscroll = try c.decodeIfPresent(Bool.self, forKey: .autoscroll) ?? false
         if let pace = try c.decodeIfPresent(Double.self, forKey: .autoscrollPace) {
             autoscrollPace = within(pace, Self.autoscrollPaceRange, 1.0)

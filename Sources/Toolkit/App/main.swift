@@ -344,6 +344,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-awake"), CommandLine.
     AwakeController.selfTest(into: CommandLine.arguments[flag + 1])
     exit(0)
 }
+if CommandLine.arguments.contains("--test-navigation") {
+    WheelEngine.navigationSelfTest()
+    exit(0)
+}
 if CommandLine.arguments.contains("--test-tweaks") {
     TweaksModel.selfTest()
     exit(0)

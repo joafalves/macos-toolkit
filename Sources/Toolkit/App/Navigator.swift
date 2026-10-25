@@ -87,6 +87,8 @@ struct WindowTitle: NSViewRepresentable {
 /// navigation swipe of three fingers or of Navigate. Only in the settings
 /// window; scrolling up and down is never taken for one.
 final class SwipeNavigation: ObservableObject {
+    /// While Mouse is asking which button is back: its press isn't one.
+    static var paused = false
     /// How far the fingers travel, in points, before it counts, as for Finder.
     private static let threshold = 80.0
     private var monitor: Any?
@@ -97,7 +99,7 @@ final class SwipeNavigation: ObservableObject {
     func start(back: @escaping () -> Void, forward: @escaping () -> Void) {
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .otherMouseDown, .swipe]) { [weak self] event in
-            guard event.window?.identifier == MainWindow.identifier else { return event }
+            guard event.window?.identifier == MainWindow.identifier, !Self.paused else { return event }
             switch event.type {
             case .otherMouseDown where event.buttonNumber == 3 || event.buttonNumber == 4:
                 event.buttonNumber == 3 ? back() : forward()

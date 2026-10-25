@@ -299,6 +299,76 @@ private struct MousePage: View {
 }
 
 /// Cursor and wheel settings for one mouse.
+/// Which buttons go back and forward, as one line, and Change… to press
+/// them: most mice use the fourth and fifth, which is where it starts.
+private struct NavigationButtons: View {
+    @Binding var profile: Profile
+    /// 0 when not choosing; 1 waiting for back, 2 for forward.
+    @StateObject private var step = ViewState(0)
+    @StateObject private var back = ViewState(3)
+    @StateObject private var listener = ButtonListener()
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Group {
+                switch step.value {
+                case 1: Text("Press the back button on the mouse.")
+                case 2: Text("Press the forward button on the mouse.")
+                default: Text("Buttons \(profile.backButton + 1) and \(profile.forwardButton + 1)")
+                }
+            }
+            .foregroundStyle(.secondary)
+            Button(step.value == 0 ? "Change…" : "Cancel") { step.value == 0 ? start() : stop() }
+                .buttonStyle(.link)
+        }
+        .font(.subheadline)
+        .onDisappear { stop() }
+    }
+
+    private func start() {
+        step.value = 1
+        listener.start { button in
+            guard Profile.sideButtons.contains(button) else { return }
+            if step.value == 1 {
+                back.value = button
+                step.value = 2
+            } else if button != back.value {
+                profile.backButton = back.value
+                profile.forwardButton = button
+                stop()
+            }
+        }
+    }
+
+    private func stop() {
+        listener.stop()
+        step.value = 0
+    }
+}
+
+/// A mouse's extra buttons pressed over the app's windows, taken from them
+/// while a button is being chosen, so the settings window doesn't go back.
+private final class ButtonListener: ObservableObject {
+    private var monitor: Any?
+
+    func start(_ pressed: @escaping (Int) -> Void) {
+        stop()
+        SwipeNavigation.paused = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { event in
+            pressed(event.buttonNumber)
+            return nil
+        }
+    }
+
+    func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        SwipeNavigation.paused = false
+    }
+
+    deinit { stop() }
+}
+
 private struct ProfileEditor: View {
     @ObservedObject var mouse: MouseController
     @ObservedObject private var permissions = Permissions.shared
@@ -386,7 +456,11 @@ private struct ProfileEditor: View {
 
             Card(title: "Buttons", footnote: "Other apps receive the back and forward buttons unchanged; most browsers and editors already handle them. A wheel click without moving stays a normal middle click.") {
                 OptionRow(title: "Back and forward buttons", caption: "Go back and forward in Finder, Safari and other Apple apps.",
-                          selection: p.navigationButtons, options: [(false, "macOS"), (true, "Navigate")])
+                          selection: p.navigationButtons, options: [(false, "macOS"), (true, "Navigate")]) {
+                    if p.wrappedValue.navigationButtons {
+                        NavigationButtons(profile: p)
+                    }
+                }
                 RowDivider()
                 OptionRow(title: "Wheel button", caption: "Hold it and move the mouse to scroll, faster the farther you move, in any app.",
                           selection: p.autoscroll, options: [(false, "macOS"), (true, "Autoscroll")]) {

@@ -503,7 +503,7 @@ soon as the mouse is connected again.
 | Wheel direction (vertical, horizontal) | macOS / inverted | scroll event tap |
 | Wheel distance | macOS (its own, scaled) / fixed (lines a notch) / curve (a notch one distance, fast spins further, along a graph you drag) | scroll event tap; fixed and curve also switch `HIDMouseScrollAcceleration` off on the device, so a slow notch isn't shrunk to a point |
 | Wheel smoothing | macOS / smooth | scroll event tap |
-| Back and forward buttons | macOS / navigate | event tap; sends a navigation swipe to Apple apps |
+| Back and forward buttons | macOS / navigate, with which buttons they are (4 and 5 unless changed) | event tap; in Apple's apps, which ignore the buttons, a navigation swipe, or a press of Back or Forward in their menus where they ignore that too (System Settings) |
 | Wheel button | macOS / autoscroll, with a speed | event tap; posts scroll events while the button is held |
 
 Cursor settings need no permission. The wheel and button settings that go through the event tap need

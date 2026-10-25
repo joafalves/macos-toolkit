@@ -13,11 +13,14 @@ worked on; it gets its date when it's released.
   now, says when it isn't macOS's default, and can put it back. What's set stays set without the
   toolkit.
 - **Finder:** its page links to Tweaks for Finder's own settings, such as hidden files.
+- **Mouse:** with **Navigate**, **Change…** sets which of a mouse's buttons go back and forward,
+  for mice that don't use the usual fourth and fifth.
 
 ### Fixed
 
 - **Settings:** a mouse's back and forward buttons, and a three-finger swipe, go back and forward
   in the settings window, as a two-finger swipe and ⌘[ ⌘] do.
+- **Mouse:** with **Navigate**, the back and forward buttons work in System Settings too.
 - **Window Switcher:** with That display, it no longer shows an empty box on a display with no
   windows.
 

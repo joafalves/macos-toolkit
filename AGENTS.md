@@ -32,6 +32,8 @@ tool; keep it in step with the code.
 - `Sources/Toolkit/App`: shell. `main.swift` (dev flags, single instance), `AppDelegate` (the menu
   bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing and order),
+  `AppNavigation` (how each app is told to go back or forward: a navigation swipe, or its Back and
+  Forward menu items; Mouse's Navigate and the Finder tool's swipes share it),
   `MenuBarOrderView` (the order list on the Settings page), `Permissions`/`PermissionsView`/`PermissionsSheet` (see Permissions below), `ToolkitPanel` (the panel the toolkit's mark opens: every tool with its switch),
   `SettingsTransfer` (export and import of all settings), `Snapshot`, `WindowUnderPointer`
   (which app owns the window under a point, for tools that act on it), `Navigator` (the settings
@@ -334,6 +336,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-menu-bar-tint <png>   # coloured text in a real menu bar item, captured (open -n; delete the png)
 .build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone
+.build/debug/Toolkit --test-navigation       # what Navigate does with each button in each kind of app, posting nothing; with Accessibility (open -n the dev bundle), Finder's Back and Forward found
 .build/debug/Toolkit --test-tweaks           # every tweak read from this Mac (changes nothing of macOS's), and the preference round trip on a scratch domain
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)
 .build/debug/Toolkit --test-awake <report>   # Keep Awake's assertion, times and one mouse drift (open -n)
