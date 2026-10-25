@@ -129,8 +129,13 @@ section in the sidebar and (where it makes sense) an entry in the menu bar.
 | 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar, with a memory figure that leaves out what macOS only caches. |
 | ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off. |
 
+Under **System** in the settings, **[Tweaks](#tweaks)** has macOS settings that System Settings
+doesn't show: background tasks such as Photos' analysis, and hidden Dock, Finder, typing and
+dialog settings.
+
 Each tool can be turned off or left on its macOS defaults, and anything the app changes outside
-itself is put back when it quits. No accounts, no telemetry, no network code. Settings are plain JSON in
+itself is put back when it quits. Tweaks are the exception: they're macOS's own settings, and stay
+as you set them. No accounts, no telemetry, no network code. Settings are plain JSON in
 `~/Library/Application Support/MacOS Toolkit`, and **Settings → Export…** saves them all to one file.
 **Import…** takes the file's settings and leaves the rest as they are.
 
@@ -546,6 +551,9 @@ is never changed: a swipe over something that can still scroll sideways (the col
 list) scrolls it, and only goes back or forward once it's at the edge. Other apps are left alone.
 It needs **Accessibility** too.
 
+Finder's own settings, such as hidden files or the full path in window titles, are in
+[Tweaks](#tweaks): they're macOS's, not the toolkit's.
+
 The right-click menu gets these items, each of which can be turned off in the Finder settings:
 
 | Item | What it does |
@@ -698,9 +706,38 @@ width as every other pill in the menu bar, Keep Awake's and the mixer's too, so 
   share, the charger, and the battery's charge, health and cycles. Some Macs only tell an admin
   what the CPU draws; there that line is left out. Desktops have no battery readings and show what
   the CPU and GPU draw.
-- Figures stop at 99%, so each part keeps the same width and the menu bar doesn't shift.
+- Figures stop at 99%, so each part keeps the same width and the menu bar doesn't shift; a pill
+  shows 100.
 - Every 2 seconds by default (1 or 5 in the settings). Only the stats in the menu bar are read, and
   nothing at all while none are, or the tool is off. A reading of all six costs under 2 ms.
+
+## Tweaks
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/tweaks-dark.png">
+    <img src="docs/images/tweaks-light.png" width="520" alt="Tweaks: switches for Photos' background analysis, Game Center and Tips, and hidden Dock settings, one of them changed from macOS's default">
+  </picture>
+</p>
+
+macOS settings that System Settings doesn't show, under **System** in the settings. Tweaks isn't a
+tool: the toolkit doesn't do anything here, it reads and writes macOS's own settings. Each switch
+shows what's set on this Mac now, read each time the page opens or the app comes to the front, so
+a change made in Terminal or by another app shows as it is. What you set stays set without the
+toolkit, and nothing is saved, exported or put back on quit. A setting that isn't at macOS's
+default says **Changed**, with a button to put it back.
+
+| Group | Settings |
+| --- | --- |
+| Background tasks | Photos' analysis of what's in photos, People and Memories, Game Center, Tips. Turned off for your user only (`launchctl disable`), each saying what stops working; a macOS update can turn one back on, and it then shows as on. |
+| Dock | Show it without delay, quicker Mission Control, dim hidden apps, only open apps, scroll on an icon for its windows. A change restarts the Dock. |
+| Finder | Full path in window titles, hidden files, the warning before changing an extension, Quit Finder, no `.DS_Store` on network or USB drives. A change restarts Finder. |
+| Typing | Hold a key for accents, or to repeat it. |
+| Windows and dialogs | Expanded Save and Print dialogs, saving new documents to iCloud, window animations, the offer to report crashes. |
+| Devices | Photos opening for a new iPhone or camera, Time Machine offering new disks. |
+
+Nothing here needs an administrator: everything is your user's own settings. The toolkit's Finder
+tool (cut, swipes, the right-click menu) is separate, on its own page.
 
 ## Install
 
@@ -839,6 +876,7 @@ Sources/Toolkit
 ├── Capture    the Screen Capture tool
 ├── Awake      the Keep Awake tool
 ├── Stats      the System Stats tool
+├── System     Tweaks, macOS's own settings
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu
 Resources      Info.plist, the icon, and the translations (pt-PT.lproj)

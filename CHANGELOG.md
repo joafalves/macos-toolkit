@@ -3,6 +3,17 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.24.0 (unreleased)
+
+### Added
+
+- **Tweaks:** a new page under **System** in the settings, with macOS settings that System Settings
+  doesn't show: background tasks (Photos' analysis, People and Memories, Game Center, Tips), and
+  hidden Dock, Finder, typing, dialog and device settings. Each switch shows what's set on this Mac
+  now, says when it isn't macOS's default, and can put it back. What's set stays set without the
+  toolkit.
+- **Finder:** its page links to Tweaks for Finder's own settings, such as hidden files.
+
 ## 0.23.0 (2026-10-25)
 
 ### Added

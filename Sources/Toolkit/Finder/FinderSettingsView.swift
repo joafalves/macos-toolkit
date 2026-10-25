@@ -73,6 +73,12 @@ struct FinderSettingsView: View {
                     }
                 }
             }
+
+            // Outside what the switch greys out: macOS's own settings work with the tool off too.
+            Text("Finder's own settings, such as hidden files and the full path in window titles, are in [Tweaks](toolkit-page:tweaks#Finder).")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 2)
         }
         .onAppear { finder.refreshExtension() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

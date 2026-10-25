@@ -73,7 +73,7 @@ enum SettingsIndex {
         func matches(_ texts: [String]) -> Bool {
             words.allSatisfy { word in texts.contains { $0.localizedStandardContains(word) } }
         }
-        let order = [AppSection.general, .about] + AppSection.tools
+        let order = [AppSection.general, .about] + AppSection.tools + AppSection.system
         func rank(_ section: AppSection) -> Int { order.firstIndex(of: section) ?? order.count }
         let all = (entries + headers).sorted { rank($0.section) < rank($1.section) }
         let pages = order.filter { matches([$0.title, $0.summary]) }.map { Hit(section: $0, entry: nil) }

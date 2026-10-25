@@ -137,7 +137,7 @@ struct ToolkitPanelView: View {
         case .capture: return $capture.config.enabled
         case .awake: return $awake.config.enabled
         case .stats: return $stats.config.enabled
-        case .welcome, .general, .permissions, .about: return .constant(true)
+        case .welcome, .general, .permissions, .about, .tweaks: return .constant(true)
         }
     }
 

@@ -11,6 +11,8 @@ enum Snapshot {
         model.persists = false
         model.general = GeneralConfig()
         model.section = section
+        // macOS's defaults with two changed, not this Mac's.
+        TweaksModel.previewing = true
         Permissions.shared.preview(missing: noAccess ? [.accessibility: .notAsked] : [:])
         let (mouse, switcher, layout, mixer) = (MouseController.preview(), SwitcherController.preview(), LayoutController.preview(),
                                                MixerController.preview(perOutput: CommandLine.arguments.contains("per-output"),

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The settings search's index (Sources/Toolkit/App/SettingsIndex.swift).
 
-Every settings row (SettingRow, ToggleRow, OptionRow, ShortcutRow, FolderRow)
+Every settings row (SettingRow, ToggleRow, OptionRow, ShortcutRow, FolderRow, TweakRow)
 and card whose title is written out is listed there with its page, so search
 finds it and goes to it. Names written by hand in the index (`name:`) are kept.
 
@@ -28,13 +28,14 @@ PAGES = {
     "Sources/Toolkit/Capture/CaptureSettingsView.swift": "capture",
     "Sources/Toolkit/Awake/AwakeSettingsView.swift": "awake",
     "Sources/Toolkit/Stats/StatsSettingsView.swift": "stats",
+    "Sources/Toolkit/System/TweaksView.swift": "tweaks",
 }
 # On the Mouse page, the rows of a mouse's own page are in these views.
 PER_MOUSE = ("struct ProfileEditor", "struct AutoscrollExceptions")
 # Window Layout's tabs, by the view each is built in, and LayoutPage's names.
 TABS = {"var snapping": "snapping", "var keyboard": "keyboard", "var tabsPage": "tabs"}
 
-ROW = re.compile(r'\b(?:SettingRow|ToggleRow|OptionRow|ShortcutRow|FolderRow|Card)\(\s*title:\s*"((?:[^"\\]|\\.)*)"')
+ROW = re.compile(r'\b(?:SettingRow|ToggleRow|OptionRow|ShortcutRow|FolderRow|TweakRow|Card)\(\s*title:\s*"((?:[^"\\]|\\.)*)"')
 # A row's caption, or a card's footnote, when it's written out.
 CAPTION = re.compile(r'\s*,\s*(?:caption|footnote):\s*"((?:[^"\\]|\\.)*)"\s*[,)]')
 

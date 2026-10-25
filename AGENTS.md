@@ -61,6 +61,9 @@ tool; keep it in step with the code.
   settings, as the Bluetooth settings show them. A mouse with neither falls back to its model and
   transport (`modelKey`, the key before 0.20.0); a profile saved under that is copied to each
   connected mouse of the model that has an address or serial number, then dropped.
+- `Sources/Toolkit/System`: the pages under **System** in the sidebar, apart from the tools. For
+  now **Tweaks** (`Tweaks.swift`, `TweaksView.swift`): macOS's own settings that System Settings
+  doesn't show. See System pages below.
 - `Sources/FinderExtension`: the Finder extension. It is sandboxed, so it only builds the right-click
   menu (reading `finder.json`, which its entitlements allow) and opens a `macos-toolkit://` URL that
   `FinderController.handle` acts on. Its `Info.plist` and entitlements are in `Resources/FinderExtension`.
@@ -105,10 +108,26 @@ tool; keep it in step with the code.
   `~/Library/Application Support/MacOS Toolkit/<tool>.json`.
 - **Adding a tool:** a case in `AppSection` (title, symbol, colour), a view in `MainView`, a field in
   `SettingsFile` (optional, so old exports still import), a section in `README.md`.
+- **System pages are not tools.** A tool is something the toolkit does: it has an Enabled switch,
+  works while the app runs, and is undone when turned off or on quit. A System page changes macOS
+  itself: no switch for the page, nothing undone on quit, and the Mac is the only record. Tweaks
+  reads every value when the page shows and when the app comes to the front, writes straight to
+  macOS (`CFPreferences` for preferences, `launchctl disable`/`enable` in the `gui/<uid>` domain for
+  background tasks), and keeps nothing in a config or the settings export. A tweak qualifies only if
+  it's macOS's own setting, System Settings doesn't offer it, it needs no root, it can be read back,
+  it has a known macOS default (what deleting the key gives, or a service running), and its row can
+  say plainly what it changes and what turning it off breaks. Each is a `Tweak` case (its kind and
+  what restarts) and a `TweakRow` on the page, worded so on means macOS's feature is on. Settings
+  about something a tool also does stay in Tweaks, linked from the tool's page (Finder's), not
+  mixed into it. The page reads every value as it's made (about 5 ms), so its first frame is the
+  Mac's, not macOS's defaults turning into it; commands run through `posix_spawn`, since `Process`
+  took 75 ms for one `launchctl`. A few switches flipped in a row restart the Dock or Finder once.
+  Never write one of macOS's settings to test: `--test-tweaks` reads them, times the read, and
+  round-trips a scratch domain of our own.
 - **Import merges, setting by setting** (`SettingsTransfer.merge`): what a file lacks stays as it is
   here. A setting that only holds on this Mac, because it goes with a grant made here, goes in
   `SettingsTransfer.localOnly`: never exported, never imported (none at the moment).
-- **Search** (`App/SettingsSearch.swift`) finds the rows listed in `App/SettingsIndex.swift`, which
+- **Search** (`App/SettingsSearch.swift`) finds the rows (`TweakRow`s too) listed in `App/SettingsIndex.swift`, which
   `scripts/settings-index.py generate` writes from the pages: a row is anchored by its title's key
   (row titles are `LocalizedStringResource`s for that), and search goes to it through
   `\.pageGoTo`. A new or renamed row is regenerated in the same commit; `check` must be clean.
@@ -206,7 +225,7 @@ tool; keep it in step with the code.
   work on folders.
 - **Memory and CPU:** the settings window is released when it closes. Background work runs on
   change or on a slow timer, not on a fast poll; check with `--measure-idle` and `footprint`.
-- Clean up after yourself: anything the app changes outside itself (Cmd-Tab, the screenshot keys,
+- Clean up after yourself (except Tweaks, which are macOS's settings set on purpose): anything the app changes outside itself (Cmd-Tab, the screenshot keys,
   macOS's window tiling, device properties, Core Audio taps) is restored on quit, on `kill`, and at the next launch if the
   app crashed.
 - **Languages:** English (the code's own text, no table) and Portuguese (Portugal), `pt-PT`. The app
@@ -270,7 +289,7 @@ swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
 ./scripts/build.sh --dev [--install]         # with the development flags, for the tests run through the app bundle
-.build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general] [light]
+.build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general|tweaks] [light]   # tweaks: macOS's defaults with two changed, not this Mac's
 .build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
 .build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
 .build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
@@ -314,6 +333,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-menu-bar-tint <png>   # coloured text in a real menu bar item, captured (open -n; delete the png)
 .build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone
+.build/debug/Toolkit --test-tweaks           # every tweak read from this Mac (changes nothing of macOS's), and the preference round trip on a scratch domain
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)
 .build/debug/Toolkit --test-awake <report>   # Keep Awake's assertion, times and one mouse drift (open -n)
 .build/debug/Toolkit --test-nudge <report>   # which posted input resets the idle time chat apps read (open -n; leave the mouse alone)

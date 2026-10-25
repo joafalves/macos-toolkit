@@ -108,7 +108,7 @@ struct MainView: View {
         case .capture: return capture.config.enabled
         case .awake: return awake.config.enabled
         case .stats: return stats.config.enabled
-        case .welcome, .general, .permissions, .about: return true
+        case .welcome, .general, .permissions, .about, .tweaks: return true
         }
     }
 
@@ -263,6 +263,13 @@ struct MainView: View {
                 .padding(.bottom, 2)
                 .padding(.leading, 18)
             ForEach(AppSection.tools) { drawnRow($0) }
+            Text("System")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 12)
+                .padding(.bottom, 2)
+                .padding(.leading, 18)
+            ForEach(AppSection.system) { drawnRow($0) }
             Spacer()
         }
         .padding(.top, 4)
@@ -303,14 +310,24 @@ struct MainView: View {
             case .permissions: PermissionsView()
             case .about: AboutView(model: model)
             case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)
+            case .tweaks: TweaksView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .environment(\.pageGoTo, $model.goTo)
+        // A link in a page's text to another page, `toolkit-page:<section>`,
+        // or to a setting on it, `toolkit-page:<section>#<title>`; through
+        // the same history as the sidebar.
+        .environment(\.openURL, OpenURLAction { url in
+            guard url.scheme == "toolkit-page", let section = AppSection(rawValue: url.path(percentEncoded: false)) else { return .systemAction }
+            open(section, nil)
+            model.goTo = url.fragment(percentEncoded: false)
+            return .handled
+        })
         .environment(\.toolTurnedOn) { model.turnedOn($0) }
     }
 
-    /// Overview and the app's own settings, then the tools.
+    /// Overview and the app's own settings, then the tools, then System.
     private var sections: some View {
         List(selection: $model.section) {
             SidebarRow(section: .welcome).tag(AppSection.welcome)
@@ -327,6 +344,14 @@ struct MainView: View {
                 .padding(.leading, -2)
                 .selectionDisabled()
             ForEach(AppSection.tools) { SidebarRow(section: $0, on: enabled($0), needs: model.permissionNeeds($0)).tag($0) }
+            // macOS's own settings: apart from the tools, which the toolkit does.
+            Text("System")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 10)
+                .padding(.leading, -2)
+                .selectionDisabled()
+            ForEach(AppSection.system) { SidebarRow(section: $0).tag($0) }
         }
         .listStyle(.sidebar)
     }

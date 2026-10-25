@@ -3,16 +3,21 @@ import SwiftUI
 import ServiceManagement
 
 /// The pages of the main window: Overview, Settings (the app's own),
-/// Permissions, About, and the tools.
+/// Permissions, About, the tools, and System's pages, which change macOS itself.
 enum AppSection: String, CaseIterable, Identifiable {
-    case welcome, mouse, switcher, layout, mixer, finder, capture, awake, stats, general, permissions, about
+    case welcome, mouse, switcher, layout, mixer, finder, capture, awake, stats, general, permissions, about, tweaks
 
     var id: String { rawValue }
 
     /// The tools by name, as the sidebar and the toolkit menu list them.
     static var tools: [AppSection] {
-        allCases.filter { ![.welcome, .general, .permissions, .about].contains($0) }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        allCases.filter { ![.welcome, .general, .permissions, .about].contains($0) && !system.contains($0) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
+
+    /// Under System in the sidebar: macOS's own settings, not something the
+    /// toolkit does, so no switch, and nothing undone when it quits.
+    static let system: [AppSection] = [.tweaks]
 
     var title: String {
         switch self {
@@ -29,6 +34,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .general: return String(localized: "Settings")
         case .permissions: return String(localized: "Permissions")
         case .about: return String(localized: "About")
+        case .tweaks: return String(localized: "Tweaks")
         }
     }
 
@@ -47,6 +53,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .general: return .gray
         case .permissions: return .gray
         case .about: return .gray
+        case .tweaks: return .gray
         }
     }
 
@@ -64,6 +71,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .general: return "gearshape"
         case .permissions: return "hand.raised.fill"
         case .about: return "info.circle"
+        case .tweaks: return "switch.2"
         }
     }
 
@@ -79,7 +87,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .capture: return String(localized: "Screenshots and small screen recordings.")
         case .awake: return String(localized: "Keeps the Mac awake for as long as you need.")
         case .stats: return String(localized: "CPU, memory and more in the menu bar.")
-        case .general, .permissions, .about: return ""
+        case .general, .permissions, .about, .tweaks: return ""
         }
     }
 }

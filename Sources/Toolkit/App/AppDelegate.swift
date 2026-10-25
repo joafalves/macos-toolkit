@@ -63,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             case .finder: return finder.permissionNeeds
             case .capture: return capture.permissionNeeds
             case .awake: return awake.permissionNeeds
-            case .stats, .welcome, .general, .permissions, .about: return []
+            case .stats, .welcome, .general, .permissions, .about, .tweaks: return []
             }
         }
 
