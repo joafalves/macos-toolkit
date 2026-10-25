@@ -3,7 +3,7 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
-## 0.24.0 (unreleased)
+## 0.24.0 (2026-10-25)
 
 ### Added
 
@@ -19,8 +19,9 @@ worked on; it gets its date when it's released.
 
 ### Changed
 
-- **Audio Mixer:** the Bass, Treble, Vocal, Rock, Electronic and Acoustic presets have the Music
-  app's values. An equalizer set to one of them before moves to its new values.
+- **Audio Mixer:** the Bass Boost, Bass Reducer, Treble Boost, Treble Reducer, Vocal, Rock,
+  Electronic and Acoustic presets have the Music app's values. An equalizer set to one of them
+  before moves to its new values.
 
 ### Fixed
 
