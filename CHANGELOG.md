@@ -10,6 +10,8 @@ worked on; it gets its date when it's released.
 - **Screen Capture:** Menu Bar While Recording picks what shows beside the stop button: the time,
   the size, both or neither, and both on one line or on two of small text, which take less room
   beside the notch.
+- **System Stats:** a stat can be in the panel only, rather than in the menu bar too: it shows
+  under the stat you click, and with every stat in the panel only, an icon in the menu bar opens it.
 
 ## 0.24.4 (2026-10-28)
 

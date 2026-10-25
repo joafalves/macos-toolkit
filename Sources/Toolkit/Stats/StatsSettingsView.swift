@@ -38,7 +38,7 @@ struct StatsSettingsView: View {
                               isOn: $stats.config.topAppsOfWholeCPU)
                 }
 
-                Card(title: "Stats", footnote: "Only the stats in the menu bar are read, and nothing at all while none are.") {
+                Card(title: "Stats", footnote: "The panel shows the stat you click, then those only in the panel. Only the stats in the menu bar or the panel are read, and nothing at all while none are.") {
                     ForEach(Array(StatKind.allCases.enumerated()), id: \.element) { index, kind in
                         if index > 0 { RowDivider() }
                         StatRow(kind: kind, stats: stats)
@@ -66,9 +66,12 @@ private struct StatRow: View {
                     .labelsHidden()
                     .fixedSize()
                 }
-                Toggle(kind.title, isOn: Binding(get: { setting.shown }, set: { shown in stats.config.set(kind) { $0.shown = shown } }))
-                    .toggleStyle(.switch)
-                    .labelsHidden()
+                Picker(kind.title, selection: Binding(get: { setting.place }, set: { place in stats.config.set(kind) { $0.place = place } })) {
+                    ForEach(StatPlace.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
             }
         }
     }

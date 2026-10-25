@@ -2,8 +2,9 @@ import AppKit
 import SwiftUI
 
 /// The panel a stat opens from the menu bar: its history and details, and
-/// for CPU and memory the apps using the most. In the compact layout it shows
-/// every stat in the menu bar, one after another.
+/// for CPU and memory the apps using the most, then the stats only in the
+/// panel. In the compact layout it shows every stat in the menu bar, one
+/// after another, then those.
 struct StatsPanelView: View {
     let stats: StatsController
     /// Watched for the readings, so the panel follows them.

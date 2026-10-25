@@ -89,6 +89,20 @@ extension StatsController {
         odd.interval = 0
         let decoded = (try? JSONEncoder().encode(odd)).flatMap { try? JSONDecoder().decode(StatsConfig.self, from: $0) }
         check(decoded?.interval == 2, "an interval of 0 from a file reads as 2 s")
+        let old = try? JSONDecoder().decode(StatsConfig.self, from: Data(#"{"stats": {"gpu": {"shown": true, "look": "chart"}}}"#.utf8))
+        check(old?.setting(.gpu) == StatSetting(shown: true, look: .chart) && old?.panelOnly == [], "a file from before panel-only stats keeps its stats")
+
+        // Only in the panel: read all the while, for the panel's history; with
+        // nothing in the menu bar, an icon there opens it.
+        var panelOnly = stats.config
+        for kind in StatKind.allCases { panelOnly.set(kind) { $0.place = kind == .gpu ? .panel : .off } }
+        stats.config = panelOnly
+        check(stats.timer != nil && stats.reading == [.cpu, .memory, .gpu], "panel-only gpu is read with no part of its own (cpu and memory for the open panel)")
+        let icon = stats.segments()
+        check(icon.count == 1 && icon[0].kind == .stats && icon[0].text == nil, "nothing in the menu bar: one icon for the panel")
+        stats.config.set(.disk) { $0.place = .menuBar }
+        check(stats.segments().map(\.kind) == [.stat(.disk)], "a stat in the menu bar takes the icon's place")
+        for kind in StatKind.allCases { stats.config.set(kind) { $0.place = .menuBar } }
 
         // What a reading of everything costs, top apps included and not.
         stats.stop()

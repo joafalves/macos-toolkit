@@ -936,6 +936,8 @@
 
 "Menu Bar" = "Barra de menus";
 
+"Menu bar" = "Barra de menus";
+
 "Menu bar icon" = "Ícone na barra de menus";
 
 "Menu bar settings" = "Definições da barra de menus";
@@ -1094,8 +1096,6 @@
 
 "Only open apps in the Dock" = "Só aplicações abertas na Dock";
 
-"Only the stats in the menu bar are read, and nothing at all while none are." = "Só se leem as estatísticas que estão na barra de menus, e nada quando não há nenhuma.";
-
 "Only this display's" = "Só as deste monitor";
 
 "Open" = "Abrir";
@@ -1143,6 +1143,8 @@
 "Padding around window screenshots" = "Margem à volta das capturas de janelas";
 
 "Page" = "Página";
+
+"Panel only" = "Só no painel";
 
 "Panels" = "Painéis";
 
@@ -1727,6 +1729,8 @@
 "The one with the pointer" = "O do ponteiro";
 
 "The output whose equalizer this is. Each keeps its own; the one in use is what you hear." = "A saída a que pertence este equalizador. Cada uma guarda o seu; o da saída em uso é o que ouve.";
+
+"The panel shows the stat you click, then those only in the panel. Only the stats in the menu bar or the panel are read, and nothing at all while none are." = "O painel mostra a estatística em que clica e depois as que estão só no painel. Só se leem as estatísticas que estão na barra de menus ou no painel, e nada quando não há nenhuma.";
 
 "The pointer drifts to a spot nearby. Any key or mouse move takes it back." = "O ponteiro desliza para um ponto próximo. Qualquer tecla ou movimento do rato o traz de volta.";
 

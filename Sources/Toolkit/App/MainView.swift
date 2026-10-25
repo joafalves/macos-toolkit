@@ -410,7 +410,7 @@ private struct GeneralView: View {
     private func place(_ tool: MenuBarTool) -> MenuBarOrderList.Place {
         switch tool {
         case .toolkit: return .always
-        case .stats: return .shown(stats.config.enabled && !stats.config.shown.isEmpty)
+        case .stats: return .shown(stats.config.enabled && !(stats.config.shown.isEmpty && stats.config.panelOnly.isEmpty))
         case .capture: return capture.config.enabled ? .shown(capture.config.standaloneIcon) : .toolOff
         case .awake: return awake.config.enabled ? .shown(awake.config.inMenuBar) : .toolOff
         case .mixer: return mixer.config.enabled ? .shown(mixer.config.inMenuBar) : .toolOff
@@ -425,7 +425,7 @@ private struct GeneralView: View {
         case .toolkit: break
         case .stats:
             stats.config.enabled = shown
-            if shown, stats.config.shown.isEmpty {
+            if shown, stats.config.shown.isEmpty, stats.config.panelOnly.isEmpty {
                 stats.config.set(.cpu) { $0.shown = true }
                 stats.config.set(.memory) { $0.shown = true }
             }

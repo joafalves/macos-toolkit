@@ -89,9 +89,44 @@ enum StatsLayout: String, Codable {
     case compact
 }
 
+/// Where a stat shows: the panel is the one a click on System Stats opens.
+enum StatPlace: CaseIterable {
+    case menuBar, panel, off
+
+    var title: String {
+        switch self {
+        case .menuBar: return String(localized: "Menu bar")
+        case .panel: return String(localized: "Panel only")
+        case .off: return String(localized: "Off")
+        }
+    }
+}
+
 struct StatSetting: Codable, Equatable {
+    /// In the menu bar, and so in the panel.
     var shown: Bool
     var look: StatLook
+    /// In the panel but not the menu bar, for a stat that isn't shown: kept
+    /// apart from `shown` so a file from before it still reads, and an older
+    /// version reading a newer file sees the stat as off.
+    var panelOnly = false
+
+    var place: StatPlace {
+        get { shown ? .menuBar : panelOnly ? .panel : .off }
+        set {
+            shown = newValue == .menuBar
+            panelOnly = newValue == .panel
+        }
+    }
+}
+
+extension StatSetting {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        shown = try c.decodeIfPresent(Bool.self, forKey: .shown) ?? false
+        look = (try? c.decodeIfPresent(StatLook.self, forKey: .look)) ?? .number
+        panelOnly = try c.decodeIfPresent(Bool.self, forKey: .panelOnly) ?? false
+    }
 }
 
 struct StatsConfig: Codable, Equatable {
@@ -125,6 +160,9 @@ struct StatsConfig: Codable, Equatable {
 
     /// The stats in the menu bar, in their order.
     var shown: [StatKind] { StatKind.allCases.filter { setting($0).shown } }
+
+    /// The stats only in the panel, in their order.
+    var panelOnly: [StatKind] { StatKind.allCases.filter { setting($0).place == .panel } }
 
     init() {}
 

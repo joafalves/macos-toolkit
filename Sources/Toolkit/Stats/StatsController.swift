@@ -121,7 +121,8 @@ final class StatsController: ObservableObject {
     /// What's being read now.
     var reading: Set<StatKind> {
         guard config.enabled else { return [] }
-        return Set(config.shown).union(panel)
+        // Panel-only stats too, so their charts have their five minutes when it opens.
+        return Set(config.shown).union(config.panelOnly).union(panel)
     }
 
     /// Readers for what's read, none for the rest; a timer only if anything
@@ -262,12 +263,16 @@ final class StatsController: ObservableObject {
 
     // MARK: - The menu bar
 
-    /// The parts for the menu bar item: one a stat, or one for all of them.
+    /// The parts for the menu bar item: one a stat, or one for all of them,
+    /// or, with every stat only in the panel, an icon that opens it.
     func segments() -> [MenuBarSegment] {
         guard config.enabled else { return [] }
         let shown = config.shown
+        if shown.isEmpty {
+            guard !config.panelOnly.isEmpty else { return [] }
+            return [MenuBarSegment(kind: .stats, glyph: MenuBarArt.glyph(AppSection.stats.symbol), label: AppSection.stats.title)]
+        }
         if config.layout == .compact {
-            guard !shown.isEmpty else { return [] }
             let lines = shown.map { compactLine($0) }
             // Two to a column, so they fit the menu bar's height.
             let columns = stride(from: 0, to: lines.count, by: 2).map { Array(lines[$0..<min($0 + 2, lines.count)]) }

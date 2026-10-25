@@ -279,9 +279,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }
         switch kind {
         case .stat(let stat):
-            showStats([stat], from: kind)
+            showStats([stat] + stats.config.panelOnly, from: kind)
         case .stats:
-            showStats(stats.config.shown, from: kind)
+            showStats(stats.config.shown + stats.config.panelOnly, from: kind)
         case .toolkit:
             showToolkitPanel()
         case .capture:
