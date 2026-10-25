@@ -30,8 +30,17 @@ extension StatsController {
         time("disk") { _ = disk.read() }
         time("gpu") { _ = StatsReadings.gpu() }
         time("power (battery)") { _ = StatsReadings.power() }
+        // A moment apart: closer, it gives the last watts again without reading.
         let energy = EnergyReport()
-        time("power (IOReport)") { _ = energy?.read() }
+        _ = energy?.read()
+        var spent = 0.0
+        for _ in 0..<8 {
+            usleep(250_000)
+            let start = cpuTime()
+            _ = energy?.read()
+            spent += cpuTime() - start
+        }
+        print(String(format: "      power (IOReport): %.2f ms", spent / 8 * 1000))
 
         // Off: no timer, no readers, no IOReport subscription. (The library
         // itself is in every app already: macOS's own frameworks load it.)
@@ -81,6 +90,15 @@ extension StatsController {
         stats.panel = [.cpu, .memory, .power]
         RunLoop.main.run(until: Date().addingTimeInterval(1.3))
         check(stats.power?.cpu != nil || stats.power?.gpu != nil, "power panel opened again: its watts a moment later, not at the next reading")
+        if let report = EnergyReport() {
+            _ = report.read()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+            let first = report.read(), soon = report.read()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+            let next = report.read()
+            check(soon == first && (next.cpu != nil || next.gpu != nil),
+                  "IOReport read twice in a moment (the panel's first figures and the timer): the last watts again, and the next read still has them")
+        }
         let top = stats.apps.sorted { $0.memory > $1.memory }.prefix(3).map { "\($0.name) \(StatsController.memory($0.memory))" }
         check(!stats.apps.isEmpty, "top apps by memory: \(top.joined(separator: ", "))")
         check(stats.segments().count == StatKind.allCases.count, "a menu bar part for each stat shown")

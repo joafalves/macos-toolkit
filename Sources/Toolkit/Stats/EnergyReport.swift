@@ -2,9 +2,10 @@ import Foundation
 
 /// CPU and GPU energy from IOReport, the private library behind
 /// `powermetrics`. Subscribed to only while the power panel is open, or on a
-/// Mac without a battery while the power stat is read, and let go of after. (macOS's own frameworks have the library loaded in
-/// every app anyway.) Some Macs report CPU energy only to root; there it
-/// reads as nothing rather than as zero watts.
+/// Mac without a battery while the power stat is read, and let go of after.
+/// (macOS's own frameworks have the library loaded in every app anyway.) Some
+/// Macs report CPU energy only to root; there it reads as nothing rather than
+/// as zero watts.
 final class EnergyReport {
     private typealias CopyChannels = @convention(c) (CFString?, CFString?, UInt64, UInt64, UInt64) -> Unmanaged<CFDictionary>?
     private typealias CreateSubscription = @convention(c) (UnsafeMutableRawPointer?, CFMutableDictionary,
@@ -23,6 +24,7 @@ final class EnergyReport {
     private let subscription: OpaquePointer
     private let channels: CFMutableDictionary
     private var last: (sample: CFDictionary, time: TimeInterval)?
+    private var watts: (cpu: Double?, gpu: Double?) = (nil, nil)
 
     static let path = "/usr/lib/libIOReport.dylib"
 
@@ -69,10 +71,14 @@ final class EnergyReport {
 
     /// Watts since the last read; nil the first time, and for what wasn't reported.
     func read() -> (cpu: Double?, gpu: Double?) {
-        guard let sample = createSamples(subscription, channels, nil)?.takeRetainedValue() else { return (nil, nil) }
         let now = ProcessInfo.processInfo.systemUptime
+        // Moments after the last read (the panel's first figures and the
+        // timer can meet), the last watts: so short a span says little, and
+        // starting afresh from it would leave the next read with nothing.
+        if let last, now - last.time <= 0.2 { return watts }
+        guard let sample = createSamples(subscription, channels, nil)?.takeRetainedValue() else { return (nil, nil) }
         defer { last = (sample, now) }
-        guard let last, now - last.time > 0.2,
+        guard let last,
               let delta = createDelta(last.sample, sample, nil)?.takeRetainedValue() as? [String: Any],
               let list = delta["IOReportChannels"] as? [CFDictionary] else { return (nil, nil) }
         var cpu: Double?, gpu: Double?
@@ -84,7 +90,8 @@ final class EnergyReport {
             guard joules > 0 else { continue }
             if name == "CPU Energy" { cpu = joules / (now - last.time) } else { gpu = joules / (now - last.time) }
         }
-        return (cpu, gpu)
+        watts = (cpu, gpu)
+        return watts
     }
 
     private static func scale(_ unit: String?) -> Double {

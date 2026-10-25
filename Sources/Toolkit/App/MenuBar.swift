@@ -49,8 +49,10 @@ struct MenuBarSegment: Equatable {
     static func recording(time: String?, size: String?, twoLines: Bool, paused: Bool, label: String) -> MenuBarSegment {
         var segment = MenuBarSegment(kind: .recording, colored: MenuBarArt.recordingDot(paused: paused), label: label)
         let parts = [time, size].compactMap { $0 }
-        if twoLines, !parts.isEmpty {
-            segment.columns = [MenuBarArt.column(parts.map { MenuBarArt.Line(text: $0) })]
+        if twoLines {
+            // Both lines from the start, the size's blank until it comes in:
+            // one line alone is centred, and the time would move up then.
+            segment.columns = [MenuBarArt.column([time, size].map { MenuBarArt.Line(text: $0 ?? "\u{00A0}") })]
         } else if !parts.isEmpty {
             segment.text = parts.joined(separator: " · ")
         }

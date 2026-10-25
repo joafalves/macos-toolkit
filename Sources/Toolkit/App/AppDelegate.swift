@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         menuBar = MenuBarItem()
         menuBar.onClick = { [weak self] kind, rect, right in self?.menuBarClicked(kind, at: rect, right: right) }
         panel = MenuBarPopover(menuBar: menuBar)
-        // Back to reading only what the menu bar shows.
+        // Back to reading only what the menu bar and panel-only stats need.
         panel.onClose = { [weak self] in self?.stats.panel = [] }
         // Published values arrive before they're stored, so the item is drawn
         // again on the next pass, from the stored ones.
@@ -207,8 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         segments += stats.segments()
         if let state = capture.recording {
             let config = capture.config
-            // Two lines only with both settings on. Until the size comes in,
-            // the time keeps the top line, so it doesn't jump.
+            // Two lines only with both settings on.
             segments.append(.recording(time: config.recordingTime ? MenuBarArt.duration(state.elapsed) : nil,
                                        size: config.recordingSize && state.bytes > 0 ? MenuBarArt.bytes(state.bytes) : nil,
                                        twoLines: config.recordingLayout == .twoLines && config.recordingTime && config.recordingSize,

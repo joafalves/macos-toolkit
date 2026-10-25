@@ -1,10 +1,11 @@
 import AppKit
 import Combine
 
-/// System Stats: reads what's shown in the menu bar, and everything a panel
-/// shows while it's open, on one timer. Nothing else: with the tool off, or
-/// nothing shown and no panel open, there's no timer, no reader, no history
-/// and no IOReport subscription.
+/// System Stats: reads what's shown in the menu bar, the stats only in the
+/// panel (for their history), and everything a panel shows while it's open,
+/// on one timer. Nothing else: with the tool off, or no stat in either place
+/// and no panel open, there's no timer, no reader, no history and no IOReport
+/// subscription.
 final class StatsController: ObservableObject {
     @Published var config: StatsConfig {
         didSet {
