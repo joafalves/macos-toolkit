@@ -342,7 +342,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-menu-bar-widths  # each part keeps its width as its figure changes
 .build/debug/Toolkit --test-menu-bar-tint <png>   # coloured text in a real menu bar item, captured (open -n; delete the png)
 .build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
-.build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone
+.build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of
 .build/debug/Toolkit --test-navigation       # what Navigate does with each button in each kind of app, posting nothing; with Accessibility (open -n the dev bundle), Finder's Back and Forward found
 .build/debug/Toolkit --test-tweaks           # every tweak read from this Mac (changes nothing of macOS's), and the preference round trip on a scratch domain
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)

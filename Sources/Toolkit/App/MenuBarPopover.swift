@@ -100,7 +100,7 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
 
     /// On the next pass of the run loop, once any menu has closed.
     func show<Content: View>(from kind: MenuBarSegment.Kind, @ViewBuilder content: () -> Content) {
-        let host = NSHostingController(rootView: content())
+        let host = NSHostingController(rootView: AnyView(content()))
         DispatchQueue.main.async { [self] in
             // The part may be gone by now; whoever opened it is told it's closed.
             guard let button = menuBar.button, let rect = menuBar.rect(of: kind) else {
@@ -191,7 +191,12 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
         menuBar.setPressed(nil)
     }
 
+    /// Every panel, the one shown now or one it took the place of, lets go
+    /// of its content: AppKit was seen keeping a closed popover's window
+    /// (a cache of its own held on to it), and with it a stats panel that
+    /// went on drawing every reading.
     func popoverDidClose(_ notification: Notification) {
+        ((notification.object as? NSPopover)?.contentViewController as? NSHostingController<AnyView>)?.rootView = AnyView(EmptyView())
         guard notification.object as? NSPopover === popover else { return }
         forget()
         onClose?()

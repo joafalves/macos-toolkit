@@ -13,6 +13,12 @@ worked on; it gets its date when it's released.
 - **System Stats:** a stat can be in the panel only, rather than in the menu bar too: it shows
   under the stat you click, and with every stat in the panel only, an icon in the menu bar opens it.
 
+### Fixed
+
+- **System Stats:** a panel from the menu bar could stay behind after it closed, out of sight but
+  drawing again with every reading, which kept costing CPU and memory until the toolkit quit. A
+  closed panel now lets go of what it showed.
+
 ## 0.24.4 (2026-10-28)
 
 ### Fixed

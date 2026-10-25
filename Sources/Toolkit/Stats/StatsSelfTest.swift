@@ -147,5 +147,109 @@ extension StatsController {
             print(String(format: "%@ panel: %.1f%% of a core, left alone", kinds.count > 1 ? "every" : kinds[0].title, (cpu() - start) / 2 * 100))
             window.orderOut(nil)
         }
+
+        // From a real menu bar item, as the app opens them: once closed, a
+        // panel draws nothing as readings come in, and its view is let go of.
+        let item = MenuBarItem()
+        item.show([MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")] + stats.segments())
+        let popover = MenuBarPopover(menuBar: item)
+        RunLoop.main.run(until: Date().addingTimeInterval(1))
+        var failures = 0
+        // The third taller than its room, so it scrolls, as on a short
+        // display. In the last, something else holds on to the window, as a
+        // cache in AppKit was seen to do with one panel in the app: it must
+        // still let go of the panel.
+        var kept: NSWindow?
+        for (kinds, room, holdWindow) in [([StatKind.cpu], nil, false), (StatKind.allCases, nil, false), (StatKind.allCases, CGFloat(400), false),
+                                          (StatKind.allCases, nil, true)] {
+            let probe = PanelProbe()
+            weak var held: PanelToken?
+            var opened = false
+            // Its own pool, as each event in the app has: the test runs
+            // before the app's loop, which would otherwise keep it all.
+            autoreleasepool {
+                let token = PanelToken()
+                held = token
+                popover.show(from: .stat(kinds[0])) {
+                    StatsPanelView(stats: stats, kinds: kinds, maxHeight: room).background(PanelProbeView(live: stats.live, probe: probe, token: token))
+                }
+                RunLoop.main.run(until: Date().addingTimeInterval(1))
+                opened = popover.isShown && probe.renders > 0
+                if holdWindow { kept = NSApp.windows.first { "\(type(of: $0))".contains("Popover") && $0.isVisible } }
+                if room != nil, let scroll = NSApp.windows.filter({ "\(type(of: $0))".contains("Popover") }).compactMap({ $0.contentView.flatMap(Self.scrollView) }).first {
+                    // Scrolled part of the way down, as with the wheel.
+                    scroll.contentView.scroll(to: NSPoint(x: 0, y: 200))
+                    scroll.reflectScrolledClipView(scroll.contentView)
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+                }
+                popover.close()
+                RunLoop.main.run(until: Date().addingTimeInterval(1))
+            }
+            let before = probe.renders
+            for _ in 0..<5 {
+                stats.live.tick += 1
+                RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            }
+            let ok = opened && probe.renders == before && held == nil
+            print((ok ? "ok    " : "FAIL  ") + "\(kinds.count > 1 ? "every" : kinds[0].title) panel\(room == nil ? "" : ", scrolling,")\(holdWindow ? ", its window held elsewhere," : "") closed: \(probe.renders - before) renders after, view \(held == nil ? "let go of" : "kept")")
+            if !ok { failures += 1 }
+        }
+        withExtendedLifetime(kept) {}
+
+        // One opened while another is open, as a click on the next stat does.
+        let first = PanelProbe()
+        weak var firstHeld: PanelToken?
+        autoreleasepool {
+            let token = PanelToken()
+            firstHeld = token
+            popover.show(from: .stat(.cpu)) {
+                StatsPanelView(stats: stats, kinds: [.cpu]).background(PanelProbeView(live: stats.live, probe: first, token: token))
+            }
+            RunLoop.main.run(until: Date().addingTimeInterval(1))
+            popover.show(from: .stat(.memory)) { StatsPanelView(stats: stats, kinds: [.memory]) }
+            RunLoop.main.run(until: Date().addingTimeInterval(1))
+        }
+        let before = first.renders
+        for _ in 0..<5 {
+            stats.live.tick += 1
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        }
+        let replaced = first.renders == before && firstHeld == nil && popover.isShown
+        print((replaced ? "ok    " : "FAIL  ") + "a panel replaced by the next: \(first.renders - before) renders after, view \(firstHeld == nil ? "let go of" : "kept")")
+        if !replaced { failures += 1 }
+        autoreleasepool {
+            popover.close()
+            RunLoop.main.run(until: Date().addingTimeInterval(1))
+        }
+        item.remove()
+        print(failures == 0 ? "all ok" : "\(failures) failed")
+    }
+}
+
+extension StatsController {
+    /// The first scroll view in a panel, to scroll it.
+    fileprivate static func scrollView(in view: NSView) -> NSScrollView? {
+        if let scroll = view as? NSScrollView { return scroll }
+        for sub in view.subviews { if let found = scrollView(in: sub) { return found } }
+        return nil
+    }
+}
+
+/// Counts a panel's renders.
+private final class PanelProbe {
+    var renders = 0
+}
+
+/// Held only by a panel's view, so it goes when the view does.
+private final class PanelToken {}
+
+private struct PanelProbeView: View {
+    @ObservedObject var live: StatsLive
+    let probe: PanelProbe
+    let token: PanelToken
+
+    var body: some View {
+        probe.renders += 1
+        return Color.clear
     }
 }
