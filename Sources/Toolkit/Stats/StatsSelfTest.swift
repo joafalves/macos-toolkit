@@ -47,7 +47,7 @@ extension StatsController {
         config.interval = 1
         for kind in StatKind.allCases { config.set(kind) { $0.shown = true } }
         stats.config = config
-        stats.panel = [.cpu, .memory]
+        stats.panel = [.cpu, .memory, .power]
         RunLoop.main.run(until: Date().addingTimeInterval(1.2))
         let busiest = stats.apps.max { $0.cpu < $1.cpu }
         check(stats.live.cpuOfAppsKnown, "top apps' CPU known a second after the panel opens" + (busiest.map { String(format: " (busiest %@, %.0f%%)", $0.name, $0.cpu * 100) } ?? ""))
@@ -72,7 +72,15 @@ extension StatsController {
         if let power = stats.power {
             check(power.drawn != nil, "power: \(power.drawn.map(watts) ?? "?") drawn; cpu \(power.cpu.map(watts) ?? "not reported"), gpu \(power.gpu.map(watts) ?? "not reported"); charger \(power.charger.map { "\($0) W" } ?? "none"); battery \(power.battery.map { "\($0)%" } ?? "none"), health \(power.health.map { "\($0)%" } ?? "?"), cycles \(power.cycles.map(String.init) ?? "?")")
         } else { check(false, "power read") }
-        check(stats.energy != nil, "power shown: an IOReport subscription")
+        check(stats.energy != nil, "power panel open: an IOReport subscription")
+        // Closed, the battery's reading is enough, where there's a battery.
+        stats.panel = [.cpu, .memory]
+        let battery = StatsReadings.power()?.system != nil
+        check((stats.energy == nil) == battery, battery ? "power panel closed: no IOReport, the battery reports the draw"
+                                                       : "power panel closed, no battery: IOReport kept for the draw")
+        stats.panel = [.cpu, .memory, .power]
+        RunLoop.main.run(until: Date().addingTimeInterval(1.3))
+        check(stats.power?.cpu != nil || stats.power?.gpu != nil, "power panel opened again: its watts a moment later, not at the next reading")
         let top = stats.apps.sorted { $0.memory > $1.memory }.prefix(3).map { "\($0.name) \(StatsController.memory($0.memory))" }
         check(!stats.apps.isEmpty, "top apps by memory: \(top.joined(separator: ", "))")
         check(stats.segments().count == StatKind.allCases.count, "a menu bar part for each stat shown")
@@ -97,7 +105,7 @@ extension StatsController {
         var panelOnly = stats.config
         for kind in StatKind.allCases { panelOnly.set(kind) { $0.place = kind == .gpu ? .panel : .off } }
         stats.config = panelOnly
-        check(stats.timer != nil && stats.reading == [.cpu, .memory, .gpu], "panel-only gpu is read with no part of its own (cpu and memory for the open panel)")
+        check(stats.timer != nil && stats.reading == [.cpu, .memory, .power, .gpu], "panel-only gpu is read with no part of its own (cpu, memory and power for the open panel)")
         let icon = stats.segments()
         check(icon.count == 1 && icon[0].kind == .stats && icon[0].text == nil, "nothing in the menu bar: one icon for the panel")
         stats.config.set(.disk) { $0.place = .menuBar }

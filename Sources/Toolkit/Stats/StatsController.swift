@@ -141,7 +141,25 @@ final class StatsController: ObservableObject {
         if reading.contains(.cpu) { cpuReader = cpuReader ?? StatsReadings.CPU() }
         if reading.contains(.network) { networkReader = networkReader ?? StatsReadings.Network() }
         if reading.contains(.disk) { diskReader = diskReader ?? StatsReadings.Disk() }
-        if reading.contains(.power) { energy = energy ?? EnergyReport() }
+        // IOReport only for what the battery doesn't say: the CPU and GPU in
+        // the power panel, or the whole draw on a desktop, which has no
+        // battery. Kept, it costs ~5 ms a reading; started, ~50 ms once.
+        if reading.contains(.power), panel.contains(.power) || StatsReadings.power()?.system == nil {
+            if energy == nil, let report = EnergyReport() {
+                energy = report
+                // Watts come from two samples: the first now, and the figures
+                // a moment on, rather than at the next reading.
+                _ = report.read()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self, weak report] in
+                    guard let self, let report, report === energy, live.power != nil else { return }
+                    let watts = report.read()
+                    live.power?.cpu = watts.cpu
+                    live.power?.gpu = watts.gpu
+                }
+            }
+        } else {
+            energy = nil
+        }
         var newApps = false
         if config.enabled, panel.contains(.cpu) || panel.contains(.memory) {
             newApps = topApps == nil
@@ -230,10 +248,6 @@ final class StatsController: ObservableObject {
             if let watts = energy?.read() {
                 value.cpu = watts.cpu
                 value.gpu = watts.gpu
-            } else {
-                // The first read has nothing to compare with yet.
-                value.cpu = live.power?.cpu
-                value.gpu = live.power?.gpu
             }
             live.power = value
             if let drawn = value.drawn { record(.power, drawn) }

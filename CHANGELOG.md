@@ -13,6 +13,12 @@ worked on; it gets its date when it's released.
 - **System Stats:** a stat can be in the panel only, rather than in the menu bar too: it shows
   under the stat you click, and with every stat in the panel only, an icon in the menu bar opens it.
 
+### Changed
+
+- **System Stats:** what the CPU and GPU draw is read only while the power panel is open, not all
+  the time, which was most of what System Stats cost on a MacBook; those lines show a moment after
+  the panel opens. Desktops, which have no battery to report the whole draw, read it as before.
+
 ### Fixed
 
 - **System Stats:** a panel from the menu bar could stay behind after it closed, out of sight but

@@ -21,7 +21,8 @@ tool; keep it in step with the code.
   `CoreDockSendNotification` (through `dlsym`) for Window Layout's Show the desktop, `SetsCursorInBackground`
   so the capture overlay can set the cursor without activating the app, AppKit's
   `_setPreventsActivation:` so a click in a menu bar panel (a popover) doesn't activate the app, and IOReport (through
-  `dlopen`) for System Stats' CPU and GPU watts, subscribed to only while the power stat is read.
+  `dlopen`) for System Stats' CPU and GPU watts, subscribed to only while the power panel is open (or, on a
+  Mac without a battery, which reports the whole draw, while the power stat is read).
 - Nothing runs as root. Keep Awake's lid-closed option did before 0.19.3, through a rule in
   `/etc/sudoers.d` for `pmset -a disablesleep`; sudo can't tell which program asks, so any process
   could use it, and it was taken out. `LidSleep.swift` now only removes that rule at launch, putting

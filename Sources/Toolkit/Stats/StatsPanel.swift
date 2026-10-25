@@ -25,6 +25,11 @@ struct StatsPanelView: View {
         self.openSettings = openSettings
     }
 
+    private static let activityMonitorPath = "/System/Applications/Utilities/Activity Monitor.app"
+    /// Looked up once: the body runs again with every reading, and the name
+    /// can't change before the app restarts (a language change takes one).
+    private static let activityMonitor = PanelFooter.name(ofAppAt: activityMonitorPath)
+
     /// The scroll view is as tall as its content until the room runs out,
     /// and only then scrolls; the footer stays below it.
     var body: some View {
@@ -40,9 +45,9 @@ struct StatsPanelView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             Divider().padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
-            PanelFooter(app: PanelFooter.name(ofAppAt: "/System/Applications/Utilities/Activity Monitor.app"), openApp: {
+            PanelFooter(app: Self.activityMonitor, openApp: {
                 close()
-                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
+                NSWorkspace.shared.open(URL(fileURLWithPath: Self.activityMonitorPath))
             }, openSettings: openSettings)
             .padding([.horizontal, .bottom], 14)
         }

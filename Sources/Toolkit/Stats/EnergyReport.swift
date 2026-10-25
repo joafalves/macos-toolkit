@@ -1,8 +1,8 @@
 import Foundation
 
 /// CPU and GPU energy from IOReport, the private library behind
-/// `powermetrics`. Subscribed to only while the power stat is read, and let
-/// go of when it isn't. (macOS's own frameworks have the library loaded in
+/// `powermetrics`. Subscribed to only while the power panel is open, or on a
+/// Mac without a battery while the power stat is read, and let go of after. (macOS's own frameworks have the library loaded in
 /// every app anyway.) Some Macs report CPU energy only to root; there it
 /// reads as nothing rather than as zero watts.
 final class EnergyReport {

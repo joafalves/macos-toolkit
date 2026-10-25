@@ -720,7 +720,8 @@ every stat there, an icon in the menu bar opens the panel.
 - Figures stop at 99%, so each part keeps the same width and the menu bar doesn't shift; a pill
   shows 100.
 - Every 2 seconds by default (1 or 5 in the settings). Only the stats in the menu bar or the panel
-  are read, and nothing at all while none are, or the tool is off. A reading of all six costs under 2 ms.
+  are read, and nothing at all while none are, or the tool is off. What the CPU and GPU draw is
+  read only while the power panel is open (on a desktop, whenever power is read). A reading of all six costs under 2 ms.
 
 ## Tweaks
 
