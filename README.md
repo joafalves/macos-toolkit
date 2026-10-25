@@ -731,7 +731,7 @@ default says **Changed**, with a button to put it back.
 | --- | --- |
 | Background tasks | Photos' analysis of what's in photos, People and Memories, Game Center, Tips. Turned off for your user only (`launchctl disable`), each saying what stops working; a macOS update can turn one back on, and it then shows as on. |
 | Dock | Show it without delay, quicker Mission Control, dim hidden apps, only open apps, scroll on an icon for its windows. A change restarts the Dock. |
-| Finder | Full path in window titles, hidden files, the warning before changing an extension, Quit Finder, no `.DS_Store` on network or USB drives. A change restarts Finder. |
+| Finder | Full path in window titles, hidden files, the warning before changing an extension, Quit Finder, no `.DS_Store` on network or USB drives. Finder shows a change once it restarts, which the page offers to do rather than doing it, since it stops a copy in progress. |
 | Typing | Hold a key for accents, or to repeat it. |
 | Windows and dialogs | Expanded Save and Print dialogs, saving new documents to iCloud, window animations, the offer to report crashes. |
 | Devices | Photos opening for a new iPhone or camera, Time Machine offering new disks. |

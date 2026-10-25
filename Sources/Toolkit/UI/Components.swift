@@ -164,7 +164,8 @@ extension SettingRow where Extra == EmptyView {
     }
 }
 
-/// A small coloured word next to a title, for something not finished yet.
+/// A small coloured word next to a title: something not finished yet, or a
+/// setting not at its default.
 struct TagBadge: View {
     let text: LocalizedStringKey
 

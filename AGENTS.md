@@ -121,7 +121,8 @@ tool; keep it in step with the code.
   about something a tool also does stay in Tweaks, linked from the tool's page (Finder's), not
   mixed into it. The page reads every value as it's made (about 5 ms), so its first frame is the
   Mac's, not macOS's defaults turning into it; commands run through `posix_spawn`, since `Process`
-  took 75 ms for one `launchctl`. A few switches flipped in a row restart the Dock or Finder once.
+  took 75 ms for one `launchctl`. A few Dock switches flipped in a row restart it once, after the
+  last; Finder is restarted only from the button the page shows, since quitting it stops a copy.
   Never write one of macOS's settings to test: `--test-tweaks` reads them, times the read, and
   round-trips a scratch domain of our own.
 - **Import merges, setting by setting** (`SettingsTransfer.merge`): what a file lacks stays as it is

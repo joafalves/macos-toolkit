@@ -8,7 +8,7 @@ struct TweaksView: View {
 
     var body: some View {
         Page {
-            PageHeader(section: .tweaks, subtitle: "macOS settings that System Settings doesn't show. Each one is as it's set on this Mac now, and stays as you set it without the toolkit.")
+            PageHeader(section: .tweaks, subtitle: "macOS settings that System Settings doesn't show, as they're set on this Mac now. What you change here stays changed without the toolkit.")
 
             if tweaks.refused != nil {
                 Banner(text: "macOS kept that setting as it was.", button: "OK") { tweaks.refused = nil }
@@ -43,7 +43,11 @@ struct TweaksView: View {
                          tweak: .scrollForWindows, tweaks: tweaks)
             }
 
-            Card(title: "Finder", footnote: "A change restarts Finder, which opens its windows again. What the toolkit adds to Finder is on the [Finder page](toolkit-page:finder).") {
+            Card(title: "Finder", footnote: "Finder shows a change once it restarts. What the toolkit adds to Finder is on the [Finder page](toolkit-page:finder).") {
+                if tweaks.finderWaiting {
+                    FinderRestart(tweaks: tweaks)
+                    RowDivider()
+                }
                 TweakRow(title: "Full path in window titles", caption: "A window's title shows where the folder is, from the top of the disk.",
                          tweak: .pathInTitle, tweaks: tweaks)
                 RowDivider()
@@ -66,7 +70,7 @@ struct TweaksView: View {
                          tweak: .pressAndHold, tweaks: tweaks)
             }
 
-            Card(title: "Windows and Dialogs", footnote: "Apps pick a change up the next time they open.") {
+            Card(title: "Windows and Dialogs", footnote: "Apps pick a change up the next time they open; crash reports, at the next crash.") {
                 TweakRow(title: "Expand Save and Print dialogs", caption: "They open with every option showing.", tweak: .expandedDialogs, tweaks: tweaks)
                 RowDivider()
                 TweakRow(title: "Save new documents to iCloud", caption: "Off, a new document is saved on this Mac unless you pick iCloud.",
@@ -86,6 +90,27 @@ struct TweaksView: View {
                          tweak: .offerTimeMachine, tweaks: tweaks)
             }
         }
+    }
+}
+
+/// After a Finder tweak changes: a way to restart Finder now, when nothing
+/// is being copied. Not a setting, so not a row search finds.
+private struct FinderRestart: View {
+    @ObservedObject var tweaks: TweaksModel
+
+    var body: some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Finder restarts to show the change")
+                Text("It opens its windows again, but a copy in progress stops.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Restart Finder") { tweaks.restartFinder() }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
     }
 }
 

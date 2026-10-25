@@ -34,7 +34,8 @@ enum Tweak: String, CaseIterable {
     }
 
     /// What has to start again for a change to show. macOS starts both again
-    /// by itself, and Finder reopens its windows.
+    /// by itself. The Dock is restarted at once; Finder only when asked, as
+    /// quitting it stops a copy in progress.
     enum Restart {
         case dock, finder
     }
@@ -120,13 +121,19 @@ final class TweaksModel: ObservableObject {
     @Published private(set) var isOn: [Tweak: Bool] = [:]
     /// The last change macOS didn't keep: the switch went back to what's set.
     @Published var refused: Tweak?
+    /// A Finder tweak changed since Finder last restarted from here: it shows
+    /// once Finder starts again, which the page offers rather than does.
+    @Published private(set) var finderWaiting = false
     /// For `--snapshot`: macOS's defaults with two changed, nothing read.
     static var previewing = false
     private let isPreview = TweaksModel.previewing
     private let queue = DispatchQueue(label: "dev.jalves.macos-toolkit.tweaks")
-    /// Apps waiting to restart, on `queue`: a few switches flipped in a row
-    /// restart the Dock or Finder once, after the last.
-    private var restarting: Set<Tweak.Restart> = []
+    /// On `queue`: the latest Dock change, so a few switches flipped in a row
+    /// restart it once, a moment after the last.
+    private var dockChange = 0
+    /// On the main thread: bumped by each change, so a read started before it
+    /// doesn't put the switch back for a moment.
+    private var generation = 0
     private var activation: NSObjectProtocol?
 
     init() {
@@ -136,7 +143,7 @@ final class TweaksModel: ObservableObject {
             isOn[.pathInTitle] = true
             return
         }
-        // Read here, about 8 ms, so the page's first frame shows the Mac's
+        // Read here, about 5 ms, so the page's first frame shows the Mac's
         // values rather than macOS's defaults turning into them.
         isOn = Self.read()
         // Back from System Settings or Terminal, it shows what's set now.
@@ -153,12 +160,15 @@ final class TweaksModel: ObservableObject {
 
     func changed(_ tweak: Tweak) -> Bool { on(tweak) != tweak.macOSDefault }
 
-    /// Reads every tweak off the main thread: `launchctl` takes a moment.
+    /// Reads every tweak again, after any change still being written.
     func refresh() {
         guard !isPreview else { return }
+        let started = generation
         queue.async {
             let states = Self.read()
-            DispatchQueue.main.async { self.isOn = states }
+            DispatchQueue.main.async {
+                if self.generation == started { self.isOn = states }
+            }
         }
     }
 
@@ -168,20 +178,31 @@ final class TweaksModel: ObservableObject {
         // whether macOS kept it.
         isOn[tweak] = value
         refused = nil
+        generation += 1
+        let started = generation
+        if tweak.restart == .finder { finderWaiting = true }
         queue.async {
             Self.write(tweak, value)
-            if let app = tweak.restart, self.restarting.insert(app).inserted {
+            if tweak.restart == .dock {
+                self.dockChange += 1
+                let change = self.dockChange
                 self.queue.asyncAfter(deadline: .now() + 0.6) {
-                    self.restarting.remove(app)
-                    Self.run("/usr/bin/killall", [app == .dock ? "Dock" : "Finder"])
+                    if self.dockChange == change { Self.run("/usr/bin/killall", ["Dock"]) }
                 }
             }
             let states = Self.read()
             DispatchQueue.main.async {
+                guard self.generation == started else { return }
                 self.isOn = states
                 if states[tweak] != value { self.refused = tweak }
             }
         }
+    }
+
+    func restartFinder() {
+        finderWaiting = false
+        guard !isPreview else { return }
+        queue.async { Self.run("/usr/bin/killall", ["Finder"]) }
     }
 
     // MARK: - macOS
