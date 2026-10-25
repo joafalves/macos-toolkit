@@ -36,7 +36,9 @@ struct EqualizerConfig: Codable, Equatable {
         let saved = ((try? c.decodeIfPresent([Double].self, forKey: .gains)) ?? []).map { min(Self.range, max(-Self.range, $0)) }
         preamp = min(Self.range, max(-Self.range, try c.decodeIfPresent(Double.self, forKey: .preamp) ?? 0))
         if saved.count == Self.frequencies.count {
-            gains = saved
+            // A preset picked before its values changed is still that preset.
+            let key = EqualizerPreset.earlier.first { $0.value == saved }?.key
+            gains = EqualizerPreset.all.first { $0.key == key }?.gains ?? saved
         } else if saved.count == EqualizerCurve.legacyFrequencies.count {
             gains = EqualizerCurve.fromFiveBands(saved)
         }
@@ -129,26 +131,44 @@ struct EqualizerPreset: Identifiable {
     // 32, 64, 125, 250, 500, 1k, 2k, 4k, 8k and 16k Hz.
     static let loudness = EqualizerPreset("Loudness", key: "Loudness", gains: [6, 5, 3, 1, 0, 0, 0, 0.5, 2, 3])
 
+    // The Music app's values, apart from Loudness, Small Speakers and Late Night.
     static let all: [EqualizerPreset] = [
         .init("Flat", key: "Flat", gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-        .init("Bass Boost", key: "Bass Boost", gains: [5, 5, 4, 2.5, 1, 0, 0, 0, 0, 0]),
-        .init("Bass Reducer", key: "Bass Reducer", gains: [-5, -5, -4, -2.5, -1, 0, 0, 0, 0, 0]),
-        .init("Treble Boost", key: "Treble Boost", gains: [0, 0, 0, 0, 0, 1, 2.5, 4, 5, 5]),
-        .init("Treble Reducer", key: "Treble Reducer", gains: [0, 0, 0, 0, 0, -1, -2.5, -4, -5, -5]),
-        // Voices: less rumble, more of the 1 to 4 kHz that carries words.
-        .init("Vocal", key: "Vocal", gains: [-3, -2.5, -1.5, 0, 1.5, 3, 3.5, 3, 1.5, 0]),
-        // The ear hears less of the lows and highs at low volume.
+        .init("Bass Boost", key: "Bass Boost", gains: [5.5, 4.25, 3.5, 2.5, 1.25, 0, 0, 0, 0, 0]),
+        .init("Bass Reducer", key: "Bass Reducer", gains: [-5.5, -4.25, -3.5, -2.5, -1.25, 0, 0, 0, 0, 0]),
+        .init("Treble Boost", key: "Treble Boost", gains: [0, 0, 0, 0, 0, 1.25, 2.5, 3.5, 4.25, 5.5]),
+        .init("Treble Reducer", key: "Treble Reducer", gains: [0, 0, 0, 0, 0, -1.25, -2.5, -3.5, -4.25, -5.5]),
+        .init("Vocal", key: "Vocal", gains: [-1.5, -3, -3, 1.5, 3.75, 3.75, 3, 1.5, 0, -1.5]),
+        // The ear hears less of the lows and highs at low volume. The Music
+        // app's dips 5 dB at 4 kHz and is back up 5 dB at 8 kHz.
         loudness,
-        .init("Rock", key: "Rock", gains: [4, 3.5, 2.5, 0.5, -1, -1.5, 0, 2, 3, 3]),
-        .init("Electronic", key: "Electronic", gains: [5.5, 5, 2.5, 0, -1.5, -1, 0, 1, 3, 4]),
-        .init("Acoustic", key: "Acoustic", gains: [2.5, 2.5, 2, 1, 0, 0, 1, 2, 2.5, 1.5]),
+        .init("Rock", key: "Rock", gains: [5, 4, 3, 1.5, -0.5, -1, 0.5, 2.5, 3.5, 4.5]),
+        .init("Electronic", key: "Electronic", gains: [4.25, 3.8, 1.2, 0, -2.15, 2.25, 0.85, 1.25, 3.95, 4.8]),
+        .init("Acoustic", key: "Acoustic", gains: [5, 4.9, 3.95, 1.05, 2.15, 1.75, 3.5, 4.1, 3.55, 2.15]),
+        .init("Classical", key: "Classical", gains: [4.75, 3.75, 3, 2.5, -1.5, -1.5, 0, 2.25, 3.25, 3.75]),
+        .init("Hip-Hop", key: "Hip-Hop", gains: [5, 4.25, 1.5, 3, -1, -1, 1.5, -0.5, 2, 3]),
+        .init("Pop", key: "Pop", gains: [-1.5, -1, 0, 2, 4, 4, 2, 0, -1, -1.5]),
         // Small speakers can't play the deepest bass: it's taken out, and the
-        // upper bass they can play brought up to stand in for it.
+        // upper bass they can play brought up to stand in for it. The Music
+        // app's raises the deepest bass instead.
         .init("Small Speakers", key: "Small Speakers", gains: [-6, -3, 2, 3, 2, 0.5, 0, 1, 1, 0]),
         // Less bass and treble, voices up front, for listening quietly.
         .init("Late Night", key: "Late Night", gains: [-5, -4, -2.5, -1, 0.5, 2, 2, 1, -0.5, -2]),
     ]
+
+    /// Presets as they were before 0.24, which now have the Music app's values.
+    static let earlier: [String: [Double]] = [
+        "Bass Boost": [5, 5, 4, 2.5, 1, 0, 0, 0, 0, 0],
+        "Bass Reducer": [-5, -5, -4, -2.5, -1, 0, 0, 0, 0, 0],
+        "Treble Boost": [0, 0, 0, 0, 0, 1, 2.5, 4, 5, 5],
+        "Treble Reducer": [0, 0, 0, 0, 0, -1, -2.5, -4, -5, -5],
+        "Vocal": [-3, -2.5, -1.5, 0, 1.5, 3, 3.5, 3, 1.5, 0],
+        "Rock": [4, 3.5, 2.5, 0.5, -1, -1.5, 0, 2, 3, 3],
+        "Electronic": [5.5, 5, 2.5, 0, -1.5, -1, 0, 1, 3, 4],
+        "Acoustic": [2.5, 2.5, 2, 1, 0, 0, 1, 2, 2.5, 1.5],
+    ]
 }
+
 
 /// One biquad's coefficients, from Robert Bristow-Johnson's audio EQ cookbook.
 struct Biquad {

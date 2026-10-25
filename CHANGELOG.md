@@ -15,6 +15,12 @@ worked on; it gets its date when it's released.
 - **Finder:** its page links to Tweaks for Finder's own settings, such as hidden files.
 - **Mouse:** with **Navigate**, **Change…** sets which of a mouse's buttons go back and forward,
   for mice that don't use the usual fourth and fifth.
+- **Audio Mixer:** the Classical, Hip-Hop and Pop equalizer presets, as in the Music app.
+
+### Changed
+
+- **Audio Mixer:** the Bass, Treble, Vocal, Rock, Electronic and Acoustic presets have the Music
+  app's values. An equalizer set to one of them before moves to its new values.
 
 ### Fixed
 
