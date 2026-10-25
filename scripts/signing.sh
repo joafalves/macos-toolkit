@@ -1,5 +1,7 @@
 # Sourced by build.sh and test-update.sh: finds the signing identity and
-# unlocks its keychain if it's locked.
+# unlocks its keychain if it's locked. signing_start also puts that keychain
+# on the user's search list, where codesign looks, so a caller follows its
+# signing with signing_end (and traps it on EXIT) to take it off again.
 #
 # The identity lives in a keychain of its own, with its own password
 # (scripts/make-cert.sh). In the login keychain, which is always unlocked,
@@ -14,9 +16,7 @@ SIGNING_KEYCHAIN="${TOOLKIT_KEYCHAIN:-$HOME/Library/Keychains/macos-toolkit-sign
 SIGNING_UNLOCKED_FOR=86400
 # Passed to codesign; empty when signing ad hoc.
 SIGN_ARGS=()
-# The user's keychain search list before signing_start, and whether it added
-# the signing keychain to it.
-SIGNING_LIST=()
+# Whether signing_start put the signing keychain on the search list.
 SIGNING_LISTED=false
 
 # SecKeychainGetStatus, which `security` doesn't offer: unlock-keychain asks
@@ -44,11 +44,10 @@ signing_start() {
     # codesign only finds an identity in a keychain on the search list,
     # --keychain or not (measured): it goes on the list while signing, and
     # signing_end takes it off again.
-    local entry
-    while IFS= read -r entry; do SIGNING_LIST+=("$entry"); done \
-      < <(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"$//')
-    if ! printf '%s\n' ${SIGNING_LIST[@]+"${SIGNING_LIST[@]}"} | grep -qxF "$SIGNING_KEYCHAIN"; then
-      security list-keychains -d user -s ${SIGNING_LIST[@]+"${SIGNING_LIST[@]}"} "$SIGNING_KEYCHAIN"
+    local list=()
+    signing_list list
+    if ! printf '%s\n' ${list[@]+"${list[@]}"} | grep -qxF "$SIGNING_KEYCHAIN"; then
+      security list-keychains -d user -s ${list[@]+"${list[@]}"} "$SIGNING_KEYCHAIN"
       SIGNING_LISTED=true
     fi
   elif security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
@@ -60,10 +59,25 @@ signing_start() {
   fi
 }
 
-# The search list as it was, once the signing is done (and on exit, if it fails).
+# The user's keychain search list, one path each, into the array named $1.
+signing_list() {
+  local entry
+  eval "$1=()"
+  while IFS= read -r entry; do eval "$1+=(\"\$entry\")"; done \
+    < <(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"$//')
+}
+
+# Once the signing is done (and on exit, if it fails): the signing keychain
+# off the search list, if signing_start put it there. Only that one comes off,
+# so a keychain added to the list meanwhile stays.
 signing_end() {
   if $SIGNING_LISTED; then
-    security list-keychains -d user -s ${SIGNING_LIST[@]+"${SIGNING_LIST[@]}"}
+    local list=() rest=() entry
+    signing_list list
+    for entry in ${list[@]+"${list[@]}"}; do
+      [[ "$entry" != "$SIGNING_KEYCHAIN" ]] && rest+=("$entry")
+    done
+    security list-keychains -d user -s ${rest[@]+"${rest[@]}"}
     SIGNING_LISTED=false
   fi
 }
