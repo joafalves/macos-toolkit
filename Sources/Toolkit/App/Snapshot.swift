@@ -4,14 +4,17 @@ import SwiftUI
 enum Snapshot {
     /// `noAccess`: as without Accessibility, for the tools' locked pages and
     /// the sidebar's warnings.
-    static func write(to path: String, section: AppSection, light: Bool, noAccess: Bool = false) {
+    /// `tall`: a window twice the height, for the whole of a long page.
+    static func write(to path: String, section: AppSection, light: Bool, noAccess: Bool = false, tall: Bool = false) {
         _ = NSApplication.shared
         let model = AppModel()
         model.persists = false
         model.general = GeneralConfig()
         model.section = section
         Permissions.shared.preview(missing: noAccess ? [.accessibility: .notAsked] : [:])
-        let (mouse, switcher, layout, mixer) = (MouseController.preview(), SwitcherController.preview(), LayoutController.preview(), MixerController.preview())
+        let (mouse, switcher, layout, mixer) = (MouseController.preview(), SwitcherController.preview(), LayoutController.preview(),
+                                               MixerController.preview(perOutput: CommandLine.arguments.contains("per-output"),
+                                                                       simple: CommandLine.arguments.contains("simple")))
         let (finder, capture, awake) = (FinderController.preview(), CaptureController.preview(), AwakeController.preview())
         model.permissionNeeds = { section in
             switch section {
@@ -34,7 +37,7 @@ enum Snapshot {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
-        window.setContentSize(NSSize(width: 860, height: 760))
+        window.setContentSize(NSSize(width: 860, height: tall ? 1520 : 760))
         onRetina(window)
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(1.0))
@@ -525,7 +528,8 @@ enum Snapshot {
     /// The menu bar mixer, filled with made-up rows.
     static func writeMixer(to path: String, light: Bool, outputs: Bool, software: Bool, equalizer: Bool, perOutput: Bool = false) {
         _ = NSApplication.shared
-        let mixer = MixerController.preview(software: software, equalizer: equalizer, perOutput: perOutput)
+        let mixer = MixerController.preview(software: software, equalizer: equalizer, perOutput: perOutput,
+                                            simple: CommandLine.arguments.contains("simple"))
         let host = NSHostingController(rootView: MixerPopoverView(mixer: mixer, showOutputs: outputs, showEqualizer: equalizer).background(Color(nsColor: .windowBackgroundColor)))
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.borderless]

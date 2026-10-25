@@ -145,6 +145,9 @@ struct MixerConfig: Codable, Equatable {
     var equalizerPerOutput = false
     /// By the output device's UID.
     var equalizers: [String: EqualizerConfig] = [:]
+    /// Ten bands or Simple's three handles, for every output: how it's
+    /// edited, not how it sounds.
+    var equalizerMode = EqualizerMode.bands
     /// Keyed by bundle ID.
     var apps: [String: AppVolume] = [:]
     /// Apps the mixer never lists or taps: bundle ID to name.
@@ -179,6 +182,7 @@ struct MixerConfig: Codable, Equatable {
         fineStep = min(max(try c.decodeIfPresent(Int.self, forKey: .fineStep) ?? 1, Self.fineStepRange.lowerBound), Self.fineStepRange.upperBound)
         equalizer = (try? c.decodeIfPresent(EqualizerConfig.self, forKey: .equalizer)) ?? EqualizerConfig()
         equalizerPerOutput = try c.decodeIfPresent(Bool.self, forKey: .equalizerPerOutput) ?? false
+        equalizerMode = (try? c.decodeIfPresent(EqualizerMode.self, forKey: .equalizerMode)) ?? .bands
         equalizers = (try? c.decodeIfPresent([String: EqualizerConfig].self, forKey: .equalizers)) ?? [:]
         apps = (try? c.decodeIfPresent([String: AppVolume].self, forKey: .apps)) ?? [:]
         ignored = (try? c.decodeIfPresent([String: String].self, forKey: .ignored)) ?? [:]

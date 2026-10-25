@@ -120,7 +120,7 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     MainView.previewSearch = rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) } ?? ""
     LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
     Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"),
-                   noAccess: rest.contains("no-access"))
+                   noAccess: rest.contains("no-access"), tall: rest.contains("tall"))
     exit(0)
 }
 

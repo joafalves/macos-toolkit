@@ -148,8 +148,9 @@ itself is put back when it quits. No accounts, no telemetry, no network code. Se
   </picture>
 </p>
 
-macOS has one volume for everything. The mixer adds the missing part: open it from the menu bar and
-every app that has sound gets its own slider.
+macOS has one volume for everything. The mixer adds the missing part: every app that has sound
+gets its own slider. It's all on the mixer's page in the settings, and in a panel one click away in
+the menu bar, the same controls in both.
 
 - **Main volume and output device** at the top, so it replaces a trip to Control Center. The
   volume stays the same when you switch outputs; with **Volume for each output** on in the
@@ -175,7 +176,11 @@ every app that has sound gets its own slider.
 - **Software volume** for outputs that have no volume control of their own (see below).
 - An **equalizer** under the main volume: ten bands an octave apart, 32 Hz to 16 kHz, ±12 dB, as
   in the Music app, with presets such as Bass Boost, Vocal, Loudness, Small Speakers and Late Night.
-  Drag a band, or double-click it for 0 dB.
+  Drag a band, or double-click it for 0 dB; hold ⌥ while dragging and the bands beside it follow,
+  less the further they are, for a smooth curve. On the mixer's page, **Simple** shows three sliders
+  instead, Bass, Mid and Treble, that move regions of the same ten bands: a preset, or a switch
+  between the two, sounds the same in both, and a curve with more detail than three sliders show
+  says so.
   - Each slider is what the sound gets at its band. Neighbouring bands overlap, so the filters are
     set to land on the sliders rather than add up past them.
   - A band boosted plays louder at its frequencies, and the rest stays as it was. The **Preamp**, on
@@ -185,7 +190,8 @@ every app that has sound gets its own slider.
     music sound squashed, lower the Preamp by about as much as the largest boost.
   - Changes glide, and turning it on or off fades, so nothing clicks.
   - With **Equalizer for each output** on in the settings, each output keeps its own, so headphones
-    and speakers can sound different. Off, one equalizer is used for all of them.
+    and speakers can sound different; the page in the settings sets any output's, the panel the one
+    in use. Off, one equalizer is used for all of them.
 
 ### Outputs with no volume control
 

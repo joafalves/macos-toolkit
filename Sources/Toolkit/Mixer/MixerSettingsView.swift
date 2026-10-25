@@ -5,6 +5,10 @@ import SwiftUI
 struct MixerSettingsView: View {
     @ObservedObject var mixer: MixerController
     @ObservedObject private var permissions = Permissions.shared
+    /// The page shows the outputs and the bands, which the panel folds away.
+    @StateObject private var unfolded = ViewState(true)
+    /// With an equalizer for each output, the one the Equalizer card sets; nil for the one in use.
+    @StateObject private var equalizerOutput = ViewState<String?>(nil)
 
     var body: some View {
         Page {
@@ -26,15 +30,35 @@ struct MixerSettingsView: View {
 
             // Locked, as when off, until it has what it needs.
             WhenEnabled(enabled: mixer.config.enabled && permissions.ready(mixer.permissionNeeds)) {
-                // The volumes and the equalizer live in the menu bar's mixer, not here.
-                Card {
-                    SettingRow(title: "Volumes and equalizer",
-                               caption: mixer.config.menuBarIcon == .none
-                                   ? "In the mixer, which opens from the toolkit's panel, or in one click once it's in the menu bar."
-                                   : "In the mixer, which opens from its part of the toolkit's menu bar item.") {
-                        Button("Open the Mixer") { mixer.openMixer?() }
-                            .disabled(mixer.config.menuBarIcon == .none)
+                // The mixer itself, the same views on the same controller as its
+                // menu bar panel: everything can be changed here, and the panel
+                // is the quick way to the same.
+                Card(title: "Sound", badge: mixer.softwareActive ? "Software volume" : nil) {
+                    MixerSoundControls(mixer: mixer, place: .page, showOutputs: unfolded)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                }
+
+                Card(title: "Equalizer") {
+                    MixerEqualizerControls(mixer: mixer, place: .page, expanded: unfolded, target: equalizerOutput)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                }
+
+                Card(title: "Apps", footnote: "Click an app to mute it; right-click it to hide it until it plays again, or to exclude it.") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Each app's volume, on top of the main volume.")
+                                .foregroundStyle(.secondary)
+                            Spacer(minLength: 12)
+                            ResetAppsButton(mixer: mixer)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.bottom, 4)
+                        MixerAppList(mixer: mixer, place: .page)
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 10)
                 }
 
                 Card(title: "Options") {

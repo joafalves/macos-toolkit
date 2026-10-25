@@ -414,43 +414,67 @@ final class MixerController: ObservableObject {
 
     /// The one in use: the shared one, or with one per output, the current
     /// output's own, or the shared one until it has one.
-    var equalizer: EqualizerConfig {
-        guard config.equalizerPerOutput else { return config.equalizer }
-        return currentOutput.flatMap { config.equalizers[$0.uid] } ?? config.equalizer
+    var equalizer: EqualizerConfig { equalizer(for: nil) }
+
+    /// With one per output, that output's (by UID), the settings page can
+    /// set any output's; nil, or with one for all, the one in use.
+    func equalizer(for output: String?) -> EqualizerConfig {
+        guard config.equalizerPerOutput, let uid = output ?? currentOutput?.uid else { return config.equalizer }
+        return config.equalizers[uid] ?? config.equalizer
     }
 
-    func setEqualizerEnabled(_ enabled: Bool) {
-        updateEqualizer { $0.enabled = enabled }
+    func setEqualizerEnabled(_ enabled: Bool, for output: String? = nil) {
+        updateEqualizer(for: output) { $0.enabled = enabled }
     }
 
-    func setBand(_ band: Int, gain: Double) {
-        let range = EqualizerConfig.range
-        updateEqualizer { equalizer in
-            equalizer.gains[band] = min(range, max(-range, (gain * 2).rounded() / 2))
+    /// The bands as a drag began, for the ones beside it to follow from.
+    private var bandDragStart: [Double]?
+
+    func beginBandDrag(for output: String? = nil) {
+        bandDragStart = equalizer(for: output).gains
+    }
+
+    /// `linked`: dragged with ⌥, the bands beside it follow (`EqualizerCurve.linked`).
+    func setBand(_ band: Int, gain: Double, linked: Bool = false, for output: String? = nil) {
+        let target = EqualizerCurve.clamped(gain, to: 0.5)
+        updateEqualizer(for: output) { equalizer in
+            if linked, let start = bandDragStart {
+                equalizer.gains = EqualizerCurve.linked(start, band: band, to: target)
+            } else {
+                equalizer.gains[band] = target
+            }
             equalizer.enabled = true
         }
     }
 
-    func setPreamp(_ gain: Double) {
+    /// One of Simple's handles, moving its region of the bands.
+    func setRegion(_ region: EqualizerRegion, to level: Double, for output: String? = nil) {
+        updateEqualizer(for: output) { equalizer in
+            equalizer.gains = region.setting(equalizer.gains, to: level)
+            equalizer.enabled = true
+        }
+    }
+
+    func setPreamp(_ gain: Double, for output: String? = nil) {
         let range = EqualizerConfig.range
-        updateEqualizer { equalizer in
+        updateEqualizer(for: output) { equalizer in
             equalizer.preamp = min(range, max(-range, (gain * 2).rounded() / 2))
             equalizer.enabled = true
         }
     }
 
-    func applyPreset(_ preset: EqualizerPreset) {
-        updateEqualizer { equalizer in
+    func applyPreset(_ preset: EqualizerPreset, for output: String? = nil) {
+        updateEqualizer(for: output) { equalizer in
             equalizer.gains = preset.gains
             equalizer.enabled = true
         }
     }
 
-    /// With one per output, a change is the current output's own from then on.
-    private func updateEqualizer(_ change: (inout EqualizerConfig) -> Void) {
-        var equalizer = self.equalizer
+    /// With one per output, a change is that output's own from then on.
+    private func updateEqualizer(for output: String?, _ change: (inout EqualizerConfig) -> Void) {
+        var equalizer = equalizer(for: output)
         change(&equalizer)
-        if config.equalizerPerOutput, let uid = currentOutput?.uid {
+        if config.equalizerPerOutput, let uid = output ?? currentOutput?.uid {
             config.equalizers[uid] = equalizer
         } else {
             config.equalizer = equalizer
@@ -1007,7 +1031,8 @@ extension MixerController {
     }
 
     /// Made-up rows for `--snapshot`, without touching Core Audio or the saved settings.
-    static func preview(software: Bool = false, equalizer: Bool = false, perOutput: Bool = false, menuBarIcon: MixerMenuBarIcon? = nil) -> MixerController {
+    static func preview(software: Bool = false, equalizer: Bool = false, perOutput: Bool = false, simple: Bool = false,
+                        menuBarIcon: MixerMenuBarIcon? = nil) -> MixerController {
         let mixer = MixerController()
         mixer.persists = false
         // Defaults, not this Mac's settings: its excluded apps and volumes
@@ -1032,6 +1057,7 @@ extension MixerController {
             mixer.config.equalizer.gains = EqualizerPreset.loudness.gains
         }
         mixer.config.equalizerPerOutput = perOutput
+        if simple { mixer.config.equalizerMode = .simple }
         mixer.outputs = [
             OutputDevice(id: 1, uid: "a", name: "MacBook Pro Speakers"),
             OutputDevice(id: 2, uid: "b", name: "AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth),

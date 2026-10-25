@@ -267,8 +267,9 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general] [light]
 .build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
 .build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
+.build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
-.build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer] [per-output]
+.build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer] [per-output] [simple]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
 .build/debug/Toolkit --snapshot out.png capture-text [light] [none|reading]   # the card after ⇧⌘2, with made-up text
 .build/debug/Toolkit --snapshot out.png volume-hud [light]      # the volume keys' bar: whole steps, part of one, muted

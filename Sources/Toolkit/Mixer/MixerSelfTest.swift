@@ -274,6 +274,29 @@ extension MixerController {
         // A click is hundreds of times a clean tone's step; switched at once, this one was 1,700.
         print("\(change < clean * 10 ? "ok  " : "DIFF") Flat to Bass Boost mid-tone: the largest step in the wave is \(String(format: "%.1f", change / clean))x a clean tone's")
 
+        // Simple's handles: each lands where it's set, from flat and on top of a
+        // preset, and moves only its own region much.
+        var landed = 0.0
+        let rock = EqualizerPreset.all.first { $0.key == "Rock" }?.gains ?? []
+        for start in [[Double](repeating: 0, count: 10), rock] {
+            for region in EqualizerRegion.allCases {
+                for target in [-6.0, 3.5, 9] {
+                    landed = max(landed, abs(region.level(region.setting(start, to: target)) - target))
+                }
+            }
+        }
+        print("\(landed < 0.1 ? "ok  " : "DIFF") Simple's handles land within \(String(format: "%.2f", landed)) dB of where they're set, from flat and from Rock")
+        let bass = EqualizerRegion.bass.setting([Double](repeating: 0, count: 10), to: 6)
+        print("     Bass to +6 from flat: \(bass.map { String(format: "%.1f", $0) }.joined(separator: " "))")
+        let peak: [Double] = [0, 12, 0, 0, 0, 0, 0, 0, 0, 0]
+        print("\(!EqualizerRegion.fit(peak) && EqualizerRegion.fit(bass) ? "ok  " : "DIFF") +12 at 64 Hz alone shows Bass at \(String(format: "%+.1f", EqualizerRegion.bass.level(peak))) dB, more detail than Simple shows; Bass to +6 is what it shows")
+        print("     presets Simple can show: \(EqualizerPreset.all.filter { EqualizerRegion.fit($0.gains) }.map(\.key).joined(separator: ", "))")
+        // ⌥-drag: the band where it's dragged, its neighbours on a bell, nothing past ±12.
+        let linked = EqualizerCurve.linked([Double](repeating: 0, count: 10), band: 4, to: 6)
+        let edge = EqualizerCurve.linked([Double](repeating: 10, count: 10), band: 4, to: 12)
+        let falls = linked[4] == 6 && linked[3] == linked[5] && linked[3] > linked[2] && linked[2] > linked[1] && edge.allSatisfy { $0 <= 12 }
+        print("\(falls ? "ok  " : "DIFF") ⌥-drag 500 Hz to +6: \(linked.map { String(format: "%.1f", $0) }.joined(separator: " "))")
+
         // Saved with five bands.
         print("saved with five bands, read now:")
         for old in [[5.0, 1, -1, 2, 5], [4, 3, 0, 1, -1], [3, 0, 0, 0, 0], [0, 0, 6, 0, 0], [-3, 2, 0, -2, 4]] {

@@ -43,6 +43,75 @@ struct EqualizerConfig: Codable, Equatable {
     }
 }
 
+/// How the equalizer is edited. The sound is the same ten band curve either
+/// way: Simple's three sliders are handles on regions of it, so a preset, or
+/// a switch between the two, sounds the same in both.
+enum EqualizerMode: String, Codable {
+    case simple, bands
+}
+
+/// Simple's handles, the classic tone controls. Each moves a region of the
+/// ten bands, its middle fully and its edges less, so it shapes the curve
+/// rather than steps it; neighbouring regions overlap a little, as tone
+/// controls do.
+enum EqualizerRegion: Int, CaseIterable, Identifiable {
+    case bass, mid, treble
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .bass: return String(localized: "Bass")
+        case .mid: return String(localized: "Mid")
+        case .treble: return String(localized: "Treble")
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .bass: return String(localized: "The lows, up to about 250 Hz. Double-click for 0 dB.")
+        case .mid: return String(localized: "The middle, from about 250 Hz to 4 kHz, where voices are. Double-click for 0 dB.")
+        case .treble: return String(localized: "The highs, from about 2 kHz up. Double-click for 0 dB.")
+        }
+    }
+
+    /// How much each band (32 Hz to 16 kHz) moves with the handle.
+    var weights: [Double] {
+        switch self {
+        case .bass: return [1, 1, 0.8, 0.4, 0.1, 0, 0, 0, 0, 0]
+        case .mid: return [0, 0, 0, 0.3, 0.8, 1, 0.8, 0.3, 0, 0]
+        case .treble: return [0, 0, 0, 0, 0, 0, 0.2, 0.7, 1, 1]
+        }
+    }
+
+    /// Where the handle sits: how much of its region's shape the curve has
+    /// (the least-squares amount). From flat, Bass at +6 is its full bands at
+    /// +6 and its edges less; on a curve with more in it, a summary.
+    func level(_ gains: [Double]) -> Double {
+        zip(gains, weights).reduce(0) { $0 + $1.0 * $1.1 } / weights.reduce(0) { $0 + $1 * $1 }
+    }
+
+    /// The bands with the handle at `target`: each moved by its weight, the
+    /// full ones by as much as the handle, so the handle lands on the target.
+    func setting(_ gains: [Double], to target: Double) -> [Double] {
+        let step = target - level(gains)
+        return zip(gains, weights).map { EqualizerCurve.clamped($0 + step * $1, to: 0.1) }
+    }
+
+    /// Whether three handles, moved from flat, can draw these bands: the
+    /// closest they come (least squares) is within 1 dB of every band. If
+    /// not, Simple shows a summary of the curve, and says so.
+    static func fit(_ gains: [Double]) -> Bool {
+        let regions = allCases.map(\.weights)
+        let normal = regions.map { a in regions.map { b in zip(a, b).reduce(0) { $0 + $1.0 * $1.1 } } }
+        let projected = regions.map { a in zip(a, gains).reduce(0) { $0 + $1.0 * $1.1 } }
+        guard let handles = EqualizerCurve.solve(normal, projected) else { return false }
+        return gains.indices.allSatisfy { band in
+            abs(gains[band] - zip(handles, regions).reduce(0) { $0 + $1.0 * $1.1[band] }) <= 1
+        }
+    }
+}
+
 struct EqualizerPreset: Identifiable {
     /// In the app's language, so it's only for showing.
     let name: String
@@ -152,6 +221,24 @@ enum EqualizerCurve {
         return gains
     }
 
+    /// A band dragged with ⌥: the bands beside it follow, less the further
+    /// they are, on a bell curve over the distance in bands (the next one 61%
+    /// as far, the one after 14%, the rest barely), each from where it was
+    /// when the drag began.
+    static func linked(_ start: [Double], band: Int, to target: Double) -> [Double] {
+        let delta = target - start[band]
+        return start.indices.map { index in
+            if index == band { return target }
+            let distance = Double(index - band)
+            return clamped(start[index] + delta * exp(-distance * distance / 2), to: 0.1)
+        }
+    }
+
+    /// Within ±12 dB, in steps of `step`.
+    static func clamped(_ gain: Double, to step: Double) -> Double {
+        min(EqualizerConfig.range, max(-EqualizerConfig.range, (gain / step).rounded() * step))
+    }
+
     /// The sound's change at `frequency`, in dB, with the filters at `gains`.
     static func response(_ gains: [Double], at frequency: Double, sampleRate: Double) -> Double {
         zip(EqualizerConfig.frequencies, gains).reduce(0) { sum, band in
@@ -173,7 +260,7 @@ enum EqualizerCurve {
     }
 
     /// Gaussian elimination with partial pivoting; nil when it can't be solved.
-    private static func solve(_ matrix: [[Double]], _ values: [Double]) -> [Double]? {
+    static func solve(_ matrix: [[Double]], _ values: [Double]) -> [Double]? {
         let n = values.count
         var rows = matrix.enumerated().map { $0.element + [values[$0.offset]] }
         for column in 0..<n {

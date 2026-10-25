@@ -3,6 +3,26 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.22.0 (unreleased)
+
+### Added
+
+- **Audio Mixer:** its page in the settings has the mixer itself: the main volume and the output,
+  the equalizer, and every app's volume, the same controls as the menu bar panel, which stays as the
+  quick way to them. Settings search finds them.
+- **Audio Mixer:** with **Equalizer for each output** on, the page sets any output's equalizer,
+  starting with the one in use; the panel's is always the one in use.
+- **Audio Mixer:** the equalizer has a **Simple** mode: Bass, Mid and Treble, each moving a region of
+  the same ten bands, so a preset sounds the same in both modes. Chosen on the mixer's page, for
+  every output; the panel follows.
+- **Audio Mixer:** dragging an equalizer band with ⌥ held moves the bands beside it too, less the
+  further they are.
+
+### Changed
+
+- **Audio Mixer:** the equalizer's sliders are macOS's own, as in the Music app's equalizer, with a
+  tick at 0 dB. In the panel a dB scale beside them takes the place of a value over every band.
+
 ## 0.21.2 (2026-10-25)
 
 ### Fixed
