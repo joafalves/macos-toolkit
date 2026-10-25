@@ -280,7 +280,8 @@ final class SwitcherController: ObservableObject {
         let backwards = backwards
         if config.style == .previews, SwitcherPreviews.permitted { previews.prepare() }
         let reveal = DispatchWorkItem { [weak self] in
-            guard let self, self.active else { return }
+            // With That display, a display may have no windows: nothing to show.
+            guard let self, self.active, !self.items.isEmpty else { return }
             // Once it shows, the settings may want the current window selected,
             // unless the selection has already been moved.
             if !self.config.startOnPrevious, !backwards, currentFirst, self.selection == initial { self.selection = 0 }
@@ -384,6 +385,8 @@ final class SwitcherController: ObservableObject {
         let keptIDs = Set(kept.map(\.id))
         items = kept + fresh.filter { !keptIDs.contains($0.id) }
         selection = min(selection, max(items.count - 1, 0))
+        // The last row closed with W or Q leaves an empty square otherwise.
+        if items.isEmpty { stopPreviews(); panel.hide() }
         panel.update(items, selection: selection)
     }
 

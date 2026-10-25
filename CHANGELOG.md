@@ -18,6 +18,8 @@ worked on; it gets its date when it's released.
 
 - **Settings:** a mouse's back and forward buttons, and a three-finger swipe, go back and forward
   in the settings window, as a two-finger swipe and ⌘[ ⌘] do.
+- **Window Switcher:** with That display, it no longer shows an empty box on a display with no
+  windows.
 
 ## 0.23.0 (2026-10-25)
 
