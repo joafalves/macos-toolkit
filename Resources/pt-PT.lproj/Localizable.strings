@@ -1736,7 +1736,7 @@
 
 "The sound of other apps." = "O som das outras aplicações.";
 
-"The stop button is always there: a click stops the recording, a right-click pauses it." = "O botão de parar está sempre lá: um clique para a gravação, um clique secundário põe-na em pausa.";
+"The stop button is always there: a click stops the recording, and a right-click opens a menu to pause or discard it." = "O botão de parar está sempre lá: um clique para a gravação, e um clique com o botão direito abre um menu para a pôr em pausa ou eliminar.";
 
 "The switcher is not active yet. It needs the Accessibility permission to see %@ and your windows." = "O Window Switcher ainda não está ativo. Precisa da permissão de Acessibilidade para ver %@ e as suas janelas.";
 

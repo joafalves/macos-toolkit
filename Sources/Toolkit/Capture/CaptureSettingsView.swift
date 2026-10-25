@@ -167,7 +167,7 @@ struct CaptureSettingsView: View {
                 }
 
                 Card(title: "Menu Bar While Recording",
-                     footnote: "The stop button is always there: a click stops the recording, a right-click pauses it.") {
+                     footnote: "The stop button is always there: a click stops the recording, and a right-click opens a menu to pause or discard it.") {
                     ToggleRow(title: "Duration", caption: "How long it's been recording.", isOn: $capture.config.recordingTime)
                     RowDivider()
                     ToggleRow(title: "File size", caption: "How big the recording is so far.", isOn: $capture.config.recordingSize)

@@ -126,7 +126,7 @@ extension SettingsIndex {
         SettingsEntry(.capture, "System audio", name: "Record system audio", caption: "The sound of other apps."),
         SettingsEntry(.capture, "Microphone", name: "Record the microphone"),
         SettingsEntry(.capture, "Input", name: "Microphone for recordings"),
-        SettingsEntry(.capture, "Menu Bar While Recording", caption: "The stop button is always there: a click stops the recording, a right-click pauses it."),
+        SettingsEntry(.capture, "Menu Bar While Recording", caption: "The stop button is always there: a click stops the recording, and a right-click opens a menu to pause or discard it."),
         SettingsEntry(.capture, "Duration", name: "Recording duration in the menu bar", caption: "How long it's been recording."),
         SettingsEntry(.capture, "File size", name: "Recording size in the menu bar", caption: "How big the recording is so far."),
         SettingsEntry(.capture, "Layout", name: "Layout of the recording in the menu bar", caption: "Two lines, the time above the size, take less room in the menu bar."),

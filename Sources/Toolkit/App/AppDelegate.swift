@@ -207,7 +207,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         segments += stats.segments()
         if let state = capture.recording {
             let config = capture.config
-            // Two lines only for both: the time alone stays on one.
+            // Two lines only with both settings on. Until the size comes in,
+            // the time keeps the top line, so it doesn't jump.
             segments.append(.recording(time: config.recordingTime ? MenuBarArt.duration(state.elapsed) : nil,
                                        size: config.recordingSize && state.bytes > 0 ? MenuBarArt.bytes(state.bytes) : nil,
                                        twoLines: config.recordingLayout == .twoLines && config.recordingTime && config.recordingSize,
