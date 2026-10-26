@@ -42,6 +42,7 @@ struct StatsPanelView: View {
                     }
                 }
                 .padding([.horizontal, .top], 14)
+                .background(OverlayScroller())
             }
             .scrollBounceBehavior(.basedOnSize)
             Divider().padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
@@ -474,6 +475,37 @@ private struct TopList: View {
                 }
                 .font(.callout)
             }
+        }
+    }
+}
+
+/// The thin scroller that shows while scrolling, whatever "Show scroll bars"
+/// says: the other, with a mouse connected or set to Always, is a thick bar
+/// that takes its width from a panel 320 pt wide. Set again after each change
+/// of the preference, which puts every scroll view back to the system's.
+private struct OverlayScroller: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { View() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class View: NSView {
+        private var observer: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+            observer = observer ?? NotificationCenter.default.addObserver(forName: NSScroller.preferredScrollerStyleDidChangeNotification,
+                                                                           object: nil, queue: .main) { [weak self] _ in
+                // Once the scroll view has taken the system's style.
+                DispatchQueue.main.async { self?.apply() }
+            }
+        }
+
+        private func apply() {
+            enclosingScrollView?.scrollerStyle = .overlay
+        }
+
+        deinit {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
         }
     }
 }

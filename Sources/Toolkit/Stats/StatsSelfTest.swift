@@ -207,6 +207,14 @@ extension StatsController {
                     scroll.contentView.scroll(to: NSPoint(x: 0, y: 200))
                     scroll.reflectScrolledClipView(scroll.contentView)
                     RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+                    // The thin scroller, and still after the preference changes
+                    // (a mouse connected), which resets every scroll view's.
+                    let before = scroll.scrollerStyle
+                    NotificationCenter.default.post(name: NSScroller.preferredScrollerStyleDidChangeNotification, object: nil)
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+                    let thin = before == .overlay && scroll.scrollerStyle == .overlay
+                    print((thin ? "ok    " : "FAIL  ") + "the panel's scroller is the thin one, and stays so as the preference changes")
+                    if !thin { failures += 1 }
                 }
                 popover.close()
                 RunLoop.main.run(until: Date().addingTimeInterval(1))
