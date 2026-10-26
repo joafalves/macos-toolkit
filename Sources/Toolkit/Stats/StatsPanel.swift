@@ -182,8 +182,12 @@ struct StatsPanelView: View {
     @ViewBuilder
     private var powerDetails: some View {
         if let power = stats.power {
-            if let cpu = power.cpu { Row("CPU", StatsController.watts(cpu)) }
-            if let gpu = power.gpu { Row("GPU", StatsController.watts(gpu)) }
+            // IOReport's watts arrive a moment after the panel opens: with it
+            // subscribed the rows are there from the start, so the panel
+            // doesn't grow when the figures come in.
+            let watching = stats.energy != nil
+            if watching || power.cpu != nil { Row("CPU", power.cpu.map(StatsController.watts) ?? "–") }
+            if watching || power.gpu != nil { Row("GPU", power.gpu.map(StatsController.watts) ?? "–") }
             if let charger = power.charger { Row("Charger", power.charging ? String(localized: "\(charger) W, charging") : "\(charger) W") }
             if let battery = power.battery { Row("Battery", "\(battery)%") }
             if let health = power.health { Row("Battery health", "\(health)%") }

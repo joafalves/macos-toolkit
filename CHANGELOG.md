@@ -16,8 +16,9 @@ worked on; it gets its date when it's released.
 ### Changed
 
 - **System Stats:** what the CPU and GPU draw is read only while the power panel is open, not all
-  the time, which was most of what System Stats cost on a MacBook; those lines show a moment after
-  the panel opens. Desktops, which have no battery to report the whole draw, read it as before.
+  the time, which was most of what System Stats cost on a MacBook; those lines read “–” until the
+  figures arrive, a moment after the panel opens, so it keeps its height. Desktops, which have no
+  battery to report the whole draw, read it as before.
 - **System Stats:** a panel too tall for the display scrolls with the thin scroll bar that shows
   while scrolling, also with a mouse connected, rather than a thick one that took width from it.
 
