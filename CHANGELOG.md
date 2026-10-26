@@ -11,7 +11,8 @@ worked on; it gets its date when it's released.
   the size, both or neither, and both on one line or on two of small text, which take less room
   beside the notch.
 - **System Stats:** a stat can be in the panel only, rather than in the menu bar too: it shows
-  under the stat you click, and with every stat in the panel only, an icon in the menu bar opens it.
+  under the stat you click, read only while the panel is open (its chart starts then), and with
+  every stat in the panel only, an icon in the menu bar opens it.
 
 ### Changed
 

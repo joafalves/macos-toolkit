@@ -149,7 +149,7 @@ extension SettingsIndex {
         SettingsEntry(.stats, "Color memory when it runs short", caption: "Yellow, then red, as macOS reports memory running short. Off, it keeps the menu bar's color."),
         SettingsEntry(.stats, "Panels", name: "Stat panels"),
         SettingsEntry(.stats, "Top apps' CPU of the whole CPU"),
-        SettingsEntry(.stats, "Stats", name: "Which stats are shown", caption: "The panel shows the stat you click, then those only in the panel. Only the stats in the menu bar or the panel are read, and nothing at all while none are."),
+        SettingsEntry(.stats, "Stats", name: "Which stats are shown", caption: "The panel shows the stat you click, then those only in the panel. Those are read only while the panel is open, so their charts start when it opens."),
         SettingsEntry(.tweaks, "Background Tasks", name: "macOS background tasks", caption: "Turned off for you only, and on again with the switch. A macOS update can turn one back on; it then shows as on here."),
         SettingsEntry(.tweaks, "Photos analysis", caption: "Finds objects, scenes and text in your photos. Off, Photos can't search by what's in a photo, and Live Text and Visual Look Up stop working in it."),
         SettingsEntry(.tweaks, "People and memories", caption: "Recognizes people and pets, and makes Memories. Off, Photos has no People & Pets, Memories or featured photos."),

@@ -699,8 +699,9 @@ What the Mac is doing, in the menu bar: **CPU**, **memory**, **network**, **disk
 number with its icon, a pill that fills (up to 100), a small pill without the number, or a chart
 of the last minute, or they all go in one **compact** part as small labels. Pills are the same
 width as every other pill in the menu bar, Keep Awake's and the mixer's too, so they line up. Click one for its last five minutes and the details. A stat can
-also be in the panel only, to keep the menu bar short: it shows under the one you click, and with
-every stat there, an icon in the menu bar opens the panel.
+also be in the panel only, to keep the menu bar short: it shows under the one you click, with its
+chart starting when the panel opens, and with every stat there, an icon in the menu bar opens the
+panel.
 
 - **Memory** shows what apps need: their memory, the kernel's, and what's compressed. Most monitors
   count everything that isn't free, but macOS fills spare memory with cached files it drops as soon
@@ -719,9 +720,10 @@ every stat there, an icon in the menu bar opens the panel.
   the CPU and GPU draw.
 - Figures stop at 99%, so each part keeps the same width and the menu bar doesn't shift; a pill
   shows 100.
-- Every 2 seconds by default (1 or 5 in the settings). Only the stats in the menu bar or the panel
-  are read, and nothing at all while none are, or the tool is off. What the CPU and GPU draw is
-  read only while the power panel is open (on a desktop, whenever power is read). A reading of all six costs under 2 ms.
+- Every 2 seconds by default (1 or 5 in the settings). Only the stats in the menu bar, and those a
+  panel shows while it's open, are read; nothing at all while none are, or the tool is off. What
+  the CPU and GPU draw is read only while the power panel is open (on a desktop, whenever power is
+  read). A reading of all six costs under 2 ms.
 
 ## Tweaks
 

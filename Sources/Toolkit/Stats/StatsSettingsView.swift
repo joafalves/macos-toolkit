@@ -38,7 +38,7 @@ struct StatsSettingsView: View {
                               isOn: $stats.config.topAppsOfWholeCPU)
                 }
 
-                Card(title: "Stats", footnote: "The panel shows the stat you click, then those only in the panel. Only the stats in the menu bar or the panel are read, and nothing at all while none are.") {
+                Card(title: "Stats", footnote: "The panel shows the stat you click, then those only in the panel. Those are read only while the panel is open, so their charts start when it opens.") {
                     ForEach(Array(StatKind.allCases.enumerated()), id: \.element) { index, kind in
                         if index > 0 { RowDivider() }
                         StatRow(kind: kind, stats: stats)

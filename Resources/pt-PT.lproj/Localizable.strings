@@ -1730,7 +1730,7 @@
 
 "The output whose equalizer this is. Each keeps its own; the one in use is what you hear." = "A saída a que pertence este equalizador. Cada uma guarda o seu; o da saída em uso é o que ouve.";
 
-"The panel shows the stat you click, then those only in the panel. Only the stats in the menu bar or the panel are read, and nothing at all while none are." = "O painel mostra a estatística em que clica e depois as que estão só no painel. Só se leem as estatísticas que estão na barra de menus ou no painel, e nada quando não há nenhuma.";
+"The panel shows the stat you click, then those only in the panel. Those are read only while the panel is open, so their charts start when it opens." = "O painel mostra a estatística em que clica e depois as que estão só no painel. Essas só se leem enquanto o painel está aberto, por isso os gráficos começam quando abre.";
 
 "The pointer drifts to a spot nearby. Any key or mouse move takes it back." = "O ponteiro desliza para um ponto próximo. Qualquer tecla ou movimento do rato o traz de volta.";
 

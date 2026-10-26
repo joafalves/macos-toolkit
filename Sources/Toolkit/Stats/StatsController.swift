@@ -1,11 +1,11 @@
 import AppKit
 import Combine
 
-/// System Stats: reads what's shown in the menu bar, the stats only in the
-/// panel (for their history), and everything a panel shows while it's open,
-/// on one timer. Nothing else: with the tool off, or no stat in either place
-/// and no panel open, there's no timer, no reader, no history and no IOReport
-/// subscription.
+/// System Stats: reads what's shown in the menu bar and everything a panel
+/// shows while it's open (the stats only in the panel included, so their
+/// charts start empty when it opens), on one timer. Nothing else: with the
+/// tool off, or no stat in the menu bar and no panel open, there's no timer,
+/// no reader, no history and no IOReport subscription.
 final class StatsController: ObservableObject {
     @Published var config: StatsConfig {
         didSet {
@@ -122,8 +122,8 @@ final class StatsController: ObservableObject {
     /// What's being read now.
     var reading: Set<StatKind> {
         guard config.enabled else { return [] }
-        // Panel-only stats too, so their charts have their five minutes when it opens.
-        return Set(config.shown).union(config.panelOnly).union(panel)
+        // A stat only in the panel is read while a panel is open, which has it in `panel`.
+        return Set(config.shown).union(panel)
     }
 
     /// Readers for what's read, none for the rest; a timer only if anything

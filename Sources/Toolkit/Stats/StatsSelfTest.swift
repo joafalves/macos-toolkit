@@ -118,17 +118,23 @@ extension StatsController {
         let old = try? JSONDecoder().decode(StatsConfig.self, from: Data(#"{"stats": {"gpu": {"shown": true, "look": "chart"}}}"#.utf8))
         check(old?.setting(.gpu) == StatSetting(shown: true, look: .chart) && old?.panelOnly == [], "a file from before panel-only stats keeps its stats")
 
-        // Only in the panel: read all the while, for the panel's history; with
+        // Only in the panel: read only while a panel that shows it is open; with
         // nothing in the menu bar, an icon there opens it.
         var panelOnly = stats.config
         for kind in StatKind.allCases { panelOnly.set(kind) { $0.place = kind == .gpu ? .panel : .off } }
+        stats.panel = []
         stats.config = panelOnly
-        check(stats.timer != nil && stats.reading == [.cpu, .memory, .power, .gpu], "panel-only gpu is read with no part of its own (cpu, memory and power for the open panel)")
+        check(stats.timer == nil && stats.reading.isEmpty, "panel-only gpu with no panel open: nothing read, no timer")
+        stats.panel = [.cpu, .memory, .power, .gpu]
+        check(stats.timer != nil && stats.reading == [.cpu, .memory, .power, .gpu] && stats.gpu != nil, "panel-only gpu is read, at once, while a panel shows it (and cpu, memory and power for that panel)")
+        stats.panel = []
+        check(stats.timer == nil && stats.gpu == nil && !stats.history.keys.contains(.gpu), "the panel closed: no timer, and the gpu's history let go")
         let icon = stats.segments()
         check(icon.count == 1 && icon[0].kind == .stats && icon[0].text == nil, "nothing in the menu bar: one icon for the panel")
         stats.config.set(.disk) { $0.place = .menuBar }
         check(stats.segments().map(\.kind) == [.stat(.disk)], "a stat in the menu bar takes the icon's place")
         for kind in StatKind.allCases { stats.config.set(kind) { $0.place = .menuBar } }
+        stats.panel = [.cpu, .memory, .power]
 
         // What a reading of everything costs, top apps included and not.
         stats.stop()

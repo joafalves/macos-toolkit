@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         menuBar = MenuBarItem()
         menuBar.onClick = { [weak self] kind, rect, right in self?.menuBarClicked(kind, at: rect, right: right) }
         panel = MenuBarPopover(menuBar: menuBar)
-        // Back to reading only what the menu bar and panel-only stats need.
+        // Back to reading only what the menu bar needs.
         panel.onClose = { [weak self] in self?.stats.panel = [] }
         // Published values arrive before they're stored, so the item is drawn
         // again on the next pass, from the stored ones.
