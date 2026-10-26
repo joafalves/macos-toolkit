@@ -143,7 +143,7 @@ extension SettingsIndex {
         SettingsEntry(.awake, "Stay available", caption: "Your status stays available while the Mac is awake."),
         SettingsEntry(.awake, "Method", name: "How Stay available keeps you available"),
         SettingsEntry(.awake, "Every", name: "How often Stay available acts", caption: "Only after this long without a key or mouse move."),
-        SettingsEntry(.stats, "Menu Bar", name: "Stats in the menu bar", caption: "Click a stat in the menu bar for its last five minutes and details."),
+        SettingsEntry(.stats, "Menu Bar", name: "Stats in the menu bar", caption: "Click a stat in the menu bar, or the System Stats icon, for its last five minutes and details."),
         SettingsEntry(.stats, "Layout", name: "Layout of the stats"),
         SettingsEntry(.stats, "Update every", caption: "Reading is cheap; this is how lively the numbers are."),
         SettingsEntry(.stats, "Color memory when it runs short", caption: "Yellow, then red, as macOS reports memory running short. Off, it keeps the menu bar's color."),

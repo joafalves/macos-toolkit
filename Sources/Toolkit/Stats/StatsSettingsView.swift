@@ -6,11 +6,11 @@ struct StatsSettingsView: View {
 
     var body: some View {
         Page {
-            ToolHeader(section: .stats, subtitle: "CPU, memory, network, disk, GPU and power, in the menu bar.",
+            ToolHeader(section: .stats, subtitle: "CPU, memory, network, disk, GPU and power, in the menu bar or a panel.",
                        enabled: $stats.config.enabled)
 
             WhenEnabled(enabled: stats.config.enabled) {
-                Card(title: "Menu Bar", footnote: "Click a stat in the menu bar for its last five minutes and details.") {
+                Card(title: "Menu Bar", footnote: "Click a stat in the menu bar, or the System Stats icon, for its last five minutes and details.") {
                     OptionRow(title: "Layout",
                               caption: stats.config.layout == .separate
                                   ? "Each stat on its own, in the look you pick below."
