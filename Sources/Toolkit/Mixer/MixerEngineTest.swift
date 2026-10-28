@@ -181,6 +181,39 @@ enum MixerEngineTest {
         attempt("the microphone alone while the mixer's taps wait", mixer: true)
         attempt("the microphone after a moment of sound, with the app's own tap waiting", mixer: true, playFirst: true)
         attempt("the microphone alone, no mixer, again", mixer: false)
+
+        // What this process spends with a tap running for an app's microphone, in silence, against waiting.
+        say("\n== a tap running in silence ==")
+        func cpu() -> Double {
+            var usage = rusage()
+            getrusage(RUSAGE_SELF, &usage)
+            return Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1e6
+        }
+        func perSecond(_ seconds: Double) -> Double {
+            let start = cpu()
+            wait(seconds)
+            return (cpu() - start) / seconds * 1000
+        }
+        let mixer = MixerController.testInstance(apps: [helperID])
+        mixer.start()
+        wait(1)
+        let report = FileManager.default.temporaryDirectory.appendingPathComponent("toolkit-mic-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: report) }
+        let process = Process()
+        process.executableURL = helper
+        process.arguments = ["--open-mic", report.path, "9"]
+        try? process.run()
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline, !((try? String(contentsOf: report, encoding: .utf8)) ?? "").contains("started") { wait(0.1) }
+        wait(1.5)
+        let running = perSecond(5)
+        say("  while the helper records: \(mixer.engineState)")
+        process.waitUntilExit()
+        wait(4)
+        let waiting = perSecond(5)
+        say("  after: \(mixer.engineState)")
+        say(String(format: "  CPU: %.2f ms a second with the tap running, %.2f ms waiting", running, waiting))
+        mixer.stop()
     }
 
     private final class Count: Sendable { let value = Atomic<Int>(0) }

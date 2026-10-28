@@ -3,6 +3,16 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.24.3 (unreleased)
+
+### Fixed
+
+- **Audio Mixer:** a call app's preview, such as Slack's before a huddle, no longer freezes the first
+  time after the mixer is turned on, which 0.24.1 and 0.24.2 didn't fix. On macOS 26 an app can't
+  start its microphone while the tap that takes its sound waits for sound, whatever the devices.
+  The mixer now checks once a second which apps use the microphone and runs their taps, so a start
+  held up goes on within a second.
+
 ## 0.24.2 (2026-10-28)
 
 ### Fixed

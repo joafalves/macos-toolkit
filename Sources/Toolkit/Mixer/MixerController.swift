@@ -116,17 +116,16 @@ final class MixerController: ObservableObject {
     /// When each listened process was last heard, or first listened to.
     private var heardAt: [AudioObjectID: Date] = [:]
     private var passPending = false
-    /// App processes with their input running, while the output has a
-    /// microphone of its own (AirPods, a headset). Taps only take the output,
-    /// so an input on another device has nothing to do with them, but one on
-    /// the output is held up while the tap that takes its process waits for
-    /// sound. That tap runs instead (`AppTap.autoStart`) and goes back to
-    /// waiting once the input has stopped and nothing it takes plays.
+    /// App processes with their input running. On macOS 26 a process a
+    /// waiting tap takes can't start an input, on any device, until a tap that
+    /// takes it runs: a call app's preview froze. That tap runs instead
+    /// (`AppTap.autoStart`); replacing the waiting one lets a start already
+    /// held up go on. It goes back to waiting once the input has stopped and
+    /// nothing it takes plays. The input of a process that already exists
+    /// starts unannounced, and a held-up one runs nothing, so the flag is read
+    /// every second (`checkRecording`), which is as long as a start can hang.
     private var recording: Set<AudioObjectID> = []
-    /// The output has input streams: only then can a tap hold up an input.
-    private var outputHasInput = false
-    /// Level ticks since the input was last read: a stuck input announces
-    /// nothing, so it's read every second while it matters.
+    /// Level ticks since the input flags were last read.
     private var ticksSinceRecordingCheck = 0
     /// The first pass after the mixer starts or the output changes, which
     /// reroutes everything anyway: every app goes to its own tap at once.
@@ -211,7 +210,6 @@ final class MixerController: ObservableObject {
         heardAt = [:]
         activity = [:]
         recording = []
-        outputHasInput = false
         softwareActive = false
         volumeKeys.setWanted(false)
         systemListeners.removeAll()
@@ -556,9 +554,7 @@ final class MixerController: ObservableObject {
                 settleTries = 0
             }
             output = current
-            outputHasInput = !current.readArray(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput, as: AudioStreamID.self).isEmpty
-            if !outputHasInput { recording = [] }
-            Log.mixer.notice("output \(current.readString(kAudioDevicePropertyDeviceUID) ?? "none", privacy: .public)\(self.outputHasInput ? ", with a microphone of its own" : "", privacy: .public)")
+            Log.mixer.notice("output \(current.readString(kAudioDevicePropertyDeviceUID) ?? "none", privacy: .public)")
             let scope = kAudioObjectPropertyScopeOutput
             deviceListeners = [
                 AudioListener(current, kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope) { [weak self] in self?.refreshMainVolume() },
@@ -634,12 +630,12 @@ final class MixerController: ObservableObject {
         appsRead = true
         if let onlyApps { groups = groups.filter { onlyApps.contains($0.value.app.bundleIdentifier ?? "") } }
         runningBundles = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-        let recordingNow = outputHasInput ? Set(groups.values.flatMap(\.recording)) : []
+        let recordingNow = Set(groups.values.flatMap(\.recording))
         if recordingNow != recording {
             recording = recordingNow
             let who = groups.values.filter { !$0.recording.isEmpty }
                 .map { "\($0.app.bundleIdentifier ?? "?") \($0.recording.sorted())" }.sorted().joined(separator: ", ")
-            Log.mixer.notice("recording on the output: \(who.isEmpty ? "none" : who, privacy: .public)")
+            Log.mixer.notice("recording: \(who.isEmpty ? "none" : who, privacy: .public)")
         }
 
         // Starting and stopping playback doesn't change the process list, so
@@ -688,7 +684,7 @@ final class MixerController: ObservableObject {
         for (object, listener) in listeners where listener.takePeak() > Self.silence { heardAt[object] = now }
         if currentlyAudible() != audible { updateList() }
         ticksSinceRecordingCheck += 1
-        if outputHasInput, ticksSinceRecordingCheck >= 4 {
+        if ticksSinceRecordingCheck >= 4 {
             ticksSinceRecordingCheck = 0
             checkRecording()
         }
@@ -758,8 +754,7 @@ final class MixerController: ObservableObject {
         activity = activity.filter { key, _ in key == Self.masterKey ? masterTap != nil : taps[key] != nil }
     }
 
-    /// A few reads a second, each about 60 µs, while the output has a
-    /// microphone: macOS announces nothing while an input's start is held up.
+    /// One read per app process, about 60 µs each, once a second.
     private func checkRecording() {
         let now = groups.values.contains { $0.objects.contains { ($0.read(kAudioProcessPropertyIsRunningInput, as: UInt32.self) ?? 0) != 0 } }
         if now != !recording.isEmpty { scheduleRefresh() }

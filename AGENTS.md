@@ -366,7 +366,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-publishing       # each control on the made-up mouse's page, changed in code in a window never shown: no SwiftUI publishing-in-update issue, and the setting changes
 .build/debug/Toolkit --test-audio-access <report>   # the microphone and an audio tap work as signed (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-mixer-engine <report>   # the mixer on a quiet tone from a helper app: clicks when it pauses, has its volume changed or the equalizer switched, and sleep once it stops (build.sh --dev; open -n the bundle; nothing else using the mixer, so quit the installed app)
-.build/debug/Toolkit --test-mixer-mic <report>   # a helper opens the microphone alone, as a call app's preview does, with the mixer's taps waiting and running: whether its input starts (build.sh --dev; open -n the bundle; quit the installed app)
+.build/debug/Toolkit --test-mixer-mic <report>   # a helper opens the microphone alone, as a call app's preview does, with the mixer's taps waiting: whether its input starts, which taps run, and what a tap running in silence costs (build.sh --dev; open -n the bundle; quit the installed app)
 .build/debug/Toolkit --test-volume           # the volume keys' steps, and saved software volumes on the even scale
 build/MacOS\ Toolkit.app/Contents/MacOS/Toolkit --measure-headroom <folder>   # each curve on the music in a folder: how far it lifts peaks, and the limiter's work (build.sh --dev, release speed)
 .build/debug/Toolkit --test-equalizer        # each preset's curve against its sliders, tones through the filters, the limiter at full scale, a preset change mid-tone, five-band equalizers read into ten

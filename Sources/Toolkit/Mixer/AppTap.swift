@@ -12,12 +12,9 @@ import Synchronization
 /// tap of its own, which gives outputs with no volume control of their own a
 /// software volume and runs the equalizer on everything.
 ///
-/// Only what goes to the output `deviceUID` is taken. A process's other
-/// devices stay out, its microphone among them: on macOS 26 a tap on every
-/// device held up any input its processes started while it waited for sound,
-/// and a call app's preview, which only opens the microphone, froze. Sound an
-/// app sends to another output goes there untouched, where a tap on every
-/// device brought it to this one.
+/// Only what goes to the output `deviceUID` is taken: sound an app sends to
+/// another output goes there untouched, where a tap on every device brought
+/// it to this one.
 ///
 /// Its device only runs while something it takes has its output running, so
 /// a tap made ahead costs nothing until then. Once running it never stops by
@@ -27,9 +24,9 @@ import Synchronization
 /// Without `controlsVolume` the tap only listens: the app plays as usual and
 /// the tap measures how loud it is.
 ///
-/// Without `autoStart` the device runs from the start instead of waiting: for
-/// an output with a microphone of its own (AirPods, a headset), whose input a
-/// waiting tap would still hold up.
+/// Without `autoStart` the device runs from the start instead of waiting: on
+/// macOS 26 a waiting tap holds up any input the processes it takes start,
+/// so the mixer runs the tap of an app using its microphone.
 final class AppTap {
     /// Our aggregate devices carry this in their UID, so leftovers from a
     /// crash can be found and removed.
