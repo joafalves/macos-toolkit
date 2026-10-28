@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import os
 
 /// Small additions to Finder. Cut is done by watching the keyboard while Finder
 /// is in front: Finder has no Cut, so ⌘X is ⌘C now and "Move Item Here" (⌥⌘V)
@@ -137,7 +138,7 @@ final class FinderController: ObservableObject {
         var installed = true
         if wantsKeys, tap == nil { installed = installTap() && installed }
         if wantsSwipes, swipeTap == nil { installed = installSwipeTap() && installed }
-        NSLog("Toolkit: finder event taps started = \(installed)")
+        Log.finder.notice("event taps started: \(installed)")
         if tapFailed == installed { tapFailed = !installed }
     }
 
@@ -310,7 +311,7 @@ final class FinderController: ObservableObject {
             number += 1
         }
         guard files.createFile(atPath: url.path, contents: Data()) else {
-            NSLog("Toolkit: could not create \(url.path)")
+            Log.finder.error("could not create \(url.path)")
             return NSSound.beep()
         }
         NSWorkspace.shared.activateFileViewerSelecting([url])

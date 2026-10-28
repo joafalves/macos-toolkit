@@ -3,6 +3,20 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.24.2 (unreleased)
+
+### Fixed
+
+- **Audio Mixer:** a call app's preview, such as Slack's before a huddle, no longer freezes the first
+  time after the mixer is turned on, which 0.24.1 didn't fix. The mixer's taps now take only the
+  sound going to the current output, so an app's microphone has nothing to do with them. With an
+  output that has a microphone of its own (AirPods, a headset), the tap of an app using it runs.
+- **Audio Mixer:** an app that sends its sound to another output than the current one (an audio
+  interface, AirPlay, the Mac's speakers) is heard there again, at that output's volume, instead of
+  being brought to the current output.
+- **Logs:** the toolkit's lines in the system log can be read: they showed as `<private>`. Each
+  tool logs under its own category, and the mixer now logs what each tap takes and when it runs.
+
 ## 0.24.1 (2026-10-28)
 
 ### Fixed

@@ -1,5 +1,6 @@
 import CoreAudio
 import Foundation
+import os
 import Synchronization
 
 /// Plays one app's sound at its own volume. macOS has no setting for that, so
@@ -11,6 +12,13 @@ import Synchronization
 /// tap of its own, which gives outputs with no volume control of their own a
 /// software volume and runs the equalizer on everything.
 ///
+/// Only what goes to the output `deviceUID` is taken. A process's other
+/// devices stay out, its microphone among them: on macOS 26 a tap on every
+/// device held up any input its processes started while it waited for sound,
+/// and a call app's preview, which only opens the microphone, froze. Sound an
+/// app sends to another output goes there untouched, where a tap on every
+/// device brought it to this one.
+///
 /// Its device only runs while something it takes has its output running, so
 /// a tap made ahead costs nothing until then. Once running it never stops by
 /// itself, which keeps the output and the Mac awake: `rearm` puts it back to
@@ -19,10 +27,9 @@ import Synchronization
 /// Without `controlsVolume` the tap only listens: the app plays as usual and
 /// the tap measures how loud it is.
 ///
-/// Without `autoStart` the device runs from the start instead of waiting.
-/// A process a waiting tap takes can't start its input until a tap runs, and
-/// the tap waits for it to play: on macOS 26 a call app's preview, which only
-/// opens the microphone, froze until the mixer was turned off.
+/// Without `autoStart` the device runs from the start instead of waiting: for
+/// an output with a microphone of its own (AirPods, a headset), whose input a
+/// waiting tap would still hold up.
 final class AppTap {
     /// Our aggregate devices carry this in their UID, so leftovers from a
     /// crash can be found and removed.
@@ -90,8 +97,11 @@ final class AppTap {
 
     private func start() -> Bool {
         let description = isGlobal
-            ? CATapDescription(stereoGlobalTapButExcludeProcesses: objects)
-            : CATapDescription(stereoMixdownOfProcesses: objects)
+            ? CATapDescription(excludingProcesses: objects, deviceUID: deviceUID, stream: 0)
+            : CATapDescription(processes: objects, deviceUID: deviceUID, stream: 0)
+        // A stereo mix, whatever the output's channels, as the render block expects.
+        description.isMixdown = true
+        description.isMono = false
         description.name = Self.tapName
         if !bundleIDs.isEmpty, #available(macOS 26.0, *) {
             description.bundleIDs = bundleIDs
@@ -102,7 +112,6 @@ final class AppTap {
         description.muteBehavior = controlsVolume ? .mutedWhenTapped : .unmuted
         var status = AudioHardwareCreateProcessTap(description, &tapID)
         guard status == noErr else { return log("create tap", status) }
-        if isGlobal { logExclusions() }
 
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: Self.tapName,
@@ -131,7 +140,7 @@ final class AppTap {
         for attempt in 0..<10 {
             status = AudioDeviceStart(aggregateID, procID)
             if status == noErr {
-                if controlsVolume { logDelay() }
+                logStart(format)
                 return true
             }
             if attempt < 9 { usleep(20_000) }
@@ -140,6 +149,7 @@ final class AppTap {
     }
 
     private func stop() {
+        if tapID != .unknown { Log.mixer.notice("\(self.label, privacy: .public) tap stopped") }
         if let procID {
             AudioDeviceStop(aggregateID, procID)
             AudioDeviceDestroyIOProcID(aggregateID, procID)
@@ -174,6 +184,7 @@ final class AppTap {
         guard status == noErr else { return log("change tap", status) }
         self.objects = objects
         self.bundleIDs = bundleIDs
+        Log.mixer.notice("\(self.label, privacy: .public) tap now takes processes \(objects, privacy: .public) bundles \(bundleIDs, privacy: .public)")
         return true
     }
 
@@ -184,32 +195,38 @@ final class AppTap {
         guard let procID else { return }
         AudioDeviceStop(aggregateID, procID)
         AudioDeviceStart(aggregateID, procID)
+        Log.mixer.info("\(self.label, privacy: .public) tap waits for sound again")
     }
 
-    /// What the detour adds on top of the app's normal path: one buffer, plus
-    /// the time the tap's input is held back for safety.
-    private func logDelay() {
+    /// Which tap this is, for the log.
+    private var label: String {
+        isGlobal ? "master" : controlsVolume ? (bundleIDs.first ?? "app \(objects)") : "listener \(objects)"
+    }
+
+    /// What it takes and how, and what the detour adds on top of the app's
+    /// normal path: one buffer, plus the time the tap's input is held back.
+    private func logStart(_ format: AudioStreamBasicDescription) {
         let rate = aggregateID.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 0
         let buffer = aggregateID.read(kAudioDevicePropertyBufferFrameSize, as: UInt32.self) ?? 0
         let input = kAudioObjectPropertyScopeInput
         let held = (aggregateID.read(kAudioDevicePropertySafetyOffset, scope: input, as: UInt32.self) ?? 0)
             + (aggregateID.read(kAudioDevicePropertyLatency, scope: input, as: UInt32.self) ?? 0)
-        guard rate > 0 else { return }
-        let ms = { (frames: UInt32) in String(format: "%.1f", Double(frames) / rate * 1000) }
-        NSLog("Toolkit: mixer tap started on \(deviceUID): buffer \(buffer) frames (\(ms(buffer)) ms), input held \(ms(held)) ms at \(Int(rate)) Hz")
-    }
-
-    /// What the global tap really leaves out, as macOS has it.
-    private func logExclusions() {
-        guard let description = tapID.read(kAudioTapPropertyDescription, as: Unmanaged<CATapDescription>?.self) ?? nil else { return }
-        let tap = description.takeUnretainedValue()
-        var bundles = ""
-        if #available(macOS 26.0, *) { bundles = "\(tap.bundleIDs)" }
-        NSLog("Toolkit: mixer global tap excludes processes \(tap.processes) bundles \(bundles), exclusive \(tap.isExclusive)")
+        let ms = { (frames: UInt32) in rate > 0 ? String(format: "%.1f", Double(frames) / rate * 1000) : "?" }
+        var taken = "processes \(objects)"
+        if #available(macOS 26.0, *), let description = tapID.read(kAudioTapPropertyDescription, as: Unmanaged<CATapDescription>?.self) ?? nil {
+            // As macOS has it. Unretained, as in `removeLeftovers`.
+            let tap = description.takeUnretainedValue()
+            taken = "\(isGlobal ? "all but " : "")processes \(tap.processes) bundles \(tap.bundleIDs)"
+        }
+        Log.mixer.notice("""
+            \(self.label, privacy: .public) tap started on \(self.deviceUID, privacy: .public), \(self.autoStart ? "waiting for sound" : "running", privacy: .public): \
+            \(taken, privacy: .public), \(format.mChannelsPerFrame) channels at \(Int(rate)) Hz, \
+            buffer \(buffer) frames (\(ms(buffer), privacy: .public) ms), input held \(ms(held), privacy: .public) ms
+            """)
     }
 
     private func log(_ step: String, _ status: OSStatus) -> Bool {
-        NSLog("Toolkit: mixer could not \(step) (\(status))")
+        Log.mixer.error("\(self.label, privacy: .public) tap: could not \(step, privacy: .public) (\(status))")
         return false
     }
 

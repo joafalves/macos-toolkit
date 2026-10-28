@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Keep Awake had a "lid closed" option before 0.19.3. It ran `pmset -a
 /// disablesleep` as root through a rule in `/etc/sudoers.d`, and sudo can't
@@ -22,14 +23,14 @@ enum LidSleep {
         DispatchQueue.global(qos: .utility).async {
             guard rule else {
                 // Taken out by hand while sleep was off: only an admin can turn it back on.
-                NSLog("Toolkit: sleep may still be off with the lid closed; `sudo pmset -a disablesleep 0` turns it back on")
+                Log.awake.error("sleep may still be off with the lid closed; `sudo pmset -a disablesleep 0` turns it back on")
                 try? files.removeItem(at: markerURL)
                 return
             }
             // Sleep back on whatever turned it off, while the rule still allows it.
             if run("/usr/bin/sudo", ["-n", pmset, "-a", "disablesleep", "0"]) { try? files.removeItem(at: markerURL) }
             let removed = run("/usr/bin/sudo", ["-n", "/bin/rm", "-f", rulePath])
-            NSLog("Toolkit: the lid-closed rule from before 0.19.3 removed = \(removed)")
+            Log.awake.notice("the lid-closed rule from before 0.19.3 removed: \(removed)")
         }
     }
 

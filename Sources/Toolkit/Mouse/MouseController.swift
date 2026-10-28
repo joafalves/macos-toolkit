@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import os
 import IOKit.ps
 
 /// A row in the device list: a connected mouse, or a saved profile whose
@@ -179,11 +180,11 @@ final class MouseController: ObservableObject {
         let trusted = AXIsProcessTrusted()
         if trusted != accessibilityGranted {
             accessibilityGranted = trusted
-            NSLog("Toolkit: accessibility granted = \(trusted)")
+            Log.mouse.notice("accessibility granted: \(trusted)")
         }
         if config.enabled, trusted, !wheel.isRunning {
             let started = wheel.start()
-            NSLog("Toolkit: scroll event tap started = \(started)")
+            Log.mouse.notice("scroll event tap started: \(started)")
             if wheelTapFailed == started { wheelTapFailed = !started }
         } else if !config.enabled, wheel.isRunning {
             wheel.stop()

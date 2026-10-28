@@ -1,6 +1,7 @@
 import AppKit
 import IOKit.ps
 import IOKit.pwr_mgt
+import os
 import UserNotifications
 
 /// Keeps the Mac awake for a while or until it's turned off: a power
@@ -181,7 +182,7 @@ final class AwakeController: ObservableObject {
         var id: IOPMAssertionID = 0
         let status = IOPMAssertionCreateWithName(type as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn),
                                                  "Keep Awake in MacOS Toolkit" as CFString, &id)
-        guard status == kIOReturnSuccess else { return NSLog("Toolkit: Keep Awake assertion failed (\(status))") }
+        guard status == kIOReturnSuccess else { return Log.awake.error("assertion failed (\(status))") }
         assertion = id
         assertionKeepsDisplay = keepingDisplay
     }

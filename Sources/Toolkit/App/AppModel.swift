@@ -1,4 +1,5 @@
 import AppKit
+import os
 import SwiftUI
 import ServiceManagement
 
@@ -151,7 +152,7 @@ final class AppModel: ObservableObject {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            NSLog("Toolkit: launch at login failed: \(error.localizedDescription)")
+            Log.app.error("launch at login failed: \(error.localizedDescription, privacy: .public)")
         }
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }

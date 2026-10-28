@@ -1,4 +1,5 @@
 import AppKit
+import os
 import Carbon.HIToolbox
 
 /// Keep Awake's one shortcut, as a Carbon hot key: no permission needed, and
@@ -38,7 +39,7 @@ final class AwakeKey {
         let status = RegisterEventHotKey(UInt32(shortcut.keyCode), shortcut.carbonModifiers, id, GetApplicationEventTarget(), 0, &ref)
         if status != noErr {
             failed = true
-            NSLog("Toolkit: Keep Awake shortcut \(shortcut.display) not registered (\(status))")
+            Log.awake.error("shortcut \(shortcut.display, privacy: .public) not registered (\(status))")
         }
     }
 

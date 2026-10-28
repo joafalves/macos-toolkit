@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import os
 import ScreenCaptureKit
 
 /// Screenshots and screen recordings: the ⇧⌘3/4/5 shortcuts, the selection
@@ -356,7 +357,7 @@ final class CaptureController: ObservableObject {
     }
 
     private func deliver(_ image: CGImage, scale: CGFloat, copy: Bool, screen: NSScreen?) {
-        NSLog("Toolkit: screenshot \(image.width)×\(image.height), \(copy ? "to the clipboard" : "to a file")\(copy && config.saveWhenCopying ? " and a file" : "")")
+        Log.capture.notice("screenshot \(image.width)×\(image.height), \(copy ? "to the clipboard" : "to a file", privacy: .public)\(copy && self.config.saveWhenCopying ? " and a file" : "", privacy: .public)")
         if config.shutterSound { SystemSound.shutter?.play() }
         var file: URL?
         if copy, let png = Screenshotter.encode(image, as: .png, scale: scale) {
@@ -395,7 +396,7 @@ final class CaptureController: ObservableObject {
                 putAway?()
                 // Switched off meanwhile: nothing was read, and nothing to say.
                 guard self.config.textEnabled else { return }
-                NSLog("Toolkit: text from \(image.width)×\(image.height): \(text.map { "\($0.count) characters" } ?? "none")")
+                Log.capture.notice("text from \(image.width)×\(image.height): \(text.map { "\($0.count) characters" } ?? "none", privacy: .public)")
                 if let text {
                     let board = NSPasteboard.general
                     board.clearContents()
@@ -433,7 +434,7 @@ final class CaptureController: ObservableObject {
         let recorder = Recorder(url: Self.uniqueURL(in: folder, stem: String(localized: "Screen Recording \(date) at \(time)"), ext: "mp4"))
         recorder.onInterrupted = { [weak self, weak recorder] error in
             guard let self, self.recorder === recorder else { return }
-            NSLog("Toolkit: recording stopped by the system: \(error?.localizedDescription ?? "")")
+            Log.capture.error("recording stopped by the system: \(error?.localizedDescription ?? "", privacy: .public)")
             self.stopRecording()
         }
         let options = Recorder.Options(quality: config.quality, frameRate: config.frameRate,
@@ -553,7 +554,7 @@ final class CaptureController: ObservableObject {
     }
 
     private func report(_ error: Error) {
-        NSLog("Toolkit: capture failed: \(error.localizedDescription)")
+        Log.capture.error("capture failed: \(error.localizedDescription, privacy: .public)")
         refreshPermissions()
         if !screenPermission {
             onOpenSettings?()

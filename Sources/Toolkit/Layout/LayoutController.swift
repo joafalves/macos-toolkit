@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import os
 import Carbon.HIToolbox
 
 /// Places windows: shortcuts for halves, quarters and thirds, a grid picked with the keyboard
@@ -409,7 +410,7 @@ final class LayoutController: ObservableObject {
     private func startDrags() {
         if (!drags.isRunning || drags.active != config.holdAtEdges), AXIsProcessTrusted() {
             let started = drags.start(active: config.holdAtEdges)
-            NSLog("Toolkit: layout drag tap started = \(started)")
+            Log.layout.notice("drag tap started: \(started)")
             if tapFailed == started { tapFailed = !started }
         }
         if drags.isRunning || tapFailed {

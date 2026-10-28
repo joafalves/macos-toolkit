@@ -1,4 +1,5 @@
 import AppKit
+import os
 import Carbon.HIToolbox
 
 /// The capture shortcuts. macOS handles its own screenshot shortcuts before
@@ -111,7 +112,7 @@ final class CaptureKeys {
             if status == noErr, let ref {
                 refs.append(ref)
             } else {
-                NSLog("Toolkit: capture shortcut \(shortcut.display) not registered (\(status))")
+                Log.capture.error("capture shortcut \(shortcut.display, privacy: .public) not registered (\(status))")
             }
             actions.append(action)
         }

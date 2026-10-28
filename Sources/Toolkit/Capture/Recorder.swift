@@ -1,4 +1,5 @@
 import AVFoundation
+import os
 import ScreenCaptureKit
 
 /// Records a display, an area or a window to an H.264 MP4. Frames only arrive
@@ -209,7 +210,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         mic?.markAsFinished()
         await writer.finishWriting()
         guard writer.status == .completed else {
-            NSLog("Toolkit: recording failed: \(writer.error?.localizedDescription ?? "unknown")")
+            Log.capture.error("recording failed: \(writer.error?.localizedDescription ?? "unknown", privacy: .public)")
             return false
         }
         if audio != nil, mic != nil { await Self.mixDown(url) }
@@ -337,7 +338,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
             guard reader.status == .completed, writer.status == .completed else { throw writer.error ?? CaptureError.failed }
             _ = try FileManager.default.replaceItemAt(url, withItemAt: temp)
         } catch {
-            NSLog("Toolkit: audio mixdown failed, keeping two tracks: \(error.localizedDescription)")
+            Log.capture.error("audio mixdown failed, keeping two tracks: \(error.localizedDescription, privacy: .public)")
             try? FileManager.default.removeItem(at: temp)
         }
     }

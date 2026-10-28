@@ -226,6 +226,13 @@ tool; keep it in step with the code.
 - **The Finder extension's URLs carry a token** that the app writes at launch (`finder-token`,
   0600) and checks in constant time; any app can open a `macos-toolkit://` URL. Actions only ever
   work on folders.
+- **Logging** goes through `Log` (`App/Log.swift`): the system's `Logger`, subsystem
+  `dev.jalves.macos-toolkit`, a category per tool. Never `NSLog`, whose text the system log shows as
+  `<private>`. Errors are `.error`, what a trace needs (a tap started, a shortcut registered, an
+  update installed) `.notice`, which is kept on disk; chatty detail `.info` or `.debug`. Mark what
+  the toolkit chose (bundle IDs, pids, device UIDs, statuses, error descriptions) `privacy: .public`,
+  and leave the user's own data (paths, text read from the screen, device names) private. A trace:
+  `/usr/bin/log show --predicate 'subsystem == "dev.jalves.macos-toolkit"' --info --last 30m`.
 - **Memory and CPU:** the settings window is released when it closes. Background work runs on
   change or on a slow timer, not on a fast poll; check with `--measure-idle` and `footprint`.
 - Clean up after yourself (except Tweaks, which are macOS's settings set on purpose): anything the app changes outside itself (Cmd-Tab, the screenshot keys,

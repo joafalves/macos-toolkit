@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import os
 
 /// Replaces Cmd-Tab with a list of windows. Holding Cmd keeps the list open;
 /// letting go switches to the selected row.
@@ -111,7 +112,7 @@ final class SwitcherController: ObservableObject {
         if tap == nil {
             guard AXIsProcessTrusted() else { return }
             let installed = installTap()
-            NSLog("Toolkit: switcher event tap started = \(installed)")
+            Log.switcher.notice("event tap started: \(installed)")
             if tapFailed == installed { tapFailed = !installed }
             guard installed else { return }
             catalog.use(self, true)

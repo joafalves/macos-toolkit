@@ -2,6 +2,7 @@
 import AppKit
 import AVFoundation
 import CoreAudio
+import os
 import Synchronization
 
 /// `--test-mixer-engine <report>`: the mixer run for real on a quiet 440 Hz
@@ -16,7 +17,7 @@ enum MixerEngineTest {
 
     static func run(into path: String) {
         var lines: [String] = []
-        func say(_ line: String) { lines.append(line); NSLog("Toolkit engine test: \(line)") }
+        func say(_ line: String) { lines.append(line); Log.mixer.notice("engine test: \(line, privacy: .public)") }
         defer { try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8) }
         _ = NSApplication.shared
 
@@ -95,7 +96,7 @@ enum MixerEngineTest {
     /// run while the input does, and wait again after.
     static func runMic(into path: String) {
         var lines: [String] = []
-        func say(_ line: String) { lines.append(line); NSLog("Toolkit mic test: \(line)") }
+        func say(_ line: String) { lines.append(line); Log.mixer.notice("mic test: \(line, privacy: .public)") }
         defer { try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8) }
         _ = NSApplication.shared
 

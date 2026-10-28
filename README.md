@@ -229,9 +229,11 @@ macOS has no setting for one app's volume, so the mixer uses Core Audio *process
 an app's sound (which silences the original) and plays it again at the volume you chose. That needs
 the **System Audio Recording** permission, which is asked for as the mixer is turned on.
 
-- While the mixer is on, all sound goes through it: each app with sound open through a tap of its
-  own, everything else through one more tap, which also applies the software volume. Each tap runs
-  the equalizer. An app at 100% plays as it would without the toolkit, passed through.
+- While the mixer is on, all sound to the current output goes through it: each app with sound open
+  through a tap of its own, everything else through one more tap, which also applies the software
+  volume. Each tap runs the equalizer. An app at 100% plays as it would without the toolkit, passed
+  through. Sound an app sends to another output (an audio interface, AirPlay, the Mac's speakers
+  while the output is a monitor) goes there untouched, at that output's own volume.
 - Sound moved from one tap to another while it plays clicks, so an app only moves into its own tap
   while it's quiet; until then both ways sound the same. An app with a volume of its own is tapped
   as it opens, before it plays (macOS 26 and later). Turning down an app that has played without a
@@ -240,13 +242,15 @@ the **System Audio Recording** permission, which is asked for as the mixer is tu
   games), each tap measures what goes through it.
 - A tap waits, costing nothing, until something plays to it, and goes back to waiting two seconds
   after the sound stops, so the output and the Mac can sleep as they would without the toolkit.
-  While an app uses the microphone, its tap runs instead of waiting: on macOS 26 a waiting tap kept
-  a call app from starting its microphone, so a meeting's preview froze. It waits again once the
-  app's microphone and sound have stopped. Other apps' taps aren't affected.
+  Taps only take what goes to the output, so an app's microphone has nothing to do with them: on
+  macOS 26 a tap that took an app on every device kept it from starting its microphone, and a
+  meeting's preview froze. With an output that has a microphone of its own (AirPods, a headset), the
+  tap of an app using it runs instead of waiting, and waits again once the microphone and the sound
+  have stopped.
 - macOS shows its purple recording indicator while the mixer is on.
 - A tapped app's sound is delayed by about one audio buffer, a few milliseconds on built-in and wired
-  outputs. The real figure is logged when a tap starts
-  (`log stream --predicate 'process == "Toolkit"'`). Bluetooth outputs may add more; I haven't
+  outputs. The real figure is logged when a tap starts (see Logs, under Good to know). Bluetooth
+  outputs may add more; I haven't
   measured that.
 - Taps are removed when the toolkit quits, and any a crash left behind are removed at the next launch.
   Volumes are stored in `mixer.json`.
@@ -863,6 +867,13 @@ it too.
   keys). They can change in any macOS update, and this
   is a personal tool, so expect to rebuild when they do.
 - It is **not notarized**, which is why the install steps above remove the quarantine flag.
+- **Logs:** the toolkit writes what it does and what goes wrong to the system log, one category
+  per tool (`mixer`, `capture`, `layout`, ...). Your own files and text stay private there. To save
+  the last half hour, for a bug report:
+
+  ```bash
+  /usr/bin/log show --predicate 'subsystem == "dev.jalves.macos-toolkit"' --info --last 30m > ~/Desktop/toolkit-log.txt
+  ```
 - Anything the toolkit changes outside itself (⌘Tab, the screenshot keys, macOS's window tiling and its margins,
   device properties, audio taps) is put back when it quits, when it is killed, and at the next launch if it crashed.
 

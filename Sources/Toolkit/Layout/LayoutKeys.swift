@@ -1,4 +1,5 @@
 import AppKit
+import os
 import Carbon.HIToolbox
 
 /// The layout shortcuts, as Carbon hot keys: they need no permission and
@@ -57,7 +58,7 @@ final class LayoutKeys {
                 refs.append(ref)
             } else {
                 failed.append(command)
-                NSLog("Toolkit: layout shortcut \(shortcut.display) not registered (\(status))")
+                Log.layout.error("shortcut \(shortcut.display, privacy: .public) not registered (\(status))")
             }
             commands.append(command)
         }

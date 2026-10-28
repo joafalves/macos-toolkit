@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import os
 
 /// Rewrites events from mice: wheel direction, distance and smoothing, the
 /// side buttons, and autoscroll on the wheel button. Trackpad and Magic Mouse
@@ -75,7 +76,7 @@ final class WheelEngine {
         }
         if type == .scrollWheel, loggedEvents < 5 {
             loggedEvents += 1
-            NSLog("Toolkit: scroll event continuous=\(event.getIntegerValueField(.scrollWheelEventIsContinuous)) lines=\(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)) points=\(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)) hasProfile=\(profileProvider() != nil)")
+            Log.mouse.debug("scroll event continuous=\(event.getIntegerValueField(.scrollWheelEventIsContinuous)) lines=\(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)) points=\(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)) hasProfile=\(self.profileProvider() != nil)")
         }
         guard type == .scrollWheel,
               event.getIntegerValueField(.eventSourceUserData) != Self.marker,

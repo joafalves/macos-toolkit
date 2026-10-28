@@ -1,4 +1,5 @@
 import AppKit
+import os
 import Vision
 
 /// The text in a capture, or what a QR code or barcode in it holds, read on
@@ -33,7 +34,7 @@ enum TextReader {
             let start = Date()
             // Nil when it was stopped; a word is there to read otherwise.
             guard readElsewhere(image) != nil else { return }
-            NSLog("Toolkit: text reader ready for this build in \(Int(Date().timeIntervalSince(start) * 1000)) ms")
+            Log.capture.notice("text reader ready for this build in \(Int(Date().timeIntervalSince(start) * 1000)) ms")
             UserDefaults.standard.set(build, forKey: preparedKey)
         }
     }
@@ -77,7 +78,7 @@ enum TextReader {
         do {
             try process.run()
         } catch {
-            NSLog("Toolkit: text reader did not start: \(error.localizedDescription)")
+            Log.capture.error("text reader did not start: \(error.localizedDescription, privacy: .public)")
             return nil
         }
         running.value = process
@@ -138,7 +139,7 @@ enum TextReader {
         do {
             try VNImageRequestHandler(cgImage: image, options: [:]).perform([text, codes])
         } catch {
-            NSLog("Toolkit: text recognition failed: \(error.localizedDescription)")
+            Log.capture.error("text recognition failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
         let lines: [Line] = (text.results ?? []).compactMap { observation in

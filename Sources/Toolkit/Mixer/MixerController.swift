@@ -1,6 +1,7 @@
 import AppKit
 import AudioToolbox
 import CoreAudio
+import os
 
 /// A row in the mixer: an app that has sound open, playing or not.
 struct MixerApp: Identifiable {
@@ -115,11 +116,18 @@ final class MixerController: ObservableObject {
     /// When each listened process was last heard, or first listened to.
     private var heardAt: [AudioObjectID: Date] = [:]
     private var passPending = false
-    /// App processes with their input running. The tap that takes one runs
-    /// instead of waiting for sound (`AppTap.autoStart`): one that waits holds
-    /// up its input. It goes back to waiting once that input has stopped and
-    /// nothing it takes plays, so the output and the Mac can sleep again.
+    /// App processes with their input running, while the output has a
+    /// microphone of its own (AirPods, a headset). Taps only take the output,
+    /// so an input on another device has nothing to do with them, but one on
+    /// the output is held up while the tap that takes its process waits for
+    /// sound. That tap runs instead (`AppTap.autoStart`) and goes back to
+    /// waiting once the input has stopped and nothing it takes plays.
     private var recording: Set<AudioObjectID> = []
+    /// The output has input streams: only then can a tap hold up an input.
+    private var outputHasInput = false
+    /// Level ticks since the input was last read: a stuck input announces
+    /// nothing, so it's read every second while it matters.
+    private var ticksSinceRecordingCheck = 0
     /// The first pass after the mixer starts or the output changes, which
     /// reroutes everything anyway: every app goes to its own tap at once.
     /// After that, one that plays without a pause would move with a click.
@@ -144,9 +152,6 @@ final class MixerController: ObservableObject {
 
     private var systemListeners: [AudioListener] = []
     private var deviceListeners: [AudioListener] = []
-    /// On every input device: a process that has played before doesn't
-    /// announce its input starting, the device does.
-    private var inputListeners: [AudioListener] = []
     private var processListeners: [AudioObjectID: [AudioListener]] = [:]
     private var observers: [NSObjectProtocol] = []
     private var permissionTimer: Timer?
@@ -166,6 +171,7 @@ final class MixerController: ObservableObject {
     func start() {
         guard config.enabled, !running else { return }
         running = true
+        Log.mixer.notice("mixer on, audio permission \(String(describing: self.permission), privacy: .public)")
         settling = true
         appsRead = false
         if ownsSystem { AppTap.removeLeftovers() }
@@ -198,17 +204,18 @@ final class MixerController: ObservableObject {
     func stop() {
         guard running else { return }
         running = false
+        Log.mixer.notice("mixer off")
         taps.removeAll()
         masterTap = nil
         listeners.removeAll()
         heardAt = [:]
         activity = [:]
         recording = []
+        outputHasInput = false
         softwareActive = false
         volumeKeys.setWanted(false)
         systemListeners.removeAll()
         deviceListeners.removeAll()
-        inputListeners.removeAll()
         processListeners.removeAll()
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers.removeAll()
@@ -530,14 +537,7 @@ final class MixerController: ObservableObject {
     }
 
     private func refreshDevices() {
-        let devices = AudioObjectID.system.readArray(kAudioHardwarePropertyDevices, as: AudioObjectID.self)
-        // Only a cue to look: which apps record is read from each app's processes.
-        inputListeners = devices.filter { id in
-            !id.readArray(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput, as: AudioStreamID.self).isEmpty
-                && id.readString(kAudioDevicePropertyDeviceUID)?.hasPrefix(AppTap.uidPrefix) == false
-        }.map { AudioListener($0, kAudioDevicePropertyDeviceIsRunningSomewhere) { [weak self] in self?.scheduleRefresh() } }
-
-        outputs = devices.compactMap { id in
+        outputs = AudioObjectID.system.readArray(kAudioHardwarePropertyDevices, as: AudioObjectID.self).compactMap { id in
             guard !id.readArray(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeOutput, as: AudioStreamID.self).isEmpty,
                   let uid = id.readString(kAudioDevicePropertyDeviceUID), !uid.hasPrefix(AppTap.uidPrefix),
                   (id.read(kAudioDevicePropertyIsHidden, as: UInt32.self) ?? 0) == 0,
@@ -556,6 +556,9 @@ final class MixerController: ObservableObject {
                 settleTries = 0
             }
             output = current
+            outputHasInput = !current.readArray(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput, as: AudioStreamID.self).isEmpty
+            if !outputHasInput { recording = [] }
+            Log.mixer.notice("output \(current.readString(kAudioDevicePropertyDeviceUID) ?? "none", privacy: .public)\(self.outputHasInput ? ", with a microphone of its own" : "", privacy: .public)")
             let scope = kAudioObjectPropertyScopeOutput
             deviceListeners = [
                 AudioListener(current, kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope) { [weak self] in self?.refreshMainVolume() },
@@ -577,7 +580,7 @@ final class MixerController: ObservableObject {
         let software = running && !hardwareVolume && currentOutput != nil
         if software != softwareActive {
             softwareActive = software
-            NSLog("Toolkit: mixer software volume \(software ? "on" : "off") for \(currentOutput?.name ?? "no output") (permission \(permission))")
+            Log.mixer.notice("software volume \(software ? "on" : "off", privacy: .public) for \(self.currentOutput?.uid ?? "no output", privacy: .public) (permission \(String(describing: self.permission), privacy: .public))")
         }
         hasMainVolume = hardwareVolume || software
         if software {
@@ -631,7 +634,13 @@ final class MixerController: ObservableObject {
         appsRead = true
         if let onlyApps { groups = groups.filter { onlyApps.contains($0.value.app.bundleIdentifier ?? "") } }
         runningBundles = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-        recording = Set(groups.values.flatMap(\.recording))
+        let recordingNow = outputHasInput ? Set(groups.values.flatMap(\.recording)) : []
+        if recordingNow != recording {
+            recording = recordingNow
+            let who = groups.values.filter { !$0.recording.isEmpty }
+                .map { "\($0.app.bundleIdentifier ?? "?") \($0.recording.sorted())" }.sorted().joined(separator: ", ")
+            Log.mixer.notice("recording on the output: \(who.isEmpty ? "none" : who, privacy: .public)")
+        }
 
         // Starting and stopping playback doesn't change the process list, so
         // each process is watched too. macOS 27 never announces a change of
@@ -678,6 +687,11 @@ final class MixerController: ObservableObject {
         for (key, loud) in heard where loud && key != Self.masterKey { lastSound[key] = now }
         for (object, listener) in listeners where listener.takePeak() > Self.silence { heardAt[object] = now }
         if currentlyAudible() != audible { updateList() }
+        ticksSinceRecordingCheck += 1
+        if outputHasInput, ticksSinceRecordingCheck >= 4 {
+            ticksSinceRecordingCheck = 0
+            checkRecording()
+        }
         rearmIdle(heard, now)
         // A process waiting for a quiet moment to move has had one.
         let quiet = listeners.keys.contains { !stranded.contains($0) && now.timeIntervalSince(heardAt[$0] ?? now) >= Self.quietFor }
@@ -742,6 +756,13 @@ final class MixerController: ObservableObject {
             activity[key] = state
         }
         activity = activity.filter { key, _ in key == Self.masterKey ? masterTap != nil : taps[key] != nil }
+    }
+
+    /// A few reads a second, each about 60 µs, while the output has a
+    /// microphone: macOS announces nothing while an input's start is held up.
+    private func checkRecording() {
+        let now = groups.values.contains { $0.objects.contains { ($0.read(kAudioProcessPropertyIsRunningInput, as: UInt32.self) ?? 0) != 0 } }
+        if now != !recording.isEmpty { scheduleRefresh() }
     }
 
     /// Whether the tap under `key` takes a process whose input runs.
@@ -948,10 +969,12 @@ final class MixerController: ObservableObject {
                     let swap = "swap \(device.uid) \(bundleID)"
                     let run = records(taking)
                     if tap.autoStart == run, group?.playing.isEmpty != false, !failed.contains(swap) {
+                        Log.mixer.notice("\(bundleID, privacy: .public) tap \(run ? "runs while its app records" : "waits for sound again", privacy: .public)")
                         if let fresh = AppTap(objects: taking, deviceUID: device.uid, gain: want.gain, autoStart: !run,
                                               bundleIDs: tap.bundleIDs, stereo: stereo, equalizer: equalizerState) {
                             taps[bundleID] = fresh
                         } else {
+                            Log.mixer.error("\(bundleID, privacy: .public) tap could not be swapped; the old one stays")
                             failed.insert(swap)
                             scheduleRetry()
                         }
@@ -1043,7 +1066,7 @@ final class MixerController: ObservableObject {
         var bundleIDs: [String] = []
         if Self.byBundle, let id = Bundle.main.bundleIdentifier { bundleIDs = [id] + plan.keys.sorted() }
         guard own != nil || !bundleIDs.isEmpty else {
-            if !loggedMasterSkip { NSLog("Toolkit: mixer software volume needs macOS 26 or later to leave its own audio out of the tap") }
+            if !loggedMasterSkip { Log.mixer.notice("software volume needs macOS 26 or later to leave its own audio out of the tap") }
             loggedMasterSkip = true
             masterTap = nil
             return
@@ -1057,10 +1080,12 @@ final class MixerController: ObservableObject {
                 let swap = "swap \(signature)"
                 guard tap.autoStart == run, !failed.contains(swap),
                       !AudioProcesses.clients().contains(where: { $0.isPlaying && takes(Self.masterKey, $0) }) else { return }
+                Log.mixer.notice("master tap \(run ? "runs while an app it takes records" : "waits for sound again", privacy: .public)")
                 if let fresh = AppTap(objects: excluded, deviceUID: device.uid, gain: gain, isGlobal: true, autoStart: !run,
                                       bundleIDs: bundleIDs, stereo: stereo, equalizer: equalizerState) {
                     masterTap = fresh
                 } else {
+                    Log.mixer.error("master tap could not be swapped; the old one stays")
                     failed.insert(swap)
                     scheduleRetry()
                 }

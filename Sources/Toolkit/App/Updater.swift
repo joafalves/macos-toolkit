@@ -1,4 +1,5 @@
 import AppKit
+import os
 import Security
 
 /// New versions, from the project's releases on GitHub. It looks when the
@@ -205,7 +206,7 @@ final class Updater: ObservableObject {
 
     /// The way round it, whatever went wrong: the release page has the app.
     private static func failed(_ release: Release, _ error: Error) {
-        NSLog("Toolkit: update to \(release.version) not installed: \(error.localizedDescription)")
+        Log.updater.error("update to \(release.version, privacy: .public) not installed: \(error.localizedDescription, privacy: .public)")
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = String(localized: "The update couldn't be installed")
