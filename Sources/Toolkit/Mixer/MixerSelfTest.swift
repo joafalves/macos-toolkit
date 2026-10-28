@@ -34,6 +34,7 @@ extension MixerController {
         var muted = true
         let kept = step(0.5, muted: &muted, key: .up, size: standard)
         print("  volume \(kept), muted \(muted)")
+        roundingOutputCheck()
 
         print("software gain on the even scale (dB):")
         for level in [1.0 / 16, 0.25, 0.5, 0.75, 1] {
@@ -57,6 +58,34 @@ extension MixerController {
         setting.volume = 0.8
         let round = (try? JSONEncoder().encode(setting)).flatMap { try? JSONDecoder().decode(SoftwareVolume.self, from: $0) }
         print("saved and read again: \(round?.volume ?? -1) (expect 0.8), file: \(String(decoding: (try? JSONEncoder().encode(setting)) ?? Data(), as: UTF8.self))")
+    }
+
+    /// The keys on an output that rounds its volume to steps of its own:
+    /// the 1 dB steps a USB display's speakers read back, measured. Each
+    /// press has to move by a whole step of the keys, where they used to land
+    /// back on the rounding (59% up, 55% down).
+    private static func roundingOutputCheck() {
+        let steps: [Float] = [0.4938, 0.5130, 0.5325, 0.5524, 0.5729, 0.5933, 0.6143, 0.6357, 0.6574, 0.6795, 0.7020]
+        func device(_ level: Float) -> Float { steps.min { abs($0 - level) < abs($1 - level) }! }
+        let output: AudioObjectID = 1, size = 1.0 / Double(VolumeKeyStep.round.presses)
+        for (start, key) in [(Float(0.5933), VolumeKey.up), (Float(0.6574), .down)] {
+            var setLevel = SetLevel(), read = start, muted = false, shown: [Float] = []
+            for _ in 0..<3 {
+                let level = setLevel.level(on: output, reading: read)
+                let next = Float(step(Double(level), muted: &muted, key: key, size: size))
+                read = device(next)
+                setLevel.wrote(next, on: output, reads: read)
+                shown.append(setLevel.level(on: output, reading: read))
+            }
+            let expected: [Float] = key == .up ? [0.60, 0.65, 0.70] : [0.65, 0.60, 0.55]
+            let ok = zip(shown, expected).allSatisfy { abs($0 - $1) < 0.001 }
+            print("\(ok ? "ok  " : "DIFF") output in 1 dB steps, round, \(key == .up ? "up" : "down") from \(Int((start * 100).rounded()))%: "
+                + shown.map { String(format: "%.0f%%", $0 * 100) }.joined(separator: " "))
+        }
+        var setLevel = SetLevel()
+        setLevel.wrote(0.60, on: 1, reads: 0.5933)
+        let elsewhere = setLevel.level(on: 1, reading: 0.6574), after = setLevel.level(on: 1, reading: 0.5933)
+        print("\(elsewhere == 0.6574 && after == 0.5933 ? "ok  " : "DIFF") set elsewhere: \(elsewhere), and the level it was set to here is forgotten: \(after)")
     }
 
     /// The software volume's curve against the one this Mac's own output

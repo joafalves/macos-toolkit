@@ -36,6 +36,26 @@ struct OutputDevice: Identifiable, Equatable {
     }
 }
 
+/// The output's own volume as last set here, and what the device read back
+/// after it. Devices round to steps of their own (1 dB on a USB display: 60%
+/// reads 59.3%), but the level is ours: while the device still reads what
+/// that gave it, the level is the one set, so the keys step from 60% and not
+/// from a rounding they'd land back on.
+struct SetLevel {
+    private var last: (output: AudioObjectID, level: Float, read: Float)?
+
+    mutating func wrote(_ level: Float, on output: AudioObjectID, reads read: Float?) {
+        last = read.map { (output, level, $0) }
+    }
+
+    mutating func level(on output: AudioObjectID, reading read: Float) -> Float {
+        if let last, last.output == output, last.read == read { return last.level }
+        // Set elsewhere (Control Center, the device's own buttons): that's the level now.
+        last = nil
+        return read
+    }
+}
+
 /// Volume per app, on top of the main volume, the equalizer and the software
 /// volume. While it's on, all sound goes through its taps (`applyTaps`).
 final class MixerController: ObservableObject {
@@ -328,7 +348,7 @@ final class MixerController: ObservableObject {
             }
         }
         shareVolume(Double(volume), muted: false)
-        output.write(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: kAudioObjectPropertyScopeOutput, Float32(volume))
+        writeMainVolume(volume)
         // Like the volume keys: changing the volume unmutes.
         if mainMuted { output.write(kAudioDevicePropertyMute, scope: kAudioObjectPropertyScopeOutput, UInt32(0)) }
         refreshMainVolume()
@@ -584,7 +604,7 @@ final class MixerController: ObservableObject {
             mainVolume = Float(setting.volume)
             mainMuted = setting.muted
         } else {
-            mainVolume = output.read(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, as: Float32.self) ?? 0
+            mainVolume = readMainVolume()
             mainMuted = (output.read(kAudioDevicePropertyMute, scope: scope, as: UInt32.self) ?? 0) != 0
             followSharedVolume()
         }
@@ -603,13 +623,28 @@ final class MixerController: ObservableObject {
         if Date() < settleUntil, settleTries < 3 {
             settleTries += 1
             let scope = kAudioObjectPropertyScopeOutput
-            output.write(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, Float32(shared.volume))
+            writeMainVolume(Float(shared.volume))
             output.write(kAudioDevicePropertyMute, scope: scope, UInt32(shared.muted ? 1 : 0))
-            mainVolume = output.read(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, as: Float32.self) ?? mainVolume
+            mainVolume = readMainVolume()
             mainMuted = (output.read(kAudioDevicePropertyMute, scope: scope, as: UInt32.self) ?? 0) != 0
         } else {
             shareVolume(Double(mainVolume), muted: mainMuted)
         }
+    }
+
+    private var setLevel = SetLevel()
+
+    private func writeMainVolume(_ level: Float) {
+        let scope = kAudioObjectPropertyScopeOutput
+        output.write(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, Float32(level))
+        let read = output.read(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, as: Float32.self)
+        setLevel.wrote(level, on: output, reads: read)
+    }
+
+    private func readMainVolume() -> Float {
+        let read = output.read(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: kAudioObjectPropertyScopeOutput,
+                               as: Float32.self) ?? 0
+        return setLevel.level(on: output, reading: read)
     }
 
     // MARK: - Apps and taps

@@ -3,6 +3,15 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.24.4 (unreleased)
+
+### Fixed
+
+- **Audio Mixer:** the volume keys no longer get stuck on an output that rounds its volume to steps
+  of its own, such as a display's speakers over USB, where they stopped at 59% going up and 55%
+  going down. The volume is the one the keys or the slider set, 60% rather than the 59.3% the
+  output rounds it to, until it's changed somewhere else.
+
 ## 0.24.3 (2026-10-28)
 
 ### Fixed
