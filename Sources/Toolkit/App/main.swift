@@ -183,6 +183,17 @@ if let flag = CommandLine.arguments.firstIndex(of: "--play-tone") {
     MixerEngineTest.playTone(Array(CommandLine.arguments[(flag + 1)...]))
     exit(0)
 }
+// `--test-mixer-mic <report>`: a helper opens the microphone alone, with and
+// without the mixer's taps waiting: whether its input starts. Run with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-mixer-mic"), CommandLine.arguments.count > flag + 1 {
+    MixerEngineTest.runMic(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+// The helper that test starts: a copy of this app opening the microphone.
+if let flag = CommandLine.arguments.firstIndex(of: "--open-mic") {
+    MixerEngineTest.openMic(Array(CommandLine.arguments[(flag + 1)...]))
+    exit(0)
+}
 if CommandLine.arguments.contains("--list-audio") {
     MixerController.dumpApps()
     exit(0)

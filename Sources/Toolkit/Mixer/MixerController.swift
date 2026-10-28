@@ -115,6 +115,11 @@ final class MixerController: ObservableObject {
     /// When each listened process was last heard, or first listened to.
     private var heardAt: [AudioObjectID: Date] = [:]
     private var passPending = false
+    /// App processes with their input running. The tap that takes one runs
+    /// instead of waiting for sound (`AppTap.autoStart`): one that waits holds
+    /// up its input. It goes back to waiting once that input has stopped and
+    /// nothing it takes plays, so the output and the Mac can sleep again.
+    private var recording: Set<AudioObjectID> = []
     /// The first pass after the mixer starts or the output changes, which
     /// reroutes everything anyway: every app goes to its own tap at once.
     /// After that, one that plays without a pause would move with a click.
@@ -139,6 +144,9 @@ final class MixerController: ObservableObject {
 
     private var systemListeners: [AudioListener] = []
     private var deviceListeners: [AudioListener] = []
+    /// On every input device: a process that has played before doesn't
+    /// announce its input starting, the device does.
+    private var inputListeners: [AudioListener] = []
     private var processListeners: [AudioObjectID: [AudioListener]] = [:]
     private var observers: [NSObjectProtocol] = []
     private var permissionTimer: Timer?
@@ -195,10 +203,12 @@ final class MixerController: ObservableObject {
         listeners.removeAll()
         heardAt = [:]
         activity = [:]
+        recording = []
         softwareActive = false
         volumeKeys.setWanted(false)
         systemListeners.removeAll()
         deviceListeners.removeAll()
+        inputListeners.removeAll()
         processListeners.removeAll()
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers.removeAll()
@@ -520,7 +530,14 @@ final class MixerController: ObservableObject {
     }
 
     private func refreshDevices() {
-        outputs = AudioObjectID.system.readArray(kAudioHardwarePropertyDevices, as: AudioObjectID.self).compactMap { id in
+        let devices = AudioObjectID.system.readArray(kAudioHardwarePropertyDevices, as: AudioObjectID.self)
+        // Only a cue to look: which apps record is read from each app's processes.
+        inputListeners = devices.filter { id in
+            !id.readArray(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeInput, as: AudioStreamID.self).isEmpty
+                && id.readString(kAudioDevicePropertyDeviceUID)?.hasPrefix(AppTap.uidPrefix) == false
+        }.map { AudioListener($0, kAudioDevicePropertyDeviceIsRunningSomewhere) { [weak self] in self?.scheduleRefresh() } }
+
+        outputs = devices.compactMap { id in
             guard !id.readArray(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeOutput, as: AudioStreamID.self).isEmpty,
                   let uid = id.readString(kAudioDevicePropertyDeviceUID), !uid.hasPrefix(AppTap.uidPrefix),
                   (id.read(kAudioDevicePropertyIsHidden, as: UInt32.self) ?? 0) == 0,
@@ -614,15 +631,17 @@ final class MixerController: ObservableObject {
         appsRead = true
         if let onlyApps { groups = groups.filter { onlyApps.contains($0.value.app.bundleIdentifier ?? "") } }
         runningBundles = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        recording = Set(groups.values.flatMap(\.recording))
 
         // Starting and stopping playback doesn't change the process list, so
         // each process is watched too. macOS 27 never announces a change of
         // running output, only of running at all, so both: a playing app went
         // unnoticed until some other change came along, often for many seconds.
+        // The input too, which decides whether the taps run.
         let objects = Set(groups.values.flatMap(\.objects))
         processListeners = processListeners.filter { objects.contains($0.key) }
         for object in objects where processListeners[object] == nil {
-            processListeners[object] = [kAudioProcessPropertyIsRunningOutput, kAudioProcessPropertyIsRunning].map {
+            processListeners[object] = [kAudioProcessPropertyIsRunningOutput, kAudioProcessPropertyIsRunningInput, kAudioProcessPropertyIsRunning].map {
                 AudioListener(object, $0) { [weak self] in self?.scheduleRefresh() }
             }
         }
@@ -710,13 +729,30 @@ final class MixerController: ObservableObject {
                 state.checked = now
                 if clients == nil { clients = AudioProcesses.clients() }
                 if !(clients ?? []).contains(where: { $0.isPlaying && takes(key, $0) }) {
-                    tap.rearm()
+                    // In the wrong mode, a pass makes a new one; one running
+                    // for an app's input stays up.
+                    if tap.autoStart == takesRecording(key) {
+                        schedulePass()
+                    } else if tap.autoStart {
+                        tap.rearm()
+                    }
                     state.sound = now
                 }
             }
             activity[key] = state
         }
         activity = activity.filter { key, _ in key == Self.masterKey ? masterTap != nil : taps[key] != nil }
+    }
+
+    /// Whether the tap under `key` takes a process whose input runs.
+    private func takesRecording(_ key: String) -> Bool {
+        guard !recording.isEmpty else { return false }
+        let inApp = { [taps, groups] (id: String) -> Set<AudioObjectID> in
+            let own = Self.byBundle ? groups.values.filter { $0.app.bundleIdentifier == id }.flatMap(\.own) : []
+            return Set(taps[id]?.objects ?? []).union(own)
+        }
+        if key != Self.masterKey { return !recording.isDisjoint(with: inApp(key)) }
+        return !recording.subtracting(taps.keys.flatMap(inApp)).isEmpty
     }
 
     /// Whether the tap under `key` takes this process's sound.
@@ -892,6 +928,10 @@ final class MixerController: ObservableObject {
         var starting: [(AppTap, UInt32)] = []
         for (bundleID, want) in plan {
             let group = byApp[bundleID]
+            // Whether the app's tap, taking these and its own processes, takes one that records.
+            let records = { [recording] (objects: [AudioObjectID]) in
+                !recording.isDisjoint(with: Set(objects).union(Self.byBundle ? group?.own ?? [] : []))
+            }
             let running = { (tap: AppTap?) in
                 want.objects.contains { object in
                     group?.playing.contains(object) == true && tap?.objects.contains(object) != true
@@ -904,12 +944,25 @@ final class MixerController: ObservableObject {
                 let wakes = running(tap)
                 let before = tap.callbacks
                 if tap.update(objects: taking, bundleIDs: tap.bundleIDs) {
-                    if wakes { starting.append((tap, before)) }
+                    // Swapped for one that runs, or waits, only while nothing of the app plays: then it can't click.
+                    let swap = "swap \(device.uid) \(bundleID)"
+                    let run = records(taking)
+                    if tap.autoStart == run, group?.playing.isEmpty != false, !failed.contains(swap) {
+                        if let fresh = AppTap(objects: taking, deviceUID: device.uid, gain: want.gain, autoStart: !run,
+                                              bundleIDs: tap.bundleIDs, stereo: stereo, equalizer: equalizerState) {
+                            taps[bundleID] = fresh
+                        } else {
+                            failed.insert(swap)
+                            scheduleRetry()
+                        }
+                    } else if wakes {
+                        starting.append((tap, before))
+                    }
                     continue
                 }
             }
             // Made before any old one is let go, so the app is never left unmuted.
-            if let tap = AppTap(objects: want.objects, deviceUID: device.uid, gain: want.gain,
+            if let tap = AppTap(objects: want.objects, deviceUID: device.uid, gain: want.gain, autoStart: !records(want.objects),
                                 bundleIDs: Self.byBundle ? [bundleID] : [], stereo: stereo, equalizer: equalizerState) {
                 taps[bundleID] = tap
                 if running(nil) || (Self.byBundle && group?.own.contains { group?.playing.contains($0) == true } == true) {
@@ -931,7 +984,10 @@ final class MixerController: ObservableObject {
         while starting.contains(where: { $0.0.callbacks < $0.1 &+ 2 }), Date() < deadline { usleep(2000) }
 
         // Then the master, which leaves out what the app taps have.
-        applyMasterTap(device: device, plan: plan, gain: master)
+        // The master takes the recording processes no app's tap has.
+        var inApps = Set(plan.values.flatMap(\.objects))
+        if Self.byBundle { for bundleID in plan.keys { inApps.formUnion(byApp[bundleID]?.own ?? []) } }
+        applyMasterTap(device: device, plan: plan, gain: master, run: !recording.subtracting(inApps).isEmpty)
 
         // Then the taps that let something go, or are no longer wanted.
         for (bundleID, tap) in taps {
@@ -940,7 +996,7 @@ final class MixerController: ObservableObject {
                 continue
             }
             if !tap.update(objects: want.objects, bundleIDs: tap.bundleIDs) {
-                taps[bundleID] = AppTap(objects: want.objects, deviceUID: device.uid, gain: want.gain,
+                taps[bundleID] = AppTap(objects: want.objects, deviceUID: device.uid, gain: want.gain, autoStart: tap.autoStart,
                                         bundleIDs: tap.bundleIDs, stereo: stereo, equalizer: equalizerState)
             }
         }
@@ -979,7 +1035,7 @@ final class MixerController: ObservableObject {
     /// the software volume and the equalizer. It's always up while the mixer
     /// is, passing the sound through untouched when there's nothing to do:
     /// putting it up or taking it down while something plays clicks.
-    private func applyMasterTap(device: OutputDevice, plan: [String: (objects: [AudioObjectID], gain: Float)], gain: Float) {
+    private func applyMasterTap(device: OutputDevice, plan: [String: (objects: [AudioObjectID], gain: Float)], gain: Float, run: Bool) {
         // Ours too, or the tap would hear its own output. Our process only has
         // a Core Audio object once it has used audio, so on macOS 26 and later
         // it is also left out by bundle ID, which needs no such object.
@@ -993,14 +1049,27 @@ final class MixerController: ObservableObject {
             return
         }
         let excluded = Array(Set((own.map { [$0] } ?? []) + plan.values.flatMap(\.objects))).sorted()
+        let signature = "master \(device.uid)"
         if let tap = masterTap, tap.deviceUID == device.uid {
             tap.gain = gain
-            if tap.update(objects: excluded, bundleIDs: bundleIDs) { return }
+            if tap.update(objects: excluded, bundleIDs: bundleIDs) {
+                // As an app's tap: another mode only while nothing it takes plays.
+                let swap = "swap \(signature)"
+                guard tap.autoStart == run, !failed.contains(swap),
+                      !AudioProcesses.clients().contains(where: { $0.isPlaying && takes(Self.masterKey, $0) }) else { return }
+                if let fresh = AppTap(objects: excluded, deviceUID: device.uid, gain: gain, isGlobal: true, autoStart: !run,
+                                      bundleIDs: bundleIDs, stereo: stereo, equalizer: equalizerState) {
+                    masterTap = fresh
+                } else {
+                    failed.insert(swap)
+                    scheduleRetry()
+                }
+                return
+            }
         }
-        let signature = "master \(device.uid)"
         guard !failed.contains(signature) else { return }
         // The new tap is up before the old one goes, so nothing plays unmuted in between.
-        if let tap = AppTap(objects: excluded, deviceUID: device.uid, gain: gain, isGlobal: true,
+        if let tap = AppTap(objects: excluded, deviceUID: device.uid, gain: gain, isGlobal: true, autoStart: !run,
                             bundleIDs: bundleIDs, stereo: stereo, equalizer: equalizerState) {
             masterTap = tap
         } else {
@@ -1089,9 +1158,10 @@ extension MixerController {
 
     /// What goes through which tap, for the test's report.
     var engineState: String {
-        let apps = taps.keys.sorted().map { "\($0) \(taps[$0]?.objects ?? [])" }.joined(separator: ", ")
-        let master = masterTap.map { "master leaves out \($0.objects) \($0.bundleIDs)" } ?? "no master"
-        return "taps: [\(apps)]; listening to \(listeners.keys.sorted()); \(master)"
+        let mode = { (tap: AppTap?) in tap?.autoStart == false ? " (running)" : "" }
+        let apps = taps.keys.sorted().map { "\($0) \(taps[$0]?.objects ?? [])\(mode(taps[$0]))" }.joined(separator: ", ")
+        let master = masterTap.map { "master leaves out \($0.objects) \($0.bundleIDs)\(mode($0))" } ?? "no master"
+        return "taps: [\(apps)]; listening to \(listeners.keys.sorted()); \(master)\(recording.isEmpty ? "" : "; recording \(recording.sorted())")"
     }
 }
 #endif

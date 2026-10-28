@@ -18,6 +18,11 @@ import Synchronization
 ///
 /// Without `controlsVolume` the tap only listens: the app plays as usual and
 /// the tap measures how loud it is.
+///
+/// Without `autoStart` the device runs from the start instead of waiting.
+/// A process a waiting tap takes can't start its input until a tap runs, and
+/// the tap waits for it to play: on macOS 26 a call app's preview, which only
+/// opens the microphone, froze until the mixer was turned off.
 final class AppTap {
     /// Our aggregate devices carry this in their UID, so leftovers from a
     /// crash can be found and removed.
@@ -31,6 +36,7 @@ final class AppTap {
     private let stereo: (Int, Int)
     let controlsVolume: Bool
     let isGlobal: Bool
+    let autoStart: Bool
     /// Applied to what this tap plays, when it is on.
     private let equalizer: EqualizerState?
 
@@ -63,8 +69,8 @@ final class AppTap {
     /// Nil when macOS refuses any step, for example without the permission.
     /// `stereo`: the output's channels for left and right, from 0, as it
     /// prefers them (Audio MIDI Setup's Configure Speakers).
-    init?(objects: [AudioObjectID], deviceUID: String, gain: Float, controlsVolume: Bool = true,
-          isGlobal: Bool = false, bundleIDs: [String] = [], stereo: (Int, Int) = (0, 1), equalizer: EqualizerState? = nil) {
+    init?(objects: [AudioObjectID], deviceUID: String, gain: Float, controlsVolume: Bool = true, isGlobal: Bool = false,
+          autoStart: Bool = true, bundleIDs: [String] = [], stereo: (Int, Int) = (0, 1), equalizer: EqualizerState? = nil) {
         self.stereo = stereo
         self.objects = objects
         self.bundleIDs = bundleIDs
@@ -72,6 +78,7 @@ final class AppTap {
         self.deviceUID = deviceUID
         self.controlsVolume = controlsVolume
         self.isGlobal = isGlobal
+        self.autoStart = autoStart
         self.gain = gain
         guard start() else {
             stop()
@@ -103,7 +110,7 @@ final class AppTap {
             kAudioAggregateDeviceMainSubDeviceKey: deviceUID,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,
-            kAudioAggregateDeviceTapAutoStartKey: true,
+            kAudioAggregateDeviceTapAutoStartKey: autoStart,
             kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: deviceUID]],
             kAudioAggregateDeviceTapListKey: [[kAudioSubTapDriftCompensationKey: true,
                                                kAudioSubTapUIDKey: description.uuid.uuidString]],

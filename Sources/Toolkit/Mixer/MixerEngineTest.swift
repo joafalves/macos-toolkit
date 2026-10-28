@@ -85,6 +85,153 @@ enum MixerEngineTest {
         say("\nall stopped: \(assertions()); \(running())")
     }
 
+    // MARK: - The microphone
+
+    /// `--test-mixer-mic <report>`: the helper opens the microphone alone, as
+    /// a call app's preview does, with and without the mixer. A process its
+    /// taps cover can't start its input until a tap runs, and a tap made to
+    /// start by itself waits for that process to play: on macOS 26 a meeting
+    /// app's preview froze until the mixer was turned off. The taps should
+    /// run while the input does, and wait again after.
+    static func runMic(into path: String) {
+        var lines: [String] = []
+        func say(_ line: String) { lines.append(line); NSLog("Toolkit mic test: \(line)") }
+        defer { try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8) }
+        _ = NSApplication.shared
+
+        let input = AudioObjectID.system.read(kAudioHardwarePropertyDefaultInputDevice, as: AudioObjectID.self) ?? .unknown
+        let output = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown
+        say("input \(input.readString(kAudioObjectPropertyName) ?? "none"), output \(output.readString(kAudioObjectPropertyName) ?? "none"), permission \(AudioPermission.status)")
+        guard let helper = makeHelper() else { return say("no helper") }
+        defer { try? FileManager.default.removeItem(at: helper.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
+
+        /// `stopMixerAt`: if the input hasn't started by then, the mixer is
+        /// stopped, to see whether that lets it go.
+        /// `playFirst`: the helper plays a moment of tone and waits before
+        /// opening the microphone, so it has a tap of its own by then.
+        func attempt(_ title: String, mixer useMixer: Bool, playFirst: Bool = false, stopMixerAt: Double = 8) {
+            say("\n== \(title) ==")
+            var mixer: MixerController?
+            if useMixer {
+                mixer = MixerController.testInstance(apps: [helperID])
+                mixer?.start()
+                wait(1)
+                say("  before: \(mixer?.engineState ?? "")")
+            }
+            let report = FileManager.default.temporaryDirectory.appendingPathComponent("toolkit-mic-\(UUID().uuidString).txt")
+            defer { try? FileManager.default.removeItem(at: report) }
+            let process = Process()
+            process.executableURL = helper
+            process.arguments = ["--open-mic", report.path, "2"] + (playFirst ? ["play-first"] : [])
+            try? process.run()
+            let start = Date()
+            var state = ""
+            var stopped = false
+            var reported = false
+            var startedAt: Double?
+            let limit = playFirst ? 23.0 : 15.0
+            while Date().timeIntervalSince(start) < limit {
+                wait(0.1)
+                let elapsed = Date().timeIntervalSince(start)
+                let text = (try? String(contentsOf: report, encoding: .utf8)) ?? ""
+                let object = AudioProcesses.processObject(of: process.processIdentifier)
+                let now = object.map { object in
+                    ["running", "input", "output"].enumerated().map { index, name in
+                        let selector = [kAudioProcessPropertyIsRunning, kAudioProcessPropertyIsRunningInput, kAudioProcessPropertyIsRunningOutput][index]
+                        return "\(name) \(object.read(selector, as: UInt32.self) ?? 9)"
+                    }.joined(separator: ", ")
+                } ?? "no audio object"
+                if now != state {
+                    say(String(format: "  %.1f s: helper %@", elapsed, now))
+                    state = now
+                }
+                if text.contains("buffers") || !process.isRunning { break }
+                if let current = mixer, text.contains("started") {
+                    startedAt = startedAt ?? elapsed
+                    if !reported, let startedAt, elapsed - startedAt >= 1 {
+                        say(String(format: "  %.1f s: input started a second ago, %@", elapsed, current.engineState))
+                        reported = true
+                    }
+                }
+                if let current = mixer, !stopped, elapsed >= stopMixerAt + (playFirst ? 8 : 0), !text.contains("started") {
+                    say(String(format: "  %.1f s: input not started, mixer stopped (%@)", elapsed, current.engineState))
+                    current.stop()
+                    stopped = true
+                }
+            }
+            // It may still be letting the microphone go.
+            let exitBy = Date().addingTimeInterval(3)
+            while process.isRunning, Date() < exitBy { wait(0.1) }
+            let text = (try? String(contentsOf: report, encoding: .utf8)) ?? ""
+            for line in text.split(separator: "\n") { say("  helper: \(line)") }
+            if process.isRunning {
+                say(String(format: "  helper still running after %.0f s", Date().timeIntervalSince(start)))
+                process.terminate()
+            }
+            if let mixer, !stopped {
+                wait(4)
+                say("  4 s after: \(mixer.engineState)")
+            }
+            mixer?.stop()
+            wait(1)
+        }
+
+        attempt("the microphone alone, no mixer", mixer: false)
+        attempt("the microphone alone while the mixer's taps wait", mixer: true)
+        attempt("the microphone after a moment of sound, with the app's own tap waiting", mixer: true, playFirst: true)
+        attempt("the microphone alone, no mixer, again", mixer: false)
+    }
+
+    private final class Count: Sendable { let value = Atomic<Int>(0) }
+    private static let micBuffers = Count()
+
+    /// `--open-mic <report> <seconds>`, in the helper: the default input,
+    /// and no output, through the unit call apps use, timing its start.
+    static func openMic(_ arguments: [String]) {
+        guard arguments.count >= 2, let seconds = Double(arguments[1]) else { return }
+        NSApplication.shared.setActivationPolicy(.accessory)
+        var lines: [String] = []
+        if arguments.count > 2, arguments[2] == "play-first", let tone = writeTone(seconds: 1),
+           let player = try? AVAudioPlayer(contentsOf: tone) {
+            player.play()
+            wait(1.05)
+            player.stop()
+            // The player keeps its output up for a few seconds, then the
+            // mixer puts the tap back to waiting two seconds into a silence.
+            wait(7)
+        }
+        func note(_ line: String) {
+            lines.append(line)
+            try? (lines.joined(separator: "\n") + "\n").write(toFile: arguments[0], atomically: true, encoding: .utf8)
+        }
+        var description = AudioComponentDescription(componentType: kAudioUnitType_Output, componentSubType: kAudioUnitSubType_HALOutput,
+                                                    componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0)
+        var made: AudioUnit?
+        guard let component = AudioComponentFindNext(nil, &description), AudioComponentInstanceNew(component, &made) == noErr,
+              let unit = made else { return note("no input unit") }
+        defer { AudioComponentInstanceDispose(unit) }
+        let size = UInt32(MemoryLayout<UInt32>.size)
+        var on: UInt32 = 1, off: UInt32 = 0
+        AudioUnitSetProperty(unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &on, size)
+        AudioUnitSetProperty(unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &off, size)
+        var device = AudioObjectID.system.read(kAudioHardwarePropertyDefaultInputDevice, as: AudioObjectID.self) ?? .unknown
+        AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &device, size)
+        var callback = AURenderCallbackStruct(inputProc: { _, _, _, _, _, _ in
+            MixerEngineTest.micBuffers.value.add(1, ordering: .relaxed)
+            return noErr
+        }, inputProcRefCon: nil)
+        AudioUnitSetProperty(unit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &callback,
+                             UInt32(MemoryLayout<AURenderCallbackStruct>.size))
+        guard AudioUnitInitialize(unit) == noErr else { return note("input unit refused") }
+        note("starting \(device.readString(kAudioObjectPropertyName) ?? "?")")
+        let start = Date()
+        let status = AudioOutputUnitStart(unit)
+        note(String(format: "started in %.2f s, status %d", Date().timeIntervalSince(start), status))
+        wait(seconds)
+        note("buffers in \(Int(seconds)) s: \(micBuffers.value.load(ordering: .relaxed))")
+        AudioOutputUnitStop(unit)
+    }
+
     // MARK: - The helper
 
     /// A copy of this executable in an app of its own, so it has a bundle ID

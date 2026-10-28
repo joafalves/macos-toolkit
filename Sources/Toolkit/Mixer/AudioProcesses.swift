@@ -7,6 +7,8 @@ struct AudioClient {
     let pid: pid_t
     /// Playing sound right now, as opposed to only having audio open.
     let isPlaying: Bool
+    /// Its input is running: the microphone, or another input device.
+    let isRecording: Bool
     let bundleID: String?
 }
 
@@ -21,6 +23,8 @@ struct AudioAppGroup {
     /// The objects of processes with the app's own bundle ID, which a tap by
     /// bundle ID takes without being told about them.
     var own: Set<AudioObjectID> = []
+    /// The objects whose input is running.
+    var recording: Set<AudioObjectID> = []
 }
 
 enum AudioProcesses {
@@ -28,7 +32,9 @@ enum AudioProcesses {
         AudioObjectID.system.readArray(kAudioHardwarePropertyProcessObjectList, as: AudioObjectID.self).compactMap { object in
             guard let pid = object.read(kAudioProcessPropertyPID, as: pid_t.self) else { return nil }
             let playing = (object.read(kAudioProcessPropertyIsRunningOutput, as: UInt32.self) ?? 0) != 0
-            return AudioClient(object: object, pid: pid, isPlaying: playing, bundleID: object.readString(kAudioProcessPropertyBundleID))
+            let recording = (object.read(kAudioProcessPropertyIsRunningInput, as: UInt32.self) ?? 0) != 0
+            return AudioClient(object: object, pid: pid, isPlaying: playing, isRecording: recording,
+                               bundleID: object.readString(kAudioProcessPropertyBundleID))
         }
     }
 
@@ -58,6 +64,7 @@ enum AudioProcesses {
                 groups[app.processIdentifier]?.isPlaying = true
                 groups[app.processIdentifier]?.playing.insert(client.object)
             }
+            if client.isRecording { groups[app.processIdentifier]?.recording.insert(client.object) }
             if client.bundleID != nil, client.bundleID == app.bundleIdentifier { groups[app.processIdentifier]?.own.insert(client.object) }
         }
         return groups
