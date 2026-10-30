@@ -67,6 +67,7 @@ final class DriverLink {
         /// The real output's speed against the host's clock, from its time stamps.
         var deviceRate = 1.0
         // For the log, and the test.
+        var sampleRate = 48000.0
         var appliedGain: Float = 1
         /// Ran out of sound, which is a gap only if more comes: the end of a
         /// sound looks the same until then.
@@ -109,6 +110,8 @@ final class DriverLink {
     /// hide its device and macOS move all sound off it. Doesn't keep the Mac awake.
     private var activity: NSObjectProtocol?
     private var loggedGaps = (0, 0)
+    /// Starts and stops the real output, and holds these two.
+    private let outputQueue = DispatchQueue(label: "dev.jalves.macos-toolkit.driver-output", qos: .userInitiated)
     private var output: AudioObjectID?
     private var ioProc: AudioDeviceIOProcID?
 
@@ -136,19 +139,16 @@ final class DriverLink {
         Log.mixer.notice("driver: linked")
     }
 
-    deinit {
-        close()
-        // Never unmapped or freed: the audio thread may have only just left,
-        // and this happens at most a few times in a run.
-    }
-
     private func beat() {
         driver_shared_set_heartbeat(shared, mach_absolute_time())
     }
 
-    /// Tells the driver it's over, which hides its device within a second.
+    /// Tells the driver it's over, which hides its device within a second. Waits
+    /// for the real output to be let go. The memory stays mapped and the reader
+    /// allocated: the audio thread may have only just left, and this happens at
+    /// most a few times in a run.
     func close() {
-        stop()
+        outputQueue.sync { stopOutput() }
         heartbeat?.cancel()
         heartbeat = nil
         if let activity { ProcessInfo.processInfo.endActivity(activity) }
@@ -157,13 +157,22 @@ final class DriverLink {
     }
 
     /// Plays what the driver writes on `device`, from now on, at the driver's
-    /// sample rate, which the caller keeps the same as the device's.
-    @discardableResult
-    func start(on device: AudioObjectID) -> Bool {
+    /// sample rate, which the caller keeps the same as the device's. Off the
+    /// main thread, like `stop`: a Bluetooth output can take a second to start.
+    func start(on device: AudioObjectID) {
+        outputQueue.async { [self] in _ = startOutput(on: device) }
+    }
+
+    /// Lets go of the real output, so it and the Mac can sleep.
+    func stop() {
+        outputQueue.async { [self] in stopOutput() }
+    }
+
+    private func startOutput(on device: AudioObjectID) -> Bool {
         // Macs say the device is running again as each app joins: restarting
         // the output for that would be a gap in everything playing.
         if output == device, ioProc != nil { return true }
-        stop()
+        stopOutput()
         guard let channels = Self.stereo(of: device) else {
             Log.mixer.error("driver: output \(device, privacy: .public) has no channels to play on")
             return false
@@ -172,6 +181,7 @@ final class DriverLink {
         reader.pointee = Reader()
         reader.pointee.position = driver_shared_write_head(shared)
         reader.pointee.slack = Self.slackSeconds * sampleRate
+        reader.pointee.sampleRate = sampleRate
         // Not from full: the first buffer is already at the volume it should be.
         reader.pointee.appliedGain = gain
         let shared = shared, reader = reader, scratch = scratch, mainGain = mainGain, equalizer = equalizer
@@ -309,7 +319,12 @@ final class DriverLink {
             Log.mixer.error("driver: output's IO proc: \(status, privacy: .public)")
             return false
         }
-        status = AudioDeviceStart(device, id)
+        // An output that has only just appeared can take a moment to agree.
+        for attempt in 0..<10 {
+            status = AudioDeviceStart(device, id)
+            if status == noErr { break }
+            if attempt < 9 { usleep(100_000) }
+        }
         guard status == noErr else {
             Log.mixer.error("driver: output start: \(status, privacy: .public)")
             AudioDeviceDestroyIOProcID(device, id)
@@ -321,8 +336,7 @@ final class DriverLink {
         return true
     }
 
-    /// Lets go of the real output, so it and the Mac can sleep.
-    func stop() {
+    private func stopOutput() {
         guard let output, let ioProc else { return }
         AudioDeviceStop(output, ioProc)
         AudioDeviceDestroyIOProcID(output, ioProc)
@@ -332,8 +346,6 @@ final class DriverLink {
         driver_shared_set_rate(shared, 1)
         Log.mixer.notice("driver: output let go, \(self.reader.pointee.underruns, privacy: .public) gaps, \(self.reader.pointee.skips, privacy: .public) skips")
     }
-
-    var isPlaying: Bool { ioProc != nil }
 
     /// Off the audio thread, on the mixer's slow timer: a gap goes in the log
     /// as it happens, with what was queued then.
@@ -394,8 +406,7 @@ final class DriverLink {
     /// For the log and the test, read off the audio thread: a moment stale.
     var state: String {
         let reader = reader.pointee
-        let rate = output?.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 48000
-        func ms(_ frames: Double) -> String { String(format: "%.1f", frames / rate * 1000) }
+        func ms(_ frames: Double) -> String { String(format: "%.1f", frames / reader.sampleRate * 1000) }
         return "queued \(ms(reader.ahead)) ms (\(ms(Double(reader.cycleFrames) + reader.slack)) wanted), reads \(ms(reader.sinceWriteLow))-\(ms(reader.sinceWriteHigh)) ms after a write, "
             + "level \(reader.lastLevel), \(reader.underruns) gaps, \(reader.skips) skips, rate \(String(format: "%.6f", driver_shared_rate(shared)))"
     }

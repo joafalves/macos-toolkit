@@ -253,7 +253,10 @@ the **System Audio Recording** permission, which is asked for as the mixer is tu
   Installing the driver asks for your password and stops all sound for a moment. If the toolkit quits
   or crashes, its device goes and macOS moves sound back to a real output. It only answers an app in
   the Applications folder, and an app set to one particular output plays there directly, without its
-  volume or the equalizer.
+  volume or the equalizer. macOS shows the toolkit as the output: choose the real one in the mixer, or
+  in macOS's own menu, which sends the sound there and keeps the toolkit in front. Headphones take over
+  as they connect, and when an output goes, the last one you used comes back. Deleting the app leaves
+  the driver behind, out of the way; turn the switch off and use Remove first.
 - A tapped app's sound is delayed by about one audio buffer, a few milliseconds on built-in and wired
   outputs. The real figure is logged when a tap starts (see Logs, under Good to know). Bluetooth
   outputs may add more; I haven't

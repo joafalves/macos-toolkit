@@ -658,8 +658,9 @@ final class MixerController: ObservableObject {
         guard let driver else { return current }
         if driver.device == nil {
             // On the way up: sound still plays on the output it's on.
-            let fallback = outputs.first { $0.transport == kAudioDeviceTransportTypeBuiltIn } ?? outputs.first
+            let fallback = outputs.first { $0.transport == kAudioDeviceTransportTypeBuiltIn && !DriverRoutes.takesOver($0) } ?? outputs.first
             guard driver.adopt(real: current, fallback: fallback?.id) else { return current }
+            _ = driver.routes.next(among: outputs, current: outputs.first { $0.id == driver.output }?.uid)
             driverRetries = 0
             driverDeadline?.cancel()
             driverDeadline = nil
@@ -675,14 +676,13 @@ final class MixerController: ObservableObject {
         }
         if current != driver.device, current != .unknown {
             Log.mixer.notice("driver: \(current.readString(kAudioDevicePropertyDeviceUID) ?? "?", privacy: .public) was made the default, so sound goes on to it")
-            driver.setOutput(current)
-            if let device = driver.device { AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, device) }
+            driver.follow(current)
         }
-        // The output it played on was unplugged, with nothing to tell macOS to
-        // move, since the default never changed: the built-in one, or any.
-        if !outputs.contains(where: { $0.id == driver.output }),
-           let next = outputs.first(where: { $0.transport == kAudioDeviceTransportTypeBuiltIn }) ?? outputs.first {
-            Log.mixer.notice("driver: the output is gone, so sound goes on to \(next.uid, privacy: .public)")
+        // With the device as the default, macOS has nothing to move when an
+        // output goes, and may not move to one that appears.
+        let playing = outputs.first { $0.id == driver.output }?.uid
+        if let next = driver.routes.next(among: outputs, current: playing) {
+            Log.mixer.notice("driver: \(playing.map { "\($0) gives way to" } ?? "the output is gone, so sound goes on to", privacy: .public) \(next.uid, privacy: .public)")
             driver.setOutput(next.id)
         }
         return driver.output
