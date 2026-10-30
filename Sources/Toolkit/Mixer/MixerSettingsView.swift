@@ -16,7 +16,7 @@ struct MixerSettingsView: View {
                        enabled: $mixer.config.enabled,
                        menuBar: MenuBarSwitch(isOn: $mixer.config.inMenuBar, caption: "A click opens the mixer."))
 
-            if mixer.config.enabled, mixer.permission != .granted {
+            if mixer.config.enabled, mixer.permission != .granted, !mixer.driverActive {
                 Banner(text: mixer.permission == .denied
                        ? "System Audio Recording is turned off for MacOS Toolkit, so the mixer can't change the sound."
                        : "The mixer needs the System Audio Recording permission: every app's volume, the equalizer and the software volume go through it.",
@@ -120,6 +120,35 @@ struct MixerSettingsView: View {
                     }
                 }
             }
+
+            // Not locked with the rest: with the driver, the permission isn't needed.
+            WhenEnabled(enabled: mixer.config.enabled) {
+                Card(title: "Audio Driver", footnote: driverNote) {
+                    ToggleRow(title: "Use the audio driver",
+                              caption: "Apps play to a device of the toolkit's, so nothing records: no purple dot, no System Audio Recording, and a microphone never waits for the mixer. Installing it asks for your password, and sound stops for a moment.",
+                              isOn: Binding(get: { mixer.config.usesDriver }, set: { mixer.setUsesDriver($0) }),
+                              badge: "Preview")
+                    if mixer.driverInstall == .current, !mixer.config.usesDriver {
+                        RowDivider()
+                        SettingRow(title: "Remove the audio driver", caption: "It stays out of the way while it's off, and macOS keeps a small process for it. Removing it asks for your password.") {
+                            Button("Remove…") { mixer.removeDriver() }
+                                .disabled(mixer.driverBusy)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var driverNote: LocalizedStringKey? {
+        switch mixer.driverProblem {
+        case .none: return nil
+        case .notInApplications: return "The driver only answers an app in the Applications folder, so the mixer is using taps."
+        case .refused: return "The driver didn't accept this copy of the app, so the mixer is using taps."
+        case .notInstalled: return "The driver isn't installed, so the mixer is using taps."
+        case .outdated: return "This version of the app needs a newer driver, so the mixer is using taps. Turn it off and on to update it."
+        case .installFailed: return "The driver wasn't installed."
+        case .noDevice: return "The driver's device didn't appear, so the mixer is using taps."
         }
     }
 

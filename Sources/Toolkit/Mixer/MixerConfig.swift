@@ -145,6 +145,9 @@ struct MixerConfig: Codable, Equatable {
     /// its own, made the first time it's changed there. Off, the per-output
     /// ones are kept for when it's on again.
     var equalizerPerOutput = false
+    /// Through the audio driver rather than taps, once it's installed. Goes
+    /// with the driver installed on this Mac, so it isn't exported.
+    var usesDriver = false
     /// By the output device's UID.
     var equalizers: [String: EqualizerConfig] = [:]
     /// Ten bands or Simple's three handles, for every output: how it's
@@ -184,6 +187,7 @@ struct MixerConfig: Codable, Equatable {
         fineStep = min(max(try c.decodeIfPresent(Int.self, forKey: .fineStep) ?? 1, Self.fineStepRange.lowerBound), Self.fineStepRange.upperBound)
         equalizer = (try? c.decodeIfPresent(EqualizerConfig.self, forKey: .equalizer)) ?? EqualizerConfig()
         equalizerPerOutput = try c.decodeIfPresent(Bool.self, forKey: .equalizerPerOutput) ?? false
+        usesDriver = try c.decodeIfPresent(Bool.self, forKey: .usesDriver) ?? false
         equalizerMode = (try? c.decodeIfPresent(EqualizerMode.self, forKey: .equalizerMode)) ?? .bands
         equalizers = (try? c.decodeIfPresent([String: EqualizerConfig].self, forKey: .equalizers)) ?? [:]
         apps = (try? c.decodeIfPresent([String: AppVolume].self, forKey: .apps)) ?? [:]

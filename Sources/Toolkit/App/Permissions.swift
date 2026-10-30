@@ -280,8 +280,10 @@ extension LayoutController {
 
 extension MixerController {
     var permissionNeeds: [PermissionNeed] {
-        [.required(.systemAudio, String(localized: "To change the volume of each app.")),
-         .optional(.accessibility, String(localized: "For the volume keys."))]
+        // Through the audio driver nothing records.
+        var needs: [PermissionNeed] = driverActive ? [] : [.required(.systemAudio, String(localized: "To change the volume of each app."))]
+        needs.append(.optional(.accessibility, String(localized: "For the volume keys.")))
+        return needs
     }
 }
 

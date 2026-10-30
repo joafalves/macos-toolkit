@@ -36,9 +36,11 @@
 #error "TOOLKIT_REQUIREMENT is set by build.sh"
 #endif
 
-enum { kObjectDevice = 2, kObjectStream = 3 };
+enum { kObjectDevice = 2, kObjectStream = 3, kObjectVolume = 4, kObjectMute = 5 };
 
-static const Float64 kSampleRates[] = {44100, 48000, 88200, 96000, 176400, 192000};
+// The rate follows the real output's, and a Bluetooth headset in a call goes
+// down to 8 or 16 kHz.
+static const Float64 kSampleRates[] = {8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 88200, 96000, 176400, 192000};
 enum { kSampleRateCount = sizeof kSampleRates / sizeof kSampleRates[0] };
 // Frames between zero time stamps: as Apple's sample, which leaves the host
 // plenty to fit its clock to.
@@ -57,6 +59,23 @@ static UInt32 gIOClients;
 static Float64 gAnchorHost;
 static Float64 gAnchorSample;
 
+// The device's volume and mute, only so macOS has something to show and change:
+// the toolkit follows them and applies them on the real output. Nothing here
+// touches the sound. Even in decibels over the same range as the built-in speakers.
+static const Float32 kVolumeRange = 63.5f;
+static _Atomic float gVolume = 1;
+static _Atomic bool gMuted;
+
+// Each client of the device: who it is, for its volume, and that volume as it
+// was last applied, which only its audio thread touches. An empty slot has
+// client ID 0. -1 for a gain not yet applied: the first buffer starts at the
+// volume it should have, not with a burst at full.
+static struct {
+    _Atomic UInt32 clientID;
+    pid_t pid;
+    float gain;
+} gClients[DRIVER_SLOTS];
+
 // The link with the toolkit. gLinkQueue covers what isn't atomic.
 static dispatch_queue_t gLinkQueue;
 static dispatch_source_t gWatch;
@@ -66,6 +85,7 @@ static bool gNameLinked;
 static uint64_t gHandedOutBeat;
 static pid_t gLinkPid;
 static _Atomic bool gPublished;
+static _Atomic UInt32 gLatency;
 
 #pragma mark - The link
 
@@ -110,6 +130,12 @@ static void Watch(void) {
     if (driver_shared_closing(shared)) return Unpublish("the toolkit closed it");
     if (kill(gLinkPid, 0) == -1 && errno == ESRCH) return Unpublish("the toolkit is gone");
     if (mach_absolute_time() - beat > SecondsToTicks(kStaleSeconds)) return Unpublish("no heartbeat");
+    UInt32 latency = driver_shared_latency(shared);
+    if (latency != atomic_exchange(&gLatency, latency)) {
+        // For the next client that asks: not a change that stops the sound.
+        const AudioObjectPropertyAddress changed = {kAudioDevicePropertyLatency, kAudioObjectPropertyScopeOutput, kAudioObjectPropertyElementMain};
+        gHost->PropertiesChanged(gHost, kObjectDevice, 1, &changed);
+    }
     if (beat != gHandedOutBeat) {
         // It has the memory open: nobody else needs the name, and with it
         // unlinked the memory goes with the last of us.
@@ -157,9 +183,14 @@ static bool MakeShared(void) {
         shm_unlink(gSharedName);
         return false;
     }
-    driver_shared_init(memory);
+    DriverSharedHeader *shared = memory;
+    driver_shared_init(shared);
+    // Whoever is already a client, for a link made while they stay.
+    for (uint32_t slot = 0; slot < DRIVER_SLOTS; slot++) {
+        if (atomic_load(&gClients[slot].clientID) != 0) driver_shared_set_client(shared, slot, gClients[slot].pid);
+    }
     gNameLinked = true;
-    atomic_store(&gShared, (DriverSharedHeader *)memory);
+    atomic_store(&gShared, shared);
     return true;
 }
 
@@ -297,9 +328,15 @@ static OSStatus DeviceProperty(const AudioObjectPropertyAddress *address, UInt32
     case kAudioObjectPropertyOwner: ANSWER(AudioObjectID, kAudioObjectPlugInObject);
     case kAudioObjectPropertyName: ANSWER(CFStringRef, CFSTR("MacOS Toolkit"));
     case kAudioObjectPropertyManufacturer: ANSWER(CFStringRef, CFSTR("MacOS Toolkit"));
-    case kAudioObjectPropertyOwnedObjects:
+    case kAudioObjectPropertyOwnedObjects: {
+        AudioObjectID owned[] = {kObjectStream, kObjectVolume, kObjectMute};
+        ANSWER_LIST(AudioObjectID, owned, output ? 3 : 0);
+    }
     case kAudioDevicePropertyStreams: ANSWER_LIST(AudioObjectID, &stream, output ? 1 : 0);
-    case kAudioObjectPropertyControlList: ANSWER_LIST(AudioObjectID, &stream, 0);
+    case kAudioObjectPropertyControlList: {
+        AudioObjectID controls[] = {kObjectVolume, kObjectMute};
+        ANSWER_LIST(AudioObjectID, controls, output ? 2 : 0);
+    }
     case kAudioDevicePropertyDeviceUID: ANSWER(CFStringRef, CFSTR(DRIVER_DEVICE_UID));
     case kAudioDevicePropertyModelUID: ANSWER(CFStringRef, CFSTR("dev.jalves.macos-toolkit.audio.model"));
     case kAudioDevicePropertyTransportType: ANSWER(UInt32, kAudioDeviceTransportTypeVirtual);
@@ -315,7 +352,7 @@ static OSStatus DeviceProperty(const AudioObjectPropertyAddress *address, UInt32
     }
     case kAudioDevicePropertyDeviceCanBeDefaultDevice:
     case kAudioDevicePropertyDeviceCanBeDefaultSystemDevice: ANSWER(UInt32, output ? 1 : 0);
-    case kAudioDevicePropertyLatency:
+    case kAudioDevicePropertyLatency: ANSWER(UInt32, output ? atomic_load(&gLatency) : 0);
     case kAudioDevicePropertySafetyOffset: ANSWER(UInt32, 0);
     case kAudioDevicePropertyNominalSampleRate: ANSWER(Float64, CurrentRate());
     case kAudioDevicePropertyAvailableNominalSampleRates: {
@@ -371,12 +408,54 @@ static OSStatus StreamProperty(const AudioObjectPropertyAddress *address, UInt32
     return kAudioHardwareUnknownPropertyError;
 }
 
+static Float32 ScalarToDecibels(Float32 scalar) {
+    return (scalar - 1) * kVolumeRange;
+}
+
+static Float32 DecibelsToScalar(Float32 decibels) {
+    Float32 scalar = decibels / kVolumeRange + 1;
+    return scalar < 0 ? 0 : scalar > 1 ? 1 : scalar;
+}
+
+static OSStatus VolumeProperty(const AudioObjectPropertyAddress *address, UInt32 capacity, UInt32 *outSize, void *out) {
+    switch (address->mSelector) {
+    case kAudioObjectPropertyBaseClass: ANSWER(AudioClassID, kAudioLevelControlClassID);
+    case kAudioObjectPropertyClass: ANSWER(AudioClassID, kAudioVolumeControlClassID);
+    case kAudioObjectPropertyOwner: ANSWER(AudioObjectID, kObjectDevice);
+    case kAudioObjectPropertyOwnedObjects: ANSWER_LIST(AudioObjectID, NULL, 0);
+    case kAudioControlPropertyScope: ANSWER(AudioObjectPropertyScope, kAudioObjectPropertyScopeOutput);
+    case kAudioControlPropertyElement: ANSWER(AudioObjectPropertyElement, kAudioObjectPropertyElementMain);
+    case kAudioLevelControlPropertyScalarValue: ANSWER(Float32, atomic_load(&gVolume));
+    case kAudioLevelControlPropertyDecibelValue: ANSWER(Float32, ScalarToDecibels(atomic_load(&gVolume)));
+    case kAudioLevelControlPropertyDecibelRange: ANSWER(AudioValueRange, ((AudioValueRange){-kVolumeRange, 0}));
+    // These two read the value to convert from where they write the answer.
+    case kAudioLevelControlPropertyConvertScalarToDecibels: ANSWER(Float32, out ? ScalarToDecibels(*(Float32 *)out) : 0);
+    case kAudioLevelControlPropertyConvertDecibelsToScalar: ANSWER(Float32, out ? DecibelsToScalar(*(Float32 *)out) : 0);
+    }
+    return kAudioHardwareUnknownPropertyError;
+}
+
+static OSStatus MuteProperty(const AudioObjectPropertyAddress *address, UInt32 capacity, UInt32 *outSize, void *out) {
+    switch (address->mSelector) {
+    case kAudioObjectPropertyBaseClass: ANSWER(AudioClassID, kAudioBooleanControlClassID);
+    case kAudioObjectPropertyClass: ANSWER(AudioClassID, kAudioMuteControlClassID);
+    case kAudioObjectPropertyOwner: ANSWER(AudioObjectID, kObjectDevice);
+    case kAudioObjectPropertyOwnedObjects: ANSWER_LIST(AudioObjectID, NULL, 0);
+    case kAudioControlPropertyScope: ANSWER(AudioObjectPropertyScope, kAudioObjectPropertyScopeOutput);
+    case kAudioControlPropertyElement: ANSWER(AudioObjectPropertyElement, kAudioObjectPropertyElementMain);
+    case kAudioBooleanControlPropertyValue: ANSWER(UInt32, atomic_load(&gMuted) ? 1 : 0);
+    }
+    return kAudioHardwareUnknownPropertyError;
+}
+
 static OSStatus Property(AudioObjectID object, pid_t pid, const AudioObjectPropertyAddress *address, UInt32 qualifierSize,
                          const void *qualifier, UInt32 capacity, UInt32 *outSize, void *out) {
     switch (object) {
     case kAudioObjectPlugInObject: return PlugInProperty(pid, address, qualifierSize, qualifier, capacity, outSize, out);
     case kObjectDevice: return DeviceProperty(address, capacity, outSize, out);
     case kObjectStream: return StreamProperty(address, capacity, outSize, out);
+    case kObjectVolume: return VolumeProperty(address, capacity, outSize, out);
+    case kObjectMute: return MuteProperty(address, capacity, outSize, out);
     }
     return kAudioHardwareBadObjectError;
 }
@@ -395,7 +474,9 @@ static OSStatus IsPropertySettable(AudioServerPlugInDriverRef driver, AudioObjec
     if (status != kAudioHardwareNoError) return status;
     AudioObjectPropertySelector selector = address->mSelector;
     *outSettable = (object == kObjectDevice && selector == kAudioDevicePropertyNominalSampleRate)
-        || (object == kObjectStream && (selector == kAudioStreamPropertyVirtualFormat || selector == kAudioStreamPropertyPhysicalFormat));
+        || (object == kObjectStream && (selector == kAudioStreamPropertyVirtualFormat || selector == kAudioStreamPropertyPhysicalFormat))
+        || (object == kObjectVolume && (selector == kAudioLevelControlPropertyScalarValue || selector == kAudioLevelControlPropertyDecibelValue))
+        || (object == kObjectMute && selector == kAudioBooleanControlPropertyValue);
     return kAudioHardwareNoError;
 }
 
@@ -424,6 +505,16 @@ static OSStatus RequestRate(Float64 rate) {
     return kAudioHardwareNoError;
 }
 
+static void NotifyControl(AudioObjectID control, AudioObjectPropertySelector first, AudioObjectPropertySelector second) {
+    dispatch_async(gLinkQueue, ^{
+        const AudioObjectPropertyAddress changed[] = {
+            {first, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain},
+            {second, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain},
+        };
+        gHost->PropertiesChanged(gHost, control, first == second ? 1 : 2, changed);
+    });
+}
+
 static OSStatus SetPropertyData(AudioServerPlugInDriverRef driver, AudioObjectID object, pid_t pid, const AudioObjectPropertyAddress *address,
                                 UInt32 qualifierSize, const void *qualifier, UInt32 size, const void *data) {
     (void)driver, (void)pid, (void)qualifierSize, (void)qualifier;
@@ -438,6 +529,20 @@ static OSStatus SetPropertyData(AudioServerPlugInDriverRef driver, AudioObjectID
         if (format->mFormatID != ours.mFormatID || format->mChannelsPerFrame != ours.mChannelsPerFrame || format->mBitsPerChannel != ours.mBitsPerChannel)
             return kAudioDeviceUnsupportedFormatError;
         return RequestRate(format->mSampleRate);
+    }
+    if (object == kObjectVolume && (address->mSelector == kAudioLevelControlPropertyScalarValue || address->mSelector == kAudioLevelControlPropertyDecibelValue)) {
+        if (size != sizeof(Float32)) return kAudioHardwareBadPropertySizeError;
+        Float32 value = *(const Float32 *)data;
+        value = address->mSelector == kAudioLevelControlPropertyScalarValue ? value : DecibelsToScalar(value);
+        atomic_store(&gVolume, value < 0 ? 0 : value > 1 ? 1 : value);
+        NotifyControl(kObjectVolume, kAudioLevelControlPropertyScalarValue, kAudioLevelControlPropertyDecibelValue);
+        return kAudioHardwareNoError;
+    }
+    if (object == kObjectMute && address->mSelector == kAudioBooleanControlPropertyValue) {
+        if (size != sizeof(UInt32)) return kAudioHardwareBadPropertySizeError;
+        atomic_store(&gMuted, *(const UInt32 *)data != 0);
+        NotifyControl(kObjectMute, kAudioBooleanControlPropertyValue, kAudioBooleanControlPropertyValue);
+        return kAudioHardwareNoError;
     }
     return kAudioHardwareUnknownPropertyError;
 }
@@ -504,7 +609,7 @@ static OSStatus WillDoIOOperation(AudioServerPlugInDriverRef driver, AudioObject
                                   Boolean *outWillDo, Boolean *outWillDoInPlace) {
     (void)driver, (void)client;
     if (device != kObjectDevice) return kAudioHardwareBadObjectError;
-    *outWillDo = operation == kAudioServerPlugInIOOperationWriteMix;
+    *outWillDo = operation == kAudioServerPlugInIOOperationWriteMix || operation == kAudioServerPlugInIOOperationProcessOutput;
     *outWillDoInPlace = true;
     return kAudioHardwareNoError;
 }
@@ -515,13 +620,43 @@ static OSStatus BeginIOOperation(AudioServerPlugInDriverRef driver, AudioObjectI
     return kAudioHardwareNoError;
 }
 
+// One client's sound, before the mix: its level, then its volume, glided over
+// the buffer so a change never clicks.
+static void ProcessClient(DriverSharedHeader *shared, UInt32 client, float *samples, UInt32 frames) {
+    for (uint32_t slot = 0; slot < DRIVER_SLOTS; slot++) {
+        if (atomic_load_explicit(&gClients[slot].clientID, memory_order_acquire) != client) continue;
+        UInt32 count = frames * DRIVER_CHANNELS;
+        float peak = 0;
+        for (UInt32 i = 0; i < count; i++) {
+            float value = samples[i] < 0 ? -samples[i] : samples[i];
+            if (value > peak) peak = value;
+        }
+        driver_shared_note_peak(shared, slot, peak);
+        float target = driver_shared_gain_of(shared, gClients[slot].pid);
+        float gain = gClients[slot].gain < 0 ? target : gClients[slot].gain;
+        if (gain != 1 || target != 1) {
+            float step = frames > 0 ? (target - gain) / (float)frames : 0;
+            for (UInt32 frame = 0; frame < frames; frame++) {
+                float now = gain + step * (float)frame;
+                samples[frame * DRIVER_CHANNELS] *= now;
+                samples[frame * DRIVER_CHANNELS + 1] *= now;
+            }
+        }
+        gClients[slot].gain = target;
+        return;
+    }
+}
+
 static OSStatus DoIOOperation(AudioServerPlugInDriverRef driver, AudioObjectID device, AudioObjectID stream, UInt32 client, UInt32 operation,
                               UInt32 frames, const AudioServerPlugInIOCycleInfo *cycle, void *mainBuffer, void *secondaryBuffer) {
-    (void)driver, (void)stream, (void)client, (void)cycle, (void)secondaryBuffer;
+    (void)driver, (void)stream, (void)cycle, (void)secondaryBuffer;
     if (device != kObjectDevice) return kAudioHardwareBadObjectError;
+    DriverSharedHeader *shared = atomic_load(&gShared);
+    if (!shared) return kAudioHardwareNoError;
     if (operation == kAudioServerPlugInIOOperationWriteMix) {
-        DriverSharedHeader *shared = atomic_load(&gShared);
-        if (shared) driver_shared_write(shared, mainBuffer, frames, mach_absolute_time());
+        driver_shared_write(shared, mainBuffer, frames, mach_absolute_time());
+    } else if (operation == kAudioServerPlugInIOOperationProcessOutput) {
+        ProcessClient(shared, client, mainBuffer, frames);
     }
     return kAudioHardwareNoError;
 }
@@ -556,13 +691,32 @@ static OSStatus DestroyDevice(AudioServerPlugInDriverRef driver, AudioObjectID d
     return kAudioHardwareUnsupportedOperationError;
 }
 
+// Called off the audio thread, one at a time. The ID last, so the audio thread
+// finds the rest in place.
 static OSStatus AddDeviceClient(AudioServerPlugInDriverRef driver, AudioObjectID device, const AudioServerPlugInClientInfo *client) {
-    (void)driver, (void)device, (void)client;
+    (void)driver, (void)device;
+    for (uint32_t slot = 0; slot < DRIVER_SLOTS; slot++) {
+        if (atomic_load(&gClients[slot].clientID) != 0) continue;
+        gClients[slot].pid = client->mProcessID;
+        gClients[slot].gain = -1;
+        DriverSharedHeader *shared = atomic_load(&gShared);
+        if (shared) driver_shared_set_client(shared, slot, client->mProcessID);
+        atomic_store(&gClients[slot].clientID, client->mClientID);
+        return kAudioHardwareNoError;
+    }
+    // More clients than slots: it plays at full volume, unmeasured.
     return kAudioHardwareNoError;
 }
 
 static OSStatus RemoveDeviceClient(AudioServerPlugInDriverRef driver, AudioObjectID device, const AudioServerPlugInClientInfo *client) {
-    (void)driver, (void)device, (void)client;
+    (void)driver, (void)device;
+    for (uint32_t slot = 0; slot < DRIVER_SLOTS; slot++) {
+        if (atomic_load(&gClients[slot].clientID) != client->mClientID) continue;
+        atomic_store(&gClients[slot].clientID, 0);
+        DriverSharedHeader *shared = atomic_load(&gShared);
+        if (shared) driver_shared_set_client(shared, slot, 0);
+        break;
+    }
     return kAudioHardwareNoError;
 }
 

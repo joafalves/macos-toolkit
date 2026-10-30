@@ -25,6 +25,23 @@
 // room is there so a stalled reader skips ahead rather than reading torn data.
 #define DRIVER_RING_FRAMES 32768u
 #define DRIVER_CHANNELS 2u
+// Processes with a volume of their own, and clients of the device. Far more
+// than ever play at once.
+#define DRIVER_SLOTS 64u
+
+// Written by the app: this process's volume. pid 0 is an empty slot.
+typedef struct DriverSharedGain {
+    int32_t pid;
+    uint32_t gainBits;
+} DriverSharedGain;
+
+// Written by the driver: a client of the device, and the loudest it has been
+// since the app last looked, which is before its volume, so a turned down app
+// still counts as playing.
+typedef struct DriverSharedClient {
+    int32_t pid;
+    uint32_t peakBits;
+} DriverSharedClient;
 
 typedef struct DriverSharedHeader {
     uint32_t magic;
@@ -46,10 +63,14 @@ typedef struct DriverSharedHeader {
     uint64_t heartbeat; // mach_absolute_time
     uint64_t rateBits;  // a double: the driver's clock against the host's
     uint32_t closing;
-    uint8_t padding2[44];
+    uint32_t latencyFrames; // what the device reports: the queue and the real output's own
+    uint8_t padding2[40];
+
+    DriverSharedGain gains[DRIVER_SLOTS];       // by the app
+    DriverSharedClient clients[DRIVER_SLOTS];   // by the driver
 } DriverSharedHeader;
 
-_Static_assert(sizeof(DriverSharedHeader) == 192, "three cache lines");
+_Static_assert(sizeof(DriverSharedHeader) % 64 == 0, "whole cache lines");
 
 // The app's way in (DriverShared.c): shm_open is variadic, which Swift can't
 // call. NULL, with `error` set, if it doesn't open.
@@ -143,6 +164,63 @@ static inline void driver_shared_set_closing(DriverSharedHeader *shared, bool cl
 
 static inline bool driver_shared_closing(DriverSharedHeader *shared) {
     return atomic_load_explicit((_Atomic uint32_t *)&shared->closing, memory_order_relaxed) != 0;
+}
+
+static inline void driver_shared_set_latency(DriverSharedHeader *shared, uint32_t frames) {
+    atomic_store_explicit((_Atomic uint32_t *)&shared->latencyFrames, frames, memory_order_relaxed);
+}
+
+static inline uint32_t driver_shared_latency(DriverSharedHeader *shared) {
+    return atomic_load_explicit((_Atomic uint32_t *)&shared->latencyFrames, memory_order_relaxed);
+}
+
+// The app's table of volumes. The gain before the pid, so a new pid never
+// meets the volume of the one before it.
+static inline void driver_shared_set_gain(DriverSharedHeader *shared, uint32_t slot, int32_t pid, float gain) {
+    uint32_t bits;
+    memcpy(&bits, &gain, sizeof bits);
+    atomic_store_explicit((_Atomic uint32_t *)&shared->gains[slot].gainBits, bits, memory_order_relaxed);
+    atomic_store_explicit((_Atomic int32_t *)&shared->gains[slot].pid, pid, memory_order_release);
+}
+
+// The driver's audio thread: 1 for a process with no volume of its own.
+static inline float driver_shared_gain_of(DriverSharedHeader *shared, int32_t pid) {
+    for (uint32_t slot = 0; slot < DRIVER_SLOTS; slot++) {
+        if (atomic_load_explicit((_Atomic int32_t *)&shared->gains[slot].pid, memory_order_acquire) == pid) {
+            uint32_t bits = atomic_load_explicit((_Atomic uint32_t *)&shared->gains[slot].gainBits, memory_order_relaxed);
+            float gain;
+            memcpy(&gain, &bits, sizeof gain);
+            return gain >= 0 && gain <= 1 ? gain : 1;
+        }
+    }
+    return 1;
+}
+
+static inline void driver_shared_set_client(DriverSharedHeader *shared, uint32_t slot, int32_t pid) {
+    atomic_store_explicit((_Atomic uint32_t *)&shared->clients[slot].peakBits, 0, memory_order_relaxed);
+    atomic_store_explicit((_Atomic int32_t *)&shared->clients[slot].pid, pid, memory_order_release);
+}
+
+static inline int32_t driver_shared_client(DriverSharedHeader *shared, uint32_t slot) {
+    return atomic_load_explicit((_Atomic int32_t *)&shared->clients[slot].pid, memory_order_acquire);
+}
+
+static inline void driver_shared_note_peak(DriverSharedHeader *shared, uint32_t slot, float peak) {
+    uint32_t last = atomic_load_explicit((_Atomic uint32_t *)&shared->clients[slot].peakBits, memory_order_relaxed);
+    float before;
+    memcpy(&before, &last, sizeof before);
+    if (peak > before) {
+        uint32_t bits;
+        memcpy(&bits, &peak, sizeof bits);
+        atomic_store_explicit((_Atomic uint32_t *)&shared->clients[slot].peakBits, bits, memory_order_relaxed);
+    }
+}
+
+static inline float driver_shared_take_peak(DriverSharedHeader *shared, uint32_t slot) {
+    uint32_t bits = atomic_exchange_explicit((_Atomic uint32_t *)&shared->clients[slot].peakBits, 0, memory_order_relaxed);
+    float peak;
+    memcpy(&peak, &bits, sizeof peak);
+    return peak;
 }
 
 static inline void driver_shared_set_io_running(DriverSharedHeader *shared, bool running) {

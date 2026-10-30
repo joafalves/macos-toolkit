@@ -26,9 +26,8 @@ struct SettingsFile: Codable {
 enum SettingsTransfer {
     /// Settings that only hold on the Mac they were set on, because they go
     /// with something granted there, so they're never exported and an import
-    /// leaves them alone. None now: Keep Awake's lid-closed option, with its
-    /// admin rule, was the one.
-    static let localOnly: [String: Set<String>] = [:]
+    /// leaves them alone. The mixer's audio driver is installed on this Mac only.
+    static let localOnly: [String: Set<String>] = ["mixer": ["usesDriver"]]
 
     static func exportSettings(model: AppModel, mouse: MouseController, switcher: SwitcherController, layout: LayoutController, mixer: MixerController, finder: FinderController, capture: CaptureController, awake: AwakeController, stats: StatsController) {
         let panel = NSSavePanel()

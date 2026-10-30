@@ -1,6 +1,7 @@
 import AppKit
 import AudioToolbox
 import CoreAudio
+import DriverShared
 import os
 
 /// A row in the mixer: an app that has sound open, playing or not.
@@ -74,6 +75,10 @@ final class MixerController: ObservableObject {
             }
             if config.enabled != oldValue.enabled {
                 config.enabled ? start() : stop()
+            } else if config.usesDriver != oldValue.usesDriver {
+                // From one way of carrying the sound to the other.
+                stop()
+                start()
             } else {
                 pushEqualizer()
                 // The software volume may have changed, which the taps depend on.
@@ -100,6 +105,13 @@ final class MixerController: ObservableObject {
     /// The volume keys are being caught, which needs Accessibility.
     @Published private(set) var keysInstalled = false
     @Published private(set) var permission = AudioPermission.status
+    /// Sound goes through the audio driver now, not taps.
+    @Published private(set) var driverActive = false
+    /// Why it doesn't, though it was asked to.
+    @Published private(set) var driverProblem: DriverProblem?
+    /// Being installed or removed.
+    @Published private(set) var driverBusy = false
+    @Published private(set) var driverInstall = DriverInstall.status
 
     /// The panel is on screen.
     var panelOpen = false {
@@ -190,6 +202,12 @@ final class MixerController: ObservableObject {
 
     /// What every tap that plays sound reads its equalizer from.
     private let equalizerState = EqualizerState()
+    /// While the mixer is on the driver; nil on taps. Taps are made only without it.
+    private var driver: MixerDriver?
+    /// How long to wait for the driver's device, then back to taps.
+    private var driverDeadline: DispatchWorkItem?
+    /// Each process's bundle ID, for the driver's levels.
+    private var driverBundles: [pid_t: String] = [:]
 
     init() {
         config = MixerConfig.load()
@@ -212,6 +230,7 @@ final class MixerController: ObservableObject {
         settling = true
         appsRead = false
         if ownsSystem { AppTap.removeLeftovers() }
+        startDriver()
 
         systemListeners = [
             AudioListener(.system, kAudioHardwarePropertyProcessObjectList) { [weak self] in self?.scheduleRefresh() },
@@ -242,6 +261,7 @@ final class MixerController: ObservableObject {
         guard running else { return }
         running = false
         Log.mixer.notice("mixer off")
+        stopDriver()
         taps.removeAll()
         masterTap = nil
         listeners.removeAll()
@@ -566,6 +586,11 @@ final class MixerController: ObservableObject {
     }
 
     func setOutput(_ device: OutputDevice) {
+        if driver?.device != nil {
+            driver?.setOutput(device.id)
+            refreshDevices()
+            return
+        }
         AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, device.id)
     }
 
@@ -580,7 +605,7 @@ final class MixerController: ObservableObject {
     private func refreshDevices() {
         outputs = AudioObjectID.system.readArray(kAudioHardwarePropertyDevices, as: AudioObjectID.self).compactMap { id in
             guard !id.readArray(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeOutput, as: AudioStreamID.self).isEmpty,
-                  let uid = id.readString(kAudioDevicePropertyDeviceUID), !uid.hasPrefix(AppTap.uidPrefix),
+                  let uid = id.readString(kAudioDevicePropertyDeviceUID), !uid.hasPrefix(AppTap.uidPrefix), uid != DRIVER_DEVICE_UID,
                   (id.read(kAudioDevicePropertyIsHidden, as: UInt32.self) ?? 0) == 0,
                   let name = id.readString(kAudioObjectPropertyName)
             else { return nil }
@@ -589,7 +614,7 @@ final class MixerController: ObservableObject {
         }
         .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
 
-        let current = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown
+        let current = realOutput(default: AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown)
         if current != output {
             // Not the first output read, at launch: the volume it has then stands.
             if output != .unknown {
@@ -613,6 +638,37 @@ final class MixerController: ObservableObject {
         refreshMainVolume()
     }
 
+    /// What the sound plays on, given macOS's default output: that, or on the
+    /// driver, the output behind its device. macOS or anyone else making
+    /// another output the default (headphones plugged in) is choosing the real
+    /// one, and the device goes back in front of it.
+    private func realOutput(default current: AudioObjectID) -> AudioObjectID {
+        guard let driver else { return current }
+        if driver.device == nil {
+            // On the way up: sound still plays on the output it's on.
+            guard driver.adopt(real: current) else { return current }
+            driverDeadline?.cancel()
+            driverDeadline = nil
+            driverActive = true
+            driverProblem = nil
+            driver.onVolume = { [weak self] volume, muted in self?.deviceVolumeChanged(volume, muted: muted) }
+            return driver.output
+        }
+        if current != driver.device, current != .unknown {
+            Log.mixer.notice("driver: \(current.readString(kAudioDevicePropertyDeviceUID) ?? "?", privacy: .public) was made the default, so sound goes on to it")
+            driver.setOutput(current)
+            if let device = driver.device { AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, device) }
+        }
+        // The output it played on was unplugged, with nothing to tell macOS to
+        // move, since the default never changed: the built-in one, or any.
+        if !outputs.contains(where: { $0.id == driver.output }),
+           let next = outputs.first(where: { $0.transport == kAudioDeviceTransportTypeBuiltIn }) ?? outputs.first {
+            Log.mixer.notice("driver: the output is gone, so sound goes on to \(next.uid, privacy: .public)")
+            driver.setOutput(next.id)
+        }
+        return driver.output
+    }
+
     private func refreshMainVolume() {
         let scope = kAudioObjectPropertyScopeOutput
         hardwareVolume = output.isSettable(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope)
@@ -633,6 +689,13 @@ final class MixerController: ObservableObject {
         }
         // Every output, so the keys always show the same bar while the mixer is on.
         if ownsSystem { volumeKeys.setWanted(running) }
+        driver?.mirror(volume: mainVolume, muted: mainMuted)
+    }
+
+    /// macOS's slider or keys moved the driver's device: that's the main volume.
+    private func deviceVolumeChanged(_ volume: Float, muted: Bool) {
+        if abs(volume - mainVolume) >= 0.001 { setMainVolume(volume) }
+        if muted != mainMuted { toggleMainMute() }
     }
 
     /// With one volume for every output, an output with a volume of its own
@@ -723,6 +786,8 @@ final class MixerController: ObservableObject {
 
     /// Whether every process of the app that's playing is heard, by its tap or a listener.
     private func measures(_ group: AudioAppGroup) -> Bool {
+        // The driver measures every client it has.
+        if driverActive { return true }
         let tap = group.app.bundleIdentifier.flatMap { taps[$0] }
         return group.playing.allSatisfy {
             listeners[$0] != nil || tap?.objects.contains($0) == true || (tap != nil && Self.byBundle && group.own.contains($0))
@@ -732,6 +797,13 @@ final class MixerController: ObservableObject {
     private func updateLevels() {
         guard running else { return }
         let now = Date()
+        if let driver {
+            for (pid, peak) in driver.link.takePeaks() where peak > Self.silence {
+                if let bundleID = driverBundles[pid] { lastSound[bundleID] = now }
+            }
+            if currentlyAudible() != audible { updateList() }
+            return
+        }
         var heard: [String: Bool] = [:]
         for (key, tap) in allTaps { heard[key] = tap.takePeak() > Self.silence }
         for (key, loud) in heard where loud && key != Self.masterKey { lastSound[key] = now }
@@ -999,6 +1071,11 @@ final class MixerController: ObservableObject {
     private func rebuildTaps() {
         // Another output has its own equalizer, and maybe another sample rate.
         pushEqualizer()
+        if let driver {
+            driver.outputReconfigured()
+            applyTaps()
+            return
+        }
         let pair = output.readArray(kAudioDevicePropertyPreferredChannelsForStereo, scope: kAudioObjectPropertyScopeOutput, as: UInt32.self)
         stereo = pair.count == 2 && pair.allSatisfy({ $0 >= 1 }) && pair[0] != pair[1] ? (Int(pair[0]) - 1, Int(pair[1]) - 1) : (0, 1)
         settling = true
@@ -1027,6 +1104,7 @@ final class MixerController: ObservableObject {
     /// ways sound the same. Each change is made in place: the tap that takes
     /// a process first, then the one that lets it go.
     private func applyTaps() {
+        if driver != nil { return applyToDriver() }
         guard running, permission == .granted, let device = currentOutput else {
             taps.removeAll()
             masterTap = nil
@@ -1204,6 +1282,130 @@ final class MixerController: ObservableObject {
         listeners = listeners.filter { waiting.contains($0.key) }
         heardAt = heardAt.filter { listeners[$0.key] != nil }
         stranded = Set(byApp.filter { plan[$0.key] == nil && failed.contains("\(device.uid) \($0.key)") }.values.flatMap(\.objects))
+    }
+
+    // MARK: - The driver
+
+    private func startDriver() {
+        driverInstall = DriverInstall.status
+        guard ownsSystem, config.usesDriver else {
+            driverProblem = nil
+            return
+        }
+        switch driverInstall {
+        case .current: break
+        case .missing, .unavailable:
+            driverProblem = .notInstalled
+            Log.mixer.notice("driver: asked for, but it isn't installed: on taps")
+            return
+        case .outdated:
+            driverProblem = .outdated
+            Log.mixer.notice("driver: asked for, but the installed one is another version: on taps")
+            return
+        }
+        do {
+            driver = try MixerDriver(equalizer: equalizerState)
+            // Its device shows in a moment, which the device list's listener hears.
+            let deadline = DispatchWorkItem { [weak self] in self?.driverNeverShowed() }
+            driverDeadline = deadline
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: deadline)
+        } catch {
+            Log.mixer.error("driver: no link: \(String(describing: error), privacy: .public): on taps")
+            // It reads the app from disk, which it can't anywhere under a home folder.
+            driverProblem = Bundle.main.bundlePath.hasPrefix("/Applications/") ? .refused : .notInApplications
+        }
+    }
+
+    private func driverNeverShowed() {
+        Log.mixer.error("driver: its device never showed: on taps")
+        driverProblem = .noDevice
+        stopDriver()
+        rebuildTaps()
+    }
+
+    private func stopDriver() {
+        driverDeadline?.cancel()
+        driverDeadline = nil
+        driver?.close()
+        driver = nil
+        driverActive = false
+        driverBundles = [:]
+    }
+
+    /// Each process at its app's volume, and the main volume where the output
+    /// has none of its own. The driver glides to them, so nothing here has to
+    /// wait for a quiet moment as taps do.
+    private func applyToDriver() {
+        guard running, let driver else { return }
+        driver.link.gain = masterGain
+        var gains: [pid_t: Float] = [:]
+        var bundles: [pid_t: String] = [:]
+        for group in groups.values {
+            guard let bundleID = group.app.bundleIdentifier else { continue }
+            let setting = config.ignored[bundleID] == nil ? config.apps[bundleID] : nil
+            for object in group.objects {
+                guard let pid = object.read(kAudioProcessPropertyPID, as: pid_t.self) else { continue }
+                bundles[pid] = bundleID
+                if let setting, !setting.isDefault { gains[pid] = setting.gain }
+            }
+        }
+        driverBundles = bundles
+        driver.link.setGains(gains)
+    }
+
+    /// The preview's switch. Turning it on installs the driver first if it has
+    /// to, which asks for a password. Off a moment for a coreaudiod restart.
+    func setUsesDriver(_ on: Bool) {
+        driverInstall = DriverInstall.status
+        guard on, driverInstall != .current else {
+            config.usesDriver = on
+            return
+        }
+        driverBusy = true
+        let wasRunning = running
+        stop()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let installed = DriverInstall.run(install: true)
+            DispatchQueue.main.async { [self] in
+                driverBusy = false
+                driverInstall = DriverInstall.status
+                if installed {
+                    driverProblem = nil
+                    whenDriverLoaded { [self] in
+                        config.usesDriver = true
+                        // No change of setting if it was already set, for an update.
+                        if wasRunning, !running { start() }
+                    }
+                } else {
+                    driverProblem = .installFailed
+                    if wasRunning { start() }
+                }
+            }
+        }
+    }
+
+    /// Takes the driver off this Mac.
+    func removeDriver() {
+        driverBusy = true
+        let wasRunning = running
+        stop()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let removed = DriverInstall.run(install: false)
+            DispatchQueue.main.async { [self] in
+                driverBusy = false
+                driverInstall = DriverInstall.status
+                if !removed { Log.mixer.error("driver: not removed") }
+                if wasRunning { start() }
+            }
+        }
+    }
+
+    /// coreaudiod has restarted, and takes a moment to load its drivers.
+    private func whenDriverLoaded(tries: Int = 40, _ then: @escaping () -> Void) {
+        if DriverLink.plugIn != nil || tries <= 0 { return then() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.whenDriverLoaded(tries: tries - 1, then)
+        }
     }
 
     /// Another pass soon, for the taps this one left for later.

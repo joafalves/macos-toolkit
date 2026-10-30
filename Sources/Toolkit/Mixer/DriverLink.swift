@@ -2,6 +2,7 @@ import CoreAudio
 import DriverShared
 import Foundation
 import os
+import Synchronization
 
 /// The toolkit's end of the audio driver (`Driver/ToolkitAudio.c`): opens the
 /// memory the driver shares, keeps its device alive with a heartbeat, and
@@ -66,6 +67,7 @@ final class DriverLink {
         /// The real output's speed against the host's clock, from its time stamps.
         var deviceRate = 1.0
         // For the log, and the test.
+        var appliedGain: Float = 1
         var underruns = 0
         var skips = 0
         var lastLevel: Int64 = 0
@@ -86,7 +88,16 @@ final class DriverLink {
     /// Well inside what the driver accepts, and what a real clock could be off.
     private static let furthest = 0.0005
 
+    /// What the audio thread reads of the main volume; a class so the block can hold it.
+    private final class MainGain: Sendable {
+        let bits = Atomic<UInt32>(Float(1).bitPattern)
+    }
+
     private let shared: UnsafeMutablePointer<DriverSharedHeader>
+    private let mainGain = MainGain()
+    private let equalizer: EqualizerState?
+    /// The slot in the driver's table of each process with a volume of its own.
+    private var slots: [pid_t: UInt32] = [:]
     private let reader = UnsafeMutablePointer<Reader>.allocate(capacity: 1)
     /// Interleaved frames for one cycle of the real output.
     private let scratch = UnsafeMutablePointer<Float>.allocate(capacity: 16384 * Int(DRIVER_CHANNELS))
@@ -94,7 +105,9 @@ final class DriverLink {
     private var output: AudioObjectID?
     private var ioProc: AudioDeviceIOProcID?
 
-    init() throws {
+    /// `equalizer`: applied, with its limiter, to everything played on the real output.
+    init(equalizer: EqualizerState? = nil) throws {
+        self.equalizer = equalizer
         guard let plugIn = Self.plugIn else { throw Failure.notInstalled }
         guard let name = plugIn.readString(DRIVER_LINK_SELECTOR) else { throw Failure.refused }
         // Open as soon as it's given: the driver takes the name away after.
@@ -149,11 +162,13 @@ final class DriverLink {
         reader.pointee = Reader()
         reader.pointee.position = driver_shared_write_head(shared)
         reader.pointee.slack = Self.slackSeconds * sampleRate
-        let shared = shared, reader = reader, scratch = scratch
+        let shared = shared, reader = reader, scratch = scratch, mainGain = mainGain, equalizer = equalizer
+        let filters = EqualizerFilters(sampleRate: sampleRate)
+        driver_shared_set_latency(shared, Self.latency(of: device, sampleRate: sampleRate))
         var timebase = mach_timebase_info_data_t()
         mach_timebase_info(&timebase)
         let framesPerTick = sampleRate * Double(timebase.numer) / (Double(timebase.denom) * 1e9)
-        let gain = Self.gain, furthest = Self.furthest
+        let clockGain = Self.gain, furthest = Self.furthest
         let oneMillisecond = sampleRate / 1000
 
         let block: AudioDeviceIOBlock = { _, _, _, outData, outTime in
@@ -233,14 +248,23 @@ final class DriverLink {
             reader.pointee.position &+= UInt64(frames)
             let left = leftData.assumingMemoryBound(to: Float.self) + channels.left.offset
             let right = rightData.assumingMemoryBound(to: Float.self) + channels.right.offset
-            if channels.left == channels.right {
-                for frame in 0..<frames { left[frame * leftStride] = (scratch[frame * 2] + scratch[frame * 2 + 1]) * 0.5 }
-            } else {
-                for frame in 0..<frames {
-                    left[frame * leftStride] = scratch[frame * 2]
-                    right[frame * rightStride] = scratch[frame * 2 + 1]
+            if let equalizer { filters.update(equalizer.load()) }
+            let applied = reader.pointee.appliedGain
+            let wanted = Float(bitPattern: mainGain.bits.load(ordering: .relaxed))
+            let step = (wanted - applied) / Float(frames)
+            for frame in 0..<frames {
+                let g = applied + step * Float(frame)
+                var l = scratch[frame * 2] * g
+                var r = scratch[frame * 2 + 1] * g
+                if equalizer != nil { filters.process(&l, &r) }
+                if channels.left == channels.right {
+                    left[frame * leftStride] = (l + r) * 0.5
+                } else {
+                    left[frame * leftStride] = l
+                    right[frame * rightStride] = r
                 }
             }
+            reader.pointee.appliedGain = wanted
 
             // Averaged over a second or so, against where the reads should land.
             // Too far ahead: the driver's clock slows until it isn't.
@@ -248,7 +272,7 @@ final class DriverLink {
                 let ahead = Double(level) + sinceWrite
                 reader.pointee.ahead += (ahead - reader.pointee.ahead) * min(1, Double(frames) / sampleRate)
                 let off = (reader.pointee.ahead - target) / sampleRate
-                reader.pointee.correction = max(-furthest, min(furthest, -off * gain))
+                reader.pointee.correction = max(-furthest, min(furthest, -off * clockGain))
                 reader.pointee.windowLow = min(reader.pointee.windowLow, sinceWrite)
                 reader.pointee.windowHigh = max(reader.pointee.windowHigh, sinceWrite)
             }
@@ -294,6 +318,53 @@ final class DriverLink {
     }
 
     var isPlaying: Bool { ioProc != nil }
+
+    /// The main volume, where the real output has none of its own. Glided.
+    var gain: Float {
+        get { Float(bitPattern: mainGain.bits.load(ordering: .relaxed)) }
+        set { mainGain.bits.store(max(0, min(1, newValue)).bitPattern, ordering: .relaxed) }
+    }
+
+    /// Each process's volume, for those that aren't at full. The driver glides to them.
+    func setGains(_ gains: [pid_t: Float]) {
+        for (pid, slot) in slots where gains[pid] == nil {
+            driver_shared_set_gain(shared, slot, 0, 1)
+            slots[pid] = nil
+        }
+        for (pid, gain) in gains {
+            let slot = slots[pid] ?? (0..<DRIVER_SLOTS).first { !slots.values.contains($0) }
+            guard let slot else {
+                Log.mixer.error("driver: no room for the volume of pid \(pid, privacy: .public)")
+                continue
+            }
+            slots[pid] = slot
+            driver_shared_set_gain(shared, slot, pid, gain)
+        }
+    }
+
+    /// The loudest each client has been since the last call, by process,
+    /// before its volume: a turned down app still counts as playing.
+    func takePeaks() -> [pid_t: Float] {
+        var peaks: [pid_t: Float] = [:]
+        for slot in 0..<DRIVER_SLOTS {
+            let pid = driver_shared_client(shared, slot)
+            guard pid != 0 else { continue }
+            peaks[pid] = Swift.max(peaks[pid] ?? 0, driver_shared_take_peak(shared, slot))
+        }
+        return peaks
+    }
+
+    /// What the device tells apps, for their pictures to keep with their
+    /// sound: the queue, the limiter's look-ahead and the real output's own.
+    private static func latency(of device: AudioObjectID, sampleRate: Float64) -> UInt32 {
+        let scope = kAudioObjectPropertyScopeOutput
+        let stream = device.readArray(kAudioDevicePropertyStreams, scope: scope, as: AudioStreamID.self).first
+        let own = (device.read(kAudioDevicePropertyLatency, scope: scope, as: UInt32.self) ?? 0)
+            + (device.read(kAudioDevicePropertySafetyOffset, scope: scope, as: UInt32.self) ?? 0)
+            + (device.read(kAudioDevicePropertyBufferFrameSize, as: UInt32.self) ?? 0)
+            + (stream?.read(kAudioStreamPropertyLatency, as: UInt32.self) ?? 0)
+        return own + UInt32((slackSeconds + 0.0015) * sampleRate)
+    }
 
     /// For the log and the test, read off the audio thread: a moment stale.
     var state: String {

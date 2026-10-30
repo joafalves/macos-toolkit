@@ -5,6 +5,13 @@ worked on; it gets its date when it's released.
 
 ## 0.25.0 (unreleased)
 
+### Added
+
+- **Audio Mixer:** the mixer can run through an audio driver of its own, as a preview you turn on in
+  its settings: nothing records, so there's no purple dot and no System Audio Recording permission,
+  and a microphone never waits for the mixer. Installing it asks for your password. Off, the mixer
+  works as before.
+
 ## 0.24.5 (2026-10-30)
 
 ### Added

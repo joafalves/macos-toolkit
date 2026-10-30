@@ -1,5 +1,6 @@
 #if TOOLKIT_DEV
 import AppKit
+import AudioToolbox
 import AVFoundation
 import CoreAudio
 import os
@@ -176,10 +177,25 @@ enum MixerEngineTest {
         try? process.run()
         wait(1)
         say("  1 s: \(link.state), peak \(link.recentPeak); \(flags())")
-        say("  CPU while playing \(perSecond(5))")
-        say("  6 s: \(link.state), peak \(link.recentPeak); \(flags())")
+        say("  CPU while playing \(perSecond(4))")
+        say("  5 s: \(link.state), peak \(link.recentPeak); \(flags())")
+        // Its own volume: halved in the mix, and its level still as it plays.
+        let full = link.recentPeak
+        link.setGains([process.processIdentifier: 0.5])
+        wait(0.5)
+        let peaks = link.takePeaks()
+        say(String(format: "  at half: peak %.4f (%.4f at full), its level %.4f", link.recentPeak, full, peaks[process.processIdentifier] ?? -1))
+        link.setGains([process.processIdentifier: 0])
+        wait(0.5)
+        say(String(format: "  muted: peak %.4f, its level %.4f", link.recentPeak, link.takePeaks()[process.processIdentifier] ?? -1))
+        link.setGains([:])
+        wait(0.2)
+        say(String(format: "  back: peak %.4f", link.recentPeak))
+        let scope = kAudioObjectPropertyScopeOutput
+        device.write(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, Float32(0.5))
+        wait(0.1)
+        say("  the device's volume, set to 0.5, reads \(device.read(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, as: Float32.self) ?? -1); latency \(device.read(kAudioDevicePropertyLatency, scope: scope, as: UInt32.self) ?? 0) frames")
         for line in hosts() { say("  \(line)") }
-        wait(3)
         process.terminate()
         wait(2)
         say("  after it: \(link.state); \(flags())")

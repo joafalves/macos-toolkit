@@ -247,7 +247,13 @@ the **System Audio Recording** permission, which is asked for as the mixer is tu
   their waiting taps away to let the start go on, and makes running ones a moment later, so a preview
   can stall for about a second. A tap waits again once the app's microphone and sound have stopped.
   While it runs, the output stays on, and the tap costs about 1% of a core.
-- macOS shows its purple recording indicator while the mixer is on.
+- macOS shows its purple recording indicator while the mixer is on, unless it runs through the
+  **audio driver**, a preview you turn on at the bottom of its page. Then apps play to a device of the
+  toolkit's and it passes the sound on to the output, so nothing records and no permission is needed.
+  Installing the driver asks for your password and stops all sound for a moment. If the toolkit quits
+  or crashes, its device goes and macOS moves sound back to a real output. It only answers an app in
+  the Applications folder, and an app set to one particular output plays there directly, without its
+  volume or the equalizer.
 - A tapped app's sound is delayed by about one audio buffer, a few milliseconds on built-in and wired
   outputs. The real figure is logged when a tap starts (see Logs, under Good to know). Bluetooth
   outputs may add more; I haven't

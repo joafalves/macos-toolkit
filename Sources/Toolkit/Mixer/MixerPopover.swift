@@ -42,7 +42,7 @@ struct MixerPopoverView: View {
                 }
                 .padding(.horizontal, 4)
 
-                if mixer.permission != .granted {
+                if mixer.permission != .granted, !mixer.driverActive {
                     PermissionNotice(denied: mixer.permission == .denied) { mixer.requestPermission() }
                 }
 

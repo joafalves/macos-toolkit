@@ -69,11 +69,9 @@ clang -bundle -arch arm64 -O2 -Wall -Wextra -mmacosx-version-min=15.0 -ISources/
   -DTOOLKIT_REQUIREMENT="\"$REQUIREMENT\"" -fvisibility=hidden \
   -framework CoreAudio -framework CoreFoundation -framework Security \
   -o "$DRIVER/Contents/MacOS/ToolkitAudio" Driver/ToolkitAudio.c
+# A version of its own, not the app's: installing one takes a password and
+# stops all sound for a moment, so only a change to the driver may ask for it.
 cp Driver/Info.plist "$DRIVER/Contents/Info.plist"
-for key in CFBundleShortVersionString CFBundleVersion; do
-  value="$(/usr/libexec/PlistBuddy -c "Print :$key" Resources/Info.plist)"
-  /usr/libexec/PlistBuddy -c "Set :$key $value" "$DRIVER/Contents/Info.plist"
-done
 codesign --force --sign "$IDENTITY" ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} --options runtime --identifier "$BUNDLE_ID.audio" "$DRIVER"
 # Inside out: the extension first, since the app's signature covers it. The
 # hardened runtime keeps other processes from loading code into the app
