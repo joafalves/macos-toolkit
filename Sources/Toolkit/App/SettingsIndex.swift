@@ -93,6 +93,7 @@ extension SettingsIndex {
         SettingsEntry(.mixer, "Add an app", name: "Leave an app out of the mixer", caption: "Choose from the apps that are open."),
         SettingsEntry(.mixer, "Audio Driver"),
         SettingsEntry(.mixer, "Use the audio driver", caption: "Apps play to a device of the toolkit's, so nothing records: no purple dot, no System Audio Recording, and a microphone never waits for the mixer. Installing it asks for your password, and sound stops for a moment."),
+        SettingsEntry(.mixer, "Update the audio driver", caption: "This version of the app comes with another driver. Updating it asks for your password, and sound stops for a moment."),
         SettingsEntry(.mixer, "Remove the audio driver", caption: "It stays out of the way while it's off, and macOS keeps a small process for it. Removing it asks for your password."),
         SettingsEntry(.finder, "Cut", name: "Cut and paste in Finder", caption: "Finder has no Cut, so this copies the selection and the next ⌘V in Finder moves it (Move Item Here, ⌥⌘V). A short sound says the files were cut, since Finder has no way to mark them. Copying something else first cancels the cut."),
         SettingsEntry(.finder, "Cut and paste files", caption: "Select files, press ⌘X or choose Cut from the right-click menu, open another folder, press ⌘V."),

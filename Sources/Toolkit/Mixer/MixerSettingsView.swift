@@ -128,7 +128,14 @@ struct MixerSettingsView: View {
                               caption: "Apps play to a device of the toolkit's, so nothing records: no purple dot, no System Audio Recording, and a microphone never waits for the mixer. Installing it asks for your password, and sound stops for a moment.",
                               isOn: Binding(get: { mixer.config.usesDriver }, set: { mixer.setUsesDriver($0) }),
                               badge: "Preview")
-                    if mixer.driverInstall == .current, !mixer.config.usesDriver {
+                    if mixer.driverInstall == .outdated, mixer.config.usesDriver {
+                        RowDivider()
+                        SettingRow(title: "Update the audio driver", caption: "This version of the app comes with another driver. Updating it asks for your password, and sound stops for a moment.") {
+                            Button("Update…") { mixer.setUsesDriver(true) }
+                                .disabled(mixer.driverBusy)
+                        }
+                    }
+                    if [.current, .outdated].contains(mixer.driverInstall), !mixer.config.usesDriver {
                         RowDivider()
                         SettingRow(title: "Remove the audio driver", caption: "It stays out of the way while it's off, and macOS keeps a small process for it. Removing it asks for your password.") {
                             Button("Remove…") { mixer.removeDriver() }
@@ -146,7 +153,7 @@ struct MixerSettingsView: View {
         case .notInApplications: return "The driver only answers an app in the Applications folder, so the mixer is using taps."
         case .refused: return "The driver didn't accept this copy of the app, so the mixer is using taps."
         case .notInstalled: return "The driver isn't installed, so the mixer is using taps."
-        case .outdated: return "This version of the app needs a newer driver, so the mixer is using taps. Turn it off and on to update it."
+        case .outdated: return "The installed driver isn't the one this version of the app needs, so the mixer is using taps until it's updated."
         case .installFailed: return "The driver wasn't installed."
         case .noDevice: return "The driver's device didn't appear, so the mixer is using taps."
         }

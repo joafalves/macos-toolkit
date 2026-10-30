@@ -70,6 +70,9 @@ tool; keep it in step with the code.
 - `Sources/FinderExtension`: the Finder extension. It is sandboxed, so it only builds the right-click
   menu (reading `finder.json`, which its entitlements allow) and opens a `macos-toolkit://` URL that
   `FinderController.handle` acts on. Its `Info.plist` and entitlements are in `Resources/FinderExtension`.
+- `Driver` (`ToolkitAudio.c`, its `Info.plist`) and `Sources/DriverShared`: the Audio Mixer's driver, an
+  AudioServerPlugIn in plain C that `build.sh` compiles with clang, signs and puts in the app's Resources,
+  and the memory it shares with the app (`Mixer/DriverLink.swift`). See The audio driver below.
 - `Sources/Toolkit/UI/Components.swift`: shared settings-page building blocks (`Page`, `Card`,
   `SettingRow`, `ToggleRow`, `Banner`, `ViewState`, ...). Use these rather than new ad-hoc styling.
 - `Resources`: `Info.plist` (the only place the version lives), app icon, and the translations:
@@ -286,6 +289,21 @@ tool; keep it in step with the code.
   prompt whether it's unlocked: `source scripts/signing.sh; signing_unlocked && echo unlocked`.
   If it's locked, run the build in the user's Terminal panel, where they type the password; never
   call `security unlock-keychain` yourself or let a build fall back to ad-hoc signing.
+- **The audio driver** is a preview (`MixerConfig.usesDriver`, local-only). Taps stay the default, and the
+  mixer goes back to them whenever it can't use the driver (`MixerController.startDriver`).
+  - It's installed only by the switch on the mixer's page, through macOS's password dialog
+    (`DriverInstall.run`), never by an update or a launch. Nothing stays running as root.
+  - It has its own version, `CFBundleVersion` in `Driver/Info.plist`, not the app's: a release that leaves
+    the driver alone asks nothing of anyone. **Any change to `Driver/` or `DriverShared.h` that ships goes up
+    by one there**, and a change to the shared memory's layout also raises `DRIVER_SHARED_VERSION`. A copy
+    with another driver than it brought stays on taps, and its page offers Update.
+  - The driver gives its memory's name only to a process signed like the toolkit, by the certificate's hash
+    compiled in by `build.sh`, so a new identity would also orphan every installed driver. It reads the app
+    from disk to check, which `_coreaudiod` can't under a home folder: test through a copy in `/Applications`.
+  - Its device exists only while the toolkit does: a killed toolkit is noticed within a second, a hung one
+    in 15, and macOS moves sound to a real output. `--test-driver-crash` checks it.
+  - Nothing on its audio thread allocates, logs or takes more than the shortest lock. A bug there stops
+    sound for the whole Mac.
 - **Development flags** (`--test-*`, `--list-*`, `--dump-*`, `--snapshot`, `--measure-idle`, the
   `layoutTrace` default) are compiled in only with `TOOLKIT_DEV`: debug builds, and `build.sh --dev`.
   Started through `open`, the app is the one macOS asks about, so in a released build any process
@@ -368,6 +386,10 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-audio-access <report>   # the microphone and an audio tap work as signed (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-mixer-engine <report>   # the mixer on a quiet tone from a helper app: clicks when it pauses, has its volume changed or the equalizer switched, and sleep once it stops (build.sh --dev; open -n the bundle; nothing else using the mixer, so quit the installed app)
 .build/debug/Toolkit --test-mixer-mic <report>   # a helper opens the microphone alone, as a call app's preview does, with the mixer's taps waiting: whether its input starts, which taps go and which run, on a path forced on where inputs aren't held up, and what a tap running in silence costs (build.sh --dev; open -n the bundle; quit the installed app)
+.build/debug/Toolkit --test-driver <report>        # the audio driver end to end, installed: a tone through it, a volume, its cost, the microphone (build.sh --dev; open -n a copy in /Applications; quit the installed app)
+.build/debug/Toolkit --test-driver-long <report> <seconds>   # a tone through the driver with others joining: what's queued, how the clocks settle, gaps (as above)
+.build/debug/Toolkit --test-driver-crash <report>  # the toolkit killed and frozen with the driver the default output: how soon sound moves back (as above)
+./scripts/driver.sh install|remove           # the last build's driver on this Mac, for development: asks for your password, restarts coreaudiod
 .build/debug/Toolkit --test-volume           # the volume keys' steps, and saved software volumes on the even scale
 build/MacOS\ Toolkit.app/Contents/MacOS/Toolkit --measure-headroom <folder>   # each curve on the music in a folder: how far it lifts peaks, and the limiter's work (build.sh --dev, release speed)
 .build/debug/Toolkit --test-equalizer        # each preset's curve against its sliders, tones through the filters, the limiter at full scale, a preset change mid-tone, five-band equalizers read into ten

@@ -35,7 +35,10 @@ enum DriverInstall: Equatable {
         var commands = ["/bin/rm -rf \(quoted(installed.path))"]
         if install {
             guard let bundled else { return false }
+            // An app that came as a download marks what's in it, and a driver
+            // must not carry that.
             commands += ["/usr/bin/ditto \(quoted(bundled.path)) \(quoted(installed.path))",
+                         "/usr/bin/xattr -dr com.apple.quarantine \(quoted(installed.path))",
                          "/usr/sbin/chown -R root:wheel \(quoted(installed.path))"]
         }
         commands.append("/usr/bin/killall coreaudiod")
