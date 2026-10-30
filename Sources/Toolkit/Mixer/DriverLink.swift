@@ -72,6 +72,10 @@ final class DriverLink {
         /// Ran out of sound, which is a gap only if more comes: the end of a
         /// sound looks the same until then.
         var ranOut = false
+        /// The last cycle played had sound in it. Running out after silence loses
+        /// nothing: macOS pauses for up to 165 ms as a client starts (measured),
+        /// and what comes after that is the sound itself, not a burst to skip.
+        var lastCycleHadSound = false
         /// Frames played since this output started, for what a gap in the first
         /// moments says: nothing, as apps are still moving to the device.
         var playedFrames = 0.0
@@ -299,7 +303,7 @@ final class DriverLink {
             } else if level < needed {
                 // A gap only if the device is still running: otherwise the sound's over.
                 reader.pointee.playing = false
-                reader.pointee.ranOut = driver_shared_io_running(shared)
+                reader.pointee.ranOut = driver_shared_io_running(shared) && reader.pointee.lastCycleHadSound
                 return
             }
 
@@ -312,9 +316,13 @@ final class DriverLink {
             let applied = reader.pointee.appliedGain
             let wanted = Float(bitPattern: mainGain.bits.load(ordering: .relaxed))
             let step = (wanted - applied) / Float(frames)
+            var hadSound = false
             for frame in 0..<frames {
                 let g = applied + step * Float(frame)
-                if abs(scratch[frame * 2]) > 0.00001 { reader.pointee.soundFrames += 1 }
+                if abs(scratch[frame * 2]) > 0.00001 {
+                    reader.pointee.soundFrames += 1
+                    hadSound = true
+                }
                 var l = scratch[frame * 2] * g
                 var r = scratch[frame * 2 + 1] * g
                 if equalizer != nil { filters.process(&l, &r) }
@@ -326,6 +334,7 @@ final class DriverLink {
                 }
             }
             reader.pointee.appliedGain = wanted
+            reader.pointee.lastCycleHadSound = hadSound
 
             // Averaged over a second or so, against where the reads should land.
             // Too far ahead: the driver's clock slows until it isn't.
