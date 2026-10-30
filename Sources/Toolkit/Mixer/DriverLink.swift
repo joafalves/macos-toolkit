@@ -68,6 +68,9 @@ final class DriverLink {
         var deviceRate = 1.0
         // For the log, and the test.
         var appliedGain: Float = 1
+        /// Ran out of sound, which is a gap only if more comes: the end of a
+        /// sound looks the same until then.
+        var ranOut = false
         var underruns = 0
         var skips = 0
         var lastLevel: Int64 = 0
@@ -241,15 +244,19 @@ final class DriverLink {
                 // of a device wake less evenly, and the clock takes the extra away.
                 let inHand = needed + written
                 guard level >= inHand else { return }
+                // More came: that was a gap. Next time keep more to spare, up to a whole write.
+                if reader.pointee.ranOut {
+                    reader.pointee.ranOut = false
+                    reader.pointee.underruns += 1
+                    reader.pointee.slack = min(reader.pointee.slack + oneMillisecond, max(Double(written), oneMillisecond))
+                }
                 reader.pointee.position = head &- UInt64(inHand)
                 reader.pointee.playing = true
                 reader.pointee.ahead = Double(inHand) + sinceWrite
                 level = inHand
             } else if level < needed {
-                // A gap. Next time keep more to spare, up to a whole write.
                 reader.pointee.playing = false
-                reader.pointee.underruns += 1
-                reader.pointee.slack = min(reader.pointee.slack + oneMillisecond, max(Double(written), oneMillisecond))
+                reader.pointee.ranOut = true
                 return
             }
 
