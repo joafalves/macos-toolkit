@@ -134,14 +134,17 @@ static bool MakeShared(void) {
     int used = snprintf(gSharedName, sizeof gSharedName, "/tk");
     for (size_t i = 0; i < sizeof bytes; i++) used += snprintf(gSharedName + used, sizeof gSharedName - (size_t)used, "%02x", bytes[i]);
 
+    // Open to all: the driver and the toolkit run as different users, and the
+    // name is the secret, kept from everyone but the toolkit. Through the umask,
+    // since fchmod fails on shared memory (measured, EINVAL).
+    mode_t mask = umask(0);
     int fd = shm_open(gSharedName, O_CREAT | O_EXCL | O_RDWR, 0666);
+    umask(mask);
     if (fd < 0) {
         os_log_error(gLog, "shm_open: %{public}s", strerror(errno));
         return false;
     }
-    // Not left to the umask: the driver and the toolkit run as different users.
-    // The name is the secret, kept from everyone but the toolkit.
-    if (fchmod(fd, 0666) != 0 || ftruncate(fd, (off_t)driver_shared_size()) != 0) {
+    if (ftruncate(fd, (off_t)driver_shared_size()) != 0) {
         os_log_error(gLog, "shared memory setup: %{public}s", strerror(errno));
         close(fd);
         shm_unlink(gSharedName);
