@@ -243,10 +243,10 @@ the **System Audio Recording** permission, which is asked for as the mixer is tu
 - A tap waits, costing nothing, until something plays to it, and goes back to waiting two seconds
   after the sound stops, so the output and the Mac can sleep as they would without the toolkit.
   On macOS 26 an app can't start its microphone while the tap that takes its sound waits, and a
-  meeting's preview froze. The mixer checks once a second which apps use the microphone and runs
-  their taps instead, which lets a start already held up go on: the first preview after the mixer
-  starts can stall for up to a second. A tap waits again once the app's microphone and sound have
-  stopped. While it runs, the output stays on, and the tap costs about 1% of a core.
+  meeting's preview froze. There the mixer checks once a second which apps use the microphone, takes
+  their waiting taps away to let the start go on, and makes running ones a moment later, so a preview
+  can stall for about a second. A tap waits again once the app's microphone and sound have stopped.
+  While it runs, the output stays on, and the tap costs about 1% of a core.
 - macOS shows its purple recording indicator while the mixer is on.
 - A tapped app's sound is delayed by about one audio buffer, a few milliseconds on built-in and wired
   outputs. The real figure is logged when a tap starts (see Logs, under Good to know). Bluetooth

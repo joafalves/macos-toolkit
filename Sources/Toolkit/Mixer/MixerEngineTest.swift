@@ -92,8 +92,9 @@ enum MixerEngineTest {
     /// a call app's preview does, with and without the mixer. A process its
     /// taps cover can't start its input until a tap runs, and a tap made to
     /// start by itself waits for that process to play: on macOS 26 a meeting
-    /// app's preview froze until the mixer was turned off. The taps should
-    /// run while the input does, and wait again after.
+    /// app's preview froze until the mixer was turned off. Where that happens,
+    /// the waiting tap should go first, a running one follow, and a waiting one
+    /// come back after. That path is forced here; this Mac may not need it.
     static func runMic(into path: String) {
         var lines: [String] = []
         func say(_ line: String) { lines.append(line); Log.mixer.notice("mic test: \(line, privacy: .public)") }
@@ -178,6 +179,9 @@ enum MixerEngineTest {
         }
 
         attempt("the microphone alone, no mixer", mixer: false)
+        attempt("the microphone alone, the taps left as they are where inputs aren't held up", mixer: true)
+        MixerController.forceInputsHeldUp = true
+        defer { MixerController.forceInputsHeldUp = false }
         attempt("the microphone alone while the mixer's taps wait", mixer: true)
         attempt("the microphone after a moment of sound, with the app's own tap waiting", mixer: true, playFirst: true)
         attempt("the microphone alone, no mixer, again", mixer: false)

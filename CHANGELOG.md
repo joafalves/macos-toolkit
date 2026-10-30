@@ -3,7 +3,7 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
-## 0.25.0 (unreleased)
+## 0.24.5 (unreleased)
 
 ### Added
 
@@ -28,6 +28,13 @@ worked on; it gets its date when it's released.
 - **System Stats:** a panel from the menu bar could stay behind after it closed, out of sight but
   drawing again with every reading, which kept costing CPU and memory until the toolkit quit. A
   closed panel now lets go of what it showed.
+- **Audio Mixer:** on macOS 26, a call app's preview should stall for about a second instead of 14
+  seconds, which 0.24.3 only brought it down to, and for every preview. The mixer now takes the
+  app's waiting tap away first, which lets the microphone's start go on, then makes a running one.
+  A second app using the microphone is no longer missed while another is recording, and macOS 27
+  no longer runs any of this.
+- **Logs:** the mixer logs each step of a microphone's start: who started it, on which device, and
+  what became of each tap, with the IDs that tell a new tap from the one it replaces.
 
 ## 0.24.4 (2026-10-28)
 

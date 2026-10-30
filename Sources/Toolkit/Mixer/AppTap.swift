@@ -26,7 +26,8 @@ import Synchronization
 ///
 /// Without `autoStart` the device runs from the start instead of waiting: on
 /// macOS 26 a waiting tap holds up any input the processes it takes start,
-/// so the mixer runs the tap of an app using its microphone.
+/// so the mixer runs the tap of an app using its microphone (see `recording`
+/// in `MixerController`).
 final class AppTap {
     /// Our aggregate devices carry this in their UID, so leftovers from a
     /// crash can be found and removed.
@@ -93,6 +94,7 @@ final class AppTap {
     deinit { stop() }
 
     private func start() -> Bool {
+        let began = Date()
         let description = isGlobal
             ? CATapDescription(excludingProcesses: objects, deviceUID: deviceUID, stream: 0)
             : CATapDescription(processes: objects, deviceUID: deviceUID, stream: 0)
@@ -137,7 +139,7 @@ final class AppTap {
         for attempt in 0..<10 {
             status = AudioDeviceStart(aggregateID, procID)
             if status == noErr {
-                logStart(format)
+                logStart(format, attempts: attempt + 1, began: began)
                 return true
             }
             if attempt < 9 { usleep(20_000) }
@@ -146,7 +148,11 @@ final class AppTap {
     }
 
     private func stop() {
-        if tapID != .unknown { Log.mixer.notice("\(self.label, privacy: .public) tap stopped") }
+        let began = Date()
+        let trace = tapID != .unknown ? self.trace : nil
+        defer {
+            if let trace { Log.mixer.notice("stopped in \(Int(Date().timeIntervalSince(began) * 1000)) ms: \(trace, privacy: .public)") }
+        }
         if let procID {
             AudioDeviceStop(aggregateID, procID)
             AudioDeviceDestroyIOProcID(aggregateID, procID)
@@ -192,7 +198,13 @@ final class AppTap {
         guard let procID else { return }
         AudioDeviceStop(aggregateID, procID)
         AudioDeviceStart(aggregateID, procID)
-        Log.mixer.info("\(self.label, privacy: .public) tap waits for sound again")
+        Log.mixer.notice("re-armed, waits for sound: \(self.trace, privacy: .public)")
+    }
+
+    /// The tap as a trace needs it: one line per state, with its IDs, so a
+    /// new tap and the one it replaces can be told apart.
+    var trace: String {
+        "\(label) tap \(tapID) device \(aggregateID), \(autoStart ? "starts on sound" : "runs from the start"), processes \(objects), \(callbacks) buffers"
     }
 
     /// Which tap this is, for the log.
@@ -202,7 +214,7 @@ final class AppTap {
 
     /// What it takes and how, and what the detour adds on top of the app's
     /// normal path: one buffer, plus the time the tap's input is held back.
-    private func logStart(_ format: AudioStreamBasicDescription) {
+    private func logStart(_ format: AudioStreamBasicDescription, attempts: Int, began: Date) {
         let rate = aggregateID.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 0
         let buffer = aggregateID.read(kAudioDevicePropertyBufferFrameSize, as: UInt32.self) ?? 0
         let input = kAudioObjectPropertyScopeInput
@@ -218,7 +230,8 @@ final class AppTap {
         Log.mixer.notice("""
             \(self.label, privacy: .public) tap started on \(self.deviceUID, privacy: .public), \(self.autoStart ? "waiting for sound" : "running", privacy: .public): \
             \(taken, privacy: .public), \(format.mChannelsPerFrame) channels at \(Int(rate)) Hz, \
-            buffer \(buffer) frames (\(ms(buffer), privacy: .public) ms), input held \(ms(held), privacy: .public) ms
+            buffer \(buffer) frames (\(ms(buffer), privacy: .public) ms), input held \(ms(held), privacy: .public) ms; \
+            tap \(self.tapID) device \(self.aggregateID), \(attempts) start attempts, \(Int(Date().timeIntervalSince(began) * 1000)) ms
             """)
     }
 
