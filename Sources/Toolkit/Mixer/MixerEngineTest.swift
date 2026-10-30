@@ -86,6 +86,133 @@ enum MixerEngineTest {
         say("\nall stopped: \(assertions()); \(running())")
     }
 
+    // MARK: - The driver
+
+    /// `--test-driver <report>`: the audio driver, end to end, with it installed.
+    /// It links, its device shows, and it becomes the default output for a
+    /// moment; a helper plays a tone to it, and this plays what comes through
+    /// on the real output. Then what that costs, whether anything records (no
+    /// privacy dot), a microphone start with it all in place, and that the
+    /// device goes with the link. The default output is put back at the end;
+    /// if this crashes, the driver hides its device and macOS moves it back.
+    static func runDriver(into path: String) {
+        var lines: [String] = []
+        func say(_ line: String) { lines.append(line); Log.mixer.notice("driver test: \(line, privacy: .public)") }
+        defer { try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8) }
+        _ = NSApplication.shared
+        func cpu() -> Double {
+            var usage = rusage()
+            getrusage(RUSAGE_SELF, &usage)
+            return Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) * 1000 + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1000
+        }
+        func perSecond(_ seconds: Double) -> String {
+            let start = cpu()
+            wait(seconds)
+            return String(format: "%.1f ms a second", (cpu() - start) / seconds)
+        }
+        func hosts() -> [String] {
+            let ps = Process(), pipe = Pipe()
+            ps.executableURL = URL(fileURLWithPath: "/bin/ps")
+            ps.arguments = ["-Ao", "pid,user,pcpu,rss,command"]
+            ps.standardOutput = pipe
+            try? ps.run()
+            let text = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            return text.split(separator: "\n").filter { $0.contains("coreaudiod") || $0.contains("Core Audio Driver") }.map { String($0.prefix(130)) }
+        }
+
+        let output = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown
+        let system = AudioObjectID.system.read(kAudioHardwarePropertyDefaultSystemOutputDevice, as: AudioObjectID.self) ?? .unknown
+        let rate = output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 48000
+        say("real output \(output.readString(kAudioObjectPropertyName) ?? "none"), \(rate) Hz, buffer \(output.read(kAudioDevicePropertyBufferFrameSize, as: UInt32.self) ?? 0)")
+        guard let plugIn = DriverLink.plugIn else { return say("the driver isn't loaded") }
+        say("plug-in object \(plugIn)")
+        for line in hosts() { say("  \(line)") }
+
+        let start = Date()
+        let link: DriverLink
+        do { link = try DriverLink() } catch { return say("link FAILED: \(error)") }
+        say(String(format: "linked in %.0f ms", Date().timeIntervalSince(start) * 1000))
+        var found = DriverLink.device
+        while found == nil, Date().timeIntervalSince(start) < 5 {
+            wait(0.02)
+            found = DriverLink.device
+        }
+        guard let device = found else {
+            link.close()
+            return say("the device never showed")
+        }
+        say(String(format: "device %d shown in %.0f ms: %@, alive %d", device, Date().timeIntervalSince(start) * 1000,
+                   device.readString(kAudioObjectPropertyName) ?? "?", device.read(kAudioDevicePropertyDeviceIsAlive, as: UInt32.self) ?? 9))
+        device.write(kAudioDevicePropertyNominalSampleRate, rate)
+        wait(0.3)
+        say("device's rate \(device.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 0), buffer \(device.read(kAudioDevicePropertyBufferFrameSize, as: UInt32.self) ?? 0)")
+
+        // The real output runs only while something plays to the device.
+        let running = AudioListener(device, kAudioDevicePropertyDeviceIsRunningSomewhere) {
+            let now = device.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 0
+            say("  device running: \(now)")
+            if now != 0 { link.start(on: output) } else { link.stop() }
+        }
+        guard let helper = makeHelper(), let tone = writeTone(seconds: 8) else { return say("no helper or tone") }
+        defer { try? FileManager.default.removeItem(at: helper.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
+        func flags() -> String {
+            let me = AudioProcesses.clients().first { $0.pid == getpid() }
+            return "real output running \(output.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 9), this process recording \(me?.isRecording.description ?? "no audio object")"
+        }
+
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, device)
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, device)
+        wait(0.5)
+        let isDefault = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) == device
+        say("the default output now: \(isDefault); \(flags())")
+
+        say("\n== silence ==")
+        say("  CPU \(perSecond(3)); \(flags())")
+
+        say("\n== a tone from a helper, through the driver ==")
+        let process = Process()
+        process.executableURL = helper
+        process.arguments = ["--play-tone", tone.path, "player", "8"]
+        try? process.run()
+        wait(1)
+        say("  1 s: \(link.state), peak \(link.recentPeak); \(flags())")
+        say("  CPU while playing \(perSecond(5))")
+        say("  6 s: \(link.state), peak \(link.recentPeak); \(flags())")
+        for line in hosts() { say("  \(line)") }
+        wait(3)
+        process.terminate()
+        wait(2)
+        say("  after it: \(link.state); \(flags())")
+        say("  CPU in silence again \(perSecond(3))")
+
+        say("\n== the microphone, with the driver in place ==")
+        let report = FileManager.default.temporaryDirectory.appendingPathComponent("toolkit-mic-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: report) }
+        let mic = Process()
+        mic.executableURL = helper
+        mic.arguments = ["--open-mic", report.path, "2"]
+        try? mic.run()
+        let micStart = Date()
+        while mic.isRunning, Date().timeIntervalSince(micStart) < 20 { wait(0.1) }
+        let text = (try? String(contentsOf: report, encoding: .utf8)) ?? ""
+        for line in text.split(separator: "\n") { say("  helper: \(line)") }
+        if mic.isRunning {
+            say("  helper still running after 20 s")
+            mic.terminate()
+        }
+
+        say("\n== and back ==")
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, output)
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, system)
+        wait(0.3)
+        _ = running
+        link.close()
+        let closed = Date()
+        while DriverLink.device != nil, Date().timeIntervalSince(closed) < 5 { wait(0.05) }
+        say(String(format: "device %@ %.1f s after closing; the default output is %@", DriverLink.device == nil ? "gone" : "still there", Date().timeIntervalSince(closed),
+                   AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self)?.readString(kAudioObjectPropertyName) ?? "none"))
+    }
+
     // MARK: - The microphone
 
     /// `--test-mixer-mic <report>`: the helper opens the microphone alone, as

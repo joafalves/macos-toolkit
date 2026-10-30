@@ -13,6 +13,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Toolkit",
+            dependencies: ["DriverShared"],
             path: "Sources/Toolkit",
             // The development flags (main.swift): in debug builds, and in
             // `build.sh --dev`, which passes it itself. Never in a release.
@@ -20,6 +21,8 @@ let package = Package(
             // SkyLight is private; the window switcher uses it to focus single windows.
             linkerSettings: [.unsafeFlags(["-F/System/Library/PrivateFrameworks", "-framework", "SkyLight"] + sdkVersion)]
         ),
+        // What the app and the audio driver (Driver/, built by build.sh) share.
+        .target(name: "DriverShared", path: "Sources/DriverShared"),
         // The Finder Sync extension, wrapped into an .appex by build.sh. It has
         // no main: extensions start in NSExtensionMain.
         .executableTarget(

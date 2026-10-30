@@ -183,6 +183,12 @@ if let flag = CommandLine.arguments.firstIndex(of: "--play-tone") {
     MixerEngineTest.playTone(Array(CommandLine.arguments[(flag + 1)...]))
     exit(0)
 }
+// `--test-driver <report>`: the audio driver, end to end, with it installed:
+// a tone through it, what that costs, the microphone. Run with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-driver"), CommandLine.arguments.count > flag + 1 {
+    MixerEngineTest.runDriver(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
 // `--test-mixer-mic <report>`: a helper opens the microphone alone, with and
 // without the mixer's taps waiting: whether its input starts. Run with `open -n`.
 if let flag = CommandLine.arguments.firstIndex(of: "--test-mixer-mic"), CommandLine.arguments.count > flag + 1 {

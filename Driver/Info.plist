@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>ToolkitAudio</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.jalves.macos-toolkit.audio</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>MacOS Toolkit Audio</string>
+	<key>CFBundlePackageType</key>
+	<string>BNDL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0</string>
+	<key>CFBundleVersion</key>
+	<string>0</string>
+	<key>CFPlugInFactories</key>
+	<dict>
+		<key>A1799280-1839-4196-A1CC-EFFA8F199009</key>
+		<string>ToolkitAudio_Create</string>
+	</dict>
+	<key>CFPlugInTypes</key>
+	<dict>
+		<key>443ABAB8-E7B3-491A-B985-BEB9187030DB</key>
+		<array>
+			<string>A1799280-1839-4196-A1CC-EFFA8F199009</string>
+		</array>
+	</dict>
+	<key>AudioServerPlugIn_MachServices</key>
+	<array>
+		<string>com.apple.SecurityServer</string>
+		<string>com.apple.securityd.xpc</string>
+		<string>com.apple.trustd</string>
+		<string>com.apple.trustd.agent</string>
+		<string>com.apple.CodeSigningHelper</string>
+	</array>
+</dict>
+</plist>

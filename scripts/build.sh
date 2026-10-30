@@ -54,6 +54,27 @@ done
 
 signing_start
 trap signing_end EXIT
+# The audio driver, in the app's Resources, and installed from there. Only a
+# process signed like this gets the driver's shared memory: an ad-hoc build
+# has no certificate to name, so its driver goes by the identifier alone.
+DRIVER="$APP/Contents/Resources/ToolkitAudio.driver"
+if [ "$IDENTITY" = "-" ]; then
+  REQUIREMENT="identifier \\\"$BUNDLE_ID\\\""
+else
+  LEAF="$(security find-certificate -c "$IDENTITY" -Z "$SIGNING_KEYCHAIN" 2>/dev/null | awk '/^SHA-1 hash:/ { print $3; exit }')"
+  REQUIREMENT="identifier \\\"$BUNDLE_ID\\\" and certificate leaf = H\\\"$LEAF\\\""
+fi
+mkdir -p "$DRIVER/Contents/MacOS"
+clang -bundle -arch arm64 -O2 -Wall -Wextra -mmacosx-version-min=15.0 -ISources/DriverShared/include \
+  -DTOOLKIT_REQUIREMENT="\"$REQUIREMENT\"" -fvisibility=hidden \
+  -framework CoreAudio -framework CoreFoundation -framework Security \
+  -o "$DRIVER/Contents/MacOS/ToolkitAudio" Driver/ToolkitAudio.c
+cp Driver/Info.plist "$DRIVER/Contents/Info.plist"
+for key in CFBundleShortVersionString CFBundleVersion; do
+  value="$(/usr/libexec/PlistBuddy -c "Print :$key" Resources/Info.plist)"
+  /usr/libexec/PlistBuddy -c "Set :$key $value" "$DRIVER/Contents/Info.plist"
+done
+codesign --force --sign "$IDENTITY" ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} --options runtime --identifier "$BUNDLE_ID.audio" "$DRIVER"
 # Inside out: the extension first, since the app's signature covers it. The
 # hardened runtime keeps other processes from loading code into the app
 # (DYLD_INSERT_LIBRARIES, a debugger) and using its permissions.
