@@ -1294,9 +1294,13 @@ final class MixerController: ObservableObject {
         }
         switch driverInstall {
         case .current: break
-        case .missing, .unavailable:
+        case .missing:
             driverProblem = .notInstalled
             Log.mixer.notice("driver: asked for, but it isn't installed: on taps")
+            return
+        case .unavailable:
+            driverProblem = .notInstalled
+            Log.mixer.error("driver: asked for, but this build of the app has none: on taps")
             return
         case .outdated:
             driverProblem = .outdated

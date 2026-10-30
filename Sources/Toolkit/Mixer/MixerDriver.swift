@@ -19,8 +19,10 @@ enum DriverInstall: Equatable {
     private static let installed = URL(fileURLWithPath: "/Library/Audio/Plug-Ins/HAL").appendingPathComponent(name)
     private static var bundled: URL? { Bundle.main.resourceURL?.appendingPathComponent(name) }
 
+    /// From the file: `Bundle` reads no Info.plist for a bundle inside an app's
+    /// Resources (measured), and keeps what it read of one that's since been replaced.
     private static func version(at driver: URL) -> String? {
-        Bundle(url: driver)?.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        NSDictionary(contentsOf: driver.appendingPathComponent("Contents/Info.plist"))?["CFBundleVersion"] as? String
     }
 
     static var status: DriverInstall {
