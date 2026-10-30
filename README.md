@@ -256,7 +256,8 @@ the **System Audio Recording** permission, which is asked for as the mixer is tu
   volume or the equalizer. macOS shows the toolkit as the output: choose the real one in the mixer, or
   in macOS's own menu, which sends the sound there and keeps the toolkit in front. Headphones take over
   as they connect, and when an output goes, the last one you used comes back. Deleting the app leaves
-  the driver behind, out of the way; turn the switch off and use Remove first.
+  the driver behind, out of the way; turn the switch off and use Remove first. When a release brings a
+  new driver, the mixer stays off until you update it, which it asks for once and shows in the sidebar.
 - A tapped app's sound is delayed by about one audio buffer, a few milliseconds on built-in and wired
   outputs. The real figure is logged when a tap starts (see Logs, under Good to know). Bluetooth
   outputs may add more; I haven't

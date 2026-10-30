@@ -64,6 +64,10 @@ struct PermissionNeed: Identifiable {
 /// changes, so they're read again when the app comes to the front, and every
 /// second while a permissions sheet is open (`watch`).
 final class Permissions: ObservableObject {
+    /// A tool that isn't working for another reason than a permission, with why:
+    /// the sidebar gives it the same warning.
+    @Published var toolWarnings: [AppSection: String] = [:]
+
     /// `needsRestart`: turned on in System Settings, but macOS only lets
     /// this process use it once it starts again (Screen Recording).
     enum State: Equatable { case granted, denied, notAsked, needsRestart }
@@ -280,8 +284,8 @@ extension LayoutController {
 
 extension MixerController {
     var permissionNeeds: [PermissionNeed] {
-        // Through the audio driver nothing records.
-        var needs: [PermissionNeed] = driverActive ? [] : [.required(.systemAudio, String(localized: "To change the volume of each app."))]
+        // Through the audio driver nothing records, and waiting for its update nothing plays through us.
+        var needs: [PermissionNeed] = driverActive || driverBlocked ? [] : [.required(.systemAudio, String(localized: "To change the volume of each app."))]
         needs.append(.optional(.accessibility, String(localized: "For the volume keys.")))
         return needs
     }

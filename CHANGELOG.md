@@ -10,7 +10,8 @@ worked on; it gets its date when it's released.
 - **Audio Mixer:** the mixer can run through an audio driver of its own, as a preview you turn on in
   its settings: nothing records, so there's no purple dot and no System Audio Recording permission,
   and a microphone never waits for the mixer. Installing it asks for your password. Off, the mixer
-  works as before.
+  works as before. A later release with a new driver turns the mixer off until the driver is updated,
+  with an alert and a warning in the sidebar; sound keeps playing as usual.
 
 ### Fixed
 

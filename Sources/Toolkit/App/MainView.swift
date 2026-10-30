@@ -23,7 +23,13 @@ private struct SidebarRow: View {
             }
             Text(section.title)
                 .foregroundStyle(on ? .primary : .secondary)
-            if on, !permissions.ready(needs) {
+            if on, let warning = permissions.toolWarnings[section] {
+                Spacer(minLength: 4)
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .help(warning)
+                    .accessibilityLabel(Text(verbatim: warning))
+            } else if on, !permissions.ready(needs) {
                 Spacer(minLength: 4)
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)

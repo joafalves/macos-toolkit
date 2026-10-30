@@ -112,6 +112,15 @@ final class MixerController: ObservableObject {
     @Published private(set) var driverActive = false
     /// Why it doesn't, though it was asked to.
     @Published private(set) var driverProblem: DriverProblem?
+    /// The driver asked for isn't the one this app brought, or isn't there: the
+    /// mixer is off until it's updated, and sound plays as if it weren't here.
+    /// An update to the driver matters, so this doesn't carry on without it.
+    @Published private(set) var driverBlocked = false {
+        didSet {
+            guard ownsSystem else { return }
+            Permissions.shared.toolWarnings[.mixer] = driverBlocked ? String(localized: "The audio driver needs updating") : nil
+        }
+    }
     /// Being installed or removed, which takes as long as a password does.
     @Published private(set) var driverWork: DriverWork?
     /// Linked, and waiting for its device to show.
@@ -691,7 +700,7 @@ final class MixerController: ObservableObject {
     private func refreshMainVolume() {
         let scope = kAudioObjectPropertyScopeOutput
         hardwareVolume = output.isSettable(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope)
-        let software = running && !hardwareVolume && currentOutput != nil
+        let software = running && !hardwareVolume && currentOutput != nil && !driverBlocked
         if software != softwareActive {
             softwareActive = software
             Log.mixer.notice("software volume \(software ? "on" : "off", privacy: .public) for \(self.currentOutput?.uid ?? "no output", privacy: .public) (permission \(String(describing: self.permission), privacy: .public))")
@@ -1125,7 +1134,7 @@ final class MixerController: ObservableObject {
     /// a process first, then the one that lets it go.
     private func applyTaps() {
         if driver != nil { return applyToDriver() }
-        if driverRetrying { return }
+        if driverRetrying || driverBlocked { return }
         guard running, permission == .granted, let device = currentOutput else {
             taps.removeAll()
             masterTap = nil
@@ -1315,17 +1324,15 @@ final class MixerController: ObservableObject {
         }
         switch driverInstall {
         case .current: break
-        case .missing:
-            driverProblem = .notInstalled
-            Log.mixer.notice("driver: asked for, but it isn't installed: on taps")
-            return
         case .unavailable:
             driverProblem = .notInstalled
             Log.mixer.error("driver: asked for, but this build of the app has none: on taps")
             return
-        case .outdated:
+        case .missing, .outdated:
+            driverBlocked = true
             driverProblem = .outdated
-            Log.mixer.notice("driver: asked for, but the installed one is another version: on taps")
+            Log.mixer.notice("driver: the installed one isn't this app's: the mixer is off until it's updated")
+            askToUpdateDriver()
             return
         }
         do {
@@ -1373,6 +1380,25 @@ final class MixerController: ObservableObject {
         }
     }
 
+    /// Once for each version of the driver, so it can't be missed: it's the
+    /// warning in the sidebar and the page after that.
+    private func askToUpdateDriver() {
+        let key = "driverUpdateAsked"
+        let version = DriverInstall.bundledVersion
+        guard UserDefaults.standard.string(forKey: key) != version else { return }
+        UserDefaults.standard.set(version, forKey: key)
+        DispatchQueue.main.async { [self] in
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = String(localized: "The audio driver needs updating")
+            alert.informativeText = String(localized: "The Audio Mixer is off until it's updated, and sound plays as usual. Updating asks for your password, and sound stops for a moment.")
+            alert.addButton(withTitle: String(localized: "Update…"))
+            alert.addButton(withTitle: String(localized: "Later"))
+            NSApp.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn { setUsesDriver(true) }
+        }
+    }
+
     private func driverNeverShowed() {
         Log.mixer.error("driver: its device never showed: on taps")
         driverProblem = .noDevice
@@ -1386,6 +1412,7 @@ final class MixerController: ObservableObject {
         driver?.close()
         driver = nil
         driverActive = false
+        driverBlocked = false
         driverStarting = false
         driverBundles = [:]
     }
@@ -1580,6 +1607,7 @@ extension MixerController {
             case "outdated":
                 mixer.driverInstall = .outdated
                 mixer.driverProblem = .outdated
+                mixer.driverBlocked = true
             case "failed-install": mixer.driverProblem = .installFailed
             default: mixer.driverProblem = .noDevice
             }

@@ -42,7 +42,18 @@ struct MixerPopoverView: View {
                 }
                 .padding(.horizontal, 4)
 
-                if mixer.permission != .granted, !mixer.driverActive {
+                if mixer.driverBlocked {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text("The audio driver needs updating. The mixer is off until it is, and sound plays as usual.")
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                        Button("Update…") { mixer.setUsesDriver(true) }
+                            .disabled(mixer.driverBusy)
+                    }
+                    .font(.callout)
+                    .padding(.horizontal, 4)
+                } else if mixer.permission != .granted, !mixer.driverActive {
                     PermissionNotice(denied: mixer.permission == .denied) { mixer.requestPermission() }
                 }
 

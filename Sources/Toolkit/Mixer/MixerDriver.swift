@@ -21,6 +21,9 @@ enum DriverInstall: Equatable {
 
     /// From the file: `Bundle` reads no Info.plist for a bundle inside an app's
     /// Resources (measured), and keeps what it read of one that's since been replaced.
+    /// The version this app brings, to ask about each one once.
+    static var bundledVersion: String? { bundled.flatMap(version(at:)) }
+
     private static func version(at driver: URL) -> String? {
         NSDictionary(contentsOf: driver.appendingPathComponent("Contents/Info.plist"))?["CFBundleVersion"] as? String
     }

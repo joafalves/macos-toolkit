@@ -291,14 +291,17 @@ tool; keep it in step with the code.
   prompt whether it's unlocked: `source scripts/signing.sh; signing_unlocked && echo unlocked`.
   If it's locked, run the build in the user's Terminal panel, where they type the password; never
   call `security unlock-keychain` yourself or let a build fall back to ad-hoc signing.
-- **The audio driver** is a preview (`MixerConfig.usesDriver`, local-only). Taps stay the default, and the
-  mixer goes back to them whenever it can't use the driver (`MixerController.startDriver`).
+- **The audio driver** is a preview (`MixerConfig.usesDriver`, local-only), and is meant to replace taps
+  altogether once it's stable. Taps stay the default for now, and the mixer goes back to them if the
+  driver can't link or its device never shows (`MixerController.startDriver`).
   - It's installed only by the switch on the mixer's page, through macOS's password dialog
     (`DriverInstall.run`), never by an update or a launch. Nothing stays running as root.
   - It has its own version, `CFBundleVersion` in `Driver/Info.plist`, not the app's: a release that leaves
     the driver alone asks nothing of anyone. **Any change to `Driver/` or `DriverShared.h` that ships goes up
-    by one there**, and a change to the shared memory's layout also raises `DRIVER_SHARED_VERSION`. A copy
-    with another driver than it brought stays on taps, and its page offers Update.
+    by one there**, and a change to the shared memory's layout also raises `DRIVER_SHARED_VERSION`. A driver
+    update matters, so a copy with another driver than it brought doesn't carry on without it: the mixer
+    is off (`driverBlocked`, sound plays as usual), an alert says so once per driver version, and the sidebar's
+    warning and the page's Update stay until it's done.
   - The driver gives its memory's name only to a process signed like the toolkit, by the certificate's hash
     compiled in by `build.sh`, so a new identity would also orphan every installed driver. It reads the app
     from disk to check, which `_coreaudiod` can't under a home folder: test through a copy in `/Applications`.

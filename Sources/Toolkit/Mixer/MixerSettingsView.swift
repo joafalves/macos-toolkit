@@ -23,13 +23,18 @@ struct MixerSettingsView: View {
                        button: mixer.permission == .denied ? "Open System Settings…" : "Allow…") { mixer.requestPermission() }
             }
 
+            if mixer.config.enabled, mixer.driverBlocked {
+                Banner(text: "The audio driver needs updating. The mixer is off until it is, and sound plays as usual.",
+                       button: "Update…") { mixer.setUsesDriver(true) }
+            }
+
             if mixer.config.enabled, !mixer.keysInstalled {
                 Banner(text: "The volume keys need Accessibility. Until it's granted, macOS handles them.",
                        button: "Grant Access…") { mixer.requestAccessibility() }
             }
 
             // Locked, as when off, until it has what it needs.
-            WhenEnabled(enabled: mixer.config.enabled && permissions.ready(mixer.permissionNeeds)) {
+            WhenEnabled(enabled: mixer.config.enabled && permissions.ready(mixer.permissionNeeds) && !mixer.driverBlocked) {
                 // The mixer itself, the same views on the same controller as its
                 // menu bar panel: everything can be changed here, and the panel
                 // is the quick way to the same.
@@ -130,9 +135,9 @@ struct MixerSettingsView: View {
                               badge: "Preview")
                         .disabled(mixer.driverBusy)
                     DriverStatusLine(mixer: mixer)
-                    if mixer.driverInstall == .outdated, mixer.config.usesDriver {
+                    if mixer.driverBlocked {
                         RowDivider()
-                        SettingRow(title: "Update the audio driver", caption: "This version of the app comes with another driver. Updating it asks for your password, and sound stops for a moment.") {
+                        SettingRow(title: "Update the audio driver", caption: "Updating it asks for your password, and sound stops for a moment.") {
                             Button("Update…") { mixer.setUsesDriver(true) }
                                 .disabled(mixer.driverBusy)
                         }
@@ -181,10 +186,10 @@ private struct DriverStatusLine: View {
         if mixer.driverActive { return .on("On: sound goes through the driver.") }
         switch mixer.driverProblem {
         case nil: return nil
-        case .notInstalled: return .problem("The driver isn't installed, so the mixer is using taps.")
+        case .notInstalled: return .problem("This build of the app has no driver, so the mixer is using taps.")
         case .notInApplications: return .problem("The driver only answers an app in the Applications folder, so the mixer is using taps.")
         case .refused: return .problem("The driver didn't accept this copy of the app, so the mixer is using taps.")
-        case .outdated: return .problem("The installed driver isn't the one this version of the app needs, so the mixer is using taps until it's updated.")
+        case .outdated: return .problem("The audio driver needs updating. The mixer is off until it is, and sound plays as usual.")
         case .noDevice: return .problem("The driver's device didn't appear, so the mixer is using taps.")
         case .installFailed: return .problem("The driver wasn't installed.")
         }
