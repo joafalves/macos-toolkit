@@ -189,6 +189,23 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-driver"), CommandLine
     MixerEngineTest.runDriver(into: CommandLine.arguments[flag + 1])
     exit(0)
 }
+// `--test-driver-long <report> <seconds>`: a tone through the driver for a long
+// while: what stays queued, how the clocks settle, any gaps. Run with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-driver-long"), CommandLine.arguments.count > flag + 2 {
+    MixerEngineTest.runDriverLong(into: CommandLine.arguments[flag + 1], seconds: Double(CommandLine.arguments[flag + 2]) ?? 60)
+    exit(0)
+}
+// `--test-driver-crash <report>`: the driver's device and the default output,
+// with the toolkit killed or frozen. Run with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-driver-crash"), CommandLine.arguments.count > flag + 1 {
+    MixerEngineTest.runDriverCrash(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+// The copy that test kills.
+if CommandLine.arguments.contains("--driver-hold") {
+    MixerEngineTest.holdDriver()
+    exit(0)
+}
 // `--test-mixer-mic <report>`: a helper opens the microphone alone, with and
 // without the mixer's taps waiting: whether its input starts. Run with `open -n`.
 if let flag = CommandLine.arguments.firstIndex(of: "--test-mixer-mic"), CommandLine.arguments.count > flag + 1 {

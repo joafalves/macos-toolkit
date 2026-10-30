@@ -37,8 +37,10 @@ typedef struct DriverSharedHeader {
     // side's writes don't slow the other's reads on the audio thread. Padded by
     // hand: Swift can't import an over-aligned struct.
     uint64_t writeHead;
+    uint64_t lastWriteTicks; // mach_absolute_time of the last write
+    uint32_t lastWriteFrames;
     uint32_t ioRunning;
-    uint8_t padding1[52];
+    uint8_t padding1[40];
 
     // Written by the app.
     uint64_t heartbeat; // mach_absolute_time
@@ -78,7 +80,7 @@ static inline bool driver_shared_is_valid(DriverSharedHeader *shared) {
 }
 
 // The driver's audio thread: one writer.
-static inline void driver_shared_write(DriverSharedHeader *shared, const float *frames, uint32_t count) {
+static inline void driver_shared_write(DriverSharedHeader *shared, const float *frames, uint32_t count, uint64_t ticks) {
     uint64_t head = atomic_load_explicit((_Atomic uint64_t *)&shared->writeHead, memory_order_relaxed);
     if (count > DRIVER_RING_FRAMES) count = DRIVER_RING_FRAMES;
     uint32_t start = (uint32_t)(head & (DRIVER_RING_FRAMES - 1));
@@ -86,11 +88,21 @@ static inline void driver_shared_write(DriverSharedHeader *shared, const float *
     float *samples = driver_shared_samples(shared);
     memcpy(samples + start * DRIVER_CHANNELS, frames, first * DRIVER_CHANNELS * sizeof(float));
     memcpy(samples, frames + first * DRIVER_CHANNELS, (count - first) * DRIVER_CHANNELS * sizeof(float));
+    atomic_store_explicit((_Atomic uint64_t *)&shared->lastWriteTicks, ticks, memory_order_relaxed);
+    atomic_store_explicit((_Atomic uint32_t *)&shared->lastWriteFrames, count, memory_order_relaxed);
     atomic_store_explicit((_Atomic uint64_t *)&shared->writeHead, head + count, memory_order_release);
 }
 
 static inline uint64_t driver_shared_write_head(DriverSharedHeader *shared) {
     return atomic_load_explicit((_Atomic uint64_t *)&shared->writeHead, memory_order_acquire);
+}
+
+static inline uint64_t driver_shared_last_write_ticks(DriverSharedHeader *shared) {
+    return atomic_load_explicit((_Atomic uint64_t *)&shared->lastWriteTicks, memory_order_acquire);
+}
+
+static inline uint32_t driver_shared_last_write_frames(DriverSharedHeader *shared) {
+    return atomic_load_explicit((_Atomic uint32_t *)&shared->lastWriteFrames, memory_order_relaxed);
 }
 
 // The app's audio thread: `position` is its own, and within the capacity of

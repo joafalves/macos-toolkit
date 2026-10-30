@@ -213,6 +213,156 @@ enum MixerEngineTest {
                    AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self)?.readString(kAudioObjectPropertyName) ?? "none"))
     }
 
+    /// `--test-driver-long <report> <seconds>`: a quiet tone through the driver
+    /// for a long while: what stays queued, how the two clocks settle, any gaps.
+    static func runDriverLong(into path: String, seconds: Double) {
+        var lines: [String] = []
+        func say(_ line: String) {
+            lines.append(line)
+            Log.mixer.notice("driver test: \(line, privacy: .public)")
+            try? (lines.joined(separator: "\n") + "\n").write(toFile: path + ".partial", atomically: true, encoding: .utf8)
+        }
+        defer {
+            try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8)
+            try? FileManager.default.removeItem(atPath: path + ".partial")
+        }
+        _ = NSApplication.shared
+        let output = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown
+        let system = AudioObjectID.system.read(kAudioHardwarePropertyDefaultSystemOutputDevice, as: AudioObjectID.self) ?? .unknown
+        let rate = output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 48000
+        let link: DriverLink
+        do { link = try DriverLink() } catch { return say("link FAILED: \(error)") }
+        defer { link.close() }
+        var found = DriverLink.device
+        let start = Date()
+        while found == nil, Date().timeIntervalSince(start) < 5 {
+            wait(0.02)
+            found = DriverLink.device
+        }
+        guard let device = found else { return say("the device never showed") }
+        device.write(kAudioDevicePropertyNominalSampleRate, rate)
+        wait(0.3)
+        let running = AudioListener(device, kAudioDevicePropertyDeviceIsRunningSomewhere) {
+            let now = device.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 0
+            if now != 0 { link.start(on: output) } else { link.stop() }
+        }
+        guard let helper = makeHelper() else { return say("no helper") }
+        defer { try? FileManager.default.removeItem(at: helper.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, device)
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, device)
+        defer {
+            AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, output)
+            AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, system)
+        }
+        wait(0.5)
+        say("real output \(output.readString(kAudioObjectPropertyName) ?? "none"), \(rate) Hz, buffers \(output.read(kAudioDevicePropertyBufferFrameSize, as: UInt32.self) ?? 0) and \(device.read(kAudioDevicePropertyBufferFrameSize, as: UInt32.self) ?? 0)")
+        let process = Process()
+        process.executableURL = helper
+        process.arguments = ["--play-tone", "-", "player", String(seconds + 2)]
+        try? process.run()
+        defer { process.terminate() }
+        let began = Date()
+        var joined = 0
+        while Date().timeIntervalSince(began) < seconds {
+            wait(10)
+            say(String(format: "%3.0f s: %@, peak %.3f", Date().timeIntervalSince(began), link.state, link.recentPeak))
+            // Every 30 s another app plays a moment, as a notification does:
+            // joining the device mustn't disturb what's already playing.
+            joined += 1
+            if joined % 3 == 0 {
+                let other = Process()
+                other.executableURL = helper
+                other.arguments = ["--play-tone", "-", "player", "2"]
+                try? other.run()
+            }
+        }
+        _ = running
+    }
+
+    /// `--test-driver-crash <report>`: a copy of this app, linked and the default
+    /// output while a helper plays, is killed, and then one is frozen: how soon
+    /// the device goes, and whether sound moves back to the real output.
+    static func runDriverCrash(into path: String) {
+        var lines: [String] = []
+        func say(_ line: String) { lines.append(line); Log.mixer.notice("driver test: \(line, privacy: .public)") }
+        defer { try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8) }
+        _ = NSApplication.shared
+        guard let executable = Bundle.main.executableURL, let helper = makeHelper() else { return say("no executable or helper") }
+        defer { try? FileManager.default.removeItem(at: helper.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
+        let output = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown
+        let system = AudioObjectID.system.read(kAudioHardwarePropertyDefaultSystemOutputDevice, as: AudioObjectID.self) ?? .unknown
+        func name(_ device: AudioObjectID?) -> String { device?.readString(kAudioObjectPropertyName) ?? "none" }
+        func currentDefault() -> AudioObjectID? { AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) }
+        say("real output \(name(output))")
+
+        func scenario(_ title: String, signal: Int32, limit: Double) {
+            say("\n== \(title) ==")
+            let holder = Process()
+            holder.executableURL = executable
+            holder.arguments = ["--driver-hold"]
+            try? holder.run()
+            let started = Date()
+            var device = DriverLink.device
+            while (device == nil || currentDefault() != device), Date().timeIntervalSince(started) < 8 {
+                wait(0.05)
+                device = DriverLink.device
+            }
+            guard let device, currentDefault() == device else {
+                holder.terminate()
+                return say("  never became the default output")
+            }
+            let tone = Process()
+            tone.executableURL = helper
+            tone.arguments = ["--play-tone", "-", "player", String(limit + 6)]
+            try? tone.run()
+            wait(3)
+            say("  before: default \(name(currentDefault())), device running \(device.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 9), real output running \(output.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 9)")
+            kill(holder.processIdentifier, signal)
+            let hit = Date()
+            while DriverLink.device != nil, Date().timeIntervalSince(hit) < limit { wait(0.02) }
+            say(String(format: "  device %@ after %.2f s", DriverLink.device == nil ? "gone" : "STILL THERE", Date().timeIntervalSince(hit)))
+            let moved = Date()
+            while currentDefault() == device, Date().timeIntervalSince(moved) < 3 { wait(0.02) }
+            say(String(format: "  default output %@ after %.2f s more", name(currentDefault()), Date().timeIntervalSince(moved)))
+            wait(1.5)
+            say("  a moment on: real output running \(output.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 9) (the tone still playing)")
+            kill(holder.processIdentifier, SIGKILL)
+            tone.terminate()
+            AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, output)
+            AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, system)
+            wait(1.5)
+        }
+        scenario("the toolkit killed", signal: SIGKILL, limit: 5)
+        scenario("the toolkit frozen", signal: SIGSTOP, limit: 20)
+        say("\nafter: default \(name(currentDefault())), device \(DriverLink.device == nil ? "gone" : "there")")
+    }
+
+    /// `--driver-hold`, in the copy that test kills: linked and the default
+    /// output, playing what comes through, until it's stopped.
+    static func holdDriver() {
+        _ = NSApplication.shared
+        NSApplication.shared.setActivationPolicy(.accessory)
+        let output = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown
+        guard let link = try? DriverLink() else { return }
+        var found = DriverLink.device
+        let start = Date()
+        while found == nil, Date().timeIntervalSince(start) < 5 {
+            wait(0.02)
+            found = DriverLink.device
+        }
+        guard let device = found else { return }
+        device.write(kAudioDevicePropertyNominalSampleRate, output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 48000)
+        wait(0.2)
+        let running = AudioListener(device, kAudioDevicePropertyDeviceIsRunningSomewhere) {
+            let now = device.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 0
+            if now != 0 { link.start(on: output) } else { link.stop() }
+        }
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, device)
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, device)
+        wait(120)
+        _ = running
+    }
+
     // MARK: - The microphone
 
     /// `--test-mixer-mic <report>`: the helper opens the microphone alone, as

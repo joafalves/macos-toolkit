@@ -521,7 +521,7 @@ static OSStatus DoIOOperation(AudioServerPlugInDriverRef driver, AudioObjectID d
     if (device != kObjectDevice) return kAudioHardwareBadObjectError;
     if (operation == kAudioServerPlugInIOOperationWriteMix) {
         DriverSharedHeader *shared = atomic_load(&gShared);
-        if (shared) driver_shared_write(shared, mainBuffer, frames);
+        if (shared) driver_shared_write(shared, mainBuffer, frames, mach_absolute_time());
     }
     return kAudioHardwareNoError;
 }
