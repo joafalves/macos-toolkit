@@ -12,6 +12,12 @@ worked on; it gets its date when it's released.
   and a microphone never waits for the mixer. Installing it asks for your password. Off, the mixer
   works as before.
 
+### Fixed
+
+- **Window Layout:** a window snapped or maximized on one display when another arrives and becomes the
+  main one is snapped again where macOS leaves it, filling that display. It no longer stays at the old
+  display's size, and a drag no longer shrinks it to its size from before it was snapped.
+
 ## 0.24.5 (2026-10-30)
 
 ### Added

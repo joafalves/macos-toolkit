@@ -83,7 +83,9 @@ tool; keep it in step with the code.
   closed since are dropped then. At launch only those still true are kept: the same window number,
   owned by the same process, still at the frame it was put at, on a display that's there (by UUID:
   a display's number can change), since the same boot. When a display goes, its snapped windows are
-  snapped again where macOS moved them and remember it (`home`); when it's back, they return.
+  snapped again where macOS moved them and remember it (`home`); when it's back, they return. A display
+  that arrives as the main one renumbers every frame, leaving windows on it at their old size: those
+  are snapped again where they are, and a record for a window on another display than it says is dropped.
 - `App/Updater.swift`: updates from GitHub's `releases/latest`. It looks at launch and once a day
   and only says so; installing is a click. A download is installed only if it's the app at the
   release's version and passes `SecStaticCodeCheckValidity` against the running app's designated

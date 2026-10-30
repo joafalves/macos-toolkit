@@ -45,6 +45,12 @@ extension LayoutController {
         check("a shared edge has the wide strip", LayoutGeometry.edgeZone(at: CGPoint(x: 1490, y: 500), in: pair)?.1 == .rightHalf)
         check("the wide display's right edge snaps", LayoutGeometry.edgeZone(at: CGPoint(x: 4951, y: 500), in: pair)?.1 == .rightHalf)
         check("wide display's left neighbour", LayoutGeometry.neighbour(of: wide, .left, in: pair)?.id == laptop.id)
+        // A display arriving as main renumbers every frame.
+        let snapped = CGRect(x: 0, y: 25, width: 1512, height: 957)
+        check("a window that kept its numbers was left by the displays", LayoutController.leftByDisplays(snapped, applied: snapped, shift: CGVector(dx: -1512, dy: 0)))
+        check("as is one that moved with its display", LayoutController.leftByDisplays(snapped.offsetBy(dx: -1512, dy: 0), applied: snapped, shift: CGVector(dx: -1512, dy: 0)))
+        check("one anywhere else was moved by hand", !LayoutController.leftByDisplays(snapped.offsetBy(dx: 300, dy: 80), applied: snapped, shift: CGVector(dx: -1512, dy: 0)))
+        check("a resized one too", !LayoutController.leftByDisplays(CGRect(x: 0, y: 25, width: 900, height: 957), applied: snapped, shift: nil))
         check("a display gets halves", GridSize.suggested(for: laptop.frame.size) == GridSize(columns: 2, rows: 1))
         check("an ultrawide gets quarters", GridSize.suggested(for: wide.frame.size) == GridSize(columns: 4, rows: 1))
         // Stopping at the edge between displays. While held, the cursor

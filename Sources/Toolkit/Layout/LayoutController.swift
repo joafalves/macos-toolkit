@@ -293,11 +293,21 @@ final class LayoutController: ObservableObject {
     /// they went, so a left and right pair stays one, and remember where they came
     /// from. When that display is back, they go back to it, if they're still
     /// where they were put (or macOS has put them back there itself). A
-    /// display that only got a new number is followed. After a moment, for
-    /// macOS to finish moving the windows.
-    private func followDisplays(gone: [LayoutDisplay], back: [LayoutDisplay], displays: [LayoutDisplay]) {
+    /// display that only got a new number is followed.
+    ///
+    /// A display that arrives moves windows too, with none gone: every frame is
+    /// measured from the main display, so if the new one becomes main, a window
+    /// that keeps its numbers is suddenly on it, at the size of the old one.
+    /// Snapped windows left that way are snapped the same way where they are
+    /// now. One that isn't where it was put, on another display, isn't snapped
+    /// any more, and its record goes: a drag would otherwise take it for
+    /// snapped, and shrink it to its size from before.
+    /// After a moment, for macOS to finish moving the windows.
+    private func followDisplays(gone: [LayoutDisplay], back: [LayoutDisplay], old: [LayoutDisplay], displays: [LayoutDisplay]) {
         let gap = CGFloat(config.gap)
         let goneUUIDs = Set(gone.map(\.uuid))
+        // Their stacks place them, as the displays change.
+        let stacked = Set(tabs.stacks.flatMap { $0.members.map(\.id) })
         work.asyncAfter(deadline: .now() + 1.5) {
             for (id, record) in self.placements {
                 if let uuid = record.displayUUID, let now = displays.first(where: { $0.uuid == uuid }), now.id != record.display {
@@ -306,7 +316,8 @@ final class LayoutController: ObservableObject {
                 // Only those with somewhere to go: asking each window costs.
                 let leaving = record.displayUUID.map(goneUUIDs.contains) == true && record.unit != nil
                 let returning = record.home.map { home in back.contains { $0.uuid == home.uuid } } == true
-                guard leaving || returning, let window = LayoutWindow.find(id: id, pid: record.pid), let frame = window.frame else { continue }
+                let moving = record.unit != nil && !stacked.contains(id)
+                guard leaving || returning || moving, let window = LayoutWindow.find(id: id, pid: record.pid), let frame = window.frame else { continue }
                 if leaving, let uuid = record.displayUUID, let unit = record.unit,
                    let target = LayoutGeometry.display(of: frame, in: displays) {
                     self.place(window, .unit(unit, target), displays: displays, gap: gap, cycle: false, original: record.original)
@@ -318,9 +329,35 @@ final class LayoutController: ObservableObject {
                     guard LayoutWindow.close(frame, record.applied) || LayoutWindow.near(frame, there) else { continue }
                     self.place(window, .unit(home.unit, display), displays: displays, gap: gap, cycle: false, original: record.original)
                     LayoutTrace.log("layout: \(id) back to \(display.name)")
+                } else if let unit = record.unit, let uuid = record.displayUUID, let here = LayoutGeometry.display(of: frame, in: displays) {
+                    let was = old.first { $0.uuid == uuid }, now = displays.first { $0.uuid == uuid }
+                    let shift = was.flatMap { was in now.map { CGVector(dx: $0.frame.minX - was.frame.minX, dy: $0.frame.minY - was.frame.minY) } }
+                    if Self.leftByDisplays(frame, applied: record.applied, shift: shift) {
+                        // Already filling what it should, nothing's to be done but
+                        // for the record to say where that is.
+                        guard !LayoutWindow.close(frame, LayoutGeometry.place(unit, in: here.usable, gap: gap)) else {
+                            self.placements[id]?.applied = frame
+                            continue
+                        }
+                        self.place(window, .unit(unit, here), displays: displays, gap: gap, cycle: false, original: record.original)
+                        self.placements[id]?.home = record.home
+                        LayoutTrace.log("layout: \(id) left by a change of displays, snapped again on \(here.name)")
+                    } else if here.uuid != uuid {
+                        self.placements[id] = nil
+                        LayoutTrace.log("layout: \(id) is on \(here.name) now, not as it was put: no longer snapped")
+                    }
                 }
             }
         }
+    }
+
+    /// Whether a change of displays is all that has happened to this window:
+    /// it has the frame it was given, or that frame moved with its display.
+    /// Anywhere else, someone moved it. `shift`: how far its display moved.
+    static func leftByDisplays(_ frame: CGRect, applied: CGRect, shift: CGVector?) -> Bool {
+        if LayoutWindow.close(frame, applied) { return true }
+        guard let shift else { return false }
+        return LayoutWindow.close(frame, applied.offsetBy(dx: shift.dx, dy: shift.dy))
     }
 
     /// Hands everything back to macOS.
@@ -431,7 +468,7 @@ final class LayoutController: ObservableObject {
         let gone = old.filter { display in !fresh.contains { $0.uuid == display.uuid } }
         let back = fresh.filter { display in !old.contains { $0.uuid == display.uuid } }
         if !isPreview, !old.isEmpty, !gone.isEmpty || !back.isEmpty || fresh != old {
-            followDisplays(gone: gone, back: back, displays: fresh)
+            followDisplays(gone: gone, back: back, old: old, displays: fresh)
         }
         // A grid on a display that went away has nothing left to stand on.
         if let grid, !fresh.contains(grid.display) { closeGrid() }
@@ -996,10 +1033,17 @@ final class LayoutController: ObservableObject {
         drags.holdDisplays.value = config.holdAtEdges ? displays : nil
         watchEscape()
         let restore = config.restoreOnDragOut
+        let displays = self.displays
         work.async {
             // Snapped when the drag began: where it was when pressed on, before
             // it moved (or macOS, for one it filled, changed its size).
             let before = grab.start ?? grab.frame
+            // Not on the display it was snapped on: it isn't snapped now, however
+            // it got there, and has no old size to go back to.
+            if let uuid = self.placements[grab.id]?.displayUUID, let here = LayoutGeometry.display(of: before, in: displays), here.uuid != uuid {
+                self.placements[grab.id] = nil
+                LayoutTrace.log("layout: drag of \(grab.id) on \(here.name), not where it was snapped: no longer snapped")
+            }
             let snappedBefore = self.placements[grab.id].flatMap { LayoutWindow.close($0.applied, before) ? $0.original : nil }
             let original = snappedBefore ?? before
             DispatchQueue.main.async {
