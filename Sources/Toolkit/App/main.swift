@@ -116,6 +116,7 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     // `layout tabs` or `layout keyboard`: that tab of the Window Layout page;
     // `mouse device`: the made-up mouse's own page.
     CaptureController.previewText = rest.contains("text")
+    MixerController.previewDriver = rest.first { $0.hasPrefix("driver=") }.map { String($0.dropFirst(7)) }
     MouseController.previewOpen = rest.contains("device")
     MainView.previewSearch = rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) } ?? ""
     LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
@@ -187,6 +188,17 @@ if let flag = CommandLine.arguments.firstIndex(of: "--play-tone") {
 // a tone through it, what that costs, the microphone. Run with `open -n`.
 if let flag = CommandLine.arguments.firstIndex(of: "--test-driver"), CommandLine.arguments.count > flag + 1 {
     MixerEngineTest.runDriver(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+// `--test-driver-eq <report>`: the same equalizer through taps and through the
+// driver, measured band by band. Run with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-driver-eq"), CommandLine.arguments.count > flag + 1 {
+    MixerEngineTest.runDriverEqualizer(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+// The helper that test starts: a copy of this app playing a file.
+if let flag = CommandLine.arguments.firstIndex(of: "--play-file"), CommandLine.arguments.count > flag + 1 {
+    MixerEngineTest.playFile(CommandLine.arguments[flag + 1])
     exit(0)
 }
 // `--test-driver-long <report> <seconds>`: a tone through the driver for a long

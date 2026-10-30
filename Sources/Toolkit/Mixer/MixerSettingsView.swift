@@ -123,11 +123,13 @@ struct MixerSettingsView: View {
 
             // Not locked with the rest: with the driver, the permission isn't needed.
             WhenEnabled(enabled: mixer.config.enabled) {
-                Card(title: "Audio Driver", footnote: driverNote) {
+                Card(title: "Audio Driver") {
                     ToggleRow(title: "Use the audio driver",
                               caption: "Apps play to a device of the toolkit's, so nothing records: no purple dot, no System Audio Recording, and a microphone never waits for the mixer. Installing it asks for your password, and sound stops for a moment.",
-                              isOn: Binding(get: { mixer.config.usesDriver }, set: { mixer.setUsesDriver($0) }),
+                              isOn: Binding(get: { mixer.config.usesDriver || mixer.driverWork == .installing }, set: { mixer.setUsesDriver($0) }),
                               badge: "Preview")
+                        .disabled(mixer.driverBusy)
+                    DriverStatusLine(mixer: mixer)
                     if mixer.driverInstall == .outdated, mixer.config.usesDriver {
                         RowDivider()
                         SettingRow(title: "Update the audio driver", caption: "This version of the app comes with another driver. Updating it asks for your password, and sound stops for a moment.") {
@@ -147,18 +149,6 @@ struct MixerSettingsView: View {
         }
     }
 
-    private var driverNote: LocalizedStringKey? {
-        switch mixer.driverProblem {
-        case .none: return nil
-        case .notInApplications: return "The driver only answers an app in the Applications folder, so the mixer is using taps."
-        case .refused: return "The driver didn't accept this copy of the app, so the mixer is using taps."
-        case .notInstalled: return "The driver isn't installed, so the mixer is using taps."
-        case .outdated: return "The installed driver isn't the one this version of the app needs, so the mixer is using taps until it's updated."
-        case .installFailed: return "The driver wasn't installed."
-        case .noDevice: return "The driver's device didn't appear, so the mixer is using taps."
-        }
-    }
-
     /// Open apps that aren't in the list yet.
     private var candidates: [(String, String)] {
         var seen = Set(mixer.config.ignored.keys)
@@ -169,5 +159,57 @@ struct MixerSettingsView: View {
                 return (id, app.localizedName ?? id)
             }
             .sorted { $0.1.localizedStandardCompare($1.1) == .orderedAscending }
+    }
+}
+
+/// Whether the driver is working, under its switch: a spinner while it's on the
+/// way, then that it's on, or why it isn't. Nothing while it's simply off.
+private struct DriverStatusLine: View {
+    @ObservedObject var mixer: MixerController
+
+    private enum Status {
+        case working(LocalizedStringKey), on(LocalizedStringKey), problem(LocalizedStringKey)
+    }
+
+    private var status: Status? {
+        switch mixer.driverWork {
+        case .installing: return .working("Installing the driver. macOS asks for your password.")
+        case .removing: return .working("Removing the driver. macOS asks for your password.")
+        case nil: break
+        }
+        if mixer.driverStarting { return .working("Starting the driver…") }
+        if mixer.driverActive { return .on("On: sound goes through the driver.") }
+        switch mixer.driverProblem {
+        case nil: return nil
+        case .notInstalled: return .problem("The driver isn't installed, so the mixer is using taps.")
+        case .notInApplications: return .problem("The driver only answers an app in the Applications folder, so the mixer is using taps.")
+        case .refused: return .problem("The driver didn't accept this copy of the app, so the mixer is using taps.")
+        case .outdated: return .problem("The installed driver isn't the one this version of the app needs, so the mixer is using taps until it's updated.")
+        case .noDevice: return .problem("The driver's device didn't appear, so the mixer is using taps.")
+        case .installFailed: return .problem("The driver wasn't installed.")
+        }
+    }
+
+    var body: some View {
+        if let status {
+            RowDivider()
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                switch status {
+                case .working(let text):
+                    // Sized as the symbols are, so the text doesn't move when it ends.
+                    ProgressView().controlSize(.small).frame(width: 16, height: 14)
+                    Text(text).foregroundStyle(.secondary)
+                case .on(let text):
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).frame(width: 16)
+                    Text(text)
+                case .problem(let text):
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).frame(width: 16)
+                    Text(text)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
     }
 }

@@ -39,7 +39,8 @@ enum Snapshot {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
-        window.setContentSize(NSSize(width: 860, height: tall ? 1520 : 760))
+        // The driver's line is at the very bottom of the mixer's long page.
+        window.setContentSize(NSSize(width: 860, height: MixerController.previewDriver != nil ? 2700 : tall ? 1520 : 760))
         onRetina(window)
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(1.0))

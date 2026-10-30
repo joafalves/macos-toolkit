@@ -229,6 +229,107 @@ enum MixerEngineTest {
                    AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self)?.readString(kAudioObjectPropertyName) ?? "none"))
     }
 
+    /// `--test-driver-eq <report>`: the same equalizer through taps and through
+    /// the driver, measured. A helper plays a tone at each band; a tap on this
+    /// process records what it sends to the real output, in each way, flat and
+    /// with a preset. Both should lift each band by what the sliders say.
+    static func runDriverEqualizer(into path: String) {
+        var lines: [String] = []
+        func say(_ line: String) { lines.append(line); Log.mixer.notice("eq test: \(line, privacy: .public)") }
+        defer { try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8) }
+        _ = NSApplication.shared
+        let frequencies: [Double] = [64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+        let stepSeconds = 0.5
+        let output = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown
+        let system = AudioObjectID.system.read(kAudioHardwarePropertyDefaultSystemOutputDevice, as: AudioObjectID.self) ?? .unknown
+        guard let uid = output.readString(kAudioDevicePropertyDeviceUID), let helper = makeHelper(),
+              let steps = writeSteps(frequencies, seconds: stepSeconds) else { return say("no output, helper or tones") }
+        defer { try? FileManager.default.removeItem(at: helper.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
+        let rate = output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 48000
+        say("real output \(output.readString(kAudioObjectPropertyName) ?? "?"), \(rate) Hz; playing now: \(AudioProcesses.clients().filter(\.isPlaying).compactMap(\.bundleID))")
+
+        func playAndMeasure(_ prepare: (pid_t) -> Void) -> [Double]? {
+            guard let monitor = MonitorTap(deviceUID: uid) else { return nil }
+            wait(0.3)
+            let process = Process()
+            process.executableURL = helper
+            process.arguments = ["--play-file", steps.path]
+            try? process.run()
+            prepare(process.processIdentifier)
+            // To its end: it took a varying while to start, and cut off the last tone.
+            let began = Date()
+            while process.isRunning, Date().timeIntervalSince(began) < stepSeconds * Double(frequencies.count) + 8 { wait(0.05) }
+            process.terminate()
+            wait(0.2)
+            let levels = frequencies.map { monitor.level(atFrequency: $0) }
+            monitor.close()
+            wait(0.5)
+            return levels
+        }
+
+        // Taps, as the mixer makes them.
+        let mixer = MixerController.testInstance(apps: [helperID])
+        mixer.start()
+        wait(0.5)
+        guard let tapsFlat = playAndMeasure({ _ in }) else { return say("no monitor (taps)") }
+        mixer.applyPreset(.loudness)
+        wait(0.3)
+        guard let tapsPreset = playAndMeasure({ _ in }) else { return say("no monitor (taps)") }
+        let chosen = mixer.equalizer
+        mixer.stop()
+        wait(1)
+
+        // The driver, with that equalizer, as the mixer sets it.
+        let state = EqualizerState()
+        state.set(on: false, gains: EqualizerCurve.filterGains(for: chosen.gains, sampleRate: rate), preamp: chosen.preamp)
+        let link: DriverLink
+        do { link = try DriverLink(equalizer: state) } catch { return say("link FAILED: \(error)") }
+        defer { link.close() }
+        var found = DriverLink.device
+        let start = Date()
+        while found == nil, Date().timeIntervalSince(start) < 5 {
+            wait(0.02)
+            found = DriverLink.device
+        }
+        guard let device = found else { return say("the device never showed") }
+        device.write(kAudioDevicePropertyNominalSampleRate, rate)
+        wait(0.3)
+        let running = AudioListener(device, kAudioDevicePropertyDeviceIsRunningSomewhere) {
+            let now = device.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 0
+            if now != 0 { link.start(on: output) } else { link.stop() }
+        }
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, device)
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, device)
+        defer {
+            AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, output)
+            AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, system)
+        }
+        wait(0.5)
+        // Everything but the tones silenced, so the measure is of them alone.
+        let others = { (helper: pid_t) in
+            var gains: [pid_t: Float] = [:]
+            for client in AudioProcesses.clients() where client.pid != helper { gains[client.pid] = 0 }
+            link.setGains(gains)
+        }
+        guard let driverFlat = playAndMeasure(others) else { return say("no monitor (driver)") }
+        say("driver, flat: \(link.state)")
+        state.set(on: true, gains: EqualizerCurve.filterGains(for: chosen.gains, sampleRate: rate), preamp: chosen.preamp)
+        wait(0.3)
+        guard let driverPreset = playAndMeasure(others) else { return say("no monitor (driver)") }
+        say("driver, preset: \(link.state)")
+        _ = running
+
+        say("\nloudness preset, preamp \(chosen.preamp) dB; lift in dB, preset against flat in the same path")
+        say("   Hz   slider    taps  driver   apart   flat: taps against driver")
+        func db(_ a: Double, _ b: Double) -> Double { b > 0 && a > 0 ? 20 * log10(a / b) : .nan }
+        for (index, frequency) in frequencies.enumerated() {
+            let band = EqualizerConfig.frequencies.firstIndex { abs(log2($0 / frequency)) < 0.2 }
+            let slider = band.map { chosen.gains[$0] } ?? .nan
+            let taps = db(tapsPreset[index], tapsFlat[index]), driver = db(driverPreset[index], driverFlat[index])
+            say(String(format: "%6.0f  %6.2f  %6.2f  %6.2f  %6.2f   %6.2f", frequency, slider + chosen.preamp, taps, driver, abs(taps - driver), db(tapsFlat[index], driverFlat[index])))
+        }
+    }
+
     /// `--test-driver-long <report> <seconds>`: a quiet tone through the driver
     /// for a long while: what stays queued, how the two clocks settle, any gaps.
     static func runDriverLong(into path: String, seconds: Double) {
@@ -649,6 +750,40 @@ enum MixerEngineTest {
     }
 
     /// A 440 Hz tone at -40 dBFS, starting and ending at a zero crossing.
+    /// A tone at each frequency in turn, the same level for each.
+    private static func writeSteps(_ frequencies: [Double], seconds: Double) -> URL? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("toolkit-steps-\(UUID().uuidString).caf")
+        let rate = 48_000.0
+        let perStep = Int(rate * seconds)
+        // Silence first and last: whatever records this takes a moment to start,
+        // and sound through a new tap's device is lost until it has.
+        let lead = Int(rate * 1)
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(perStep * frequencies.count + 2 * lead)),
+              let channels = buffer.floatChannelData else { return nil }
+        buffer.frameLength = buffer.frameCapacity
+        for channel in 0..<2 { channels[channel].initialize(repeating: 0, count: Int(buffer.frameLength)) }
+        for (step, frequency) in frequencies.enumerated() {
+            for i in 0..<perStep {
+                // Faded at each end, so no step clicks into other frequencies.
+                let fade = min(1, min(Double(i), Double(perStep - i)) / 480)
+                let value = Float(0.03 * fade * sin(2 * Double.pi * frequency * Double(i) / rate))
+                channels[0][lead + step * perStep + i] = value
+                channels[1][lead + step * perStep + i] = value
+            }
+        }
+        guard let file = try? AVAudioFile(forWriting: url, settings: format.settings), (try? file.write(from: buffer)) != nil else { return nil }
+        return url
+    }
+
+    /// `--play-file <file>`, in the helper.
+    static func playFile(_ path: String) {
+        NSApplication.shared.setActivationPolicy(.accessory)
+        guard let player = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: path)) else { return }
+        player.play()
+        wait(player.duration + 0.2)
+    }
+
     private static func writeTone(seconds: Double) -> URL? {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("toolkit-tone-\(Int(seconds)).wav")
         let rate = 48_000.0
@@ -743,6 +878,20 @@ private final class MonitorTap {
         }
         if aggregateID != .unknown { AudioHardwareDestroyAggregateDevice(aggregateID); aggregateID = .unknown }
         if tapID != .unknown { AudioHardwareDestroyProcessTap(tapID); tapID = .unknown }
+    }
+
+    /// How much of this frequency there is in all that's been recorded (Goertzel):
+    /// comparable between recordings of the same sound, wherever in them it falls.
+    func level(atFrequency frequency: Double) -> Double {
+        let total = count.value.load(ordering: .acquiring)
+        let coefficient = 2 * cos(2 * Double.pi * frequency / rate)
+        var previous = 0.0, older = 0.0
+        for index in 0..<total {
+            let value = Double(samples[index]) + coefficient * previous - older
+            older = previous
+            previous = value
+        }
+        return sqrt(max(0, previous * previous + older * older - coefficient * previous * older))
     }
 
     func event(_ name: String) { events.append((name, Int((Double(mach_absolute_time() - started) * Self.ticks * rate).rounded()))) }

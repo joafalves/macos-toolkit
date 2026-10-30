@@ -60,6 +60,11 @@ enum DriverInstall: Equatable {
     }
 }
 
+/// What's being done to the driver on this Mac.
+enum DriverWork: Equatable {
+    case installing, removing
+}
+
 /// Why the mixer isn't on the driver though it was asked to be, for its page.
 enum DriverProblem: Equatable {
     case notInstalled, outdated, notInApplications, refused, noDevice, installFailed
@@ -82,6 +87,9 @@ final class MixerDriver {
     /// What was last written to the device's own volume, to tell a change
     /// made elsewhere from our own.
     private var mirrored: (volume: Float, muted: Bool)?
+    /// Hearing our own write back isn't someone moving the slider, even if the
+    /// host reads back a value a little off what it was given.
+    private var mirroredAt = Date.distantPast
     /// A change to the device's volume or mute made elsewhere: macOS's slider.
     var onVolume: ((Float, Bool) -> Void)?
 
@@ -89,14 +97,20 @@ final class MixerDriver {
         link = try DriverLink(equalizer: equalizer)
     }
 
+    /// Whether the device shown is ours and still there: coreaudiod restarting
+    /// or a heartbeat that came too late takes it away.
+    var deviceIsGone: Bool { device != nil && DriverLink.device == nil }
+
     /// Takes over as the default output if the device has shown up. `real`:
-    /// what the sound goes on to. True once it has happened, now or before.
+    /// what the sound goes on to, or `fallback` if that's the device itself, as
+    /// it still is for a moment after a toolkit that was killed.
+    /// True once it has happened, now or before.
     @discardableResult
-    func adopt(real: AudioObjectID) -> Bool {
+    func adopt(real: AudioObjectID, fallback: AudioObjectID?) -> Bool {
         if device != nil { return true }
         guard let found = DriverLink.device else { return false }
         device = found
-        output = real
+        output = real == found ? fallback ?? .unknown : real
         systemOutput = AudioObjectID.system.read(kAudioHardwarePropertyDefaultSystemOutputDevice, as: AudioObjectID.self) ?? real
         followRate()
         let scope = kAudioObjectPropertyScopeOutput
@@ -152,13 +166,14 @@ final class MixerDriver {
         guard let device else { return }
         if let mirrored, abs(mirrored.volume - volume) < 0.001, mirrored.muted == muted { return }
         mirrored = (volume, muted)
+        mirroredAt = Date()
         let scope = kAudioObjectPropertyScopeOutput
         device.write(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, Float32(volume))
         device.write(kAudioDevicePropertyMute, scope: scope, UInt32(muted ? 1 : 0))
     }
 
     private func volumeChanged() {
-        guard let device, let mirrored else { return }
+        guard let device, let mirrored, Date().timeIntervalSince(mirroredAt) > 0.2 else { return }
         let scope = kAudioObjectPropertyScopeOutput
         let volume = device.read(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope, as: Float32.self) ?? mirrored.volume
         let muted = (device.read(kAudioDevicePropertyMute, scope: scope, as: UInt32.self) ?? 0) != 0

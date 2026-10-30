@@ -102,6 +102,10 @@ final class DriverLink {
     /// Interleaved frames for one cycle of the real output.
     private let scratch = UnsafeMutablePointer<Float>.allocate(capacity: 16384 * Int(DRIVER_CHANNELS))
     private var heartbeat: DispatchSourceTimer?
+    /// App Nap holds timers back, and a late heartbeat would make the driver
+    /// hide its device and macOS move all sound off it. Doesn't keep the Mac awake.
+    private var activity: NSObjectProtocol?
+    private var loggedGaps = (0, 0)
     private var output: AudioObjectID?
     private var ioProc: AudioDeviceIOProcID?
 
@@ -125,6 +129,7 @@ final class DriverLink {
         timer.setEventHandler { [shared] in driver_shared_set_heartbeat(shared, mach_absolute_time()) }
         timer.resume()
         heartbeat = timer
+        activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep, reason: "The audio driver's heartbeat")
         Log.mixer.notice("driver: linked")
     }
 
@@ -143,6 +148,8 @@ final class DriverLink {
         stop()
         heartbeat?.cancel()
         heartbeat = nil
+        if let activity { ProcessInfo.processInfo.endActivity(activity) }
+        activity = nil
         driver_shared_set_closing(shared, true)
     }
 
@@ -162,6 +169,8 @@ final class DriverLink {
         reader.pointee = Reader()
         reader.pointee.position = driver_shared_write_head(shared)
         reader.pointee.slack = Self.slackSeconds * sampleRate
+        // Not from full: the first buffer is already at the volume it should be.
+        reader.pointee.appliedGain = gain
         let shared = shared, reader = reader, scratch = scratch, mainGain = mainGain, equalizer = equalizer
         let filters = EqualizerFilters(sampleRate: sampleRate)
         driver_shared_set_latency(shared, Self.latency(of: device, sampleRate: sampleRate))
@@ -228,9 +237,9 @@ final class DriverLink {
             let target = Double(needed) + reader.pointee.slack + (locks ? 0 : Double(written))
             if !reader.pointee.playing {
                 guard written > 0, level >= needed else { return }
-                // A write that's only just come could as well have come after
-                // this read: one more in hand, until the clock has moved away.
-                let inHand = needed + (locks && sinceWrite >= reader.pointee.slack ? 0 : written)
+                // One write more in hand than it will settle on: the first cycles
+                // of a device wake less evenly, and the clock takes the extra away.
+                let inHand = needed + written
                 guard level >= inHand else { return }
                 reader.pointee.position = head &- UInt64(inHand)
                 reader.pointee.playing = true
@@ -318,6 +327,15 @@ final class DriverLink {
     }
 
     var isPlaying: Bool { ioProc != nil }
+
+    /// Off the audio thread, on the mixer's slow timer: a gap goes in the log
+    /// as it happens, with what was queued then.
+    func logNewGaps() {
+        let now = (reader.pointee.underruns, reader.pointee.skips)
+        guard now != loggedGaps else { return }
+        loggedGaps = now
+        Log.mixer.notice("driver: a gap in the sound: \(self.state, privacy: .public)")
+    }
 
     /// The main volume, where the real output has none of its own. Glided.
     var gain: Float {

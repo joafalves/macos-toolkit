@@ -1147,6 +1147,9 @@
 /* Sources/Toolkit/App/AboutView.swift:121 */
 "Installing %@…" = "A instalar a versão %@…";
 
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:176 */
+"Installing the driver. macOS asks for your password." = "A instalar o driver. O macOS pede a sua palavra-passe.";
+
 /* Sources/Toolkit/Stats/StatsPanel.swift:163 */
 "Interface" = "Interface";
 
@@ -1639,6 +1642,9 @@
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:89 */
 "On while Stay available is on" = "Ligado enquanto Manter disponível estiver ativo";
 
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:181 */
+"On: sound goes through the driver." = "Ativado: o som passa pelo driver.";
+
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:178 */
 "One line" = "Uma linha";
 
@@ -1972,8 +1978,11 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:97 */
 "Remove the audio driver" = "Remover o driver de áudio";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:141 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:143 */
 "Remove…" = "Remover…";
+
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:177 */
+"Removing the driver. macOS asks for your password." = "A remover o driver. O macOS pede a sua palavra-passe.";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:284 */
 "Rename" = "Alterar nome";
@@ -2398,6 +2407,9 @@
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:30 */
 "Start the corners again" = "Recomeçar os cantos";
 
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:180 */
+"Starting the driver…" = "A iniciar o driver…";
+
 /* Sources/Toolkit/App/MainView.swift:444 */
 "Startup" = "Arranque";
 
@@ -2569,19 +2581,19 @@
 /* Sources/Toolkit/App/Updater.swift:274 */
 "The download's signature can't be read." = "Não é possível ler a assinatura da transferência.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:154 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:186 */
 "The driver didn't accept this copy of the app, so the mixer is using taps." = "O driver não aceitou esta cópia da aplicação, por isso o misturador está a usar taps.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:155 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:184 */
 "The driver isn't installed, so the mixer is using taps." = "O driver não está instalado, por isso o misturador está a usar taps.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:153 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:185 */
 "The driver only answers an app in the Applications folder, so the mixer is using taps." = "O driver só responde a uma aplicação na pasta Aplicações, por isso o misturador está a usar taps.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:157 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:189 */
 "The driver wasn't installed." = "O driver não foi instalado.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:158 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:188 */
 "The driver's device didn't appear, so the mixer is using taps." = "O dispositivo do driver não apareceu, por isso o misturador está a usar taps.";
 
 /* Sources/Toolkit/Capture/CaptureThumbnail.swift:273 */
@@ -2593,7 +2605,7 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:76 */
 "The highs, from about 2 kHz up. Double-click for 0 dB." = "Os agudos, a partir de cerca de 2 kHz. Clique duas vezes para 0 dB.";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:156 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:187 */
 "The installed driver isn't the one this version of the app needs, so the mixer is using taps until it's updated." = "O driver instalado não é o que esta versão da aplicação precisa, por isso o misturador está a usar taps até ser atualizado.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:55 */
@@ -2863,7 +2875,7 @@
 /* Sources/Toolkit/App/AboutView.swift:68 */
 "Updates" = "Atualizações";
 
-/* Sources/Toolkit/Mixer/MixerSettingsView.swift:134 */
+/* Sources/Toolkit/Mixer/MixerSettingsView.swift:136 */
 "Update…" = "Atualizar…";
 
 /* Sources/Toolkit/Stats/StatsPanel.swift:162 */

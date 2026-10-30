@@ -322,6 +322,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
 .build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
 .build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
+.build/debug/Toolkit --snapshot out.png mixer driver=<installing|removing|starting|on|outdated|failed-install> [light]   # the mixer's page, tall enough for the driver's line in that state
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer] [per-output] [simple]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
@@ -388,6 +389,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-mixer-mic <report>   # a helper opens the microphone alone, as a call app's preview does, with the mixer's taps waiting: whether its input starts, which taps go and which run, on a path forced on where inputs aren't held up, and what a tap running in silence costs (build.sh --dev; open -n the bundle; quit the installed app)
 .build/debug/Toolkit --test-driver <report>        # the audio driver end to end, installed: a tone through it, a volume, its cost, the microphone (build.sh --dev; open -n a copy in /Applications; quit the installed app)
 .build/debug/Toolkit --test-driver-long <report> <seconds>   # a tone through the driver with others joining: what's queued, how the clocks settle, gaps (as above)
+.build/debug/Toolkit --test-driver-eq <report>     # the same equalizer through taps and the driver, measured at each band against its slider (as above)
 .build/debug/Toolkit --test-driver-crash <report>  # the toolkit killed and frozen with the driver the default output: how soon sound moves back (as above)
 ./scripts/driver.sh install|remove           # the last build's driver on this Mac, for development: asks for your password, restarts coreaudiod
 .build/debug/Toolkit --test-volume           # the volume keys' steps, and saved software volumes on the even scale
