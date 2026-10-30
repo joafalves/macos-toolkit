@@ -305,6 +305,9 @@ tool; keep it in step with the code.
     device goes back in front (`MixerDriver.follow`). macOS has nothing to move while the default stays, so
     `DriverRoutes` does what it would: headphones take over as they appear, and when an output goes, the last
     one used comes back. The real output starts and stops off the main thread, since Bluetooth can take a second.
+  - The real output comes up after a sound has started, so what's come since it last read is played rather
+    than dropped, up to 0.3 s and with no leading silence, and the clock (or a moment of silence) takes the
+    extra away. It stays up 3 s after the sound stops. After a gap in what's playing, the backlog is dropped.
   - Its device exists only while the toolkit does: a killed toolkit is noticed within a second, a hung one
     in 15, and macOS moves sound to a real output. `--test-driver-crash` checks it.
   - Nothing on its audio thread allocates, logs or takes more than the shortest lock. A bug there stops
@@ -394,6 +397,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-mixer-mic <report>   # a helper opens the microphone alone, as a call app's preview does, with the mixer's taps waiting: whether its input starts, which taps go and which run, on a path forced on where inputs aren't held up, and what a tap running in silence costs (build.sh --dev; open -n the bundle; quit the installed app)
 .build/debug/Toolkit --test-driver <report>        # the audio driver end to end, installed: a tone through it, a volume, its cost, the microphone (build.sh --dev; open -n a copy in /Applications; quit the installed app)
 .build/debug/Toolkit --test-driver-long <report> <seconds>   # a tone through the driver with others joining: what's queued, how the clocks settle, gaps (as above)
+.build/debug/Toolkit --test-driver-sounds <report>  # short sounds from a stopped output: how much of each is heard; and a recording's system audio, leaving this process out and not (as above; nothing else playing, or the output never stops)
 .build/debug/Toolkit --test-driver-outputs   # where sound goes on the driver as outputs come and go: headphones, a display, the last one used (no sound)
 .build/debug/Toolkit --test-driver-eq <report>     # the same equalizer through taps and the driver, measured at each band against its slider (as above)
 .build/debug/Toolkit --test-driver-crash <report>  # the toolkit killed and frozen with the driver the default output: how soon sound moves back (as above)
@@ -485,8 +489,8 @@ hold `MacOS Toolkit.app` at its top, and be built by `build.sh` with the `MacOS 
 identity, without `--dev`. Check `codesign -dv` on the built app first: `build.sh` falls back to
 ad-hoc signing when the identity is missing, and an ad-hoc build is refused by every installed copy;
 `flags=0x10000(runtime)` should show, and `ToolkitDev` must not be in its Info.plist.
-`Authority=MacOS Toolkit Dev` should show for the app and for `Contents/PlugIns/FinderExtension.appex`
-alike, `ToolkitCommit` should be the tagged commit, and `ToolkitModified` should be false (built
+`Authority=MacOS Toolkit Dev` should show for the app, for `Contents/PlugIns/FinderExtension.appex` and for
+`Contents/Resources/ToolkitAudio.driver` alike, `ToolkitCommit` should be the tagged commit, and `ToolkitModified` should be false (built
 from a clean tree).
 
 The release is named `X.Y.Z` with tag `vX.Y.Z`. Its notes are the version's `CHANGELOG.md` entry

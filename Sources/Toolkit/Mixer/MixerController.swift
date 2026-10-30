@@ -1336,6 +1336,12 @@ final class MixerController: ObservableObject {
             driverDeadline = deadline
             DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: deadline)
         } catch {
+            // Installed, but coreaudiod hasn't loaded it yet: at login, or just restarted.
+            if case DriverLink.Failure.notInstalled = error, driverRetries < 3 {
+                Log.mixer.notice("driver: not loaded yet: try \(self.driverRetries + 1, privacy: .public) of 3")
+                retryDriver()
+                return
+            }
             Log.mixer.error("driver: no link: \(String(describing: error), privacy: .public): on taps")
             // It reads the app from disk, which it can't anywhere under a home folder.
             driverProblem = Bundle.main.bundlePath.hasPrefix("/Applications/") ? .refused : .notInApplications
@@ -1349,6 +1355,10 @@ final class MixerController: ObservableObject {
     private func driverLost() {
         Log.mixer.error("driver: its device went: try \(self.driverRetries + 1, privacy: .public) of 3 to get it back")
         stopDriver()
+        retryDriver()
+    }
+
+    private func retryDriver() {
         driverRetrying = true
         driverRetries += 1
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in

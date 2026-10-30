@@ -43,7 +43,7 @@ enum DriverInstall: Equatable {
                          "/usr/bin/xattr -dr com.apple.quarantine \(quoted(installed.path))",
                          "/usr/sbin/chown -R root:wheel \(quoted(installed.path))"]
         }
-        commands.append("/usr/bin/killall coreaudiod")
+        commands.append("(/usr/bin/killall coreaudiod || true)")
         let script = "do shell script \"\(commands.joined(separator: " && ").replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\" with administrator privileges"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -179,6 +179,14 @@ final class MixerDriver {
     private(set) var output: AudioObjectID = .unknown
     private var systemOutput: AudioObjectID = .unknown
     var routes = DriverRoutes()
+    private var outputListeners: [AudioListener] = []
+    /// The output's shape when it last started, so the same news twice doesn't
+    /// restart it, which on Bluetooth is a second without sound.
+    private var shape = ""
+    /// Letting go of the real output a moment after the sound stops: the next
+    /// sound, often soon, starts at once rather than waiting for it to come up.
+    private var letGo: DispatchWorkItem?
+    private static let lingers: TimeInterval = 3
     private var listeners: [AudioListener] = []
     /// What was last written to the device's own volume, to tell a change
     /// made elsewhere from our own.
@@ -209,10 +217,14 @@ final class MixerDriver {
         output = real == found ? fallback ?? .unknown : real
         output.readString(kAudioDevicePropertyDeviceUID).map { routes.use($0) }
         systemOutput = AudioObjectID.system.read(kAudioHardwarePropertyDefaultSystemOutputDevice, as: AudioObjectID.self) ?? real
+        watchOutput()
         followRate()
         let scope = kAudioObjectPropertyScopeOutput
         listeners = [
             AudioListener(found, kAudioDevicePropertyDeviceIsRunningSomewhere) { [weak self] in self?.runningChanged() },
+            // An app can set the device's rate as it could a real output's, and
+            // it has to be the real output's, or everything plays at the wrong pitch.
+            AudioListener(found, kAudioDevicePropertyNominalSampleRate) { [weak self] in self?.followRate() },
             AudioListener(found, kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope) { [weak self] in self?.volumeChanged() },
             AudioListener(found, kAudioDevicePropertyMute, scope: scope) { [weak self] in self?.volumeChanged() },
         ]
@@ -229,6 +241,26 @@ final class MixerDriver {
         guard real != output else { return }
         output = real
         real.readString(kAudioDevicePropertyDeviceUID).map { routes.use($0) }
+        watchOutput()
+        restart()
+    }
+
+    private func watchOutput() {
+        outputListeners = [AudioListener(output, kAudioDevicePropertyStreamConfiguration, scope: kAudioObjectPropertyScopeOutput) { [weak self] in
+            self?.outputReconfigured()
+        }]
+    }
+
+    private var currentShape: String {
+        let scope = kAudioObjectPropertyScopeOutput
+        return "\(output) \(output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 0) "
+            + "\(output.readArray(kAudioDevicePropertyPreferredChannelsForStereo, scope: scope, as: UInt32.self)) "
+            + "\(output.readArray(kAudioDevicePropertyStreams, scope: scope, as: AudioStreamID.self).count)"
+            + "\(output.read(kAudioDevicePropertyStreamConfiguration, scope: scope, as: UInt32.self) ?? 0)"
+    }
+
+    private func restart() {
+        shape = currentShape
         link.stop()
         followRate()
         runningChanged()
@@ -254,9 +286,9 @@ final class MixerDriver {
 
     /// The real output changed its rate or stereo pair.
     func outputReconfigured() {
-        link.stop()
-        followRate()
-        runningChanged()
+        guard currentShape != shape else { return }
+        Log.mixer.notice("driver: the output changed shape: \(self.currentShape, privacy: .public)")
+        restart()
     }
 
     private func followRate() {
@@ -270,10 +302,14 @@ final class MixerDriver {
     private func runningChanged() {
         guard let device else { return }
         let running = (device.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 0) != 0
+        letGo?.cancel()
+        letGo = nil
         if running, output != .unknown {
             link.start(on: output)
         } else if !running {
-            link.stop()
+            let work = DispatchWorkItem { [weak self] in self?.link.stop() }
+            letGo = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.lingers, execute: work)
         }
     }
 
@@ -300,7 +336,9 @@ final class MixerDriver {
 
     /// Everything back as it was: macOS's outputs, and the driver's device gone.
     func close() {
+        letGo?.cancel()
         listeners = []
+        outputListeners = []
         if let device {
             let own = { (id: AudioObjectID?) in id == device || id == nil }
             if own(AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self)), output != .unknown {

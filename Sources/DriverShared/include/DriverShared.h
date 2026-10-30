@@ -223,6 +223,21 @@ static inline float driver_shared_take_peak(DriverSharedHeader *shared, uint32_t
     return peak;
 }
 
+static inline bool driver_shared_io_running(DriverSharedHeader *shared) {
+    return atomic_load_explicit((_Atomic uint32_t *)&shared->ioRunning, memory_order_relaxed) != 0;
+}
+
+// How many of the `limit` frames from `position` are silent, to the first that
+// isn't: an app often plays silence as it starts, and nothing need wait for that.
+static inline uint32_t driver_shared_leading_silence(DriverSharedHeader *shared, uint64_t position, uint32_t limit) {
+    const float *samples = driver_shared_samples(shared);
+    for (uint32_t frame = 0; frame < limit; frame++) {
+        uint32_t at = (uint32_t)((position + frame) & (DRIVER_RING_FRAMES - 1)) * DRIVER_CHANNELS;
+        if (samples[at] > 0.00001f || samples[at] < -0.00001f || samples[at + 1] > 0.00001f || samples[at + 1] < -0.00001f) return frame;
+    }
+    return limit;
+}
+
 static inline void driver_shared_set_io_running(DriverSharedHeader *shared, bool running) {
     atomic_store_explicit((_Atomic uint32_t *)&shared->ioRunning, running ? 1 : 0, memory_order_relaxed);
 }

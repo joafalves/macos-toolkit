@@ -4,6 +4,7 @@ import AudioToolbox
 import AVFoundation
 import CoreAudio
 import os
+import ScreenCaptureKit
 import Synchronization
 
 /// `--test-mixer-engine <report>`: the mixer run for real on a quiet 440 Hz
@@ -328,6 +329,117 @@ enum MixerEngineTest {
             let taps = db(tapsPreset[index], tapsFlat[index]), driver = db(driverPreset[index], driverFlat[index])
             say(String(format: "%6.0f  %6.2f  %6.2f  %6.2f  %6.2f   %6.2f", frequency, slider + chosen.preamp, taps, driver, abs(taps - driver), db(tapsFlat[index], driverFlat[index])))
         }
+    }
+
+    /// `--test-driver-sounds <report>`: short sounds through the driver, each
+    /// from silence with the real output stopped: how much of each is heard. And
+    /// what a screen recording's system audio gets, leaving this process out as
+    /// recordings do and not, since on the driver this process plays everything.
+    static func runDriverSounds(into path: String) {
+        var lines: [String] = []
+        func say(_ line: String) { lines.append(line); Log.mixer.notice("sounds test: \(line, privacy: .public)") }
+        defer { try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8) }
+        _ = NSApplication.shared
+        let output = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self) ?? .unknown
+        let system = AudioObjectID.system.read(kAudioHardwarePropertyDefaultSystemOutputDevice, as: AudioObjectID.self) ?? .unknown
+        let rate = output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 48000
+        let link: DriverLink
+        do { link = try DriverLink() } catch { return say("link FAILED: \(error)") }
+        defer { link.close() }
+        var found = DriverLink.device
+        let start = Date()
+        while found == nil, Date().timeIntervalSince(start) < 5 {
+            wait(0.02)
+            found = DriverLink.device
+        }
+        guard let device = found, let helper = makeHelper() else { return say("no device or helper") }
+        defer { try? FileManager.default.removeItem(at: helper.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
+        device.write(kAudioDevicePropertyNominalSampleRate, rate)
+        wait(0.3)
+        let running = AudioListener(device, kAudioDevicePropertyDeviceIsRunningSomewhere) {
+            let now = device.read(kAudioDevicePropertyDeviceIsRunningSomewhere, as: UInt32.self) ?? 0
+            if now != 0 { link.start(on: output) } else { link.stop() }
+        }
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, device)
+        AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, device)
+        defer {
+            AudioObjectID.system.write(kAudioHardwarePropertyDefaultOutputDevice, output)
+            AudioObjectID.system.write(kAudioHardwarePropertyDefaultSystemOutputDevice, system)
+        }
+        wait(0.5)
+        say("real output \(output.readString(kAudioObjectPropertyName) ?? "?"); other apps playing: \(AudioProcesses.clients().filter(\.isPlaying).compactMap(\.bundleID))")
+
+        for seconds in [0.1, 0.1, 0.25, 1.0] {
+            wait(1.5)
+            let process = Process()
+            process.executableURL = helper
+            process.arguments = ["--play-tone", "-", "player", String(seconds)]
+            try? process.run()
+            let began = Date()
+            while process.isRunning, Date().timeIntervalSince(began) < 8 { wait(0.05) }
+            wait(1)
+            say(String(format: "a sound of %.2f s (%d frames): %@", seconds, Int(seconds * rate), link.state))
+        }
+
+        for excluded in [true, false] {
+            let peak = captureSystemAudio(excludingThisProcess: excluded) {
+                let process = Process()
+                process.executableURL = helper
+                process.arguments = ["--play-tone", "-", "player", "3"]
+                try? process.run()
+            }
+            say(String(format: "a recording's system audio, %@ this process: loudest %.5f (the tone is 0.01)", excluded ? "leaving out" : "with", peak))
+            wait(1)
+        }
+        _ = running
+    }
+
+    /// The loudest sample a stream of the display's audio gets while `play` plays,
+    /// configured as `Recorder` does, or -1 if it can't run.
+    private static func captureSystemAudio(excludingThisProcess excluded: Bool, while play: () -> Void) -> Float {
+        final class Peak: NSObject, SCStreamOutput, @unchecked Sendable {
+            let value = Mutex<Float>(0)
+            func stream(_ stream: SCStream, didOutputSampleBuffer sample: CMSampleBuffer, of type: SCStreamOutputType) {
+                guard type == .audio else { return }
+                try? sample.withAudioBufferList { list, _ in
+                    for buffer in list {
+                        guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+                        let count = Int(buffer.mDataByteSize) / MemoryLayout<Float>.size
+                        let loudest = (0..<count).reduce(Float(0)) { max($0, abs(data[$1])) }
+                        value.withLock { $0 = max($0, loudest) }
+                    }
+                }
+            }
+        }
+        let peak = Peak()
+        let ready = Mutex<SCStream?>(nil)
+        let failed = Mutex(false)
+        Task {
+            do {
+                let content = try await SCShareableContent.current
+                guard let display = content.displays.first else { throw CocoaError(.featureUnsupported) }
+                let config = SCStreamConfiguration()
+                config.capturesAudio = true
+                config.excludesCurrentProcessAudio = excluded
+                config.width = 16
+                config.height = 16
+                let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: []), configuration: config, delegate: nil)
+                try stream.addStreamOutput(peak, type: .audio, sampleHandlerQueue: .global(qos: .userInitiated))
+                try await stream.startCapture()
+                ready.withLock { $0 = stream }
+            } catch {
+                Log.mixer.error("sounds test: capture: \(String(describing: error), privacy: .public)")
+                failed.withLock { $0 = true }
+            }
+        }
+        let began = Date()
+        while ready.withLock({ $0 == nil }), !failed.withLock({ $0 }), Date().timeIntervalSince(began) < 5 { wait(0.05) }
+        guard let stream = ready.withLock({ $0 }) else { return -1 }
+        play()
+        wait(5)
+        Task { try? await stream.stopCapture() }
+        wait(0.5)
+        return peak.value.withLock { $0 }
     }
 
     /// `--test-driver-long <report> <seconds>`: a quiet tone through the driver
