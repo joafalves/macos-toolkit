@@ -218,6 +218,7 @@ final class MixerDriver {
         output.readString(kAudioDevicePropertyDeviceUID).map { routes.use($0) }
         systemOutput = AudioObjectID.system.read(kAudioHardwarePropertyDefaultSystemOutputDevice, as: AudioObjectID.self) ?? real
         watchOutput()
+        shape = currentShape
         followRate()
         let scope = kAudioObjectPropertyScopeOutput
         listeners = [
@@ -286,7 +287,7 @@ final class MixerDriver {
 
     /// The real output changed its rate or stereo pair.
     func outputReconfigured() {
-        guard currentShape != shape else { return }
+        guard device != nil, currentShape != shape else { return }
         Log.mixer.notice("driver: the output changed shape: \(self.currentShape, privacy: .public)")
         restart()
     }
