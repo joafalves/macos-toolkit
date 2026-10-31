@@ -374,6 +374,13 @@ final class MixerController: ObservableObject {
         config.ignored[bundleID] = nil
     }
 
+    /// Brings the app forward as clicking its Dock icon does: unhidden, a minimized
+    /// window restored, and a new one if it has none.
+    func bringForward(_ app: MixerApp) {
+        guard let running = NSRunningApplication(processIdentifier: app.pid), let url = running.bundleURL else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
+
     /// Takes a quiet app off the list until it plays again.
     func hide(_ app: MixerApp) {
         config.played.remove(app.bundleID)

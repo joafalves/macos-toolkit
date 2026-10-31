@@ -7,6 +7,7 @@ worked on; it gets its date when it's released.
 
 ### Added
 
+- **Audio Mixer:** right-click an app to show it, as clicking its Dock icon does.
 - **Audio Mixer:** the mixer can run through an audio driver of its own, as a preview you turn on in
   its settings: nothing records, so there's no purple dot and no System Audio Recording permission,
   and a microphone never waits for the mixer. Installing it asks for your password. Off, the mixer

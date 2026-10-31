@@ -822,6 +822,7 @@
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:621 */
 "Exclude %@" = "Excluir %@";
+"Show %@" = "Mostrar %@";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:92 */
 "Excluded Apps" = "Aplicações excluídas";

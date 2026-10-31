@@ -60,7 +60,7 @@ struct MixerPopoverView: View {
                     PermissionNotice(denied: mixer.permission == .denied) { mixer.requestPermission() }
                 }
 
-                MixerAppList(mixer: mixer, place: .panel)
+                MixerAppList(mixer: mixer, place: .panel, onBringForward: close)
                     .disabled(mixer.driverBlocked)
             }
 
@@ -172,6 +172,8 @@ struct MixerSoundControls: View {
 struct MixerAppList: View {
     @ObservedObject var mixer: MixerController
     let place: MixerPlace
+    /// As an app is brought forward: the panel gets out of its way.
+    var onBringForward: () -> Void = {}
     /// Past this many rows the panel's list scrolls instead of growing.
     private static let visibleRows = 9
 
@@ -189,7 +191,7 @@ struct MixerAppList: View {
     private var rows: some View {
         VStack(spacing: 0) {
             ForEach(mixer.apps) { app in
-                AppRow(mixer: mixer, app: app, nameWidth: place == .panel ? 104 : 200)
+                AppRow(mixer: mixer, app: app, nameWidth: place == .panel ? 104 : 200, onBringForward: onBringForward)
             }
         }
     }
@@ -573,6 +575,7 @@ struct AppRow: View {
     @ObservedObject var mixer: MixerController
     let app: MixerApp
     var nameWidth: CGFloat = 104
+    var onBringForward: () -> Void = {}
     @StateObject private var hovering = ViewState(false)
 
     var body: some View {
@@ -616,6 +619,11 @@ struct AppRow: View {
         .onTapGesture { mixer.toggleMute(app) }
         .help(setting.isSilent ? "Click to unmute \(app.name)" : "Click to mute \(app.name)")
         .contextMenu {
+            Button("Show \(app.name)") {
+                onBringForward()
+                mixer.bringForward(app)
+            }
+            Divider()
             Button(setting.isSilent ? "Unmute" : "Mute") { mixer.toggleMute(app) }
             Button("Reset to 100%") { mixer.forget(app.bundleID) }
                 .disabled(setting.isDefault)

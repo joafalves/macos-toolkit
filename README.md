@@ -167,8 +167,9 @@ the menu bar, the same controls in both.
   the volume keys still move everything.
 - **Click an app's icon or row to mute** (0% counts as muted, and unmuting restores where it was).
 - **Reset** puts every app back to 100%, so they all follow the main volume again.
-- Volumes are remembered per app. Right-click an app to hide it until it plays again, or to
-  **Exclude** it: excluded apps are left out of the mixer and always play at the main volume.
+- Volumes are remembered per app. Right-click an app to **Show** it, as clicking its Dock icon does, to
+  hide it until it plays again, or to **Exclude** it: excluded apps are left out of the mixer and always play
+  at the main volume.
 - A place in the **menu bar**, one click away, with **Show in the menu bar** at the top of its page,
   in a look set in the options: the mixer glyph, **Volume**, a speaker that follows the volume and shows when it's muted, **Volume and
   percentage**, **Volume pill**, a pill that fills with the volume like the battery, with the
