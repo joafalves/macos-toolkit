@@ -45,7 +45,8 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         }
     }
     if rest.contains("switcher-list") || rest.contains("switcher-grid") {
-        if rest.contains("small") { SwitcherPanel.previewIcons = .small }
+        if rest.contains("medium") { SwitcherPanel.previewIcons = .medium }
+        if rest.contains("large") { SwitcherPanel.previewIcons = .large }
         Snapshot.writeSwitcher(to: rest[0], light: rest.contains("light"), grid: rest.contains("switcher-grid"), colors: rest.contains("colors"),
                                many: rest.contains("many"), query: rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) })
         exit(0)

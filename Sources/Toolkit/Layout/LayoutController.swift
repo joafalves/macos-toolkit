@@ -302,13 +302,26 @@ final class LayoutController: ObservableObject {
     /// now. One that isn't where it was put, on another display, isn't snapped
     /// any more, and its record goes: a drag would otherwise take it for
     /// snapped, and shrink it to its size from before.
-    /// After a moment, for macOS to finish moving the windows.
-    private func followDisplays(gone: [LayoutDisplay], back: [LayoutDisplay], old: [LayoutDisplay], displays: [LayoutDisplay]) {
+    /// After a moment, for macOS to finish moving the windows. Changes in that
+    /// moment are one change, from the displays before the first to those after
+    /// the last: a dock's two displays can arrive apart, and frames already
+    /// measured from the second, set against a list without it, look like a
+    /// window someone moved.
+    private func followDisplays(from before: [LayoutDisplay], to displays: [LayoutDisplay]) {
+        let old = followingFrom ?? before
+        followingFrom = old
+        following?.cancel()
+        let gone = old.filter { display in !displays.contains { $0.uuid == display.uuid } }
+        let back = displays.filter { display in !old.contains { $0.uuid == display.uuid } }
         let gap = CGFloat(config.gap)
+        // By UUID, above and here: a display's number can change while it's the same display.
         let goneUUIDs = Set(gone.map(\.uuid))
         // Their stacks place them, as the displays change.
         let stacked = Set(tabs.stacks.flatMap { $0.members.map(\.id) })
-        work.asyncAfter(deadline: .now() + 1.5) {
+        followingCount += 1
+        let count = followingCount
+        let item = DispatchWorkItem {
+            DispatchQueue.main.async { if self.followingCount == count { self.followingFrom = nil } }
             for (id, record) in self.placements {
                 if let uuid = record.displayUUID, let now = displays.first(where: { $0.uuid == uuid }), now.id != record.display {
                     self.placements[id]?.display = now.id
@@ -337,6 +350,8 @@ final class LayoutController: ObservableObject {
                         // for the record to say where that is.
                         guard !LayoutWindow.close(frame, LayoutGeometry.place(unit, in: here.usable, gap: gap)) else {
                             self.placements[id]?.applied = frame
+                            self.placements[id]?.display = here.id
+                            self.placements[id]?.displayUUID = here.uuid
                             continue
                         }
                         self.place(window, .unit(unit, here), displays: displays, gap: gap, cycle: false, original: record.original)
@@ -349,7 +364,14 @@ final class LayoutController: ObservableObject {
                 }
             }
         }
+        following = item
+        work.asyncAfter(deadline: .now() + 1.5, execute: item)
     }
+
+    /// The change of displays waiting to be followed, and what it's from. On the main thread.
+    private var following: DispatchWorkItem?
+    private var followingFrom: [LayoutDisplay]?
+    private var followingCount = 0
 
     /// Whether a change of displays is all that has happened to this window:
     /// it has the frame it was given, or that frame moved with its display.
@@ -464,11 +486,8 @@ final class LayoutController: ObservableObject {
         let fresh = LayoutDisplay.all()
         let old = displays
         if fresh != displays { displays = fresh }
-        // By UUID: a display's number can change while it's the same display.
-        let gone = old.filter { display in !fresh.contains { $0.uuid == display.uuid } }
-        let back = fresh.filter { display in !old.contains { $0.uuid == display.uuid } }
-        if !isPreview, !old.isEmpty, !gone.isEmpty || !back.isEmpty || fresh != old {
-            followDisplays(gone: gone, back: back, old: old, displays: fresh)
+        if !isPreview, !old.isEmpty, fresh != old {
+            followDisplays(from: old, to: fresh)
         }
         // A grid on a display that went away has nothing left to stand on.
         if let grid, !fresh.contains(grid.display) { closeGrid() }

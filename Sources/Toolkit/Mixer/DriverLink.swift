@@ -123,8 +123,9 @@ final class DriverLink {
     /// hide its device and macOS move all sound off it. Doesn't keep the Mac awake.
     private var activity: NSObjectProtocol?
     private var loggedGaps = (0, 0)
-    /// Starts and stops the real output, and holds these two.
+    /// Starts and stops the real output, and holds these.
     private let outputQueue = DispatchQueue(label: "dev.jalves.macos-toolkit.driver-output", qos: .userInitiated)
+    private var wanted: AudioObjectID?
     private var output: AudioObjectID?
     private var ioProc: AudioDeviceIOProcID?
     private var stoppedWhilePlaying = false
@@ -163,7 +164,10 @@ final class DriverLink {
     /// allocated: the audio thread may have only just left, and this happens at
     /// most a few times in a run.
     func close() {
-        outputQueue.sync { stopOutput() }
+        outputQueue.sync {
+            wanted = nil
+            stopOutput()
+        }
         heartbeat?.cancel()
         heartbeat = nil
         if let activity { ProcessInfo.processInfo.endActivity(activity) }
@@ -175,12 +179,25 @@ final class DriverLink {
     /// sample rate, which the caller keeps the same as the device's. Off the
     /// main thread, like `stop`: a Bluetooth output can take a second to start.
     func start(on device: AudioObjectID) {
-        outputQueue.async { [self] in _ = startOutput(on: device) }
+        outputQueue.async { [self] in
+            wanted = device
+            start(on: device, tries: 5)
+        }
+    }
+
+    /// Nothing else would ask again, and meanwhile apps are playing to the
+    /// device with nothing to hear them. For a moment only: then it's not coming.
+    private func start(on device: AudioObjectID, tries: Int) {
+        guard wanted == device, !startOutput(on: device), tries > 0 else { return }
+        outputQueue.asyncAfter(deadline: .now() + 3) { [self] in start(on: device, tries: tries - 1) }
     }
 
     /// Lets go of the real output, so it and the Mac can sleep.
     func stop() {
-        outputQueue.async { [self] in stopOutput() }
+        outputQueue.async { [self] in
+            wanted = nil
+            stopOutput()
+        }
     }
 
     private func startOutput(on device: AudioObjectID) -> Bool {
@@ -500,7 +517,7 @@ final class DriverLink {
     }
 
     /// The channels of each buffer the device's IO proc gets.
-    private static func readStreamConfiguration(of device: AudioObjectID) -> [Int] {
+    static func readStreamConfiguration(of device: AudioObjectID) -> [Int] {
         var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreamConfiguration,
                                                  mScope: kAudioObjectPropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
         var size: UInt32 = 0

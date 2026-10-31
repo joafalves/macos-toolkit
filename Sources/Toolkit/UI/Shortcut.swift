@@ -172,7 +172,7 @@ struct ShortcutRecorder: View {
                     .frame(minWidth: 96)
             }
             .help(!model.recording ? "Click to change" : optional ? "Press the keys. Esc cancels, Delete clears." : "Press the keys. Esc cancels.")
-            if shortcut != defaultValue, !model.recording {
+            if shortcut != defaultValue, !model.recording, !taken.contains(defaultValue) {
                 Button { shortcut = defaultValue } label: { Image(systemName: "arrow.uturn.backward") }
                     .buttonStyle(.borderless)
                     .help("Back to \(defaultValue.display)")

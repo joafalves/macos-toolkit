@@ -302,9 +302,10 @@ display, so they're left out then. On the main display it always lists every win
 display wherever you work, so only its own would hide the rest.
 
 **Style** is a grid with a picture of each window by default, which needs the Screen Recording
-permission, or a list of rows. **App icons** shows each app's icon in the grid large in the top right
-corner of the picture, with the app's badge, or small in the bar. Each tile names the app, then the window.
-**Grid Width** sets how much of each display the grid can use; windows that don't fit go on another row.
+permission, or a list of rows. **App icons** shows each app's icon in the grid small (the default) or medium
+in the bar, or large in the top right corner of the picture, with the app's badge. Each tile names the app, then
+the window: on one line, or one above the other with a medium icon.
+Under **Sizing**, each display's grid width sets how much of it the grid can use; windows that don't fit go on another row.
 Each display keeps its own, a new one starts with what suits its size, and **Use on All Displays** applies
 one display's width to the rest, and to any new one.
 
@@ -329,8 +330,8 @@ app and title along the bottom. ← → step through the tiles, ↑ ↓ go to th
 the other keys work as in the list. Minimized windows keep their last picture, dimmed; hidden apps
 and apps without a window show their icon.
 
-- **Size**: Small, Medium or Large is the largest a tile gets, and tiles shrink when there are more
-  windows than fit, so there's never any scrolling. **Fit** makes them as large as the display allows.
+- **Tile size**, under Sizing: Small, Medium or Large is the largest a tile gets, and tiles shrink when
+  there are more windows than fit, so there's never any scrolling. **Fit** makes them as large as the display allows.
 - **Pictures**: **Cached** shows the last picture of each window at once and a new one a moment later,
   **Fresh** shows the app's icon until the new picture arrives, and **Live** keeps them updating
   while the switcher is open (more power).

@@ -31,6 +31,7 @@ struct MixerPopoverView: View {
                 .padding(10)
                 .background(ModuleBackground())
             MixerEqualizerControls(mixer: mixer, place: .panel, expanded: showEqualizer, target: noTarget)
+                .disabled(mixer.driverBlocked)
                 .padding(10)
                 .background(ModuleBackground())
 
@@ -58,6 +59,7 @@ struct MixerPopoverView: View {
                 }
 
                 MixerAppList(mixer: mixer, place: .panel)
+                    .disabled(mixer.driverBlocked)
             }
 
             Divider().padding(.horizontal, 4)

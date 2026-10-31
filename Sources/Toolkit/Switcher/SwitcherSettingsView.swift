@@ -89,13 +89,9 @@ struct SwitcherSettingsView: View {
                               isOn: $switcher.config.appColors)
                     if switcher.config.style == .previews {
                         RowDivider()
-                        OptionRow(title: "Size", caption: "The largest a preview gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows.",
-                                  selection: $switcher.config.previewSize,
-                                  options: PreviewSize.allCases.map { ($0, $0.title) })
-                        RowDivider()
-                        OptionRow(title: "App icons", caption: "Small icons sit in the bar beside the title. Large ones are in the top right corner of the picture, with the app's badge.",
+                        OptionRow(title: "App icons", caption: "Small and medium icons sit in the bar, beside the app's name. Large ones are in the top right corner of the picture, with the app's badge.",
                                   selection: $switcher.config.previewIcons,
-                                  options: [(.small, "Small"), (.large, "Large")])
+                                  options: [(.small, "Small"), (.medium, "Medium"), (.large, "Large")])
                         RowDivider()
                         OptionRow(title: "Pictures", caption: freshnessCaption,
                                   selection: $switcher.config.previewFreshness,
@@ -104,10 +100,14 @@ struct SwitcherSettingsView: View {
                 }
 
                 if switcher.config.style == .previews {
-                    Card(title: "Grid Width",
+                    Card(title: "Sizing",
                          footnote: "How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with what suits its size.") {
-                        ForEach(Array(displays.value.enumerated()), id: \.element.uuid) { index, display in
-                            if index > 0 { RowDivider() }
+                        // Here because each display's "across" is its width divided by this.
+                        OptionRow(title: "Tile size", caption: "The largest a tile gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows.",
+                                  selection: $switcher.config.previewSize,
+                                  options: PreviewSize.allCases.map { ($0, $0.title) })
+                        ForEach(displays.value, id: \.uuid) { display in
+                            RowDivider()
                             GridWidthRow(switcher: switcher, display: display)
                         }
                     }
@@ -122,12 +122,12 @@ struct SwitcherSettingsView: View {
                                     ? "Hold \(held) to keep the list open and let go to switch."
                                     : "Hold \(held) to keep the list open and let go to switch. Add ⇧ to go backwards.",
                                 shortcut: $switcher.config.shortcut, defaultValue: .commandTab, optional: false,
-                                taken: [switcher.config.appShortcut])
+                                taken: SwitcherController.takenByAppShortcut(switcher.config.appShortcut))
                     RowDivider()
                     ShortcutRow(title: "Windows of the current app",
                                 caption: "The same list, with only the windows of the app you're in.",
                                 shortcut: $switcher.config.appShortcut, defaultValue: .commandAboveTab,
-                                taken: [switcher.config.shortcut])
+                                taken: SwitcherController.takenByShortcut(switcher.config.shortcut))
                     RowDivider()
                     OptionRow(title: "Show on", caption: "Which display the list opens on.",
                               selection: $switcher.config.placement,

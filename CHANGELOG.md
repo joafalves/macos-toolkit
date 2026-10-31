@@ -18,8 +18,8 @@ worked on; it gets its date when it's released.
 - **Window Switcher:** type while the list is open to search what it lists, apps by name and windows by
   title, and to open an app it doesn't list. ⌘ and the key above Tab lists only the windows of the current app.
 - **Window Switcher:** App Icons picks how the grid, and Window Layout's suggestions, show each app's icon:
-  large in the top right corner of the picture, with the app's badge, or small in the bar. Tiles are a
-  little taller, with the app's name above the window's title.
+  small (the default) or medium in the bar, or large in the top right corner of the picture, with the app's badge. Tiles are a
+  little taller, with the app's name and the window's title on one line, or one above the other beside a medium icon.
 - **Window Switcher:** Grid Width sets how much of a display the grid can use, so you don't have to turn
   your head; windows that don't fit go on another row. Each display keeps its own, a new one starts with
   what suits its size, and one display's width can be used on all of them.
@@ -31,6 +31,7 @@ worked on; it gets its date when it's released.
 - **Window Switcher:** closing, minimizing, hiding and quitting from the list are now ⇧W, ⇧M, ⇧H, ⇧Q and
   ⇧X, since letters on their own now search.
 - **Window Switcher:** Previews is the default style. A style you've already chosen stays.
+- **Window Switcher:** Size is now Tile Size, under Sizing with each display's Grid Width, since the two decide together how many fit across.
 
 ### Fixed
 
@@ -40,6 +41,15 @@ worked on; it gets its date when it's released.
   list only shows one display's.
 - **Window Switcher:** an app that didn't answer when the toolkit started is asked again, and anything
   the list has missed is looked for when it opens. Its windows could be missing until you switched to it.
+- **Window Switcher:** when a window closes while the list is open, the selection stays on the window it
+  was on, rather than moving to another that ⇧Q or ⇧W would then act on.
+- **Window Switcher:** ⇧W, ⇧Q, ⇧M, ⇧H and ⇧X go by the letter on keyboards that aren't QWERTY. On
+  AZERTY, ⇧A quit the selected app.
+- **Window Switcher:** ⇧X no longer quits an app with a window on screen that it couldn't list.
+- **Window Layout:** two displays arriving a moment apart, as from a dock, no longer make snapped windows
+  forget they're snapped. A window already filling the new display now remembers that it's on it.
+- **Audio Mixer:** after turning the mixer off and on, it follows the output's volume and sample rate again.
+  They were only followed once the output changed.
 - **Window Layout:** a window snapped or maximized on one display when another arrives and becomes the
   main one is snapped again where macOS leaves it, filling that display. It no longer stays at the old
   display's size, and a drag no longer shrinks it to its size from before it was snapped.

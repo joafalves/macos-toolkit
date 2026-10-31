@@ -1,8 +1,10 @@
 import AudioToolbox
 import CoreAudio
+import CryptoKit
 import DriverShared
 import Foundation
 import os
+import Security
 
 /// The audio driver on this Mac: whether it's there, and putting it there.
 /// Install and removal run as root for a moment, through macOS's own password
@@ -17,6 +19,8 @@ enum DriverInstall: Equatable {
 
     private static let name = "ToolkitAudio.driver"
     private static let installed = URL(fileURLWithPath: "/Library/Audio/Plug-Ins/HAL").appendingPathComponent(name)
+    /// Beside the HAL folder, not in it, where coreaudiod would load it.
+    private static let staged = URL(fileURLWithPath: "/Library/Audio/Plug-Ins").appendingPathComponent(".\(name).new")
     private static var bundled: URL? { Bundle.main.resourceURL?.appendingPathComponent(name) }
 
     /// From the file: `Bundle` reads no Info.plist for a bundle inside an app's
@@ -37,17 +41,36 @@ enum DriverInstall: Equatable {
     /// Puts the app's driver in place, or removes it, and restarts coreaudiod,
     /// which stops all sound for a moment. False if refused, or cancelled. Blocks.
     static func run(install: Bool) -> Bool {
-        var commands = ["/bin/rm -rf \(quoted(installed.path))"]
+        var commands: String
         if install {
-            guard let bundled else { return false }
-            // An app that came as a download marks what's in it, and a driver
-            // must not carry that.
-            commands += ["/usr/bin/ditto \(quoted(bundled.path)) \(quoted(installed.path))",
-                         "/usr/bin/xattr -dr com.apple.quarantine \(quoted(installed.path))",
-                         "/usr/sbin/chown -R root:wheel \(quoted(installed.path))"]
+            guard let bundled, let requirement = signedLikeThisApp else {
+                Log.mixer.error("driver: this copy can't tell its own driver from another: not installed")
+                return false
+            }
+            // The app's folder is the user's, so anything running as them could
+            // swap the driver at any moment up to the copy. So it's copied first
+            // into a place only root can write, loses the owner, ACLs (which ditto
+            // keeps, even with --noacl: measured) and modes that would leave it
+            // writable, and is checked there, where it can no longer change. An
+            // app that came as a download marks what's in it, and a driver must
+            // not carry that.
+            let stage = quoted(staged.path)
+            commands = "/bin/rm -rf \(stage)"
+                + " && /usr/bin/ditto \(quoted(bundled.path)) \(stage)"
+                + " && /usr/sbin/chown -R root:wheel \(stage)"
+                + " && /bin/chmod -R -N \(stage)"
+                + " && /bin/chmod -R u-s,g-s,go-w \(stage)"
+                + " && /usr/bin/codesign --verify --strict -R\(quoted("=" + requirement)) \(stage)"
+                + " && /usr/bin/xattr -dr com.apple.quarantine \(stage)"
+                + " && /bin/mkdir -p \(quoted(installed.deletingLastPathComponent().path))"
+                + " && /bin/rm -rf \(quoted(installed.path))"
+                + " && /bin/mv \(stage) \(quoted(installed.path))"
+                + " || { /bin/rm -rf \(stage); exit 1; }"
+        } else {
+            commands = "/bin/rm -rf \(quoted(installed.path)) || exit 1"
         }
-        commands.append("(/usr/bin/killall coreaudiod || true)")
-        let script = "do shell script \"\(commands.joined(separator: " && ").replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\" with administrator privileges"
+        commands += "; /usr/bin/killall coreaudiod || true"
+        let script = "do shell script \"\(commands.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\" with administrator privileges"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         process.arguments = ["-e", script]
@@ -60,6 +83,21 @@ enum DriverInstall: Equatable {
 
     private static func quoted(_ path: String) -> String {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// The requirement for a driver worth installing: this app's own certificate,
+    /// as the driver asks of the app. Nil for a copy signed ad hoc, which has none.
+    private static var signedLikeThisApp: String? {
+        var me: SecCode?
+        var mine: SecStaticCode?
+        var information: CFDictionary?
+        guard SecCodeCopySelf([], &me) == errSecSuccess, let me,
+              SecCodeCopyStaticCode(me, [], &mine) == errSecSuccess, let mine,
+              SecCodeCopySigningInformation(mine, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
+              let certificates = (information as NSDictionary?)?[kSecCodeInfoCertificates] as? [SecCertificate],
+              let leaf = certificates.first else { return nil }
+        let hash = Insecure.SHA1.hash(data: SecCertificateCopyData(leaf) as Data).map { String(format: "%02x", $0) }.joined()
+        return "identifier \"\(DRIVER_PLUGIN_BUNDLE_ID)\" and certificate leaf = H\"\(hash)\""
     }
 }
 
@@ -314,8 +352,7 @@ final class MixerDriver {
         let scope = kAudioObjectPropertyScopeOutput
         return "\(output) \(output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 0) "
             + "\(output.readArray(kAudioDevicePropertyPreferredChannelsForStereo, scope: scope, as: UInt32.self)) "
-            + "\(output.readArray(kAudioDevicePropertyStreams, scope: scope, as: AudioStreamID.self).count)"
-            + "\(output.read(kAudioDevicePropertyStreamConfiguration, scope: scope, as: UInt32.self) ?? 0)"
+            + "\(DriverLink.readStreamConfiguration(of: output))"
     }
 
     private func restart() {

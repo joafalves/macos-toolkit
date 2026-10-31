@@ -1403,7 +1403,7 @@
 "Measuring…" = "A medir…";
 
 /* Sources/Toolkit/Switcher/SwitcherConfig.swift:35 */
-"Medium" = "Média";
+"Medium" = "Médio";
 
 /* Sources/Toolkit/Stats/StatsConfig.swift:24 */
 "MEM" = "MEM";
@@ -2274,9 +2274,6 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:347 */
 "Simple: bass, mid and treble, handles on the same ten bands. A preset sounds the same in both." = "Simples: graves, médios e agudos, que movem as mesmas dez bandas. Uma predefinição soa igual nos dois modos.";
 
-/* Sources/Toolkit/App/SettingsIndex.swift:55 */
-"Size" = "Tamanho";
-
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:18 */
 "Size and Position" = "Tamanho e posição";
 
@@ -2608,7 +2605,9 @@
 "The highs, from about 2 kHz up. Double-click for 0 dB." = "Os agudos, a partir de cerca de 2 kHz. Clique duas vezes para 0 dB.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:55 */
-"The largest a preview gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows." = "O maior que uma pré-visualização fica. Com muitas janelas, encolhem para caberem todas. Ajustar torna-as tão grandes quanto o monitor permite.";
+"The largest a tile gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows." = "O maior que uma pré-visualização fica. Com muitas janelas, encolhem para caberem todas. Ajustar torna-as tão grandes quanto o monitor permite.";
+"Tile size" = "Tamanho das pré-visualizações";
+"Sizing" = "Tamanho";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:79 */
 "The letters are the keys in the grid's place on the keyboard, whatever the layout: the top left cell is always the key where Q is on a US keyboard." = "As letras são as teclas no lugar da grelha no teclado, seja qual for a disposição: a célula superior esquerda é sempre a tecla onde fica o Q num teclado dos EUA.";
@@ -3206,7 +3205,7 @@
 "⇧W" = "⇧W";
 "⇧X" = "⇧X";
 "App icons" = "Ícones das aplicações";
-"Small icons sit in the bar beside the title. Large ones are in the top right corner of the picture, with the app's badge." = "Os ícones pequenos ficam na barra, ao lado do título. Os grandes ficam no canto superior direito da imagem, com o emblema da aplicação.";
+"Small and medium icons sit in the bar, beside the app's name. Large ones are in the top right corner of the picture, with the app's badge." = "Os ícones pequenos e médios ficam na barra, ao lado do nome da aplicação. Os grandes ficam no canto superior direito da imagem, com o emblema da aplicação.";
 "Grid Width" = "Largura da grelha";
 "How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with what suits its size." = "Quanto da largura de um monitor a grelha pode usar. As janelas que não couberem passam para outra linha. Cada monitor guarda a sua, e um monitor novo começa com a que se adequa ao seu tamanho.";
 "Use on All Displays" = "Usar em todos os monitores";

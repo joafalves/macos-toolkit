@@ -128,6 +128,8 @@ final class WindowCatalog {
             })
         }
         on(NSWorkspace.didLaunchApplicationNotification) { [weak self] app in
+            // A helper that came first can belong to this one: `heal` asks again.
+            if app?.activationPolicy == .regular { self?.notHelpers.removeAll() }
             if let app { self?.watch(app) }
         }
         on(NSWorkspace.didTerminateApplicationNotification) { [weak self] app in
@@ -187,13 +189,18 @@ final class WindowCatalog {
         if app.activationPolicy == .regular { return app }
         let pid = app.processIdentifier
         guard app.activationPolicy == .accessory, !notHelpers.contains(pid) else { return nil }
-        if let path = app.bundleURL?.path, let owner = NSWorkspace.shared.runningApplications.first(where: { candidate in
+        // The innermost, for an app that carries another inside it: ⇧Q on this
+        // helper's window quits what's found here.
+        if let path = app.bundleURL?.path, let owner = NSWorkspace.shared.runningApplications.filter({ candidate in
             guard candidate.activationPolicy == .regular, let parent = candidate.bundleURL?.path else { return false }
             return path.hasPrefix(parent + "/Contents/")
-        }) { return owner }
+        }).max(by: { ($0.bundleURL?.path.count ?? 0) < ($1.bundleURL?.path.count ?? 0) }) { return owner }
         notHelpers.insert(pid)
         return nil
     }
+
+    /// Every window known, listed now or not.
+    var windowIDs: Set<CGWindowID> { Set(entries.keys) }
 
     /// The process of the app that a process's windows are listed under.
     func appPID(_ pid: pid_t) -> pid_t {
@@ -218,6 +225,7 @@ final class WindowCatalog {
 
     private func unwatch(_ pid: pid_t) {
         notHelpers.remove(pid)
+        healedAt[pid] = nil
         guard let watch = watches.removeValue(forKey: pid) else { return }
         CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(watch.observer), .commonModes)
         entries = entries.filter { $0.value.pid != pid }
@@ -320,7 +328,13 @@ final class WindowCatalog {
             let onScreen = Self.windowsOnScreen()
             DispatchQueue.main.async {
                 guard !self.tokens.isEmpty else { return }
-                for app in NSWorkspace.shared.runningApplications { self.watch(app) }
+                let running = NSWorkspace.shared.runningApplications
+                // macOS says nothing when an app with no Dock icon starts or ends
+                // (measured), so its helpers are only ever noticed from here. One
+                // whose app has gone goes too, to find its app again if it's back.
+                for (pid, watch) in self.watches where watch.app.isTerminated || watch.owner.isTerminated { self.unwatch(pid) }
+                self.notHelpers.formIntersection(running.map(\.processIdentifier))
+                for app in running { self.watch(app) }
                 let now = ProcessInfo.processInfo.systemUptime
                 for (pid, windows) in onScreen {
                     guard let watch = self.watches[pid], !windows.subtracting(self.entries.keys).isEmpty,
@@ -735,8 +749,10 @@ final class WindowCatalog {
     /// with every window minimized. Finder and the toolkit are spared.
     func quitIdle(_ items: [SwitcherItem]) {
         // Going by every window, not only those listed: with one display's
-        // listed, an app can have its only normal window on another.
+        // listed, an app can have its only normal window on another, and a
+        // window on screen may be one Accessibility doesn't list at all.
         let inUse = Set(snapshot().items.filter { !$0.dimmed }.map(\.pid))
+            .union(Self.windowsOnScreen().keys.map(appPID))
         for pid in Set(items.map(\.pid)).subtracting(inUse) where pid != ownPID {
             guard let app = app(pid), app.bundleIdentifier != "com.apple.finder" else { continue }
             app.terminate()

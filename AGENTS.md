@@ -295,7 +295,10 @@ tool; keep it in step with the code.
   altogether once it's stable. Taps stay the default for now, and the mixer goes back to them if the
   driver can't link or its device never shows (`MixerController.startDriver`).
   - It's installed only by the switch on the mixer's page, through macOS's password dialog
-    (`DriverInstall.run`), never by an update or a launch. Nothing stays running as root.
+    (`DriverInstall.run`), never by an update or a launch. Nothing stays running as root. The app's folder
+    is the user's, so the driver is copied first to a place only root can write, stripped of ACLs and
+    open modes, and has to pass `codesign` against the app's own certificate there before it goes into
+    `HAL`. A copy signed ad hoc has no certificate to name and refuses to install it.
   - It has its own version, `CFBundleVersion` in `Driver/Info.plist`, not the app's: a release that leaves
     the driver alone asks nothing of anyone. **Any change to `Driver/` or `DriverShared.h` that ships goes up
     by one there**, and a change to the shared memory's layout also raises `DRIVER_SHARED_VERSION`. A driver
@@ -345,7 +348,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png volume-hud [light]      # the volume keys' bar: whole steps, part of one, muted
 .build/debug/Toolkit --snapshot out.png switcher-grid [light]   # drawn stand-ins, no real windows
 .build/debug/Toolkit --snapshot out.png switcher-list [light] [colors] [many] [search=text]   # the list, with app colours, fourteen apps, or a search
-.build/debug/Toolkit --snapshot out.png switcher-grid [light] [colors] [many] [small]   # the grid, with small app icons
+.build/debug/Toolkit --snapshot out.png switcher-grid [light] [colors] [many] [medium|large]   # the grid, with medium or large app icons rather than small
 .build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
 .build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power ...] [light]

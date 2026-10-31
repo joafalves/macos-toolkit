@@ -111,9 +111,19 @@ static void WatchEvery(double seconds) {
                               (uint64_t)(seconds * NSEC_PER_SEC), (uint64_t)(seconds * NSEC_PER_SEC / 5));
 }
 
+// On gLinkQueue. A name handed out and never used would otherwise stay until a
+// restart of the Mac.
+static void UnlinkName(void) {
+    if (gNameLinked) {
+        shm_unlink(gSharedName);
+        gNameLinked = false;
+    }
+}
+
 // On gLinkQueue.
 static void Unpublish(const char *why) {
     os_log(gLog, "link over: %{public}s", why);
+    UnlinkName();
     if (gWatch) {
         dispatch_source_cancel(gWatch);
         gWatch = NULL;
@@ -139,10 +149,7 @@ static void Watch(void) {
     if (beat != gHandedOutBeat) {
         // It has the memory open: nobody else needs the name, and with it
         // unlinked the memory goes with the last of us.
-        if (gNameLinked) {
-            shm_unlink(gSharedName);
-            gNameLinked = false;
-        }
+        UnlinkName();
         if (!atomic_exchange(&gPublished, true)) {
             os_log(gLog, "device shown, for pid %d", gLinkPid);
             NotifyDeviceList();
@@ -155,6 +162,7 @@ static void Watch(void) {
 // memory of a later link. An old region is left mapped: the audio thread could
 // be in it, and it's small and only happens when the toolkit starts over.
 static bool MakeShared(void) {
+    UnlinkName();
     uint8_t bytes[12];
     arc4random_buf(bytes, sizeof bytes);
     int used = snprintf(gSharedName, sizeof gSharedName, "/tk");
@@ -185,10 +193,14 @@ static bool MakeShared(void) {
     }
     DriverSharedHeader *shared = memory;
     driver_shared_init(shared);
-    // Whoever is already a client, for a link made while they stay.
+    // Whoever is already a client, for a link made while they stay, and whether
+    // they're playing: no StartIO will come to say so.
     for (uint32_t slot = 0; slot < DRIVER_SLOTS; slot++) {
         if (atomic_load(&gClients[slot].clientID) != 0) driver_shared_set_client(shared, slot, gClients[slot].pid);
     }
+    os_unfair_lock_lock(&gLock);
+    driver_shared_set_io_running(shared, gIOClients > 0);
+    os_unfair_lock_unlock(&gLock);
     gNameLinked = true;
     atomic_store(&gShared, shared);
     return true;
@@ -300,7 +312,7 @@ static OSStatus PlugInProperty(pid_t pid, const AudioObjectPropertyAddress *addr
     case kAudioPlugInPropertyDeviceList: ANSWER_LIST(AudioObjectID, &device, published ? 1 : 0);
     case kAudioPlugInPropertyTranslateUIDToDevice: {
         if (!out) ANSWER(AudioObjectID, kAudioObjectUnknown);
-        if (qualifierSize != sizeof(CFStringRef) || !qualifier) return kAudioHardwareBadPropertySizeError;
+        if (qualifierSize != sizeof(CFStringRef) || !qualifier || !*(const CFStringRef *)qualifier) return kAudioHardwareBadPropertySizeError;
         bool same = published && CFStringCompare(*(const CFStringRef *)qualifier, CFSTR(DRIVER_DEVICE_UID), 0) == kCFCompareEqualTo;
         ANSWER(AudioObjectID, same ? (AudioObjectID)kObjectDevice : (AudioObjectID)kAudioObjectUnknown);
     }
@@ -533,6 +545,8 @@ static OSStatus SetPropertyData(AudioServerPlugInDriverRef driver, AudioObjectID
     if (object == kObjectVolume && (address->mSelector == kAudioLevelControlPropertyScalarValue || address->mSelector == kAudioLevelControlPropertyDecibelValue)) {
         if (size != sizeof(Float32)) return kAudioHardwareBadPropertySizeError;
         Float32 value = *(const Float32 *)data;
+        // Any process can set this, and NaN gets past the limits below.
+        if (value != value) return kAudioHardwareIllegalOperationError;
         value = address->mSelector == kAudioLevelControlPropertyScalarValue ? value : DecibelsToScalar(value);
         atomic_store(&gVolume, value < 0 ? 0 : value > 1 ? 1 : value);
         NotifyControl(kObjectVolume, kAudioLevelControlPropertyScalarValue, kAudioLevelControlPropertyDecibelValue);

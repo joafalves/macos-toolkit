@@ -50,9 +50,11 @@ enum PreviewSize: String, Codable, CaseIterable {
 
 /// Where a preview shows its app's icon.
 enum PreviewIcons: String, Codable, CaseIterable {
-    /// In the bar along the bottom, beside the title.
+    /// 24 pt in the bar along the bottom, with the app's name and the title on one line.
     case small
-    /// In the top right corner, over the picture, with the app's badge.
+    /// 32 pt in the bar, with the title below the app's name.
+    case medium
+    /// 48 pt in the top right corner, over the picture, with the app's badge.
     case large
 }
 
@@ -109,7 +111,7 @@ struct SwitcherConfig: Codable, Equatable {
     var style = SwitcherStyle.previews
     var previewSize = PreviewSize.medium
     var previewFreshness = PreviewFreshness.cached
-    var previewIcons = PreviewIcons.large
+    var previewIcons = PreviewIcons.small
     /// How wide the grid gets on each display, by its UUID, where it's been set.
     var gridWidths: [String: Double] = [:]
     /// For every other display, once it's been applied to all of them.
@@ -131,7 +133,7 @@ struct SwitcherConfig: Codable, Equatable {
         style = (try? c.decodeIfPresent(SwitcherStyle.self, forKey: .style)) ?? .previews
         previewSize = (try? c.decodeIfPresent(PreviewSize.self, forKey: .previewSize)) ?? .medium
         previewFreshness = (try? c.decodeIfPresent(PreviewFreshness.self, forKey: .previewFreshness)) ?? .cached
-        previewIcons = (try? c.decodeIfPresent(PreviewIcons.self, forKey: .previewIcons)) ?? .large
+        previewIcons = (try? c.decodeIfPresent(PreviewIcons.self, forKey: .previewIcons)) ?? .small
         gridWidths = (try? c.decodeIfPresent([String: Double].self, forKey: .gridWidths)) ?? [:]
         gridWidthForAll = try? c.decodeIfPresent(Double.self, forKey: .gridWidthForAll)
         appColors = try c.decodeIfPresent(Bool.self, forKey: .appColors) ?? false

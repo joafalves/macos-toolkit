@@ -285,7 +285,9 @@ extension LayoutController {
 extension MixerController {
     var permissionNeeds: [PermissionNeed] {
         // Through the audio driver nothing records, and waiting for its update nothing plays through us.
-        var needs: [PermissionNeed] = driverActive || driverBlocked ? [] : [.required(.systemAudio, String(localized: "To change the volume of each app."))]
+        // Before its device shows too: only a problem with it means taps after all.
+        let onDriver = driverActive || driverBlocked || (config.usesDriver && driverInstall == .current && driverProblem == nil)
+        var needs: [PermissionNeed] = onDriver ? [] : [.required(.systemAudio, String(localized: "To change the volume of each app."))]
         needs.append(.optional(.accessibility, String(localized: "For the volume keys.")))
         return needs
     }

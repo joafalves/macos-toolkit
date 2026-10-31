@@ -217,7 +217,7 @@ enum SwitcherSearch {
         // Defaults.
         let fresh = SwitcherConfig()
         let empty = try? JSONDecoder().decode(SwitcherConfig.self, from: Data("{}".utf8))
-        check("large icons by default", fresh.previewIcons == .large && empty?.previewIcons == .large)
+        check("small icons by default", fresh.previewIcons == .small && empty?.previewIcons == .small)
         check("previews by default", fresh.style == .previews && empty?.style == .previews)
         check("no colours by default", !fresh.appColors && empty?.appColors == false)
 

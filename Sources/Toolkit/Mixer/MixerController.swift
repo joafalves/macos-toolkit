@@ -271,6 +271,9 @@ final class MixerController: ObservableObject {
         RunLoop.main.add(levels, forMode: .common)
         levelTimer = levels
 
+        // `stop` let go of its listeners, and the same output again wouldn't
+        // bring them back.
+        output = .unknown
         refreshDevices()
         refreshApps()
     }
@@ -666,8 +669,10 @@ final class MixerController: ObservableObject {
     private func realOutput(default current: AudioObjectID) -> AudioObjectID {
         guard let driver else { return current }
         if driver.device == nil {
-            // On the way up: sound still plays on the output it's on.
-            let fallback = outputs.first { $0.transport == kAudioDeviceTransportTypeBuiltIn && !DriverRoutes.takesOver($0) } ?? outputs.first
+            // On the way up: sound still plays on the output it's on, unless
+            // that's the device, left by a toolkit just killed.
+            let fallback = driver.routes.used.reversed().lazy.compactMap { uid in self.outputs.first { $0.uid == uid } }.first
+                ?? outputs.first { $0.transport == kAudioDeviceTransportTypeBuiltIn && !DriverRoutes.takesOver($0) } ?? outputs.first
             guard driver.adopt(real: current, fallback: fallback?.id) else { return current }
             driver.routes.begin(among: outputs, current: outputs.first { $0.id == driver.output }?.uid)
             driverRetries = 0
@@ -1373,7 +1378,8 @@ final class MixerController: ObservableObject {
             driverRetrying = false
             if driverRetries <= 3 { startDriver() }
             if driver == nil {
-                if driverRetries <= 3 { driverProblem = .noDevice }
+                // Unless that last try found out what the matter is.
+                if driverRetries <= 3, driverProblem == nil { driverProblem = .noDevice }
                 rebuildTaps()
             }
             refreshDevices()
@@ -1387,7 +1393,10 @@ final class MixerController: ObservableObject {
         let version = DriverInstall.bundledVersion
         guard UserDefaults.standard.string(forKey: key) != version else { return }
         UserDefaults.standard.set(version, forKey: key)
-        DispatchQueue.main.async { [self] in
+        // Not through the main queue, which nothing else gets through while its
+        // block waits for an answer (measured): every tool's work goes that way,
+        // and with the switcher on, ⌘Tab would be dead until this was answered.
+        RunLoop.main.perform { [self] in
             let alert = NSAlert()
             alert.alertStyle = .warning
             alert.messageText = String(localized: "The audio driver needs updating")
@@ -1457,8 +1466,9 @@ final class MixerController: ObservableObject {
                 driverInstall = DriverInstall.status
                 guard installed else {
                     driverWork = nil
-                    driverProblem = .installFailed
                     if wasRunning { start() }
+                    // After: starting says what it finds, which isn't this.
+                    driverProblem = .installFailed
                     return
                 }
                 whenDriverLoaded { [self] in

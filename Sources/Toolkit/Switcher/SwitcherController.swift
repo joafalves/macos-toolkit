@@ -143,7 +143,7 @@ final class SwitcherController: ObservableObject {
     private func apply() {
         guard config.enabled else { return uninstall() }
         if tap == nil {
-            guard AXIsProcessTrusted() else { return }
+            guard AXIsProcessTrusted() else { return restoreSystemKeysOnce() }
             let installed = installTap()
             Log.switcher.notice("event tap started: \(installed)")
             if tapFailed == installed { tapFailed = !installed }
@@ -182,17 +182,28 @@ final class SwitcherController: ObservableObject {
     private var systemSwitcherSetAt: TimeInterval?
     private var wakeObservers: [NSObjectProtocol] = []
 
-    private func uninstall() {
-        guard let tap else { return }
-        end()
-        tap.stop()
-        self.tap = nil
-        catalog.use(self, false)
+    /// A copy that crashed with the keys taken leaves them off, and this one may
+    /// have no tap to set them from: turned off since, or without Accessibility.
+    private func restoreSystemKeysOnce() {
+        guard systemSwitcherOn == nil else { return }
+        restoreSystemKeys()
+    }
+
+    private func restoreSystemKeys() {
         CGSSetSymbolicHotKeyEnabled(1, true)
         CGSSetSymbolicHotKeyEnabled(2, true)
         CGSSetSymbolicHotKeyEnabled(Self.systemCycleKey, CaptureKeys.systemEnabled(CaptureKeys.systemPrefs()[String(Self.systemCycleKey)]))
         systemCycleCheckedFor = nil
         systemSwitcherOn = true
+    }
+
+    private func uninstall() {
+        guard let tap else { return restoreSystemKeysOnce() }
+        end()
+        tap.stop()
+        self.tap = nil
+        catalog.use(self, false)
+        restoreSystemKeys()
         systemSwitcherSetAt = nil
     }
 
@@ -296,11 +307,11 @@ final class SwitcherController: ObservableObject {
                 guard digit < items.count else { return }
                 selection = digit
                 confirm()
-            } else if actions, [Key.w, Key.q, Key.m, Key.h, Key.x].contains(code) {
+            } else if actions, let action = Self.action(of: code) {
                 // Only once the list is on screen: these should not be done blind.
                 guard panel.isVisible, items.indices.contains(selection) else { return }
                 let item = items[selection]
-                switch code {
+                switch action {
                 case Key.w: catalog.close(item)
                 case Key.q: catalog.quit(item)
                 case Key.m: catalog.toggleMinimized(item)
@@ -319,6 +330,26 @@ final class SwitcherController: ObservableObject {
                 }
             }
         }
+    }
+
+    /// What the app shortcut can't be: the main shortcut goes backwards with ⇧,
+    /// which it takes first, so that keys would never reach the app shortcut.
+    static func takenByShortcut(_ shortcut: Shortcut) -> [Shortcut] {
+        shortcut.flags.contains(.shift) ? [shortcut] : [shortcut, Shortcut(keyCode: shortcut.keyCode, flags: shortcut.flags.union(.shift))]
+    }
+
+    /// What the main shortcut can't be, the same seen from the other side.
+    static func takenByAppShortcut(_ shortcut: Shortcut) -> [Shortcut] {
+        shortcut.flags.contains(.shift) ? [shortcut, Shortcut(keyCode: shortcut.keyCode, flags: shortcut.flags.subtracting(.shift))] : [shortcut]
+    }
+
+    /// The action a key stands for, by the letter it types, as the settings
+    /// name them: on AZERTY, what's ⇧W's place elsewhere is ⇧Z. By its place
+    /// only on a layout with no such letters.
+    private static func action(of code: Int64) -> Int64? {
+        let actions = ["w": Key.w, "q": Key.q, "m": Key.m, "h": Key.h, "x": Key.x]
+        if let typed = Shortcut.typed(Int(code))?.lowercased(), typed.allSatisfy({ $0.isASCII && $0.isLetter }) { return actions[typed] }
+        return actions.values.contains(code) ? code : nil
     }
 
     // MARK: - Search
@@ -479,9 +510,11 @@ final class SwitcherController: ObservableObject {
 
     /// Only once the grid is on screen, so a quick ⌘Tab takes no pictures.
     private func startPreviews() {
-        let ids = previewIDs
+        // All that's listed, not what a search typed before it appeared left:
+        // the rest come back when the search is cleared.
+        let ids = unfiltered.filter { $0.state == .window }.compactMap(\.window)
         // Minimized windows can't be taken again, but keep their last picture.
-        let shown = items.compactMap(\.window)
+        let shown = unfiltered.compactMap(\.window)
         panel.model.previews = config.previewFreshness == .fresh ? [:] : previews.cached(shown)
         previews.refresh(ids, width: panel.previewWidth)
         if config.previewFreshness == .live {
@@ -498,7 +531,9 @@ final class SwitcherController: ObservableObject {
         liveTimer?.invalidate()
         liveTimer = nil
         previews.cancel()
-        if !unfiltered.isEmpty { previews.keep(only: Set(unfiltered.compactMap(\.window))) }
+        // Every window there is, not this list's: one app's or display's list
+        // would lose the pictures of all the others.
+        previews.keep(only: catalog.windowIDs)
         panel.model.previews = [:]
     }
 
@@ -516,7 +551,8 @@ final class SwitcherController: ObservableObject {
         unfiltered = kept + fresh.filter { !keptIDs.contains($0.id) }
         if query.isEmpty {
             items = unfiltered
-            selection = min(selection, max(items.count - 1, 0))
+            // Still the same window if one above it went: Q or W is next.
+            selection = items.firstIndex { $0.id == selected } ?? min(selection, max(items.count - 1, 0))
             // The last row closed with W or Q leaves an empty square otherwise.
             if items.isEmpty { stopPreviews(); panel.hide() }
         } else {

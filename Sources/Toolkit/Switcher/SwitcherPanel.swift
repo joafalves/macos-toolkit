@@ -15,7 +15,7 @@ final class SwitcherListModel: ObservableObject {
     /// Pictures for the grid, by window.
     @Published var previews: [CGWindowID: CGImage] = [:]
     @Published var layout = GridLayout()
-    @Published var previewIcons = PreviewIcons.large
+    @Published var previewIcons = PreviewIcons.small
     /// What's been typed. Shows above the rows, once there's something.
     @Published var query = ""
     /// The numbers on apps' icons, by the file name of the app.
@@ -159,7 +159,8 @@ struct GridLayout: Equatable {
         let row = index / columns, column = index % columns
         let inRow = tiles(inRow: row)
         let rowWidth = CGFloat(inRow) * tile.width + CGFloat(inRow - 1) * Self.spacing
-        let x = (size.width - rowWidth) / 2 + CGFloat(column) * (tile.width + Self.spacing)
+        // On a whole point: half of one would blur everything on the tile on a 1x display.
+        let x = ((size.width - rowWidth) / 2).rounded() + CGFloat(column) * (tile.width + Self.spacing)
         let y = Self.padding + CGFloat(row) * (tile.height + Self.spacing)
         return CGRect(x: x, y: y, width: tile.width, height: tile.height)
     }
@@ -200,11 +201,11 @@ struct SwitcherGridView: View {
 /// Anything between is scaled and comes out soft, most of all on a 1x display:
 /// measured at 28 pt, a third as sharp as at 32 pt.
 private enum AppIconSize {
-    static let small: CGFloat = 16, medium: CGFloat = 32
+    static let tiny: CGFloat = 16, small: CGFloat = 24, medium: CGFloat = 32
 
-    /// The sharp size nearest a share of the tile: 48 pt on a medium one.
+    /// 48 pt, or the sharp size nearest a share of the tile if it's too narrow for that.
     static func large(onTile width: CGFloat) -> CGFloat {
-        [24, 32, 48, 64].min { abs($0 - width * 0.18) < abs($1 - width * 0.18) } ?? 48
+        [24, 32, 48].min { abs($0 - width * 0.18) < abs($1 - width * 0.18) } ?? 48
     }
 }
 
@@ -217,7 +218,20 @@ private struct PreviewTile: View {
     let width: CGFloat
     let icons: PreviewIcons
 
-    private static let barHeight: CGFloat = 40
+    /// As much as its icon and text need. What that saves goes to the picture:
+    /// the tile stays the same.
+    private var barHeight: CGFloat {
+        switch icons {
+        case .small: return 30
+        case .medium: return 40
+        case .large: return 26
+        }
+    }
+
+    /// The icon in the bar, smaller only on a tile too narrow for it.
+    private var barIcon: CGFloat {
+        width < 140 ? AppIconSize.tiny : icons == .small ? AppIconSize.small : AppIconSize.medium
+    }
 
     /// In proportion to the tile. Without a picture, the icon in the middle
     /// says it already.
@@ -244,7 +258,7 @@ private struct PreviewTile: View {
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
                         .padding(8)
-                        .padding(.bottom, Self.barHeight - 4)
+                        .padding(.bottom, barHeight - 4)
                 } else if let icon = item.icon {
                     // Nothing to show of the window itself (minimized, hidden,
                     // or not seen yet): its app instead.
@@ -252,7 +266,7 @@ private struct PreviewTile: View {
                         .resizable()
                         .interpolation(.high)
                         .frame(width: 64, height: 64)
-                        .padding(.bottom, Self.barHeight - 4)
+                        .padding(.bottom, barHeight - 4)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -290,39 +304,56 @@ private struct PreviewTile: View {
         .opacity(item.tint == nil && item.dimmed ? 0.55 : 1)
     }
 
-    /// The app, and below it the window's title, across the bottom of the
-    /// tile: the app is what the eye looks for, the title which of its windows.
+    /// The app and the window's title, across the bottom of the tile: the app
+    /// is what the eye looks for, the title which of its windows. Below it beside
+    /// a medium icon, which has the height; otherwise on the same line, the title
+    /// to the right. Nothing more to say for a row that stands for an app, or a
+    /// window that's only named after it.
     private var label: some View {
         HStack(spacing: 8) {
-            if icons == .small, let icon = item.icon {
-                let size = width < 140 ? AppIconSize.small : AppIconSize.medium
-                Image(nsImage: icon).resizable().interpolation(.high).frame(width: size, height: size)
+            if icons != .large, let icon = item.icon {
+                Image(nsImage: icon).resizable().interpolation(.high).frame(width: barIcon, height: barIcon)
             }
-            VStack(alignment: .leading, spacing: 0) {
-                Text(item.appName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                // Nothing more to say for a row that stands for an app, or a
-                // window that's only named after it.
-                if let title = item.titleBesideApp {
-                    Text(title)
-                        .font(.system(size: 11))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .opacity(0.8)
+            let name = Text(item.appName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+            if icons == .medium {
+                VStack(alignment: .leading, spacing: 0) {
+                    name
+                    if let title = item.titleBesideApp { windowTitle(title) }
+                }
+                Spacer(minLength: 0)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    // The name whole if it can be: on a narrow tile, it's all there's room for.
+                    name.layoutPriority(1)
+                    Spacer(minLength: 0)
+                    if let title = item.titleBesideApp, width >= Self.widthForTitleBeside + (icons == .small ? barIcon + 8 : 0) {
+                        windowTitle(title)
+                    }
                 }
             }
-            Spacer(minLength: 0)
             if let symbol = item.stateSymbol {
                 Image(systemName: symbol).font(.system(size: 11))
             }
         }
         .foregroundStyle(.white)
         .opacity(item.tint != nil && item.dimmed ? 0.65 : 1)
-        .padding(.horizontal, 8)
-        .frame(height: Self.barHeight)
+        // A 24 pt icon has 2 pt of empty margin of its own (measured): less here,
+        // so the gap on its left looks like the one after the text on the right.
+        .padding(.leading, icons == .small && item.icon != nil ? 6 : 8)
+        .padding(.trailing, 8)
+        .frame(height: barHeight)
         .background(item.tint.map(AppPalette.selected) ?? Color.black.opacity(0.55))
         .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10, style: .continuous))
+    }
+
+    private static let widthForTitleBeside: CGFloat = 150
+
+    private func windowTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11))
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .opacity(0.7)
     }
 }
 
@@ -550,7 +581,7 @@ final class SwitcherPanel {
     var previewSize = PreviewSize.medium
     var scale: CGFloat = 2
     /// The switcher's setting, for Window Layout's suggestions as well.
-    static var previewIcons = PreviewIcons.large
+    static var previewIcons = PreviewIcons.small
     /// How much of the display's width the grid can use, set before `show`.
     var gridWidth = GridWidth.range.upperBound
     /// What's been typed, shown from the next `update`.
