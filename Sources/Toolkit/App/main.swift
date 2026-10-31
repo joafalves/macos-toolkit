@@ -45,7 +45,9 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         }
     }
     if rest.contains("switcher-list") || rest.contains("switcher-grid") {
-        Snapshot.writeSwitcher(to: rest[0], light: rest.contains("light"), grid: rest.contains("switcher-grid"))
+        if rest.contains("small") { SwitcherPanel.previewIcons = .small }
+        Snapshot.writeSwitcher(to: rest[0], light: rest.contains("light"), grid: rest.contains("switcher-grid"), colors: rest.contains("colors"),
+                               many: rest.contains("many"), query: rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) })
         exit(0)
     }
     if rest.contains("mixer-popover") {
@@ -128,6 +130,32 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
 // Development aid: `--list-windows` prints the rows the window switcher would show.
 if CommandLine.arguments.contains("--list-windows") {
     SwitcherController.dumpWindows()
+    exit(0)
+}
+
+// Development aid: what the switcher finds for what's typed, and app colours,
+// from made-up apps.
+if CommandLine.arguments.contains("--test-switcher-search") {
+    SwitcherSearch.test()
+    exit(0)
+}
+// Development aid: `--list-search <text> [file]`: what the switcher finds for
+// that on this Mac, as ranked; with Accessibility (open -n), the open windows too.
+if let flag = CommandLine.arguments.firstIndex(of: "--list-search"), CommandLine.arguments.count > flag + 1 {
+    _ = NSApplication.shared
+    SwitcherSearch.listSearch(CommandLine.arguments[flag + 1], file: CommandLine.arguments.count > flag + 2 ? CommandLine.arguments[flag + 2] : nil)
+    exit(0)
+}
+// Development aid: what the Dock shows on its icons (open -n; Accessibility).
+if CommandLine.arguments.contains("--list-badges") {
+    _ = NSApplication.shared
+    SwitcherSearch.listBadges()
+    exit(0)
+}
+
+// Development aid: how the switcher's list fills from nothing, and recovers (open -n).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-catalog-startup") {
+    SwitcherController.catalogStartupTest(report: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
     exit(0)
 }
 

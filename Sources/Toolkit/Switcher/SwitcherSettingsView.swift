@@ -7,6 +7,7 @@ struct SwitcherSettingsView: View {
     @ObservedObject private var permissions = Permissions.shared
     /// Screen Recording, checked again when the app comes back to the front.
     @StateObject private var recording = ViewState(SwitcherPreviews.permitted)
+    @StateObject private var displays = ViewState<[LayoutDisplay]>([])
 
     private var shortcut: Shortcut { switcher.config.shortcut }
     /// The keys held to keep the list open, like "⌘".
@@ -23,11 +24,12 @@ struct SwitcherSettingsView: View {
             ("Go straight to one of the first nine", "1 – 9"),
             ("Go to the selected window", "release \(held)"),
             ("Cancel", "esc"),
-            ("Close the window", "W"),
-            ("Minimize the window", "M"),
-            ("Hide the app", "H"),
-            ("Quit the app", "Q"),
-            ("Quit every dimmed app", "X"),
+            ("Search by name, or open an app", "type"),
+            ("Close the window", "⇧W"),
+            ("Minimize the window", "⇧M"),
+            ("Hide the app", "⇧H"),
+            ("Quit the app", "⇧Q"),
+            ("Quit every dimmed app", "⇧X"),
         ]
     }
 
@@ -79,11 +81,19 @@ struct SwitcherSettingsView: View {
                     OptionRow(title: "Style", caption: "A list of rows, or a grid with a picture of each window.",
                               selection: $switcher.config.style,
                               options: [(.list, "List"), (.previews, "Previews")])
+                    RowDivider()
+                    ToggleRow(title: "App colours",
+                              caption: "A flat colour for each app, here and in Window Layout's suggestions. Apps open together get colours that look different, and an app keeps its colour wherever it can.",
+                              isOn: $switcher.config.appColors)
                     if switcher.config.style == .previews {
                         RowDivider()
                         OptionRow(title: "Size", caption: "The largest a preview gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows.",
                                   selection: $switcher.config.previewSize,
                                   options: PreviewSize.allCases.map { ($0, $0.title) })
+                        RowDivider()
+                        OptionRow(title: "App icons", caption: "Small icons sit in the bar beside the title. Large ones are in the top right corner of the picture, with the app's badge.",
+                                  selection: $switcher.config.previewIcons,
+                                  options: [(.small, "Small"), (.large, "Large")])
                         RowDivider()
                         OptionRow(title: "Pictures", caption: freshnessCaption,
                                   selection: $switcher.config.previewFreshness,
@@ -91,15 +101,31 @@ struct SwitcherSettingsView: View {
                     }
                 }
 
+                if switcher.config.style == .previews {
+                    Card(title: "Grid Width",
+                         footnote: "How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with what suits its size.") {
+                        ForEach(Array(displays.value.enumerated()), id: \.element.uuid) { index, display in
+                            if index > 0 { RowDivider() }
+                            GridWidthRow(switcher: switcher, display: display)
+                        }
+                    }
+                }
+
                 Card(title: "Shortcut",
                      footnote: shortcut == .commandTab
-                        ? "macOS's app switcher is off while the switcher has ⌘Tab. ⌘` still cycles the windows of the current app."
+                        ? "macOS's app switcher is off while the switcher has ⌘Tab."
                         : "macOS's ⌘Tab app switcher works as usual alongside this.") {
                     ShortcutRow(title: "Open the switcher",
                                 caption: shortcut.flags.contains(.shift)
                                     ? "Hold \(held) to keep the list open and let go to switch."
                                     : "Hold \(held) to keep the list open and let go to switch. Add ⇧ to go backwards.",
-                                shortcut: $switcher.config.shortcut, defaultValue: .commandTab, optional: false)
+                                shortcut: $switcher.config.shortcut, defaultValue: .commandTab, optional: false,
+                                taken: [switcher.config.appShortcut])
+                    RowDivider()
+                    ShortcutRow(title: "Windows of the current app",
+                                caption: "The same list, with only the windows of the app you're in.",
+                                shortcut: $switcher.config.appShortcut, defaultValue: .commandAboveTab,
+                                taken: [switcher.config.shortcut])
                     RowDivider()
                     OptionRow(title: "Show on", caption: "Which display the list opens on.",
                               selection: $switcher.config.placement,
@@ -141,6 +167,48 @@ struct SwitcherSettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             recording.value = SwitcherPreviews.permitted
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            displays.value = switcher.gridDisplays
+        }
+        .onAppear { displays.value = switcher.gridDisplays }
+    }
+}
+
+/// How wide the grid gets on one display.
+private struct GridWidthRow: View {
+    @ObservedObject var switcher: SwitcherController
+    let display: LayoutDisplay
+
+    private var width: Double { switcher.config.gridWidth(for: display) }
+    private var custom: Bool { switcher.config.gridWidths[display.uuid] != nil }
+    /// Set for all, nothing here is different from what "all" would give.
+    private var sameEverywhere: Bool { switcher.config.gridWidths.isEmpty && switcher.config.gridWidthForAll == width }
+    private var across: Int {
+        GridLayout.across(display.usable.width * width / 100, tile: switcher.config.previewSize.maxTileWidth)
+    }
+
+    var body: some View {
+        SettingRow(title: .verbatim(display.name), caption: "\(across) across") {
+            HStack(spacing: 10) {
+                Button { switcher.config.gridWidths[display.uuid] = nil } label: { Image(systemName: "arrow.uturn.backward") }
+                    .buttonStyle(.borderless)
+                    .help("Back to the default")
+                    .opacity(custom ? 1 : 0)
+                    .disabled(!custom)
+                Button("Use on All Displays") {
+                    let width = width
+                    var config = switcher.config
+                    config.gridWidths = [:]
+                    config.gridWidthForAll = width
+                    switcher.config = config
+                }
+                .disabled(sameEverywhere)
+            }
+        } extra: {
+            ValueSlider(value: Binding(get: { width }, set: { switcher.config.gridWidths[display.uuid] = $0 }),
+                        range: GridWidth.range, step: 1, low: .verbatim("\(Int(GridWidth.range.lowerBound))%"),
+                        high: .verbatim("\(Int(GridWidth.range.upperBound))%")) { "\(Int($0))%" }
         }
     }
 }

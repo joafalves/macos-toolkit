@@ -1022,7 +1022,6 @@
 "Grow or shrink it" = "Aumentar ou reduzir";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:28 */
-"H" = "H";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:125 */
 "H.264 MP4, which plays everywhere. Frames are only written when something on screen changes, so a still screen adds almost nothing to the file. When it stops, the file is put on the clipboard, ready to paste." = "MP4 H.264, que abre em todo o lado. Só se gravam fotogramas quando algo muda no ecrã, por isso um ecrã parado quase nada acrescenta ao ficheiro. Quando para, o ficheiro fica no clipboard, pronto a colar.";
@@ -1346,7 +1345,6 @@
 "Loudness" = "Intensidade";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:27 */
-"M" = "M";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:403 */
 "macOS" = "macOS";
@@ -1379,7 +1377,6 @@
 "MacOS Toolkit has to restart to use %@." = "O MacOS Toolkit tem de reiniciar para usar: %@.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:96 */
-"macOS's app switcher is off while the switcher has ⌘Tab. ⌘` still cycles the windows of the current app." = "O seletor de aplicações do macOS fica desativado enquanto o Window Switcher tiver ⌘Tab. ⌘` continua a percorrer as janelas da aplicação atual.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:106 */
 "macOS's own screenshot shortcuts are off only where they clash with these. ⌃ counts if it's held when the capture happens: at the end of the drag, or at the click on a window." = "Os atalhos de captura do próprio macOS só ficam desativados onde coincidem com estes. ⌃ conta se estiver premido no momento da captura: no fim do arrasto, ou no clique numa janela.";
@@ -1877,7 +1874,6 @@
 "PWR" = "ENER";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:29 */
-"Q" = "Q";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:126 */
 "Quality" = "Qualidade";
@@ -2960,7 +2956,6 @@
 "Volume pill" = "Cápsula de volume";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:26 */
-"W" = "W";
 
 /* Sources/Toolkit/Capture/CaptureSettingsView.swift:113 */
 "Wallpaper" = "Papel de parede";
@@ -3131,7 +3126,6 @@
 "Write" = "Escrita";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:30 */
-"X" = "X";
 
 /* Sources/Toolkit/Stats/StatsSettingsView.swift:31 */
 "Yellow, then red, as macOS reports memory running short. Off, it keeps the menu bar's color." = "Amarelo, depois vermelho, à medida que o macOS indica que a memória escasseia. Se desativado, mantém a cor da barra de menus.";
@@ -3198,3 +3192,22 @@
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:30 */
 "⌫" = "⌫";
+"App colours" = "Cores das aplicações";
+"A flat colour for each app, here and in Window Layout's suggestions. Apps open together get colours that look different, and an app keeps its colour wherever it can." = "Uma cor lisa para cada aplicação, aqui e nas sugestões do Gestor de Janelas. As aplicações abertas ao mesmo tempo têm cores que se distinguem, e cada uma mantém a sua cor sempre que possível.";
+"macOS's app switcher is off while the switcher has ⌘Tab." = "O seletor de aplicações do macOS fica desativado enquanto o Window Switcher tiver ⌘Tab.";
+"No matches" = "Sem resultados";
+"Search by name, or open an app" = "Pesquisar por nome ou abrir uma aplicação";
+"The same list, with only the windows of the app you're in." = "A mesma lista, só com as janelas da aplicação em que está.";
+"type" = "escrever";
+"Windows of the current app" = "Janelas da aplicação atual";
+"⇧H" = "⇧H";
+"⇧M" = "⇧M";
+"⇧Q" = "⇧Q";
+"⇧W" = "⇧W";
+"⇧X" = "⇧X";
+"App icons" = "Ícones das aplicações";
+"Small icons sit in the bar beside the title. Large ones are in the top right corner of the picture, with the app's badge." = "Os ícones pequenos ficam na barra, ao lado do título. Os grandes ficam no canto superior direito da imagem, com o emblema da aplicação.";
+"Grid Width" = "Largura da grelha";
+"How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with what suits its size." = "Quanto da largura de um monitor a grelha pode usar. As janelas que não couberem passam para outra linha. Cada monitor guarda a sua, e um monitor novo começa com a que se adequa ao seu tamanho.";
+"Use on All Displays" = "Usar em todos os monitores";
+"Back to the default" = "Voltar ao valor predefinido";

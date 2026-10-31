@@ -51,15 +51,21 @@ enum Snapshot {
 
     /// The window switcher's list, or with `grid` its previews, filled with
     /// made-up rows and drawn stand-ins for windows: nothing from the screen.
-    static func writeSwitcher(to path: String, light: Bool, grid: Bool = false) {
+    static func writeSwitcher(to path: String, light: Bool, grid: Bool = false, colors: Bool = false, many: Bool = false, query: String? = nil) {
         _ = NSApplication.shared
-        func icon(_ app: String) -> NSImage { NSWorkspace.shared.icon(forFile: "/System/Applications/\(app).app") }
+        func icon(_ app: String) -> NSImage {
+            let path = ["/System/Applications/\(app).app", "/System/Applications/Utilities/\(app).app", "/Applications/\(app).app"]
+                .first(where: FileManager.default.fileExists) ?? "/System/Applications/\(app).app"
+            return NSWorkspace.shared.icon(forFile: path)
+        }
         func row(_ id: Int, _ title: String, _ app: String, _ state: SwitcherItem.State = .window) -> SwitcherItem {
             SwitcherItem(id: "\(id)", window: state == .window || state == .minimized ? CGWindowID(id) : nil, pid: 0,
-                         title: title, appName: app, icon: icon(app), state: state)
+                         title: title, appName: app, icon: icon(app), state: state, appURL: URL(fileURLWithPath: "/\(app).app"))
         }
         let model = SwitcherListModel()
-        model.items = [
+        model.badges = ["Mail.app": "3", "Notes.app": "1"]
+        model.items = many ? ["Mail", "Safari", "App Store", "Messages", "FaceTime", "Maps", "Photos", "Terminal", "Notes", "Calendar", "System Settings", "Reminders", "Finder", "Music"]
+            .enumerated().map { row($0.offset + 1, $0.element, $0.element) } : [
             row(1, "Inbox — 3 new messages", "Mail"),
             row(2, "macos-toolkit — zsh — 120×40", "Terminal"),
             row(3, "A very long window title that will not fit in the space the row has for it at all", "TextEdit"),
@@ -69,12 +75,23 @@ enum Snapshot {
             row(7, "Music", "Music", .hiddenApp),
             row(8, "Calculator", "Calculator", .noWindows),
         ]
+        if colors { tint(&model.items) }
+        model.previewIcons = SwitcherPanel.previewIcons
         model.selection = 1
+        // A search for this, with an app that isn't running among what it finds.
+        if let query {
+            let notes = model.items.filter { $0.appName == "Notes" }
+            let other = SwitcherItem(id: "i", window: nil, pid: -1, title: "Notebook", appName: "Notebook", icon: icon("Freeform"), state: .notListed)
+            model.items = notes + [other]
+            model.query = query
+            model.selection = 0
+        }
         model.shown = model.items.count
-        var size = NSSize(width: 620, height: CGFloat(model.shown) * SwitcherListView.rowHeight + SwitcherListView.padding * 2)
+        var size = NSSize(width: 620, height: CGFloat(max(model.shown, 1)) * SwitcherListView.rowHeight + SwitcherListView.padding * 2 + (query == nil ? 0 : 44))
         if grid {
             model.style = .previews
-            model.layout = GridLayout(count: model.items.count, maxTileWidth: PreviewSize.medium.maxTileWidth, area: CGSize(width: 1180, height: 760))
+            model.layout = GridLayout(count: model.items.count, maxTileWidth: PreviewSize.medium.maxTileWidth,
+                                      area: SwitcherPanel.gridArea(on: CGSize(width: 2560, height: 1409), percent: 55))
             let colors: [NSColor] = [.systemBlue, .darkGray, .systemOrange, .systemYellow, .systemRed, .systemGray]
             for (index, item) in model.items.enumerated() where item.state == .window || item.state == .minimized {
                 guard let id = item.window, let image = fakeWindow(accent: colors[index % colors.count], dark: !light, wide: index % 3 != 2) else { continue }
@@ -91,6 +108,14 @@ enum Snapshot {
         window.layoutIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         if let view = window.contentView { save(view, to: path) }
+    }
+
+    /// Colours chosen as for a Mac that has only ever seen these apps.
+    private static func tint(_ items: inout [SwitcherItem]) {
+        var choices = AppColorChoices()
+        let open = Set(items.compactMap(\.colorKey))
+        for item in items { if let key = item.colorKey { choices.assign(key, iconHue: item.icon.flatMap(AppPalette.dominantHue), open: open) } }
+        for index in items.indices { items[index].tint = items[index].colorKey.flatMap(choices.color) }
     }
 
     /// A drawn window: a title bar, a sidebar and a few lines of "text".

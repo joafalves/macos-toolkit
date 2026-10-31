@@ -287,17 +287,33 @@ a window come last, dimmed.
 | --- | --- |
 | ⇥ / ⇧⇥, ↓ / ↑ | Next / previous row |
 | 1 – 9 | Go straight to that row |
+| letters | Search what's listed: apps by name, then windows by title. Below those, a few apps it doesn't list, to open them |
+| ⌫, esc | Take back a letter; esc clears the search, then cancels |
 | release ⌘, or click | Go to the selected row |
 | esc | Cancel |
-| W, M | Close / minimize the window |
-| H, Q | Hide / quit the app |
-| X | Quit every app that only has dimmed rows (hidden, no windows, or all minimized), except Finder |
+| ⇧W, ⇧M | Close / minimize the window |
+| ⇧H, ⇧Q | Hide / quit the app |
+| ⇧X | Quit every app that only has dimmed rows (hidden, no windows, or all minimized), except Finder |
 
 The list opens on the main display, the display with the pointer, or the one with the active window,
 as you choose in the settings. **Windows** lists every window, or only those on the display the list
 opens on, each counted on the display with most of it; hidden apps and apps with no window are on no
 display, so they're left out then. On the main display it always lists every window: it's the same
-display wherever you work, so only its own would hide the rest. ⌘\` is left alone.
+display wherever you work, so only its own would hide the rest.
+
+**Style** is a grid with a picture of each window by default, which needs the Screen Recording
+permission, or a list of rows. **App icons** shows each app's icon in the grid large in the top right
+corner of the picture, with the app's badge, or small in the bar. Each tile names the app, then the window.
+**Grid Width** sets how much of each display the grid can use; windows that don't fit go on another row.
+Each display keeps its own, a new one starts with what suits its size, and **Use on All Displays** applies
+one display's width to the rest, and to any new one.
+
+**Windows of the current app** is a second shortcut, ⌘ and the key above Tab by default, for the same
+list with only the windows of the app you're in.
+
+**App colours**, off by default, gives each app a flat colour on its rows, also in Window Layout's suggestions. Each
+colour is made to look different from those of the apps open with it, close to the icon's where there's
+room. An app keeps its colour, unless it's open beside an older app it looks too much like. Rows also show the number on an app's Dock icon, read once the list is up.
 
 ### Previews
 

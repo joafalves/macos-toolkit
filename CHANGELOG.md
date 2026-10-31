@@ -12,9 +12,32 @@ worked on; it gets its date when it's released.
   and a microphone never waits for the mixer. Installing it asks for your password. Off, the mixer
   works as before. A later release with a new driver turns the mixer off until the driver is updated,
   with an alert and a warning in the sidebar; sound keeps playing as usual.
+- **Window Switcher:** App Colours, off by default, gives each app a flat colour of its own on its rows,
+  also in Window Layout's suggestions. Colours are made to look different from those of the apps open with them, close to the
+  icon's where there's room, and an app keeps its colour unless it's open beside one too like it. Rows of minimized windows and hidden apps keep the colour; only their content fades.
+- **Window Switcher:** type while the list is open to search what it lists, apps by name and windows by
+  title, and to open an app it doesn't list. ⌘ and the key above Tab lists only the windows of the current app.
+- **Window Switcher:** App Icons picks how the grid, and Window Layout's suggestions, show each app's icon:
+  large in the top right corner of the picture, with the app's badge, or small in the bar. Tiles are a
+  little taller, with the app's name above the window's title.
+- **Window Switcher:** Grid Width sets how much of a display the grid can use, so you don't have to turn
+  your head; windows that don't fit go on another row. Each display keeps its own, a new one starts with
+  what suits its size, and one display's width can be used on all of them.
+- **Window Switcher:** rows show the number on an app's Dock icon. It's read once the list is up, so
+  the list never waits for it.
+
+### Changed
+
+- **Window Switcher:** closing, minimizing, hiding and quitting from the list are now ⇧W, ⇧M, ⇧H, ⇧Q and
+  ⇧X, since letters on their own now search.
+- **Window Switcher:** Previews is the default style. A style you've already chosen stays.
 
 ### Fixed
 
+- **Window Switcher:** apps that draw their windows in a helper process, such as Steam, are listed with
+  their windows. They seemed to have none, and with only one display's windows listed they were missing.
+- **Window Switcher:** an app that didn't answer when the toolkit started is asked again, and anything
+  the list has missed is looked for when it opens. Its windows could be missing until you switched to it.
 - **Window Layout:** a window snapped or maximized on one display when another arrives and becomes the
   main one is snapped again where macOS leaves it, filling that display. It no longer stays at the old
   display's size, and a drag no longer shrinks it to its size from before it was snapped.

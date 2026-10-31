@@ -12,6 +12,13 @@ struct Shortcut: Codable, Equatable {
     var key: String
 
     static let commandTab = Shortcut(keyCode: kVK_Tab, flags: [.command])
+    /// ⌘ and the key above Tab, wherever the keyboard has it: on an ISO
+    /// keyboard that key has a code of its own, and macOS's ⌘` is beside Z.
+    static var commandAboveTab: Shortcut {
+        let iso = Int(KBGetLayoutType(Int16(LMGetKbdType()))) == Int(kKeyboardISO)
+        let code = iso ? kVK_ISO_Section : kVK_ANSI_Grave
+        return Shortcut(keyCode: code, flags: [.command], key: typed(code)?.uppercased())
+    }
     /// A cleared shortcut. Stored as a value rather than left out, so a
     /// cleared one doesn't come back as the default.
     static let none = Shortcut(keyCode: -1, flags: [], key: "")
@@ -72,6 +79,24 @@ struct Shortcut: Codable, Equatable {
         if flags.contains(.control) { value.insert(.maskControl) }
         if flags.contains(.shift) { value.insert(.maskShift) }
         return value
+    }
+
+    /// What the key types with no modifiers, on the keyboard layout in use.
+    /// On the main thread: the layout can't be asked for elsewhere.
+    static func typed(_ keyCode: Int) -> String? {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
+        let data = Unmanaged<CFData>.fromOpaque(pointer).takeUnretainedValue() as Data
+        return data.withUnsafeBytes { bytes -> String? in
+            guard let layout = bytes.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return nil }
+            var dead: UInt32 = 0
+            var length = 0
+            var characters = [UniChar](repeating: 0, count: 4)
+            let status = UCKeyTranslate(layout, UInt16(keyCode), UInt16(kUCKeyActionDown), 0, UInt32(LMGetKbdType()),
+                                        OptionBits(kUCKeyTranslateNoDeadKeysBit), &dead, characters.count, &length, &characters)
+            guard status == noErr, length > 0 else { return nil }
+            return String(utf16CodeUnits: characters, count: length)
+        }
     }
 
     /// Keys whose typed character is missing or unhelpful.

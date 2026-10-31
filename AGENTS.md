@@ -344,6 +344,8 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png capture-text [light] [none|reading]   # the card after ⇧⌘2, with made-up text
 .build/debug/Toolkit --snapshot out.png volume-hud [light]      # the volume keys' bar: whole steps, part of one, muted
 .build/debug/Toolkit --snapshot out.png switcher-grid [light]   # drawn stand-ins, no real windows
+.build/debug/Toolkit --snapshot out.png switcher-list [light] [colors] [many] [search=text]   # the list, with app colours, fourteen apps, or a search
+.build/debug/Toolkit --snapshot out.png switcher-grid [light] [colors] [many] [small]   # the grid, with small app icons
 .build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
 .build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power ...] [light]
@@ -393,6 +395,10 @@ swift build                                  # compile check
 ./scripts/test-persist.sh                    # snaps kept across a quit, a kill and a crash of the installed app, which it restarts (install first; leave the mouse alone)
 .build/debug/Toolkit --test-switcher-displays [report]   # the list for each display, with the windows open now: each where most of it is (open -n)
 .build/debug/Toolkit --test-switcher-previews   # times the grid's pictures of real windows; keeps none
+.build/debug/Toolkit --test-catalog-startup [report]   # how the list fills from nothing, when apps don't answer at first, and when it has missed everything (build.sh --dev; open -n the bundle)
+.build/debug/Toolkit --test-switcher-search     # what a search finds and how app colours are chosen, from made-up apps
+.build/debug/Toolkit --list-search <text> [file]   # what a search finds on this Mac; with Accessibility (build.sh --dev; open -n the bundle), the open windows too
+.build/debug/Toolkit --list-badges              # the numbers on Dock icons, and what reading them costs (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --list-windows [--counts <file>]   # what the Window Switcher would list; with --counts, how many and the lookups it took
 .build/debug/Toolkit --list-suggestions [file]  # per display, what Window Layout would offer for the rest
 .build/debug/Toolkit --dump-menus <app> [file]  # an app's menu items with key equivalents and identifiers

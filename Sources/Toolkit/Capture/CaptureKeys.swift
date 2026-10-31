@@ -142,17 +142,17 @@ final class CaptureKeys {
 
     // MARK: - macOS's settings
 
-    private static func systemPrefs() -> [String: [String: Any]] {
+    static func systemPrefs() -> [String: [String: Any]] {
         CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, "com.apple.symbolichotkeys" as CFString) as? [String: [String: Any]] ?? [:]
     }
 
     /// Missing from the file means never changed, which is on.
-    private static func systemEnabled(_ entry: [String: Any]?) -> Bool {
+    static func systemEnabled(_ entry: [String: Any]?) -> Bool {
         (entry?["enabled"] as? NSNumber)?.boolValue ?? true
     }
 
     /// The keys set in System Settings, when they were changed there.
-    private static func systemShortcut(_ entry: [String: Any]?) -> Shortcut? {
+    static func systemShortcut(_ entry: [String: Any]?) -> Shortcut? {
         guard let value = entry?["value"] as? [String: Any],
               let parameters = value["parameters"] as? [NSNumber], parameters.count == 3
         else { return nil }

@@ -1,10 +1,13 @@
 import AppKit
 import ApplicationServices
+import os
 
 /// A row in the switcher: one window, or an app that has no window to show.
 struct SwitcherItem: Identifiable {
     enum State {
-        case window, minimized, hiddenApp, noWindows
+        /// `notListed`: an app found by searching that has no row of its own,
+        /// because it isn't running or its windows are on another display.
+        case window, minimized, hiddenApp, noWindows, notListed
     }
 
     let id: String
@@ -15,7 +18,13 @@ struct SwitcherItem: Identifiable {
     var appName: String
     var icon: NSImage?
     var state: State
+    var bundleID: String? = nil
+    var appURL: URL? = nil
+    /// Nil with the colours off.
+    var tint: AppColor? = nil
     var dimmed: Bool { state != .window }
+    /// What its colour goes by: one app, however many windows.
+    var colorKey: String? { bundleID ?? (appName.isEmpty ? nil : appName) }
 }
 
 /// Keeps an up-to-date list of every window of every app, in most recently
@@ -36,12 +45,15 @@ final class WindowCatalog {
 
     private final class Watch {
         let app: NSRunningApplication
+        /// The app its windows are listed under: itself, or the app it's a helper of.
+        let owner: NSRunningApplication
         let element: AXUIElement
         let observer: AXObserver
-        lazy var icon = app.icon
+        lazy var icon = owner.icon
 
-        init(app: NSRunningApplication, observer: AXObserver) {
+        init(app: NSRunningApplication, owner: NSRunningApplication, observer: AXObserver) {
             self.app = app
+            self.owner = owner
             self.element = AXUIElementCreateApplication(app.processIdentifier)
             self.observer = observer
         }
@@ -74,6 +86,18 @@ final class WindowCatalog {
     /// suggestions), watched while any of them does.
     static let shared = WindowCatalog()
     private var users = Set<ObjectIdentifier>()
+
+    #if TOOLKIT_DEV
+    /// For `--test-catalog-startup`: as if every app didn't answer this many times.
+    var refusedScans = 0
+    /// And as if the list had missed everything.
+    func forgetWindows() { entries = [:] }
+    var windowCount: Int { entries.count }
+    /// Windows on screen, of the apps it watches, that it doesn't have.
+    var missingOnScreen: Int {
+        Self.windowsOnScreen().filter { watches[$0.key] != nil }.values.reduce(0) { $0 + $1.subtracting(entries.keys).count }
+    }
+    #endif
 
     func use(_ user: AnyObject, _ on: Bool) {
         let id = ObjectIdentifier(user)
@@ -112,7 +136,8 @@ final class WindowCatalog {
             guard let self, let app else { return }
             if app.processIdentifier == self.ownPID { self.touchOwn() }
             self.watch(app)
-            if let watch = self.watches[app.processIdentifier] { self.scan(watch, deep: false) }
+            let front = self.appPID(app.processIdentifier)
+            for watch in self.watches.values where watch.owner.processIdentifier == front { self.scan(watch, deep: false) }
         }
         on(NSWorkspace.didHideApplicationNotification) { [weak self] _ in self?.onChange() }
         on(NSWorkspace.didUnhideApplicationNotification) { [weak self] _ in self?.onChange() }
@@ -149,16 +174,40 @@ final class WindowCatalog {
         for pid in Array(watches.keys) { unwatch(pid) }
     }
 
+    /// Processes looked at that aren't an app or a helper of one, of which
+    /// there are many: asked about once.
+    private var notHelpers = Set<pid_t>()
+
+    /// The app whose windows these are. Some apps draw theirs in a helper
+    /// inside their bundle, with no Dock icon of its own and none in the app
+    /// itself: without it, such an app seems to have no windows at all.
+    private func owner(of app: NSRunningApplication) -> NSRunningApplication? {
+        if app.activationPolicy == .regular { return app }
+        let pid = app.processIdentifier
+        guard app.activationPolicy == .accessory, !notHelpers.contains(pid) else { return nil }
+        if let path = app.bundleURL?.path, let owner = NSWorkspace.shared.runningApplications.first(where: { candidate in
+            guard candidate.activationPolicy == .regular, let parent = candidate.bundleURL?.path else { return false }
+            return path.hasPrefix(parent + "/Contents/")
+        }) { return owner }
+        notHelpers.insert(pid)
+        return nil
+    }
+
+    /// The process of the app that a process's windows are listed under.
+    func appPID(_ pid: pid_t) -> pid_t {
+        watches[pid]?.owner.processIdentifier ?? pid
+    }
+
     private func watch(_ app: NSRunningApplication) {
         let pid = app.processIdentifier
-        guard pid > 0, pid != ownPID, app.activationPolicy == .regular, watches[pid] == nil else { return }
+        guard pid > 0, pid != ownPID, watches[pid] == nil, let owner = owner(of: app) else { return }
         var observer: AXObserver?
         let callback: AXObserverCallback = { _, element, notification, context in
             guard let context else { return }
             Unmanaged<WindowCatalog>.fromOpaque(context).takeUnretainedValue().handle(element, notification as String)
         }
         guard AXObserverCreate(pid, callback, &observer) == .success, let observer else { return }
-        let watch = Watch(app: app, observer: observer)
+        let watch = Watch(app: app, owner: owner, observer: observer)
         watches[pid] = watch
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
         attach(watch, attempt: 0)
@@ -166,6 +215,7 @@ final class WindowCatalog {
     }
 
     private func unwatch(_ pid: pid_t) {
+        notHelpers.remove(pid)
         guard let watch = watches.removeValue(forKey: pid) else { return }
         CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(watch.observer), .commonModes)
         entries = entries.filter { $0.value.pid != pid }
@@ -194,32 +244,85 @@ final class WindowCatalog {
 
     // MARK: - Discovery
 
+    /// How long to wait before asking an app again, each time it didn't
+    /// answer. A busy Mac, as at the toolkit's own launch, can leave any app
+    /// not answering for a moment, and nothing else would ask it again until
+    /// it's switched to: its windows were missing from the list until then.
+    private static let scanRetries: [TimeInterval] = [0.5, 1, 2, 4]
+
     /// Lists an app's windows. `deep` also digs out the ones on other Spaces,
-    /// which is slow and only needed once per app.
-    private func scan(_ watch: Watch, deep: Bool) {
+    /// which is slow and only needed once per app, so what's here doesn't wait for it.
+    private func scan(_ watch: Watch, deep: Bool, attempt: Int = 0) {
         let pid = watch.app.processIdentifier
         let known = Set(entries.keys)
+        func retry() {
+            let bundle = watch.app.bundleIdentifier ?? ""
+            guard attempt < Self.scanRetries.count else {
+                Log.switcher.error("no windows from \(bundle, privacy: .public) after \(attempt + 1) tries")
+                return
+            }
+            if attempt == 0 { Log.switcher.notice("no windows from \(bundle, privacy: .public) yet, asking again") }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.scanRetries[attempt]) {
+                guard self.watches[pid] === watch else { return }
+                self.scan(watch, deep: deep, attempt: attempt + 1)
+            }
+        }
         work.async {
             // Doubles as the check that the app is answering at all.
-            guard var elements: [AXUIElement] = Self.attribute(watch.element, kAXWindowsAttribute) else { return }
+            #if TOOLKIT_DEV
+            let answer: [AXUIElement]? = attempt < self.refusedScans ? nil : Self.attribute(watch.element, kAXWindowsAttribute)
+            #else
+            let answer: [AXUIElement]? = Self.attribute(watch.element, kAXWindowsAttribute)
+            #endif
+            guard let elements = answer else { return retry() }
+            var seen = Set<CGWindowID>()
+            func deliver(_ elements: [AXUIElement]) -> Int {
+                let found = elements.compactMap { Self.read($0, pid: pid) }.filter { seen.insert($0.id).inserted }
+                for entry in found where !known.contains(entry.id) { self.observe(entry.element, with: watch) }
+                let focused = Self.focusedWindow(of: watch.element)
+                DispatchQueue.main.async {
+                    guard self.watches[pid] === watch else { return }
+                    found.forEach(self.upsert)
+                    if let focused, watch.app.isActive || watch.owner.isActive { self.touch(focused) }
+                }
+                return found.count
+            }
+            var count = deliver(elements)
             if deep {
                 // Only what the window server says is missing: most apps have
                 // nothing on other Spaces, and the search stops once it's found.
-                let here = Set(elements.compactMap { element -> CGWindowID? in
-                    var id: CGWindowID = 0
-                    return _AXUIElementGetWindow(element, &id) == .success ? id : nil
-                })
-                let missing = Self.windowIDs(of: pid).subtracting(here)
-                if !missing.isEmpty { elements += Self.windowsOnOtherSpaces(of: pid, looking: missing) }
+                let missing = Self.windowIDs(of: pid).subtracting(seen)
+                if !missing.isEmpty { count += deliver(Self.windowsOnOtherSpaces(of: pid, looking: missing)) }
             }
-            var seen = Set<CGWindowID>()
-            let found = elements.compactMap { Self.read($0, pid: pid) }.filter { seen.insert($0.id).inserted }
-            for entry in found where !known.contains(entry.id) { self.observe(entry.element, with: watch) }
-            let focused = Self.focusedWindow(of: watch.element)
+            // It answered, with nothing, yet there's a window on screen: not ready.
+            if count == 0, Self.windowsOnScreen()[pid] != nil { retry() }
+        }
+    }
+
+    /// When an app was last looked at again for windows missing from the list.
+    private var healedAt: [pid_t: TimeInterval] = [:]
+    /// An app can have a window Accessibility never lists, so at most this
+    /// often, in seconds, for one app: looking includes the slow search.
+    private static let healInterval: TimeInterval = 60
+
+    /// Puts right anything the list has missed, whatever the reason: every
+    /// running app is watched, and an app with a window on screen that the
+    /// list doesn't have is asked again. For when the list opens: off the main
+    /// thread, and what it finds shows up in the open list.
+    func heal() {
+        work.async {
+            let onScreen = Self.windowsOnScreen()
             DispatchQueue.main.async {
-                guard self.watches[pid] === watch else { return }
-                found.forEach(self.upsert)
-                if let focused, watch.app.isActive { self.touch(focused) }
+                guard !self.tokens.isEmpty else { return }
+                for app in NSWorkspace.shared.runningApplications { self.watch(app) }
+                let now = ProcessInfo.processInfo.systemUptime
+                for (pid, windows) in onScreen {
+                    guard let watch = self.watches[pid], !windows.subtracting(self.entries.keys).isEmpty,
+                          now - (self.healedAt[pid] ?? -.infinity) > Self.healInterval else { continue }
+                    self.healedAt[pid] = now
+                    Log.switcher.notice("list was missing a window of \(watch.app.bundleIdentifier ?? "", privacy: .public), asking again")
+                    self.attach(watch, attempt: 0)
+                }
             }
         }
     }
@@ -243,7 +346,7 @@ final class WindowCatalog {
             DispatchQueue.main.async {
                 guard self.watches[pid] === watch else { return }
                 self.upsert(entry)
-                if focus, watch.app.isActive { self.touch(entry.id) }
+                if focus, watch.app.isActive || watch.owner.isActive { self.touch(entry.id) }
             }
         }
     }
@@ -329,6 +432,23 @@ final class WindowCatalog {
         })
     }
 
+    /// Each app's windows that are on screen now, at a normal level and not a
+    /// sliver. Only these say a window is really there: every app also has
+    /// windows the window server lists that are never drawn (several across
+    /// the top of each display, for one), which no list should have.
+    private static func windowsOnScreen() -> [pid_t: Set<CGWindowID>] {
+        let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        var windows: [pid_t: Set<CGWindowID>] = [:]
+        for info in list {
+            guard let pid = info[kCGWindowOwnerPID as String] as? pid_t, let id = info[kCGWindowNumber as String] as? CGWindowID,
+                  info[kCGWindowLayer as String] as? Int == 0, (info[kCGWindowAlpha as String] as? Double ?? 1) > 0 else { continue }
+            let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+            guard (bounds["Width"] ?? 0) >= 24, (bounds["Height"] ?? 0) >= 24 else { continue }
+            windows[pid, default: []].insert(id)
+        }
+        return windows
+    }
+
     /// Windows of the app that only these IDs, on other Spaces, are missing.
     /// Some of them may not be windows Accessibility knows (a helper the app
     /// keeps off screen), in which case the search goes the whole way.
@@ -384,7 +504,7 @@ final class WindowCatalog {
         // Background tabs are windows too, but belong to no Space.
         let onSpaces = Self.windowsOnAllSpaces()
         var windows = entries.values.filter { entry in
-            guard let app = watches[entry.pid]?.app, listed(app), !app.isHidden else { return false }
+            guard let app = watches[entry.pid]?.owner, listed(app), !app.isHidden else { return false }
             return onSpaces.isEmpty || onSpaces.contains(entry.id)
         }
         let unseen = Self.invisible(windows.filter { !$0.minimized }.map(\.id))
@@ -400,19 +520,21 @@ final class WindowCatalog {
 
         var items = windows.map { entry in
             let watch = watches[entry.pid]
-            let name = watch?.app.localizedName ?? ""
-            return SwitcherItem(id: "w\(entry.id)", window: entry.id, pid: entry.pid,
+            let name = watch?.owner.localizedName ?? ""
+            return SwitcherItem(id: "w\(entry.id)", window: entry.id, pid: appPID(entry.pid),
                                 title: entry.title.isEmpty ? name : entry.title, appName: name,
-                                icon: watch?.icon, state: entry.minimized ? .minimized : .window)
+                                icon: watch?.icon, state: entry.minimized ? .minimized : .window,
+                                bundleID: watch?.owner.bundleIdentifier, appURL: watch?.owner.bundleURL)
         }
-        let withWindows = Set(windows.map(\.pid))
+        let withWindows = Set(windows.map { appPID($0.pid) })
         for app in NSWorkspace.shared.runningApplications {
             guard let watch = watches[app.processIdentifier], listed(app), app.isHidden || !withWindows.contains(app.processIdentifier)
             else { continue }
             let name = app.localizedName ?? ""
             items.append(SwitcherItem(id: "a\(app.processIdentifier)", window: nil, pid: app.processIdentifier,
                                       title: name, appName: name, icon: watch.icon,
-                                      state: app.isHidden ? .hiddenApp : .noWindows))
+                                      state: app.isHidden ? .hiddenApp : .noWindows,
+                                      bundleID: app.bundleIdentifier, appURL: app.bundleURL))
         }
 
         if let own = ownItem() {
@@ -432,7 +554,8 @@ final class WindowCatalog {
             }
         }
 
-        let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        AppColors.shared.tint(&items)
+        let front = NSWorkspace.shared.frontmostApplication.map { appPID($0.processIdentifier) }
         let currentFirst = items.first.map { $0.state == .window && $0.pid == front } ?? false
         return (items, currentFirst)
     }
@@ -449,7 +572,8 @@ final class WindowCatalog {
         let app = NSRunningApplication.current
         return SwitcherItem(id: "a\(ownPID)", window: window.windowID, pid: ownPID, title: window.title,
                             appName: app.localizedName ?? "", icon: app.icon,
-                            state: NSApp.isHidden ? .hiddenApp : window.isMiniaturized ? .minimized : .window)
+                            state: NSApp.isHidden ? .hiddenApp : window.isMiniaturized ? .minimized : .window,
+                            bundleID: app.bundleIdentifier, appURL: app.bundleURL)
     }
 
     private func app(_ pid: pid_t) -> NSRunningApplication? {
@@ -520,6 +644,11 @@ final class WindowCatalog {
     // MARK: - Acting on a row
 
     func activate(_ item: SwitcherItem) {
+        // Opens it, or brings it forward if it's already running.
+        if item.state == .notListed, let url = item.appURL {
+            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+            return
+        }
         guard let id = item.window, let entry = entries[id] else {
             activateApp(item.pid)
             return
