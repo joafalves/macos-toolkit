@@ -260,6 +260,8 @@ the **System Audio Recording** permission, which is asked for as the mixer is tu
   sound returns to the one you chose when it's back, unless you chose another meanwhile. Deleting the app leaves
   the driver behind, out of the way; turn the switch off and use Remove first. When a release brings a
   new driver, the mixer stays off until you update it, which it asks for once and shows in the sidebar.
+  If the driver is removed from the Mac, the toolkit says so as soon as that happens: it keeps working until
+  the next restart, and then the mixer stays off until you install it again.
 - A tapped app's sound is delayed by about one audio buffer, a few milliseconds on built-in and wired
   outputs. The real figure is logged when a tap starts (see Logs, under Good to know). Bluetooth
   outputs may add more; I haven't
@@ -767,12 +769,16 @@ macOS settings that System Settings doesn't show, under **System** in the settin
 tool: the toolkit doesn't do anything here, it reads and writes macOS's own settings. Each switch
 shows what's set on this Mac now, read each time the page opens or the app comes to the front, so
 a change made in Terminal or by another app shows as it is. What you set stays set without the
-toolkit, and nothing is saved, exported or put back on quit. A setting that isn't at macOS's
+toolkit, and nothing is exported or put back on quit. A setting that isn't at macOS's
 default says **Changed**, with a button to put it back.
+
+A macOS update can turn these back to their defaults. **Keep my choices**, off to start with, remembers
+what you've changed, on this Mac only, and puts it back when the toolkit starts and when the Mac wakes,
+with a notification saying so.
 
 | Group | Settings |
 | --- | --- |
-| Background tasks | Photos' analysis of what's in photos, People and Memories, Game Center, Tips. Turned off for your user only (`launchctl disable`), each saying what stops working; a macOS update can turn one back on, and it then shows as on. |
+| Background tasks | Photos' analysis of what's in photos, People and Memories, Game Center, Tips. Turned off for your user only (`launchctl disable`), each saying what stops working. macOS doesn't stop one that's already running, so its row says **Stops at the next restart** until then. |
 | Dock | Show it without delay, quicker Mission Control, dim hidden apps, only open apps, scroll on an icon for its windows. A change restarts the Dock. |
 | Finder | Full path in window titles, hidden files, the warning before changing an extension, Quit Finder, no `.DS_Store` on network or USB drives. Finder shows a change once it restarts, which the page offers to do rather than doing it, since it stops a copy in progress. |
 | Typing | Hold a key for accents, or to repeat it. |
@@ -929,8 +935,10 @@ Sources/Toolkit
 ├── System     Tweaks, macOS's own settings
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu
+Sources/DriverShared      the memory the audio driver and the app share
+Driver         the Audio Mixer's audio driver, in C
 Resources      Info.plist, the icon, and the translations (pt-PT.lproj)
-scripts        build.sh, signing.sh, make-cert.sh, make-icon.swift, strings.py, test-update.sh, test-persist.sh
+scripts        build.sh, driver.sh, signing.sh, make-cert.sh, make-icon.swift, strings.py, test-update.sh, test-persist.sh
 docs/images    the screenshots above
 ```
 

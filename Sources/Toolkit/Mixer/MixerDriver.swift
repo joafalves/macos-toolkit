@@ -21,6 +21,8 @@ enum DriverInstall: Equatable {
     private static let installed = URL(fileURLWithPath: "/Library/Audio/Plug-Ins/HAL").appendingPathComponent(name)
     /// Beside the HAL folder, not in it, where coreaudiod would load it.
     private static let staged = URL(fileURLWithPath: "/Library/Audio/Plug-Ins").appendingPathComponent(".\(name).new")
+    /// Where it's installed, for hearing it go.
+    static var folder: URL { installed.deletingLastPathComponent() }
     private static var bundled: URL? { Bundle.main.resourceURL?.appendingPathComponent(name) }
 
     /// From the file: `Bundle` reads no Info.plist for a bundle inside an app's
@@ -108,7 +110,7 @@ enum DriverWork: Equatable {
 
 /// Why the mixer isn't on the driver though it was asked to be, for its page.
 enum DriverProblem: Equatable {
-    case notInstalled, outdated, notInApplications, refused, noDevice, installFailed
+    case notInstalled, outdated, removed, notInApplications, refused, noDevice, installFailed
 }
 
 /// Where sound goes when outputs come and go, with the driver's device as the

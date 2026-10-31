@@ -14,8 +14,14 @@ struct TweaksView: View {
                 Banner(text: "macOS kept that setting as it was.", button: "OK") { tweaks.refused = nil }
             }
 
+            Card {
+                ToggleRow(title: "Keep my choices",
+                          caption: "A macOS update can turn these back to their defaults. With this on, the toolkit puts what you've changed back when it starts and when the Mac wakes, and tells you. Your choices are kept on this Mac only.",
+                          isOn: Binding(get: { tweaks.keeps }, set: { tweaks.setKeeps($0) }))
+            }
+
             Card(title: "Background Tasks",
-                 footnote: "Turned off for you only, and on again with the switch. A macOS update can turn one back on; it then shows as on here.") {
+                 footnote: "Turned off for you only, and on again with the switch, which can take a restart. macOS doesn't stop one that's running, so it stops at the next restart.") {
                 TweakRow(title: "Photos analysis",
                          caption: "Finds objects, scenes and text in your photos. Off, Photos can't search by what's in a photo, and Live Text and Visual Look Up stop working in it.",
                          tweak: .photosAnalysis, tweaks: tweaks)
@@ -122,8 +128,13 @@ struct TweakRow: View {
     let tweak: Tweak
     @ObservedObject var tweaks: TweaksModel
 
+    private var badge: LocalizedStringKey? {
+        if tweaks.stillRunning.contains(tweak) { return "Stops at the next restart" }
+        return tweaks.changed(tweak) ? "Changed" : nil
+    }
+
     var body: some View {
-        SettingRow(title: title, caption: caption, badge: tweaks.changed(tweak) ? "Changed" : nil) {
+        SettingRow(title: title, caption: caption, badge: badge) {
             HStack(spacing: 10) {
                 if tweaks.changed(tweak) {
                     Button { tweaks.set(tweak, tweak.macOSDefault) } label: {

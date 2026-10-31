@@ -7,12 +7,15 @@ worked on; it gets its date when it's released.
 
 ### Added
 
+- **Tweaks:** Keep my choices, off by default, puts what you've changed back when the toolkit starts and when
+  the Mac wakes, since a macOS update can reset these, and tells you when it does.
 - **Audio Mixer:** right-click an app to show it, as clicking its Dock icon does.
 - **Audio Mixer:** the mixer can run through an audio driver of its own, as a preview you turn on in
   its settings: nothing records, so there's no purple dot and no System Audio Recording permission,
   and a microphone never waits for the mixer. Installing it asks for your password. Off, the mixer
   works as before. A later release with a new driver turns the mixer off until the driver is updated,
-  with an alert and a warning in the sidebar; sound keeps playing as usual.
+  with an alert and a warning in the sidebar; sound keeps playing as usual. If the driver is removed from
+  the Mac, it says so as soon as that happens, and offers to install it again.
 - **Window Switcher:** App Colours, off by default, gives each app a flat colour of its own on its rows,
   also in Window Layout's suggestions. Colours are made to look different from those of the apps open with them, close to the
   icon's where there's room, and an app keeps its colour unless it's open beside one too like it. Rows of minimized windows and hidden apps keep the colour; only their content fades.
@@ -37,6 +40,8 @@ worked on; it gets its date when it's released.
 
 ### Fixed
 
+- **Tweaks:** a background task turned off that's still running now says so: macOS doesn't stop it, so it stops
+  at the next restart. It used to look stopped.
 - **Window Switcher:** apps that draw their windows in a helper process are listed with their windows.
   They seemed to have none, and with only one display's windows listed they were missing.
 - **Window Switcher:** ⇧X no longer quits an app whose only normal window is on another display, when the

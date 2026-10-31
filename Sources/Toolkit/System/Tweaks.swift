@@ -2,8 +2,9 @@ import AppKit
 
 /// One of macOS's own settings that System Settings doesn't show. The Mac is
 /// its only record: the page reads it each time it shows, and a switch writes
-/// it straight to macOS, so nothing here is saved, exported or put back on
-/// quit, and a change made elsewhere shows as it is.
+/// it straight to macOS, so nothing here is exported or put back on quit, and a
+/// change made elsewhere shows as it is. Nothing is saved either, unless asked
+/// for with Keep my choices (`TweaksKeeper`).
 enum Tweak: String, CaseIterable {
     case photosAnalysis, peopleAndMemories, gameCenter, tips
     case dockWithoutDelay, quickMissionControl, dimHiddenApps, onlyOpenApps, scrollForWindows
@@ -124,8 +125,15 @@ final class TweaksModel: ObservableObject {
     /// A Finder tweak changed since Finder last restarted from here: it shows
     /// once Finder starts again, which the page offers rather than does.
     @Published private(set) var finderWaiting = false
+    /// Background tasks turned off that are running all the same. macOS won't
+    /// stop one for us, so it stops at the next restart, and the row says so.
+    @Published private(set) var stillRunning: Set<Tweak> = []
+    /// Keep my choices.
+    @Published private(set) var keeps = TweaksKeeper.shared.isOn
     /// For `--snapshot`: macOS's defaults with two changed, nothing read.
     static var previewing = false
+    /// With `running`, Tips off as well and still running.
+    static var previewStillRunning = false
     private let isPreview = TweaksModel.previewing
     private let queue = DispatchQueue(label: "dev.jalves.macos-toolkit.tweaks")
     /// On `queue`: the latest Dock change, so a few switches flipped in a row
@@ -134,26 +142,34 @@ final class TweaksModel: ObservableObject {
     /// On the main thread: bumped by each change, so a read started before it
     /// doesn't put the switch back for a moment.
     private var generation = 0
-    private var activation: NSObjectProtocol?
+    private var observers: [NSObjectProtocol] = []
 
     init() {
         if isPreview {
+            keeps = false
             for tweak in Tweak.allCases { isOn[tweak] = tweak.macOSDefault }
             isOn[.dockWithoutDelay] = true
             isOn[.pathInTitle] = true
+            if Self.previewStillRunning {
+                isOn[.tips] = false
+                stillRunning = [.tips]
+            }
             return
         }
-        // Read here, about 5 ms, so the page's first frame shows the Mac's
+        // Read here, about 10 ms, so the page's first frame shows the Mac's
         // values rather than macOS's defaults turning into them.
         isOn = Self.read()
-        // Back from System Settings or Terminal, it shows what's set now.
-        activation = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.refresh()
+        stillRunning = Self.stillRunning(given: isOn)
+        // Back from System Settings or Terminal, it shows what's set now, and
+        // likewise after something was put back.
+        let center = NotificationCenter.default
+        for name in [NSApplication.didBecomeActiveNotification, TweaksKeeper.putBack] {
+            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.refresh() })
         }
     }
 
     deinit {
-        if let activation { NotificationCenter.default.removeObserver(activation) }
+        observers.forEach(NotificationCenter.default.removeObserver)
     }
 
     func on(_ tweak: Tweak) -> Bool { isOn[tweak] ?? tweak.macOSDefault }
@@ -166,10 +182,19 @@ final class TweaksModel: ObservableObject {
         let started = generation
         queue.async {
             let states = Self.read()
+            let running = Self.stillRunning(given: states)
             DispatchQueue.main.async {
-                if self.generation == started { self.isOn = states }
+                guard self.generation == started else { return }
+                self.isOn = states
+                self.stillRunning = running
             }
         }
+    }
+
+    func setKeeps(_ value: Bool) {
+        keeps = value
+        guard !isPreview else { return }
+        if value { TweaksKeeper.shared.turnOn(states: isOn) } else { TweaksKeeper.shared.turnOff() }
     }
 
     func set(_ tweak: Tweak, _ value: Bool) {
@@ -181,6 +206,7 @@ final class TweaksModel: ObservableObject {
         generation += 1
         let started = generation
         if tweak.restart == .finder { finderWaiting = true }
+        TweaksKeeper.shared.chose(tweak, value)
         queue.async {
             Self.write(tweak, value)
             if tweak.restart == .dock {
@@ -191,9 +217,11 @@ final class TweaksModel: ObservableObject {
                 }
             }
             let states = Self.read()
+            let running = Self.stillRunning(given: states)
             DispatchQueue.main.async {
                 guard self.generation == started else { return }
                 self.isOn = states
+                self.stillRunning = running
                 if states[tweak] != value { self.refused = tweak }
             }
         }
@@ -219,7 +247,7 @@ final class TweaksModel: ObservableObject {
         return states
     }
 
-    private static func write(_ tweak: Tweak, _ value: Bool) {
+    static func write(_ tweak: Tweak, _ value: Bool) {
         switch tweak.kind {
         case .service(let label):
             let target = "gui/\(getuid())/\(label)"
@@ -229,12 +257,44 @@ final class TweaksModel: ObservableObject {
                 launchctl(["kickstart", target])
             } else {
                 launchctl(["disable", target])
-                // Disabled only stops it starting; the one running is stopped too.
-                launchctl(["kill", "SIGTERM", target])
+                // Disabled only stops it starting. The one running is asked to
+                // end, directly: launchd refuses to signal it (measured, "Not
+                // privileged") and to unload it, which SIP protects. It can decline,
+                // as Tips does (measured): then it's there until the next restart.
+                if let pid = runningServices()[label] { kill(pid, SIGTERM) }
             }
         case .preference(let preference):
             preference.write(value)
         }
+    }
+
+    /// Of those `states` has off, the services that are running all the same.
+    static func stillRunning(given states: [Tweak: Bool]) -> Set<Tweak> {
+        let off = Tweak.allCases.filter { tweak in
+            if case .service = tweak.kind { return states[tweak] == false }
+            return false
+        }
+        guard !off.isEmpty else { return [] }
+        let running = runningServices()
+        return Set(off.filter { tweak in
+            guard case .service(let label) = tweak.kind else { return false }
+            return running[label] != nil
+        })
+    }
+
+    /// The running services in the user's session, and their processes.
+    static func runningServices() -> [String: pid_t] {
+        runningServices(in: launchctl(["list"]))
+    }
+
+    /// From `launchctl list`: lines of a process (`-` if none), a status and a label.
+    static func runningServices(in list: String) -> [String: pid_t] {
+        var running: [String: pid_t] = [:]
+        for line in list.split(separator: "\n") {
+            let parts = line.split(separator: "\t")
+            if parts.count == 3, let pid = pid_t(parts[0]), pid > 0 { running[String(parts[2])] = pid }
+        }
+        return running
     }
 
     /// The labels launchd has disabled in the user's session.

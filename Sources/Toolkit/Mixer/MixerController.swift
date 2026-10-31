@@ -116,17 +116,28 @@ final class MixerController: ObservableObject {
     /// mixer is off until it's updated, and sound plays as if it weren't here.
     /// An update to the driver matters, so this doesn't carry on without it.
     @Published private(set) var driverBlocked = false {
-        didSet {
-            guard ownsSystem else { return }
-            Permissions.shared.toolWarnings[.mixer] = driverBlocked ? String(localized: "The audio driver needs updating") : nil
-        }
+        didSet { updateDriverWarning() }
     }
     /// Being installed or removed, which takes as long as a password does.
     @Published private(set) var driverWork: DriverWork?
     /// Linked, and waiting for its device to show.
     @Published private(set) var driverStarting = false
     var driverBusy: Bool { driverWork != nil }
-    @Published private(set) var driverInstall = DriverInstall.status
+    @Published private(set) var driverInstall = DriverInstall.status {
+        didSet { updateDriverWarning() }
+    }
+    /// Asked for, and not on this Mac. It can still be working: taken away while
+    /// it's loaded, coreaudiod keeps it until it next restarts.
+    var driverRemoved: Bool { config.usesDriver && driverInstall == .missing }
+    /// Watches the folder the driver is in, which costs nothing until it changes.
+    private var driverWatch: DispatchSourceFileSystemObject?
+    private var driverCheck: DispatchWorkItem?
+
+    private func updateDriverWarning() {
+        guard ownsSystem else { return }
+        Permissions.shared.toolWarnings[.mixer] = driverRemoved ? String(localized: "The audio driver is no longer on this Mac")
+            : driverBlocked ? String(localized: "The audio driver needs updating") : nil
+    }
 
     /// The panel is on screen.
     var panelOpen = false {
@@ -1335,12 +1346,19 @@ final class MixerController: ObservableObject {
             return
         }
         switch driverInstall {
-        case .current: break
+        case .current:
+            UserDefaults.standard.removeObject(forKey: Self.driverRemovedAskedKey)
         case .unavailable:
             driverProblem = .notInstalled
             Log.mixer.error("driver: asked for, but this build of the app has none: on taps")
             return
-        case .missing, .outdated:
+        case .missing:
+            driverBlocked = true
+            driverProblem = .removed
+            Log.mixer.notice("driver: it's no longer on this Mac: the mixer is off until it's installed again")
+            askToInstallDriver()
+            return
+        case .outdated:
             driverBlocked = true
             driverProblem = .outdated
             Log.mixer.notice("driver: the installed one isn't this app's: the mixer is off until it's updated")
@@ -1349,6 +1367,7 @@ final class MixerController: ObservableObject {
         }
         do {
             driver = try MixerDriver(equalizer: equalizerState)
+            watchDriver()
             driverStarting = true
             // Its device shows in a moment, which the device list's listener hears.
             let deadline = DispatchWorkItem { [weak self] in self?.driverNeverShowed() }
@@ -1400,18 +1419,71 @@ final class MixerController: ObservableObject {
         let version = DriverInstall.bundledVersion
         guard UserDefaults.standard.string(forKey: key) != version else { return }
         UserDefaults.standard.set(version, forKey: key)
+        driverAlert(title: String(localized: "The audio driver needs updating"),
+                    text: String(localized: "The Audio Mixer is off until it's updated, and sound plays as usual. Updating asks for your password, and sound stops for a moment."),
+                    button: String(localized: "Update…"))
+    }
+
+    private static let driverRemovedAskedKey = "driverRemovedAsked"
+
+    /// Once each time it goes: it's the warning in the sidebar and the page after that.
+    private func askToInstallDriver() {
+        guard !UserDefaults.standard.bool(forKey: Self.driverRemovedAskedKey) else { return }
+        UserDefaults.standard.set(true, forKey: Self.driverRemovedAskedKey)
+        let text = driverBlocked
+            ? String(localized: "The Audio Mixer is off until it's installed again, and sound plays as usual. Installing it asks for your password, and sound stops for a moment.")
+            : String(localized: "It keeps working until the next restart, and then the Audio Mixer is off until it's installed again. Installing it asks for your password, and sound stops for a moment.")
+        driverAlert(title: String(localized: "The audio driver is no longer on this Mac"), text: text, button: String(localized: "Install…"))
+    }
+
+    private func driverAlert(title: String, text: String, button: String) {
         // Not through the main queue, which nothing else gets through while its
         // block waits for an answer (measured): every tool's work goes that way,
         // and with the switcher on, ⌘Tab would be dead until this was answered.
         RunLoop.main.perform { [self] in
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = String(localized: "The audio driver needs updating")
-            alert.informativeText = String(localized: "The Audio Mixer is off until it's updated, and sound plays as usual. Updating asks for your password, and sound stops for a moment.")
-            alert.addButton(withTitle: String(localized: "Update…"))
+            alert.messageText = title
+            alert.informativeText = text
+            alert.addButton(withTitle: button)
             alert.addButton(withTitle: String(localized: "Later"))
             NSApp.activate(ignoringOtherApps: true)
             if alert.runModal() == .alertFirstButtonReturn { setUsesDriver(true) }
+        }
+    }
+
+    /// Hears the driver being taken away while it's in use, when nothing else
+    /// would until coreaudiod next restarts. The toolkit's own install and removal
+    /// stop the mixer first, so they're never heard.
+    private func watchDriver() {
+        guard driverWatch == nil else { return }
+        let folder = open(DriverInstall.folder.path, O_EVTONLY)
+        guard folder >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: folder, eventMask: [.write, .delete, .rename], queue: .main)
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            // In a moment: replacing it by hand removes it first.
+            driverCheck?.cancel()
+            let check = DispatchWorkItem { [weak self] in self?.checkDriverStillThere() }
+            driverCheck = check
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: check)
+        }
+        source.setCancelHandler { close(folder) }
+        source.resume()
+        driverWatch = source
+    }
+
+    private func checkDriverStillThere() {
+        guard driver != nil else { return }
+        driverInstall = DriverInstall.status
+        switch driverInstall {
+        case .missing:
+            Log.mixer.error("driver: it's no longer on this Mac, though it's still loaded")
+            askToInstallDriver()
+        case .current:
+            UserDefaults.standard.removeObject(forKey: Self.driverRemovedAskedKey)
+        case .outdated, .unavailable:
+            break
         }
     }
 
@@ -1425,6 +1497,10 @@ final class MixerController: ObservableObject {
     private func stopDriver() {
         driverDeadline?.cancel()
         driverDeadline = nil
+        driverCheck?.cancel()
+        driverCheck = nil
+        driverWatch?.cancel()
+        driverWatch = nil
         driver?.close()
         driver = nil
         driverActive = false
@@ -1462,6 +1538,7 @@ final class MixerController: ObservableObject {
         driverProblem = nil
         guard on, driverInstall != .current else {
             config.usesDriver = on
+            updateDriverWarning()
             return
         }
         driverWork = .installing
@@ -1625,6 +1702,13 @@ extension MixerController {
                 mixer.driverInstall = .outdated
                 mixer.driverProblem = .outdated
                 mixer.driverBlocked = true
+            case "removed":
+                mixer.driverInstall = .missing
+                mixer.driverProblem = .removed
+                mixer.driverBlocked = true
+            case "removed-loaded":
+                mixer.driverInstall = .missing
+                mixer.driverActive = true
             case "failed-install": mixer.driverProblem = .installFailed
             default: mixer.driverProblem = .noDevice
             }

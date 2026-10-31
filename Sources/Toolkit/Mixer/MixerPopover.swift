@@ -45,13 +45,13 @@ struct MixerPopoverView: View {
                 }
                 .padding(.horizontal, 4)
 
-                if mixer.driverBlocked {
+                if let notice = mixer.driverNotice {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                        Text("The audio driver needs updating. The mixer is off until it is, and sound plays as usual.")
+                        Text(notice.text)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
-                        Button("Update…") { mixer.setUsesDriver(true) }
+                        Button(notice.button) { mixer.setUsesDriver(true) }
                             .disabled(mixer.driverBusy)
                     }
                     .font(.callout)
@@ -76,6 +76,20 @@ struct MixerPopoverView: View {
         }
         .padding(10)
         .frame(width: Self.width)
+    }
+}
+
+extension MixerController {
+    /// What to say about a driver that isn't as it should be, on the page and in
+    /// the panel, and what the button does about it.
+    var driverNotice: (text: LocalizedStringKey, button: LocalizedStringKey)? {
+        if driverRemoved {
+            return (driverBlocked
+                ? "The audio driver is no longer on this Mac. The mixer is off until it's installed again, and sound plays as usual."
+                : "The audio driver is no longer on this Mac. It keeps working until the next restart, and then the mixer is off until it's installed again.",
+                "Install…")
+        }
+        return driverBlocked ? ("The audio driver needs updating. The mixer is off until it is, and sound plays as usual.", "Update…") : nil
     }
 }
 
@@ -343,7 +357,7 @@ struct MixerEqualizerControls: View {
                         Spacer()
                         // How it's edited, for every output; the panel follows.
                         if place == .page {
-                            Picker("Equalizer mode", selection: $mixer.config.equalizerMode) {
+                            Picker("Equalizer mode", selection: $mixer.config.equalizerMode.afterUpdate) {
                                 Text("Simple").tag(EqualizerMode.simple)
                                 Text("10 Bands").tag(EqualizerMode.bands)
                             }

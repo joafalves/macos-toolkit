@@ -335,7 +335,8 @@ struct MainView: View {
 
     /// Overview and the app's own settings, then the tools, then System.
     private var sections: some View {
-        List(selection: $model.section) {
+        // A click sets it from inside the view's update, as a segmented picker does.
+        List(selection: $model.section.afterUpdate) {
             SidebarRow(section: .welcome).tag(AppSection.welcome)
             SidebarRow(section: .general).tag(AppSection.general)
             SidebarRow(section: .permissions).tag(AppSection.permissions)

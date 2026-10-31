@@ -8,10 +8,11 @@ import SwiftUI
 /// mouse's page (its changes reach no real one), in a
 /// window that's never shown: each segmented control and switch on it is
 /// changed as a click would, through its action, and the process's own log
-/// is read for the issue after each.
+/// is read for the issue after each. Then the other pages and the sidebar.
 enum PublishingProbe {
     static func run() {
         _ = NSApplication.shared
+        TweaksModel.previewing = true
         let model = AppModel()
         model.persists = false
         model.general = GeneralConfig()
@@ -49,6 +50,53 @@ enum PublishingProbe {
             if found > 0 || !changed { failed += 1 }
             print("\(what): \(found == 0 ? "ok" : "\(found) issue(s)")\(changed ? "" : ", but the setting didn't change")")
         }
+
+        // The other pages, made up too: segmented controls, and any menu that's an
+        // ordinary one (SwiftUI's aren't found this way). Switches only
+        // on Tweaks, whose preview writes nothing: a tool's can start it for real.
+        // Not Finder's or Settings', whose changes aren't all held back in a preview.
+        for section in [AppSection.switcher, .layout, .mixer, .capture, .awake, .stats, .tweaks] {
+            model.section = section
+            settle()
+            for control in controls(in: window.contentView!, menus: true) {
+                let before = issues(since: start)
+                var what = String(describing: type(of: control))
+                if let segments = control as? NSSegmentedControl {
+                    what = "segments (\((0..<segments.segmentCount).compactMap { segments.label(forSegment: $0) }.joined(separator: "/")))"
+                    segments.selectedSegment = (segments.selectedSegment + 1) % segments.segmentCount
+                } else if let menu = control as? NSPopUpButton, menu.numberOfItems > 1 {
+                    what = "menu (\(menu.titleOfSelectedItem ?? "?"))"
+                    menu.selectItem(at: (menu.indexOfSelectedItem + 1) % menu.numberOfItems)
+                } else if let toggle = control as? NSSwitch, section == .tweaks {
+                    what = "switch"
+                    toggle.state = toggle.state == .on ? .off : .on
+                } else {
+                    continue
+                }
+                _ = control.sendAction(control.action, to: control.target)
+                settle()
+                let found = issues(since: start) - before
+                if found > 0 { failed += 1 }
+                print("\(section.rawValue) \(what): \(found == 0 ? "ok" : "\(found) issue(s)")")
+            }
+        }
+
+        // The sidebar, row by row, as clicks on it.
+        func table(in view: NSView) -> NSTableView? {
+            (view as? NSTableView) ?? view.subviews.lazy.compactMap(table).first
+        }
+        if let sidebar = table(in: window.contentView!) {
+            for row in stride(from: 0, to: sidebar.numberOfRows, by: 3) {
+                let before = issues(since: start)
+                sidebar.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+                settle()
+                let found = issues(since: start) - before
+                if found > 0 { failed += 1 }
+                print("sidebar row \(row) (\(model.section?.rawValue ?? "none")): \(found == 0 ? "ok" : "\(found) issue(s)")")
+            }
+        } else {
+            print("sidebar: not found")
+        }
         print(failed == 0 ? "ok: no control published from within a view update" : "FAIL: \(failed) control(s) did")
     }
 
@@ -56,14 +104,16 @@ enum PublishingProbe {
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
     }
 
-    /// Segmented controls and switches, top to bottom.
-    private static func controls(in view: NSView) -> [NSControl] {
+    /// Segmented controls and switches, top to bottom, and with `menus`, menus.
+    private static func controls(in view: NSView, menus: Bool = false) -> [NSControl] {
         var found: [NSControl] = []
         func walk(_ view: NSView) {
             if let segments = view as? NSSegmentedControl, !segments.isHidden {
                 found.append(segments)
             } else if let toggle = view as? NSSwitch, !toggle.isHidden {
                 found.append(toggle)
+            } else if menus, let menu = view as? NSPopUpButton, !menu.isHidden {
+                found.append(menu)
             }
             view.subviews.forEach(walk)
         }

@@ -503,7 +503,7 @@
 "Click a Window to Record" = "Clique numa janela para gravar";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:84 */
-"Click an app to mute it; right-click it to hide it until it plays again, or to exclude it." = "Clique numa aplicação para lhe tirar o som; clique com o botão direito para a ocultar até voltar a tocar, ou para a excluir.";
+"Click an app to mute it; right-click it to show it, to hide it until it plays again, or to exclude it." = "Clique numa aplicação para lhe tirar o som; clique com o botão direito para a mostrar, para a ocultar até voltar a tocar, ou para a excluir.";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:738 */
 "Click the speaker to mute" = "Clique no altifalante para tirar o som";
@@ -2541,6 +2541,14 @@
 
 /* Sources/Toolkit/Mixer/MixerController.swift:121 */
 "The audio driver needs updating" = "O driver de áudio precisa de ser atualizado";
+"The audio driver is no longer on this Mac" = "O driver de áudio já não está neste Mac";
+"The audio driver is no longer on this Mac. The mixer is off until it's installed again, and sound plays as usual." = "O driver de áudio já não está neste Mac. O misturador fica desativado até o voltar a instalar, e o som toca normalmente.";
+"The audio driver is no longer on this Mac. It keeps working until the next restart, and then the mixer is off until it's installed again." = "O driver de áudio já não está neste Mac. Continua a funcionar até ao próximo reinício; depois, o misturador fica desativado até o voltar a instalar.";
+"The Audio Mixer is off until it's installed again, and sound plays as usual. Installing it asks for your password, and sound stops for a moment." = "O Misturador de Áudio fica desativado até o voltar a instalar, e o som toca normalmente. A instalação pede a sua palavra-passe, e o som para por um momento.";
+"It keeps working until the next restart, and then the Audio Mixer is off until it's installed again. Installing it asks for your password, and sound stops for a moment." = "Continua a funcionar até ao próximo reinício; depois, o Misturador de Áudio fica desativado até o voltar a instalar. A instalação pede a sua palavra-passe, e o som para por um momento.";
+"Install the audio driver" = "Instalar o driver de áudio";
+"Installing it asks for your password, and sound stops for a moment." = "A instalação pede a sua palavra-passe, e o som para por um momento.";
+"Install…" = "Instalar…";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:48 */
 "The audio driver needs updating. The mixer is off until it is, and sound plays as usual." = "O driver de áudio precisa de ser atualizado. O misturador fica desativado até lá, e o som toca normalmente.";
@@ -2809,7 +2817,12 @@
 "Turn On" = "Ativar";
 
 /* Sources/Toolkit/System/TweaksView.swift:18 */
-"Turned off for you only, and on again with the switch. A macOS update can turn one back on; it then shows as on here." = "Desativadas só para si, e reativadas com o interruptor. Uma atualização do macOS pode voltar a ativar uma; aparece então aqui ativada.";
+"Turned off for you only, and on again with the switch, which can take a restart. macOS doesn't stop one that's running, so it stops at the next restart." = "Desativadas só para si, e reativadas com o interruptor, o que pode exigir um reinício. O macOS não para uma que esteja a correr, por isso para no próximo reinício.";
+"Keep my choices" = "Manter as minhas escolhas";
+"A macOS update can turn these back to their defaults. With this on, the toolkit puts what you've changed back when it starts and when the Mac wakes, and tells you. Your choices are kept on this Mac only." = "Uma atualização do macOS pode repor estas definições. Com isto ativado, o toolkit volta a aplicar o que alterou quando arranca e quando o Mac sai da pausa, e avisa-o. As suas escolhas ficam guardadas só neste Mac.";
+"Stops at the next restart" = "Para no próximo reinício";
+"Your Tweaks are back as you set them" = "Os seus Ajustes voltaram ao que definiu";
+"macOS had changed some of them. A background task that's running stops at the next restart." = "O macOS tinha alterado alguns. Uma tarefa em segundo plano que esteja a correr para no próximo reinício.";
 
 /* Sources/Toolkit/Awake/AwakeSettingsView.swift:76 */
 "Turns it on with no end, or off again." = "Ativa-o sem fim, ou volta a desativá-lo.";

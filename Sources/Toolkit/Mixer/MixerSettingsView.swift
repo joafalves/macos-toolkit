@@ -23,9 +23,8 @@ struct MixerSettingsView: View {
                        button: mixer.permission == .denied ? "Open System Settings…" : "Allow…") { mixer.requestPermission() }
             }
 
-            if mixer.config.enabled, mixer.driverBlocked {
-                Banner(text: "The audio driver needs updating. The mixer is off until it is, and sound plays as usual.",
-                       button: "Update…") { mixer.setUsesDriver(true) }
+            if mixer.config.enabled, let notice = mixer.driverNotice {
+                Banner(text: notice.text, button: notice.button) { mixer.setUsesDriver(true) }
             }
 
             if mixer.config.enabled, !mixer.keysInstalled {
@@ -50,7 +49,7 @@ struct MixerSettingsView: View {
                         .padding(.vertical, 11)
                 }
 
-                Card(title: "Apps", footnote: "Click an app to mute it; right-click it to hide it until it plays again, or to exclude it.") {
+                Card(title: "Apps", footnote: "Click an app to mute it; right-click it to show it, to hide it until it plays again, or to exclude it.") {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(alignment: .firstTextBaseline) {
                             Text("Each app's volume, on top of the main volume.")
@@ -135,7 +134,13 @@ struct MixerSettingsView: View {
                               badge: "Preview")
                         .disabled(mixer.driverBusy)
                     DriverStatusLine(mixer: mixer)
-                    if mixer.driverBlocked {
+                    if mixer.driverRemoved {
+                        RowDivider()
+                        SettingRow(title: "Install the audio driver", caption: "Installing it asks for your password, and sound stops for a moment.") {
+                            Button("Install…") { mixer.setUsesDriver(true) }
+                                .disabled(mixer.driverBusy)
+                        }
+                    } else if mixer.driverBlocked {
                         RowDivider()
                         SettingRow(title: "Update the audio driver", caption: "Updating it asks for your password, and sound stops for a moment.") {
                             Button("Update…") { mixer.setUsesDriver(true) }
@@ -183,9 +188,11 @@ private struct DriverStatusLine: View {
         case nil: break
         }
         if mixer.driverStarting { return .working("Starting the driver…") }
-        if mixer.driverActive { return .on("On: sound goes through the driver.") }
+        if mixer.driverActive, !mixer.driverRemoved { return .on("On: sound goes through the driver.") }
+        if mixer.driverRemoved, let notice = mixer.driverNotice { return .problem(notice.text) }
         switch mixer.driverProblem {
         case nil: return nil
+        case .removed: return nil
         case .notInstalled: return .problem("This build of the app has no driver, so the mixer is using taps.")
         case .notInApplications: return .problem("The driver only answers an app in the Applications folder, so the mixer is using taps.")
         case .refused: return .problem("The driver didn't accept this copy of the app, so the mixer is using taps.")

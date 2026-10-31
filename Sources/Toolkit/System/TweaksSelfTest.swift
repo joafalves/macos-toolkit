@@ -28,6 +28,15 @@ extension TweaksModel {
             check(!run("/bin/launchctl", ["print", "gui/\(getuid())/\(label)"]).isEmpty, "\(label) is a service in this session")
         }
 
+        print("      off but still running: \(stillRunning(given: states).map(\.rawValue).sorted().joined(separator: ", "))")
+        let list = "PID\tStatus\tLabel\n3641\t0\tcom.apple.tipsd\n-\t0\tcom.apple.gamed\n12\t-9\tcom.example.other"
+        check(runningServices(in: list) == ["com.apple.tipsd": 3641, "com.example.other": 12], "a running service is one with a process")
+
+        // What Keep my choices would write, from made-up states: nothing is written.
+        let differences = TweaksKeeper.differences(kept: [.tips: false, .gameCenter: false], states: [.tips: true, .gameCenter: false, .photosAnalysis: true])
+        check(differences == [.tips: false], "only what's kept and isn't set is put back, and nothing that wasn't changed here")
+        check(TweaksKeeper.differences(kept: [:], states: [.tips: true]).isEmpty, "with nothing kept, nothing is put back")
+
         let domain = "dev.jalves.macos-toolkit.tweaks-test"
         let pair = Tweak.Preference(domain: domain, keys: ["first", "second"], on: 0.0)
         check(!pair.read(), "a preference whose on value is set reads off while the key isn't there")

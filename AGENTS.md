@@ -121,13 +121,18 @@ tool; keep it in step with the code.
   itself: no switch for the page, nothing undone on quit, and the Mac is the only record. Tweaks
   reads every value when the page shows and when the app comes to the front, writes straight to
   macOS (`CFPreferences` for preferences, `launchctl disable`/`enable` in the `gui/<uid>` domain for
-  background tasks), and keeps nothing in a config or the settings export. A tweak qualifies only if
+  background tasks), and keeps nothing in a config or the settings export. The one exception, only when
+  asked for: Keep my choices (`TweaksKeeper`, off to start with) remembers what was changed in the local
+  defaults, not an export, and puts it back when the app starts and the Mac wakes, since a macOS update
+  can reset these. No timer: an update means a restart. A service can't be stopped once it's running:
+  launchd refuses to signal it and SIP to unload it (both measured), a plain SIGTERM can be declined, and
+  we don't force it, so its row says it stops at the next restart. A tweak qualifies only if
   it's macOS's own setting, System Settings doesn't offer it, it needs no root, it can be read back,
   it has a known macOS default (what deleting the key gives, or a service running), and its row can
   say plainly what it changes and what turning it off breaks. Each is a `Tweak` case (its kind and
   what restarts) and a `TweakRow` on the page, worded so on means macOS's feature is on. Settings
   about something a tool also does stay in Tweaks, linked from the tool's page (Finder's), not
-  mixed into it. The page reads every value as it's made (about 5 ms), so its first frame is the
+  mixed into it. The page reads every value as it's made (about 10 ms), so its first frame is the
   Mac's, not macOS's defaults turning into it; commands run through `posix_spawn`, since `Process`
   took 75 ms for one `launchctl`. A few Dock switches flipped in a row restart it once, after the
   last; Finder is restarted only from the button the page shows, since quitting it stops a copy.
@@ -157,10 +162,10 @@ tool; keep it in step with the code.
   search result or a menu bar panel, goes through `moved(to:)`, so back and forward (the toolbar's
   capsule, ⌘[ ⌘], a two-finger swipe) retrace it. A page within a page (a mouse's) is a place of its
   own, not a back button on the page.
-- **Segmented pickers** bind through `.afterUpdate` (`Components.swift`): their selection is set
-  during the view update, and setting a published config there is SwiftUI's "publishing changes
-  from within view updates", which can leave the setting unapplied. `--test-publishing` checks the
-  Mouse page's controls for it.
+- **Segmented pickers and the sidebar's list** bind through `.afterUpdate` (`Components.swift`): their
+  selection is set during the view update, and setting a published value there is SwiftUI's "publishing
+  changes from within view updates", which can leave the setting unapplied. `--test-publishing` checks the
+  made-up Mouse page's controls, the segmented controls of most other pages, Tweaks' switches and the sidebar.
 - **Linked settings** (`UI/LinkedSettings.swift`): when one setting holds another (Stay available
   keeps the display on), pass a `SettingLink` to both rows while it's in force, `.heldBy(...)` on the
   held one, which locks its control, and `.holds(...)` on the holder, and mark each row with
@@ -304,7 +309,9 @@ tool; keep it in step with the code.
     by one there**, and a change to the shared memory's layout also raises `DRIVER_SHARED_VERSION`. A driver
     update matters, so a copy with another driver than it brought doesn't carry on without it: the mixer
     is off (`driverBlocked`, sound plays as usual), an alert says so once per driver version, and the sidebar's
-    warning and the page's Update stay until it's done.
+    warning and the page's Update stay until it's done. One that's been removed is its own case
+    (`driverRemoved`): a watch on its folder (a kqueue source, no polling) says so as soon as it goes, while
+    coreaudiod still has it loaded and it keeps working, with an alert once each time it goes and Install.
   - The driver gives its memory's name only to a process signed like the toolkit, by the certificate's hash
     compiled in by `build.sh`, so a new identity would also orphan every installed driver. It reads the app
     from disk to check, which `_coreaudiod` can't under a home folder: test through a copy in `/Applications`.
@@ -336,11 +343,11 @@ swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
 ./scripts/build.sh --dev [--install]         # with the development flags, for the tests run through the app bundle
-.build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general|tweaks] [light]   # tweaks: macOS's defaults with two changed, not this Mac's
+.build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general|tweaks] [light]   # tweaks: macOS's defaults with two changed, not this Mac's (with `running`, Tips off and still running)
 .build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
 .build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
 .build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
-.build/debug/Toolkit --snapshot out.png mixer driver=<installing|removing|starting|on|outdated|failed-install> [light]   # the mixer's page, tall enough for the driver's line in that state
+.build/debug/Toolkit --snapshot out.png mixer driver=<installing|removing|starting|on|outdated|removed|removed-loaded|failed-install> [light]   # the mixer's page, tall enough for the driver's line in that state
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer] [per-output] [simple]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
@@ -407,7 +414,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --dump-menus <app> [file]  # an app's menu items with key equivalents and identifiers
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
 .build/debug/Toolkit --list-mice             # the mice the Mouse tool sees, what each is saved under, and its charge
-.build/debug/Toolkit --test-publishing       # each control on the made-up mouse's page, changed in code in a window never shown: no SwiftUI publishing-in-update issue, and the setting changes
+.build/debug/Toolkit --test-publishing       # each control on the made-up mouse's page, then the other pages' segmented controls, Tweaks' switches and the sidebar, changed in code in a window never shown: no SwiftUI publishing-in-update issue, and the mouse's setting changes
 .build/debug/Toolkit --test-audio-access <report>   # the microphone and an audio tap work as signed (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-mixer-engine <report>   # the mixer on a quiet tone from a helper app: clicks when it pauses, has its volume changed or the equalizer switched, and sleep once it stops (build.sh --dev; open -n the bundle; nothing else using the mixer, so quit the installed app)
 .build/debug/Toolkit --test-mixer-mic <report>   # a helper opens the microphone alone, as a call app's preview does, with the mixer's taps waiting: whether its input starts, which taps go and which run, on a path forced on where inputs aren't held up, and what a tap running in silence costs (build.sh --dev; open -n the bundle; quit the installed app)

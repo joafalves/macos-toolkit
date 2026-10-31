@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         capture.start()
         awake = AwakeController()
         awake.start()
+        TweaksKeeper.shared.start()
         stats = StatsController()
         // `--measure-idle` with `--without-stats`: the cost of the rest, with
         // nothing saved to the user's settings.

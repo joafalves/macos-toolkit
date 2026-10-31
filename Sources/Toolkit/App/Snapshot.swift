@@ -469,7 +469,12 @@ enum Snapshot {
         background.imageScaling = .scaleAxesIndependently
         container.addSubview(background)
 
-        func icon(_ app: String) -> NSImage { NSWorkspace.shared.icon(forFile: "/System/Applications/\(app).app") }
+        // Terminal is in Utilities.
+        func icon(_ app: String) -> NSImage {
+            let path = ["/System/Applications/\(app).app", "/System/Applications/Utilities/\(app).app"]
+                .first(where: FileManager.default.fileExists) ?? "/System/Applications/\(app).app"
+            return NSWorkspace.shared.icon(forFile: path)
+        }
         let rows: [(String, String, NSColor)] = [("Inbox — 3 new messages", "Mail", .systemBlue), ("Notes", "Notes", .systemYellow),
                                                  ("October 2026", "Calendar", .systemRed), ("macos-toolkit — zsh", "Terminal", .darkGray),
                                                  ("Untitled", "TextEdit", .systemOrange)]
