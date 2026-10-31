@@ -608,7 +608,8 @@ final class MixerController: ObservableObject {
     /// The current output's equalizer to the taps: the filters' gains that
     /// give its sliders, and its preamp.
     private func pushEqualizer() {
-        let rate = output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self).flatMap { $0 > 0 ? $0 : nil } ?? 48_000
+        // Called from `init` too, before there's an output to ask.
+        let rate = (output == .unknown ? nil : output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self)).flatMap { $0 > 0 ? $0 : nil } ?? 48_000
         let equalizer = self.equalizer
         if let pushed, pushed.0 == equalizer, pushed.1 == rate { return }
         pushed = (equalizer, rate)
