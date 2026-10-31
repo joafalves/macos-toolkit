@@ -220,6 +220,12 @@ if let flag = CommandLine.arguments.firstIndex(of: "--test-driver"), CommandLine
     MixerEngineTest.runDriver(into: CommandLine.arguments[flag + 1])
     exit(0)
 }
+// `--test-driver-sync <report>`: when a click through the driver is heard, against
+// when an app was told it would be. Run with `open -n`.
+if let flag = CommandLine.arguments.firstIndex(of: "--test-driver-sync"), CommandLine.arguments.count > flag + 1 {
+    MixerEngineTest.runDriverSync(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
 // `--test-driver-sounds <report>`: short sounds through the driver, and what a
 // recording's system audio gets. Run with `open -n`.
 if let flag = CommandLine.arguments.firstIndex(of: "--test-driver-sounds"), CommandLine.arguments.count > flag + 1 {

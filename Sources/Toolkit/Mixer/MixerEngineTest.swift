@@ -97,6 +97,95 @@ enum MixerEngineTest {
     /// privacy dot), a microphone start with it all in place, and that the
     /// device goes with the link. The default output is put back at the end;
     /// if this crashes, the driver hides its device and macOS moves it back.
+    /// `--test-driver-sync <report>`: a client of the driver's device with a buffer
+    /// of each size, as a player is, and a click: when it reached the output, against
+    /// when the device's time stamps and reported latency say it would be heard,
+    /// which is what a picture is timed by. Started from a stopped output, and once
+    /// the sound has been going a while. Plays quiet clicks. Run with `open -n`.
+    static func runDriverSync(into path: String) {
+        var lines: [String] = []
+        func say(_ line: String) { lines.append(line); Log.mixer.notice("sync test: \(line, privacy: .public)") }
+        defer { try? (lines.joined(separator: "\n") + "\n").write(toFile: path, atomically: true, encoding: .utf8) }
+        _ = NSApplication.shared
+        let scope = kAudioObjectPropertyScopeOutput
+        guard let output = AudioObjectID.system.read(kAudioHardwarePropertyDefaultOutputDevice, as: AudioObjectID.self), DriverLink.plugIn != nil else {
+            return say("the driver isn't loaded")
+        }
+        let driver: MixerDriver
+        do { driver = try MixerDriver(equalizer: EqualizerState()) } catch { return say("link FAILED: \(error)") }
+        defer { driver.close() }
+        let start = Date()
+        while !driver.adopt(real: output, fallback: nil), Date().timeIntervalSince(start) < 5 { wait(0.05) }
+        guard let device = driver.device else { return say("the device never showed") }
+        let rate = output.read(kAudioDevicePropertyNominalSampleRate, as: Float64.self) ?? 48000
+        let stream = output.readArray(kAudioDevicePropertyStreams, scope: scope, as: AudioStreamID.self).first
+        let own = (output.read(kAudioDevicePropertyLatency, scope: scope, as: UInt32.self) ?? 0) + (stream?.read(kAudioStreamPropertyLatency, as: UInt32.self) ?? 0)
+        var timebase = mach_timebase_info_data_t()
+        mach_timebase_info(&timebase)
+        let ticksPerMs = 1e6 * Double(timebase.denom) / Double(timebase.numer)
+        let ownMs = Double(own) / rate * 1000
+        say("output \(output.readString(kAudioDevicePropertyDeviceUID) ?? "?"), \(rate) Hz, its own latency \(String(format: "%.1f", ownMs)) ms, the limiter's 1.5 ms")
+        wait(1.5)
+
+        final class Client {
+            var frames: Int64 = 0
+            var clickAt: Int64 = 0
+            var clickHost: UInt64 = 0
+            var phase = 0.0
+        }
+        var failures = 0
+        for (size, after) in [(4096, 0.0), (4096, 3.0), (4096, 14.0), (2048, 0.0), (2048, 3.0), (1024, 0.0), (1024, 3.0), (512, 0.0), (512, 3.0), (512, 14.0), (256, 3.0)] {
+            device.write(kAudioDevicePropertyBufferFrameSize, UInt32(size))
+            let client = Client()
+            client.clickAt = Int64(rate * after)
+            let clickFrames = Int64(rate * 0.02)
+            let ticksPerFrame = ticksPerMs * 1000 / rate
+            var proc: AudioDeviceIOProcID?
+            let block: AudioDeviceIOBlock = { _, _, _, out, outTime in
+                let list = UnsafeMutableAudioBufferListPointer(out)
+                guard let data = list[0].mData else { return }
+                let samples = data.assumingMemoryBound(to: Float.self)
+                let channels = Int(list[0].mNumberChannels)
+                let count = Int(list[0].mDataByteSize) / (channels * MemoryLayout<Float>.size)
+                for frame in 0..<count {
+                    let at = client.frames + Int64(frame)
+                    client.phase += 2 * .pi * 1000 / rate
+                    let clicking = at >= client.clickAt && at < client.clickAt + clickFrames
+                    if clicking, client.clickHost == 0 {
+                        client.clickHost = outTime.pointee.mHostTime + UInt64(Double(frame) * ticksPerFrame)
+                    }
+                    // Not silence, which can be skipped: too quiet to hear.
+                    let value = Float(sin(client.phase)) * (clicking ? 0.1 : 0.0005)
+                    for channel in 0..<channels { samples[frame * channels + channel] = value }
+                }
+                client.frames += Int64(count)
+            }
+            guard AudioDeviceCreateIOProcIDWithBlock(&proc, device, nil, block) == noErr, let proc else { say("no IO proc"); continue }
+            AudioDeviceStart(device, proc)
+            wait(after + 1.5)
+            let state = driver.link.state
+            AudioDeviceStop(device, proc)
+            AudioDeviceDestroyIOProcID(device, proc)
+            wait(0.3)
+            let reported = Double(device.read(kAudioDevicePropertyLatency, scope: scope, as: UInt32.self) ?? 0) / rate * 1000
+            let marker = driver.link.markerHost
+            let reached = (Double(Int64(bitPattern: marker &- client.clickHost))) / ticksPerMs
+            // Above zero, heard after its picture.
+            let error = reached + ownMs + 1.5 - reported
+            // A long write is on time from its first frame. A short one keeps its
+            // sound's start, so it's late at first, by what an output takes to start,
+            // and has caught up within a few seconds more.
+            let limit = size >= 1024 || after >= 14 ? 10.0 : after > 0 ? 30.0 : 300.0
+            let ok = marker != 0 && abs(error) < limit
+            if !ok { failures += 1 }
+            say(String(format: "%@ buffer %4d, %@: heard %+6.1f ms from its time; %@", ok ? "ok  " : "FAIL", size,
+                       after == 0 ? "from a stopped output" : String(format: "after %2.0f s of sound", after), error, state))
+            // For the output to stop, so the next one starts from nothing.
+            wait(4)
+        }
+        say(failures == 0 ? "all ok" : "\(failures) failed")
+    }
+
     static func runDriver(into path: String) {
         var lines: [String] = []
         func say(_ line: String) { lines.append(line); Log.mixer.notice("driver test: \(line, privacy: .public)") }

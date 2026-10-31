@@ -3,6 +3,14 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.25.1 (unreleased)
+
+### Fixed
+
+- **Audio Mixer:** on the audio driver, sound is now heard when macOS told the app it would be, so a video's
+  picture stays with its sound. With video players it was about 80 ms early. This needs the driver updated,
+  which the mixer asks for; until then it's off, and sound plays as usual.
+
 ## 0.25.0 (2026-10-31)
 
 ### Added

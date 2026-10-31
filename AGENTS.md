@@ -323,9 +323,18 @@ tool; keep it in step with the code.
     choice still there comes back, and the chosen output gets the sound back when it returns (a monitor
     unplugged or asleep). Only a choice counts, not an output the sound fell back to; the list is saved
     (`driverOutputsChosen`, in the defaults, so not in an export). The real output starts and stops off the main thread, since Bluetooth can take a second.
-  - The real output comes up after a sound has started, so what's come since it last read is played rather
-    than dropped, up to 0.3 s and with no leading silence, and the clock (or a moment of silence) takes the
-    extra away. It stays up 3 s after the sound stops. After a gap in what's playing, the backlog is dropped.
+  - Sound is played by time, not by how much is queued, which is what keeps a picture with it. macOS tells
+    an app when what it writes is due (`mOutputTime`, a whole buffer after the write), and the app adds the
+    device's reported latency to time its picture. The driver passes that time with each write
+    (`lastWriteOutputHost`, read whole through `writeSequence`), and each cycle of the real output plays the
+    frame due at its own time stamp, less what's held back: its buffer, its safety offset and the slack, all in the
+    reported latency with the limiter's look-ahead. The driver's clock follows the real output and is nudged to
+    hold that; nothing is resampled. `--test-driver-sync` measures it: within a few ms with large buffers.
+  - The real output comes up after a sound has started. With a long write (20 ms or more, a player's), what's
+    past its time is dropped, so the picture stays with it. With a short one, what's come since is played
+    rather than dropped, up to 0.3 s and with no leading silence, or a short sound would be lost, and the clock
+    (up to 8 ms a second) or a moment of silence takes the extra away. It stays up 3 s after the sound stops. After
+    a gap in what's playing, the backlog is dropped.
   - Its device exists only while the toolkit does: a killed toolkit is noticed within a second, a hung one
     in 15, and macOS moves sound to a real output. `--test-driver-crash` checks it.
   - Nothing on its audio thread allocates, logs or takes more than the shortest lock. A bug there stops
@@ -421,6 +430,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-mixer-mic <report>   # a helper opens the microphone alone, as a call app's preview does, with the mixer's taps waiting: whether its input starts, which taps go and which run, on a path forced on where inputs aren't held up, and what a tap running in silence costs (build.sh --dev; open -n the bundle; quit the installed app)
 .build/debug/Toolkit --test-driver <report>        # the audio driver end to end, installed: a tone through it, a volume, its cost, the microphone (build.sh --dev; open -n a copy in /Applications; quit the installed app)
 .build/debug/Toolkit --test-driver-long <report> <seconds>   # a tone through the driver with others joining: what's queued, how the clocks settle, gaps (as above)
+.build/debug/Toolkit --test-driver-sync <report>   # a click from a client with each buffer size: when it's heard against when the device says it would be, which a picture is timed by (as above; plays quiet clicks)
 .build/debug/Toolkit --test-driver-sounds <report>  # short sounds from a stopped output: how much of each is heard; and a recording's system audio, leaving this process out and not (as above; nothing else playing, or the output never stops)
 .build/debug/Toolkit --test-driver-outputs   # where sound goes on the driver as outputs come and go: headphones, a display, the last one used (no sound)
 .build/debug/Toolkit --test-driver-eq <report>     # the same equalizer through taps and the driver, measured at each band against its slider (as above)

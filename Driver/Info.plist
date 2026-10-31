@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>AudioServerPlugIn_MachServices</key>
+	<array>
+		<string>com.apple.SecurityServer</string>
+		<string>com.apple.securityd.xpc</string>
+		<string>com.apple.trustd</string>
+		<string>com.apple.trustd.agent</string>
+		<string>com.apple.CodeSigningHelper</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleExecutable</key>
@@ -15,9 +23,9 @@
 	<key>CFBundlePackageType</key>
 	<string>BNDL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1</string>
+	<string>2</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>CFPlugInFactories</key>
 	<dict>
 		<key>A1799280-1839-4196-A1CC-EFFA8F199009</key>
@@ -30,13 +38,5 @@
 			<string>A1799280-1839-4196-A1CC-EFFA8F199009</string>
 		</array>
 	</dict>
-	<key>AudioServerPlugIn_MachServices</key>
-	<array>
-		<string>com.apple.SecurityServer</string>
-		<string>com.apple.securityd.xpc</string>
-		<string>com.apple.trustd</string>
-		<string>com.apple.trustd.agent</string>
-		<string>com.apple.CodeSigningHelper</string>
-	</array>
 </dict>
 </plist>

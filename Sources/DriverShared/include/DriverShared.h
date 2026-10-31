@@ -20,7 +20,7 @@
 #define DRIVER_SHARED_MAGIC 0x544B4144u // 'TKAD'
 // Goes up when the layout changes, so an older driver says so rather than
 // misbehaving.
-#define DRIVER_SHARED_VERSION 1u
+#define DRIVER_SHARED_VERSION 2u
 // A power of two. About 680 ms at 48 kHz, far more than is ever queued: the
 // room is there so a stalled reader skips ahead rather than reading torn data.
 #define DRIVER_RING_FRAMES 32768u
@@ -55,9 +55,14 @@ typedef struct DriverSharedHeader {
     // hand: Swift can't import an over-aligned struct.
     uint64_t writeHead;
     uint64_t lastWriteTicks; // mach_absolute_time of the last write
+    // When macOS told the apps the last write's first frame is due: the time
+    // line their pictures are timed by.
+    uint64_t lastWriteOutputHost;
     uint32_t lastWriteFrames;
     uint32_t ioRunning;
-    uint8_t padding1[40];
+    uint32_t nominalFrames; // the size of a cycle, which the odd short write isn't
+    uint32_t writeSequence; // odd during a write, so a reader sees one write whole
+    uint8_t padding1[24];
 
     // Written by the app.
     uint64_t heartbeat; // mach_absolute_time
@@ -100,8 +105,9 @@ static inline bool driver_shared_is_valid(DriverSharedHeader *shared) {
         && shared->version == DRIVER_SHARED_VERSION && shared->capacity == DRIVER_RING_FRAMES && shared->channels == DRIVER_CHANNELS;
 }
 
-// The driver's audio thread: one writer.
-static inline void driver_shared_write(DriverSharedHeader *shared, const float *frames, uint32_t count, uint64_t ticks) {
+// The driver's audio thread: one writer. `outputHost`: when the first of these
+// frames is due, as macOS told the apps.
+static inline void driver_shared_write(DriverSharedHeader *shared, const float *frames, uint32_t count, uint64_t ticks, uint64_t outputHost, uint32_t nominalFrames) {
     uint64_t head = atomic_load_explicit((_Atomic uint64_t *)&shared->writeHead, memory_order_relaxed);
     if (count > DRIVER_RING_FRAMES) count = DRIVER_RING_FRAMES;
     uint32_t start = (uint32_t)(head & (DRIVER_RING_FRAMES - 1));
@@ -109,21 +115,51 @@ static inline void driver_shared_write(DriverSharedHeader *shared, const float *
     float *samples = driver_shared_samples(shared);
     memcpy(samples + start * DRIVER_CHANNELS, frames, first * DRIVER_CHANNELS * sizeof(float));
     memcpy(samples, frames + first * DRIVER_CHANNELS, (count - first) * DRIVER_CHANNELS * sizeof(float));
+    _Atomic uint32_t *sequence = (_Atomic uint32_t *)&shared->writeSequence;
+    uint32_t odd = atomic_load_explicit(sequence, memory_order_relaxed) + 1;
+    atomic_store_explicit(sequence, odd, memory_order_relaxed);
+    atomic_thread_fence(memory_order_release);
     atomic_store_explicit((_Atomic uint64_t *)&shared->lastWriteTicks, ticks, memory_order_relaxed);
+    atomic_store_explicit((_Atomic uint64_t *)&shared->lastWriteOutputHost, outputHost, memory_order_relaxed);
     atomic_store_explicit((_Atomic uint32_t *)&shared->lastWriteFrames, count, memory_order_relaxed);
+    atomic_store_explicit((_Atomic uint32_t *)&shared->nominalFrames, nominalFrames, memory_order_relaxed);
     atomic_store_explicit((_Atomic uint64_t *)&shared->writeHead, head + count, memory_order_release);
+    atomic_store_explicit(sequence, odd + 1, memory_order_release);
 }
 
 static inline uint64_t driver_shared_write_head(DriverSharedHeader *shared) {
     return atomic_load_explicit((_Atomic uint64_t *)&shared->writeHead, memory_order_acquire);
 }
 
-static inline uint64_t driver_shared_last_write_ticks(DriverSharedHeader *shared) {
-    return atomic_load_explicit((_Atomic uint64_t *)&shared->lastWriteTicks, memory_order_acquire);
-}
+// The latest write, whole.
+typedef struct DriverSharedWrite {
+    uint64_t head;
+    uint64_t ticks;
+    uint64_t outputHost;
+    uint32_t frames;
+    uint32_t nominalFrames;
+} DriverSharedWrite;
 
-static inline uint32_t driver_shared_last_write_frames(DriverSharedHeader *shared) {
-    return atomic_load_explicit((_Atomic uint32_t *)&shared->lastWriteFrames, memory_order_relaxed);
+// The app's audio thread. False if the driver kept writing through every try,
+// which leaves `write` as it was: the one before, a moment old and still true.
+static inline bool driver_shared_latest_write(DriverSharedHeader *shared, DriverSharedWrite *write) {
+    _Atomic uint32_t *sequence = (_Atomic uint32_t *)&shared->writeSequence;
+    for (int attempt = 0; attempt < 4; attempt++) {
+        uint32_t before = atomic_load_explicit(sequence, memory_order_acquire);
+        if (before & 1) continue;
+        DriverSharedWrite seen;
+        seen.head = atomic_load_explicit((_Atomic uint64_t *)&shared->writeHead, memory_order_acquire);
+        seen.ticks = atomic_load_explicit((_Atomic uint64_t *)&shared->lastWriteTicks, memory_order_relaxed);
+        seen.outputHost = atomic_load_explicit((_Atomic uint64_t *)&shared->lastWriteOutputHost, memory_order_relaxed);
+        seen.frames = atomic_load_explicit((_Atomic uint32_t *)&shared->lastWriteFrames, memory_order_relaxed);
+        seen.nominalFrames = atomic_load_explicit((_Atomic uint32_t *)&shared->nominalFrames, memory_order_relaxed);
+        atomic_thread_fence(memory_order_acquire);
+        if (atomic_load_explicit(sequence, memory_order_relaxed) == before) {
+            *write = seen;
+            return true;
+        }
+    }
+    return false;
 }
 
 // The app's audio thread: `position` is its own, and within the capacity of

@@ -10,8 +10,9 @@ import Synchronization
 /// device, and nothing here records, so macOS shows no privacy dot.
 ///
 /// The two clocks are the same clock: the driver's follows the rate written
-/// here, taken from the real output, and nudged to keep as little queued as
-/// plays without a gap. So nothing is resampled and the delay stays put.
+/// here, taken from the real output, and nudged to keep each frame at the time
+/// macOS gave the app for it, plus the latency the device reports. So nothing is
+/// resampled, the delay stays put, and a picture timed by that stays with its sound.
 final class DriverLink {
     /// The driver's plug-in object, if it's installed and loaded.
     static var plugIn: AudioObjectID? {
@@ -56,13 +57,11 @@ final class DriverLink {
         /// long after each write, the output's cycle comes round. Grows when
         /// that wasn't enough.
         var slack = 0.0
-        /// What the driver writes each cycle. Not the last write: the host
-        /// makes the odd one short when a new client joins.
-        var writeSize: Int64 = 0
-        var writeSizeRun = 0
-        /// How far ahead the driver is at each read, counting the time since
-        /// its last write, so it doesn't jump by a whole write as the level does.
-        var ahead = 0.0
+        /// The latest write the driver made.
+        var write = DriverSharedWrite()
+        /// How many frames behind its time what's playing is, or if negative
+        /// ahead of it, averaged over a second or so.
+        var late = 0.0
         var correction = 0.0
         /// The real output's speed against the host's clock, from its time stamps.
         var deviceRate = 1.0
@@ -85,21 +84,30 @@ final class DriverLink {
         var skips = 0
         var lastLevel: Int64 = 0
         var cycleFrames: UInt32 = 0
-        var windowFrames: UInt32 = 0
-        var windowLow = Double.infinity
-        var windowHigh = 0.0
-        var sinceWriteLow = 0.0
-        var sinceWriteHigh = 0.0
+        #if TOOLKIT_DEV
+        /// For `--test-driver-sync`: when a loud sample after a while without
+        /// one reached the output.
+        var markerHost: UInt64 = 0
+        var quietFrames = 100_000
+        #endif
     }
 
     /// The least time to spare after a write: the driver's and the output's
     /// threads both wake a little late at times.
     private static let slackSeconds = 0.003
+    /// The limiter's, in what the device tells apps.
+    private static let lookAheadSeconds = 0.0015
     /// How much faster or slower per second off target: gone in about 10 s,
     /// at a rate no one can hear.
     private static let gain = 0.1
     /// Well inside what the driver accepts, and what a real clock could be off.
     private static let furthest = 0.0005
+    /// Off by more than a few ms, as a sound's start can leave it: still inside what
+    /// the driver accepts, and unheard, as nothing is resampled. 8 ms a second.
+    private static let fastest = 0.008
+    /// A write this long is a player's, timing a picture by it (`inOutputTime`).
+    /// Being on time matters more than the very start of its sound.
+    private static let longWrite = 0.02
     /// How late a sound's start may play, to not lose it while the output starts.
     /// Long enough for speakers; a Bluetooth output takes longer, and only the
     /// last of what came before it's up gets played.
@@ -227,8 +235,15 @@ final class DriverLink {
         var timebase = mach_timebase_info_data_t()
         mach_timebase_info(&timebase)
         let framesPerTick = sampleRate * Double(timebase.numer) / (Double(timebase.denom) * 1e9)
-        let clockGain = Self.gain, furthest = Self.furthest
+        let clockGain = Self.gain, furthest = Self.furthest, fastest = Self.fastest
         let oneMillisecond = sampleRate / 1000
+        let longWrite = UInt32(Self.longWrite * sampleRate)
+        // What's held back behind the time macOS gave, and what makes it enough:
+        // the last of what a cycle reads has to have been written as that cycle
+        // wakes, a cycle and the output's safety offset before it's due. All of it
+        // is in the latency the device reports, with the limiter's look-ahead.
+        let safety = Double(device.read(kAudioDevicePropertySafetyOffset, scope: kAudioObjectPropertyScopeOutput, as: UInt32.self) ?? 0)
+        let held = Double(device.read(kAudioDevicePropertyBufferFrameSize, as: UInt32.self) ?? 512) + safety
 
         let block: AudioDeviceIOBlock = { _, _, _, outData, outTime in
             let list = UnsafeMutableAudioBufferListPointer(outData)
@@ -251,32 +266,22 @@ final class DriverLink {
                 reader.pointee.deviceRate = 1 / outTime.pointee.mRateScalar
             }
 
-            // A write and its time, not one of each from either side of a write.
-            var ticks = driver_shared_last_write_ticks(shared)
-            var head = driver_shared_write_head(shared)
-            let again = driver_shared_last_write_ticks(shared)
-            if again != ticks {
-                ticks = again
-                head = driver_shared_write_head(shared)
-            }
-            let lastWrite = Int64(driver_shared_last_write_frames(shared))
-            if lastWrite == reader.pointee.writeSize {
-                reader.pointee.writeSizeRun = 0
-            } else if lastWrite > 0 {
-                reader.pointee.writeSizeRun += 1
-                // A while of the same new size, or the first we've seen.
-                if reader.pointee.writeSize == 0 || reader.pointee.writeSizeRun >= 16 {
-                    reader.pointee.writeSize = lastWrite
-                    reader.pointee.writeSizeRun = 0
-                }
-            }
-            let written = reader.pointee.writeSize
-            let now = mach_absolute_time()
-            let sinceWrite = now > ticks ? Double(now - ticks) * framesPerTick : 0
+            _ = driver_shared_latest_write(shared, &reader.pointee.write)
+            let write = reader.pointee.write
+            guard write.outputHost != 0 else { return }
+            let head = write.head
             let needed = Int64(frames)
             var level = Int64(bitPattern: head &- reader.pointee.position)
             reader.pointee.lastLevel = level
             reader.pointee.cycleFrames = UInt32(frames)
+
+            // The frame due now, on the time line the apps were given: this cycle
+            // reaches the output at its time stamp, and the device reports what it
+            // holds back. The last write says where that time line is.
+            let host = outTime.pointee.mFlags.contains(.hostTimeValid) ? outTime.pointee.mHostTime : mach_absolute_time()
+            let sinceDue = Double(Int64(bitPattern: host &- write.outputHost)) * framesPerTick
+            let due = Int64(bitPattern: head &- UInt64(write.frames)) + Int64(sinceDue - held - reader.pointee.slack)
+            var late = due - Int64(bitPattern: reader.pointee.position)
 
             // Stalled behind what the ring still holds, while playing: from now.
             if reader.pointee.playing, level > Int64(DRIVER_RING_FRAMES) / 2 {
@@ -284,43 +289,53 @@ final class DriverLink {
                 reader.pointee.playing = false
                 reader.pointee.skips += 1
                 level = 0
+                late = due - Int64(bitPattern: head)
             }
-            // When the output reads as much as the driver writes (or a whole
-            // number of writes), every read lands the same time after a write,
-            // and the clock below holds it there: nothing more than one cycle
-            // is queued. Otherwise a read can land just before the next write.
-            let locks = written > 0 && needed % written == 0
-            let target = Double(needed) + reader.pointee.slack + (locks ? 0 : Double(written))
             if !reader.pointee.playing {
-                // One write more in hand than it will settle on: the first cycles
-                // of a device wake less evenly, and the clock takes the extra away.
-                let least = needed + written
-                guard written > 0, level >= least else { return }
-                // Everything that came while it wasn't playing, or a short sound
-                // would be over before it's heard: up to what's fair to be late
-                // by, and with no silence an app opened with. Not after a gap in
-                // what was playing, which is lost anyway: the burst after a stall
-                // would only leave everything late from then on.
-                let most = reader.pointee.ranOut ? least : min(Int64(sampleRate * Self.mostToCatchUp), Int64(DRIVER_RING_FRAMES) / 2)
-                let keep = max(least, min(level, most))
-                let silent = Int64(driver_shared_leading_silence(shared, head &- UInt64(keep), UInt32(keep - least)))
-                level = keep - silent
-                // More came: that was a gap. Next time keep more to spare, up to a
-                // whole write, unless it's the first moments of a new output.
+                let running = driver_shared_io_running(shared)
+                guard level >= needed else { return }
+                // Not yet its time, within half a cycle, as a cycle is as fine as this
+                // gets. With the device stopped nothing more is coming, so it plays.
+                guard !running || late >= -needed / 2 else { return }
+                if running, late > 0 {
+                    if reader.pointee.ranOut || write.nominalFrames >= longWrite {
+                        // A gap, which is lost anyway, or a player: what's past its
+                        // time goes, so the sound and its picture stay together.
+                        let on = min(late, level - needed)
+                        reader.pointee.position &+= UInt64(on)
+                    } else {
+                        // Everything that came while it wasn't playing, or a short
+                        // sound would be over before it's heard: up to what's fair to
+                        // be late by, and with no silence an app opened with.
+                        let most = min(Int64(sampleRate * Self.mostToCatchUp), Int64(DRIVER_RING_FRAMES) / 2)
+                        let keep = max(needed, min(level, most))
+                        let silent = Int64(driver_shared_leading_silence(shared, head &- UInt64(keep), UInt32(keep - needed)))
+                        let from = Int64(bitPattern: head) - keep + silent
+                        reader.pointee.position = UInt64(bitPattern: min(from, max(due, Int64(bitPattern: reader.pointee.position))))
+                    }
+                    level = Int64(bitPattern: head &- reader.pointee.position)
+                    late = due - Int64(bitPattern: reader.pointee.position)
+                }
+                // More came: that was a gap. Next time keep more to spare, unless
+                // it's the first moments of a new output.
                 if reader.pointee.ranOut {
                     reader.pointee.ranOut = false
                     reader.pointee.underruns += 1
                     if reader.pointee.playedFrames > sampleRate * 2 {
-                        reader.pointee.slack = min(reader.pointee.slack + oneMillisecond, max(Double(written), oneMillisecond))
+                        reader.pointee.slack = min(reader.pointee.slack + oneMillisecond, oneMillisecond * 20)
                     }
                 }
-                reader.pointee.position = head &- UInt64(level)
                 reader.pointee.playing = true
-                reader.pointee.ahead = Double(level) + min(sinceWrite, Double(written))
+                reader.pointee.late = Double(late)
             } else if level < needed {
                 // A gap only if the device is still running: otherwise the sound's over.
                 reader.pointee.playing = false
                 reader.pointee.ranOut = driver_shared_io_running(shared) && reader.pointee.lastCycleHadSound
+                return
+            } else if reader.pointee.late < -Double(frames),
+                      driver_shared_leading_silence(shared, reader.pointee.position, UInt32(frames)) == UInt32(frames) {
+                // Ahead of its time, in a moment of silence, which no one hears grow.
+                reader.pointee.late += Double(frames)
                 return
             }
 
@@ -336,6 +351,16 @@ final class DriverLink {
             var hadSound = false
             for frame in 0..<frames {
                 let g = applied + step * Float(frame)
+                #if TOOLKIT_DEV
+                if abs(scratch[frame * 2]) > 0.05 {
+                    if reader.pointee.quietFrames > 4800 {
+                        reader.pointee.markerHost = host + UInt64(Double(frame) / framesPerTick)
+                    }
+                    reader.pointee.quietFrames = 0
+                } else {
+                    reader.pointee.quietFrames += 1
+                }
+                #endif
                 if abs(scratch[frame * 2]) > 0.00001 {
                     reader.pointee.soundFrames += 1
                     hadSound = true
@@ -353,31 +378,17 @@ final class DriverLink {
             reader.pointee.appliedGain = wanted
             reader.pointee.lastCycleHadSound = hadSound
 
-            // Averaged over a second or so, against where the reads should land.
-            // Too far ahead: the driver's clock slows until it isn't.
-            if sinceWrite <= Double(written) * 2 {
-                let ahead = Double(level) + sinceWrite
-                reader.pointee.ahead += (ahead - reader.pointee.ahead) * min(1, Double(frames) / sampleRate)
-                let off = (reader.pointee.ahead - target) / sampleRate
-                // Well behind, as after catching up on a sound's start: faster, and
-                // at once in a moment of silence, which no one can hear go.
-                let limit = abs(off) > 0.02 ? furthest * 4 : furthest
-                reader.pointee.correction = max(-limit, min(limit, -off * clockGain))
-                if off > Double(frames) / sampleRate, level - needed >= needed,
-                   driver_shared_leading_silence(shared, reader.pointee.position, UInt32(frames)) == UInt32(frames) {
-                    reader.pointee.position &+= UInt64(frames)
-                    reader.pointee.ahead -= Double(frames)
-                }
-                reader.pointee.windowLow = min(reader.pointee.windowLow, sinceWrite)
-                reader.pointee.windowHigh = max(reader.pointee.windowHigh, sinceWrite)
-            }
-            reader.pointee.windowFrames &+= UInt32(frames)
-            if Double(reader.pointee.windowFrames) >= sampleRate {
-                reader.pointee.sinceWriteLow = reader.pointee.windowLow
-                reader.pointee.sinceWriteHigh = reader.pointee.windowHigh
-                reader.pointee.windowLow = .infinity
-                reader.pointee.windowHigh = 0
-                reader.pointee.windowFrames = 0
+            // Averaged over a second or so. Behind its time, the driver's clock slows
+            // until it isn't: nothing is resampled, so that's only how fast apps are
+            // asked for sound, and it isn't heard. At once in a moment of silence.
+            reader.pointee.late += (Double(late) - reader.pointee.late) * min(1, Double(frames) / sampleRate)
+            let off = reader.pointee.late / sampleRate
+            let limit = abs(off) > 0.005 ? fastest : furthest
+            reader.pointee.correction = max(-limit, min(limit, -off * clockGain))
+            if off > Double(frames) / sampleRate, level - needed >= needed,
+               driver_shared_leading_silence(shared, reader.pointee.position, UInt32(frames)) == UInt32(frames) {
+                reader.pointee.position &+= UInt64(frames)
+                reader.pointee.late -= Double(frames)
             }
             driver_shared_set_rate(shared, reader.pointee.deviceRate * (1 + reader.pointee.correction))
         }
@@ -462,7 +473,8 @@ final class DriverLink {
     }
 
     /// What the device tells apps, for their pictures to keep with their
-    /// sound: the queue, the limiter's look-ahead and the real output's own.
+    /// sound: what's held back behind their time (a cycle of the real output, its
+    /// safety offset and the slack), the limiter's look-ahead and the output's own.
     private static func latency(of device: AudioObjectID, sampleRate: Float64) -> UInt32 {
         let scope = kAudioObjectPropertyScopeOutput
         let stream = device.readArray(kAudioDevicePropertyStreams, scope: scope, as: AudioStreamID.self).first
@@ -470,16 +482,21 @@ final class DriverLink {
             + (device.read(kAudioDevicePropertySafetyOffset, scope: scope, as: UInt32.self) ?? 0)
             + (device.read(kAudioDevicePropertyBufferFrameSize, as: UInt32.self) ?? 0)
             + (stream?.read(kAudioStreamPropertyLatency, as: UInt32.self) ?? 0)
-        return own + UInt32((slackSeconds + 0.0015) * sampleRate)
+        return own + UInt32((slackSeconds + lookAheadSeconds) * sampleRate)
     }
 
     /// For the log and the test, read off the audio thread: a moment stale.
     var state: String {
         let reader = reader.pointee
         func ms(_ frames: Double) -> String { String(format: "%.1f", frames / reader.sampleRate * 1000) }
-        return "\(reader.soundFrames) frames of sound, queued \(ms(reader.ahead)) ms (\(ms(Double(reader.cycleFrames) + reader.slack)) wanted), reads \(ms(reader.sinceWriteLow))-\(ms(reader.sinceWriteHigh)) ms after a write, "
-            + "level \(reader.lastLevel), \(reader.underruns) gaps, \(reader.skips) skips, rate \(String(format: "%.6f", driver_shared_rate(shared)))"
+        return "\(reader.soundFrames) frames of sound, queued \(ms(Double(reader.lastLevel))) ms, \(ms(reader.late)) ms behind its time, cycles of \(reader.write.nominalFrames), "
+            + "\(reader.underruns) gaps, \(reader.skips) skips, rate \(String(format: "%.6f", driver_shared_rate(shared)))"
     }
+
+    #if TOOLKIT_DEV
+    /// For `--test-driver-sync`.
+    var markerHost: UInt64 { reader.pointee.markerHost }
+    #endif
 
     /// The loudest sample in the last 512 frames written, for the test: proof
     /// that sound really comes through the shared memory.

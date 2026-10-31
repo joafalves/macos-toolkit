@@ -663,12 +663,18 @@ static void ProcessClient(DriverSharedHeader *shared, UInt32 client, float *samp
 
 static OSStatus DoIOOperation(AudioServerPlugInDriverRef driver, AudioObjectID device, AudioObjectID stream, UInt32 client, UInt32 operation,
                               UInt32 frames, const AudioServerPlugInIOCycleInfo *cycle, void *mainBuffer, void *secondaryBuffer) {
-    (void)driver, (void)stream, (void)cycle, (void)secondaryBuffer;
+    (void)driver, (void)stream, (void)secondaryBuffer;
     if (device != kObjectDevice) return kAudioHardwareBadObjectError;
     DriverSharedHeader *shared = atomic_load(&gShared);
     if (!shared) return kAudioHardwareNoError;
     if (operation == kAudioServerPlugInIOOperationWriteMix) {
-        driver_shared_write(shared, mainBuffer, frames, mach_absolute_time());
+        // When macOS told the apps this is due: what the toolkit plays it by, so
+        // it's heard when they expect, and a picture timed by that stays with it.
+        uint64_t now = mach_absolute_time();
+        uint64_t due = cycle->mOutputTime.mFlags & kAudioTimeStampHostTimeValid
+            ? cycle->mOutputTime.mHostTime
+            : now + (uint64_t)(cycle->mNominalIOBufferFrameSize * cycle->mDeviceHostTicksPerFrame);
+        driver_shared_write(shared, mainBuffer, frames, now, due, cycle->mNominalIOBufferFrameSize);
     } else if (operation == kAudioServerPlugInIOOperationProcessOutput) {
         ProcessClient(shared, client, mainBuffer, frames);
     }
