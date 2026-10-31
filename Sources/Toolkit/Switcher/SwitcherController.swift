@@ -159,22 +159,23 @@ final class SwitcherController: ObservableObject {
         // turned macOS's back on: every 2 seconds was a window server call
         // for nothing.
         let now = ProcessInfo.processInfo.systemUptime
+        guard systemSwitcherOn != !ours || systemCycleCheckedFor != config.appShortcut || now - (systemSwitcherSetAt ?? -.infinity) > 60 else { return }
+        CGSSetSymbolicHotKeyEnabled(1, !ours)
+        CGSSetSymbolicHotKeyEnabled(2, !ours)
         // macOS's way through an app's windows goes the same way, if ours has its keys.
         let entry = CaptureKeys.systemPrefs()[String(Self.systemCycleKey)]
         let cycleOurs = config.appShortcut == (CaptureKeys.systemShortcut(entry) ?? Self.systemCycle)
-        guard systemSwitcherOn != !ours || systemCycleOurs != cycleOurs || now - (systemSwitcherSetAt ?? -.infinity) > 60 else { return }
-        CGSSetSymbolicHotKeyEnabled(1, !ours)
-        CGSSetSymbolicHotKeyEnabled(2, !ours)
         CGSSetSymbolicHotKeyEnabled(Self.systemCycleKey, !cycleOurs && CaptureKeys.systemEnabled(entry))
         systemSwitcherOn = !ours
-        systemCycleOurs = cycleOurs
+        systemCycleCheckedFor = config.appShortcut
         systemSwitcherSetAt = now
     }
 
     /// macOS's "Move focus to next window", with the keys it has out of the box.
     private static let systemCycleKey: Int32 = 27
     private static let systemCycle = Shortcut(keyCode: 50, flags: [.command])
-    private var systemCycleOurs = false
+    /// The shortcut macOS's was last compared with.
+    private var systemCycleCheckedFor: Shortcut?
 
     /// What macOS's own ⌘Tab was last set to, and when.
     private var systemSwitcherOn: Bool?
@@ -190,7 +191,7 @@ final class SwitcherController: ObservableObject {
         CGSSetSymbolicHotKeyEnabled(1, true)
         CGSSetSymbolicHotKeyEnabled(2, true)
         CGSSetSymbolicHotKeyEnabled(Self.systemCycleKey, CaptureKeys.systemEnabled(CaptureKeys.systemPrefs()[String(Self.systemCycleKey)]))
-        systemCycleOurs = false
+        systemCycleCheckedFor = nil
         systemSwitcherOn = true
         systemSwitcherSetAt = nil
     }
@@ -263,7 +264,10 @@ final class SwitcherController: ObservableObject {
             } else {
                 let shift = flags.contains(.maskShift)
                 let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-                main { $0.keyDown(code, shift: shift, isRepeat: isRepeat) }
+                // A shortcut with ⇧ has it held all along, so it can't mean an
+                // action: typing "mail" would minimize a window.
+                let actions = shift && current.shiftReverses
+                main { $0.keyDown(code, shift: shift, actions: actions, isRepeat: isRepeat) }
             }
         }
         // Keys pressed while the switcher is open must not reach the app behind
@@ -271,7 +275,7 @@ final class SwitcherController: ObservableObject {
         return type == .flagsChanged ? pass : nil
     }
 
-    private func keyDown(_ code: Int64, shift: Bool, isRepeat: Bool) {
+    private func keyDown(_ code: Int64, shift: Bool, actions: Bool, isRepeat: Bool) {
         switch code {
         case Key.tab: move(by: shift ? -1 : 1)
         case Key.right: move(by: 1)
@@ -286,12 +290,13 @@ final class SwitcherController: ObservableObject {
         case Key.enter: confirm()
         case Key.delete: if !query.isEmpty { search(String(query.dropLast())) }
         default:
-            guard !isRepeat, code != Int64(config.shortcut.keyCode), code != Int64(config.appShortcut.keyCode) else { return }
+            guard !isRepeat else { return }
+            // Numbers pick a row, searching or not, so they aren't searched for.
             if let digit = Key.digits.firstIndex(of: code) {
                 guard digit < items.count else { return }
                 selection = digit
                 confirm()
-            } else if shift, [Key.w, Key.q, Key.m, Key.h, Key.x].contains(code) {
+            } else if actions, [Key.w, Key.q, Key.m, Key.h, Key.x].contains(code) {
                 // Only once the list is on screen: these should not be done blind.
                 guard panel.isVisible, items.indices.contains(selection) else { return }
                 let item = items[selection]
@@ -300,14 +305,18 @@ final class SwitcherController: ObservableObject {
                 case Key.q: catalog.quit(item)
                 case Key.m: catalog.toggleMinimized(item)
                 case Key.h: catalog.toggleHidden(item)
-                // Of everything listed, not just what a search left: an app
-                // with a window that wasn't found is still in use.
+                // Of everything listed, not just what a search left.
                 case Key.x: catalog.quitIdle(unfiltered)
                 default: break
                 }
-            } else if code != Key.space || !query.isEmpty, let text = Shortcut.typed(Int(code)),
-                      text.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.union(.punctuationCharacters).union(.whitespaces).contains($0) }) {
-                search(query + text)
+            } else if code != Key.space || !query.isEmpty, let text = Shortcut.typed(Int(code)) {
+                func all(_ set: CharacterSet) -> Bool { text.unicodeScalars.allSatisfy(set.contains) }
+                // A shortcut's key stays out of the search, like § after ⌘, unless
+                // it's a letter, which searching needs whatever else it's used for.
+                let shortcutKey = code == Int64(config.shortcut.keyCode) || code == Int64(config.appShortcut.keyCode)
+                if shortcutKey ? all(.alphanumerics) : all(CharacterSet.alphanumerics.union(.punctuationCharacters).union(.whitespaces)) {
+                    search(query + text)
+                }
             }
         }
     }
@@ -340,7 +349,8 @@ final class SwitcherController: ObservableObject {
         // An app's own windows don't lead to opening others.
         var found = SwitcherSearch.results(query, rows: unfiltered, installed: onlyApp == nil ? index.apps : [],
                                            otherName: index.otherName, icon: index.icon)
-        AppColors.shared.tint(&found)
+        // The rows have theirs: only an app without a row may need one looked up.
+        AppColors.shared.lookUp(&found)
         items = found
     }
 
@@ -628,6 +638,16 @@ final class SwitcherController: ObservableObject {
             // A window that changes on its own comes back through its notice, so not none.
             check("but apps aren't asked again straight away", healing.windowCount < count, "\(healing.windowCount) of \(count) windows")
             healing.stop()
+
+            // What Window Layout's suggestions place a picked window by.
+            let placing = WindowCatalog()
+            placing.start()
+            _ = wait(placing, for: count, within: 3)
+            let own = ProcessInfo.processInfo.processIdentifier
+            let rows = placing.snapshot().items.filter { $0.state == .window && $0.pid != own }
+            let lost = rows.filter { item in item.window.map { LayoutWindow.find(id: $0, pid: item.windowPID ?? item.pid) == nil } ?? true }
+            check("every window listed can be found to place it, a helper's too", lost.isEmpty, "\(rows.count) windows, \(lost.count) not found")
+            placing.stop()
             lines.append(String(format: "     all in %.1f s", Date().timeIntervalSince(start)))
         } else {
             lines.append("skip: Accessibility is not granted to this process (run the app bundle with `open -n`)")

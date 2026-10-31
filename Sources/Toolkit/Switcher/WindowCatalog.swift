@@ -18,6 +18,8 @@ struct SwitcherItem: Identifiable {
     var appName: String
     var icon: NSImage?
     var state: State
+    /// The process with the window, where that isn't `pid`: a helper of the app.
+    var windowPID: pid_t? = nil
     var bundleID: String? = nil
     var appURL: URL? = nil
     /// Nil with the colours off.
@@ -234,7 +236,7 @@ final class WindowCatalog {
             DispatchQueue.main.asyncAfter(deadline: .now() + (ready ? 0 : 1)) {
                 guard self.watches[watch.app.processIdentifier] === watch else { return }
                 if ready {
-                    self.scan(watch, deep: true)
+                    self.scan(watch, deep: true, attempt: 0)
                 } else if attempt < 10 {
                     self.attach(watch, attempt: attempt + 1)
                 }
@@ -252,13 +254,16 @@ final class WindowCatalog {
 
     /// Lists an app's windows. `deep` also digs out the ones on other Spaces,
     /// which is slow and only needed once per app, so what's here doesn't wait for it.
-    private func scan(_ watch: Watch, deep: Bool, attempt: Int = 0) {
+    /// With an `attempt`, an app that doesn't answer is asked again: only for the
+    /// first look at an app, since one with no windows to list never will.
+    private func scan(_ watch: Watch, deep: Bool, attempt: Int? = nil) {
         let pid = watch.app.processIdentifier
         let known = Set(entries.keys)
-        func retry() {
+        func retry(deep: Bool) {
+            guard let attempt else { return }
             let bundle = watch.app.bundleIdentifier ?? ""
             guard attempt < Self.scanRetries.count else {
-                Log.switcher.error("no windows from \(bundle, privacy: .public) after \(attempt + 1) tries")
+                Log.switcher.notice("no windows from \(bundle, privacy: .public) after \(attempt + 1) tries")
                 return
             }
             if attempt == 0 { Log.switcher.notice("no windows from \(bundle, privacy: .public) yet, asking again") }
@@ -270,11 +275,11 @@ final class WindowCatalog {
         work.async {
             // Doubles as the check that the app is answering at all.
             #if TOOLKIT_DEV
-            let answer: [AXUIElement]? = attempt < self.refusedScans ? nil : Self.attribute(watch.element, kAXWindowsAttribute)
+            let answer: [AXUIElement]? = (attempt ?? .max) < self.refusedScans ? nil : Self.attribute(watch.element, kAXWindowsAttribute)
             #else
             let answer: [AXUIElement]? = Self.attribute(watch.element, kAXWindowsAttribute)
             #endif
-            guard let elements = answer else { return retry() }
+            guard let elements = answer else { return retry(deep: deep) }
             var seen = Set<CGWindowID>()
             func deliver(_ elements: [AXUIElement]) -> Int {
                 let found = elements.compactMap { Self.read($0, pid: pid) }.filter { seen.insert($0.id).inserted }
@@ -295,7 +300,8 @@ final class WindowCatalog {
                 if !missing.isEmpty { count += deliver(Self.windowsOnOtherSpaces(of: pid, looking: missing)) }
             }
             // It answered, with nothing, yet there's a window on screen: not ready.
-            if count == 0, Self.windowsOnScreen()[pid] != nil { retry() }
+            // The search for other Spaces has been done by then, and is slow.
+            if count == 0, attempt != nil, Self.windowsOnScreen()[pid] != nil { retry(deep: false) }
         }
     }
 
@@ -524,7 +530,7 @@ final class WindowCatalog {
             return SwitcherItem(id: "w\(entry.id)", window: entry.id, pid: appPID(entry.pid),
                                 title: entry.title.isEmpty ? name : entry.title, appName: name,
                                 icon: watch?.icon, state: entry.minimized ? .minimized : .window,
-                                bundleID: watch?.owner.bundleIdentifier, appURL: watch?.owner.bundleURL)
+                                windowPID: entry.pid, bundleID: watch?.owner.bundleIdentifier, appURL: watch?.owner.bundleURL)
         }
         let withWindows = Set(windows.map { appPID($0.pid) })
         for app in NSWorkspace.shared.runningApplications {
@@ -728,7 +734,9 @@ final class WindowCatalog {
     /// Quits every app that only has dimmed rows: hidden, without windows, or
     /// with every window minimized. Finder and the toolkit are spared.
     func quitIdle(_ items: [SwitcherItem]) {
-        let inUse = Set(items.filter { !$0.dimmed }.map(\.pid))
+        // Going by every window, not only those listed: with one display's
+        // listed, an app can have its only normal window on another.
+        let inUse = Set(snapshot().items.filter { !$0.dimmed }.map(\.pid))
         for pid in Set(items.map(\.pid)).subtracting(inUse) where pid != ownPID {
             guard let app = app(pid), app.bundleIdentifier != "com.apple.finder" else { continue }
             app.terminate()

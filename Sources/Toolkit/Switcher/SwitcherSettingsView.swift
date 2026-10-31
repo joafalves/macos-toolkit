@@ -25,12 +25,14 @@ struct SwitcherSettingsView: View {
             ("Go to the selected window", "release \(held)"),
             ("Cancel", "esc"),
             ("Search by name, or open an app", "type"),
+        // ⇧ is held all along with a shortcut that has it, so it can't mean these.
+        ] + (shortcut.flags.contains(.shift) ? [] : [
             ("Close the window", "⇧W"),
             ("Minimize the window", "⇧M"),
             ("Hide the app", "⇧H"),
             ("Quit the app", "⇧Q"),
             ("Quit every dimmed app", "⇧X"),
-        ]
+        ])
     }
 
     private var freshnessCaption: LocalizedStringKey {

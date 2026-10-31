@@ -277,16 +277,16 @@ the **System Audio Recording** permission, which is asked for as the mixer is tu
   </picture>
 </p>
 
-⌘Tab opens a list with **one row per window**, never grouped by app, across all Spaces and displays.
-Rows are in most recently used order, so row 1 is the window you are in, and a quick ⌘Tab goes back
-to the previous one without showing the list at all. When the list does appear, the previous window
+⌘Tab opens a grid with a picture of each window, or a list with **one row per window**, never grouped by
+app, across all Spaces and displays. Windows are in most recently used order, so row 1 is the window you
+are in, and a quick ⌘Tab goes back to the previous one without showing anything at all. When it does appear, the previous window
 is selected, or the one you're in with **Open on the previous window** off. Minimized windows, hidden apps and apps without
 a window come last, dimmed.
 
 | Key (while ⌘ is held) | Action |
 | --- | --- |
 | ⇥ / ⇧⇥, ↓ / ↑ | Next / previous row |
-| 1 – 9 | Go straight to that row |
+| 1 – 9 | Go straight to that row, also while searching: numbers aren't searched for |
 | letters | Search what's listed: apps by name, then windows by title. Below those, a few apps it doesn't list, to open them |
 | ⌫, esc | Take back a letter; esc clears the search, then cancels |
 | release ⌘, or click | Go to the selected row |

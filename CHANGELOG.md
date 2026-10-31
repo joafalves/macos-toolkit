@@ -34,8 +34,10 @@ worked on; it gets its date when it's released.
 
 ### Fixed
 
-- **Window Switcher:** apps that draw their windows in a helper process, such as Steam, are listed with
-  their windows. They seemed to have none, and with only one display's windows listed they were missing.
+- **Window Switcher:** apps that draw their windows in a helper process are listed with their windows.
+  They seemed to have none, and with only one display's windows listed they were missing.
+- **Window Switcher:** ⇧X no longer quits an app whose only normal window is on another display, when the
+  list only shows one display's.
 - **Window Switcher:** an app that didn't answer when the toolkit started is asked again, and anything
   the list has missed is looked for when it opens. Its windows could be missing until you switched to it.
 - **Window Layout:** a window snapped or maximized on one display when another arrives and becomes the

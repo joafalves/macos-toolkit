@@ -252,6 +252,15 @@ final class AppColors {
         if changed { save() }
     }
 
+    /// The colour of each app offered by a search that has no row: it keeps the
+    /// one it has, and doesn't get one just for being come across.
+    func lookUp(_ items: inout [SwitcherItem]) {
+        guard enabled else { return }
+        for index in items.indices where items[index].state == .notListed {
+            items[index].tint = items[index].colorKey.flatMap(choices.color)
+        }
+    }
+
     private func save() {
         guard let data = try? JSONEncoder().encode(choices) else { return }
         let url = Self.fileURL

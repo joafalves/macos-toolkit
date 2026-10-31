@@ -123,7 +123,8 @@ struct GridLayout: Equatable {
     init(count: Int, maxTileWidth: CGFloat, area: CGSize) {
         self.count = count
         let n = max(count, 1)
-        var width = maxTileWidth
+        // Never wider than the area: one tile would be, with a narrow one.
+        var width = max(min(maxTileWidth, area.width - Self.padding * 2), Self.minimumWidth)
         var columns = 1
         while true {
             columns = min(n, Self.across(area.width, tile: width))
@@ -327,7 +328,7 @@ private struct PreviewTile: View {
 
 extension SwitcherItem {
     /// The title with the app's name taken off, for showing under that name:
-    /// "#general - Discord" is "#general". Nil if that leaves nothing.
+    /// "Inbox - Mail" is "Inbox". Nil if that leaves nothing.
     var titleBesideApp: String? {
         Self.title(title, without: appName)
     }

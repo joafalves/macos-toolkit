@@ -196,6 +196,8 @@ enum SwitcherSearch {
         check("and on the laptop", grid(10, .medium, laptopWidth, on: laptop).columns == 5)
         check("at full size", grid(10, .medium, largeWidth, on: large).tile.width == 260)
         check("narrower, fewer across", grid(10, .medium, 35, on: large).columns == 3)
+        let narrow = grid(3, .fit, 30, on: laptop), area = SwitcherPanel.gridArea(on: laptop, percent: 30)
+        check("a tile is never wider than the grid may be", narrow.size.width <= area.width, "\(Int(narrow.size.width)) of \(Int(area.width)) pt")
         check("few windows aren't spread out", grid(2, .medium, largeWidth, on: large).size.width < 600)
         func display(_ uuid: String) -> LayoutDisplay {
             LayoutDisplay(id: 0, uuid: uuid, name: uuid, frame: CGRect(x: 0, y: 0, width: 2800, height: 1400), usable: CGRect(x: 0, y: 0, width: 2800, height: 1400))
@@ -220,9 +222,9 @@ enum SwitcherSearch {
         check("no colours by default", !fresh.appColors && empty?.appColors == false)
 
         // The second line of a tile.
-        check("a window named after its app has no second line", SwitcherItem.title("Spotify", without: "Spotify") == nil)
-        check("whatever the case", SwitcherItem.title("SPOTIFY", without: "Spotify") == nil)
-        check("the app's name off the end", SwitcherItem.title("#general - Discord", without: "Discord") == "#general")
+        check("a window named after its app has no second line", SwitcherItem.title("Music", without: "Music") == nil)
+        check("whatever the case", SwitcherItem.title("MUSIC", without: "Music") == nil)
+        check("the app's name off the end", SwitcherItem.title("Inbox - Mail", without: "Mail") == "Inbox")
         check("and off the start", SwitcherItem.title("Safari — Start Page", without: "Safari") == "Start Page")
         check("kept inside a sentence", SwitcherItem.title("Notes for Monday", without: "Notes") == "Notes for Monday")
         check("kept at the end of one", SwitcherItem.title("My Notes", without: "Notes") == "My Notes")

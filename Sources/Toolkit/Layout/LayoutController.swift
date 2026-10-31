@@ -1250,7 +1250,7 @@ final class LayoutController: ObservableObject {
         guard let id = item.window else { return assist.next() }
         let displays = self.displays, gap = CGFloat(config.gap)
         work.async {
-            if let window = LayoutWindow.find(id: id, pid: item.pid) {
+            if let window = LayoutWindow.find(id: id, pid: item.windowPID ?? item.pid) {
                 self.place(window, .unit(slot.unit, slot.display), displays: displays, gap: gap, cycle: false)
             }
             DispatchQueue.main.async { self.assist.next() }
