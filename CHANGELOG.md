@@ -30,6 +30,7 @@ worked on; it gets its date when it's released.
 
 - **Window Switcher:** closing, minimizing, hiding and quitting from the list are now ⇧W, ⇧M, ⇧H, ⇧Q and
   ⇧X, since letters on their own now search.
+- **Audio Mixer:** the panel's Sound and Equalizer are one module, with a line between them.
 - **Window Switcher:** Previews is the default style. A style you've already chosen stays.
 - **Window Switcher:** Size is now Tile Size, under Sizing with each display's Grid Width, since the two decide together how many fit across.
 

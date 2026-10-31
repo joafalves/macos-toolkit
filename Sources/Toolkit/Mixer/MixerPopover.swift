@@ -27,13 +27,15 @@ struct MixerPopoverView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            MixerSoundControls(mixer: mixer, place: .panel, showOutputs: showOutputs)
-                .padding(10)
-                .background(ModuleBackground())
-            MixerEqualizerControls(mixer: mixer, place: .panel, expanded: showEqualizer, target: noTarget)
-                .disabled(mixer.driverBlocked)
-                .padding(10)
-                .background(ModuleBackground())
+            // One module: the panel's equalizer is always that of the output above it.
+            VStack(alignment: .leading, spacing: 10) {
+                MixerSoundControls(mixer: mixer, place: .panel, showOutputs: showOutputs)
+                Divider()
+                MixerEqualizerControls(mixer: mixer, place: .panel, expanded: showEqualizer, target: noTarget)
+                    .disabled(mixer.driverBlocked)
+            }
+            .padding(10)
+            .background(ModuleBackground())
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
