@@ -104,6 +104,13 @@ struct AboutView: View {
             ToggleRow(title: "Check automatically",
                       caption: "When the app starts and once a day, from the project's releases on GitHub. It asks before installing anything.",
                       isOn: $model.general.checkForUpdates)
+            RowDivider()
+            ToggleRow(title: "Include betas",
+                      caption: "Also offers release candidates, such as 0.25.0-rc.1, which come before a final version and are for testing. They can have bugs.",
+                      isOn: Binding(get: { model.general.betaUpdates }, set: {
+                          model.general.betaUpdates = $0
+                          updater.betasChanged(to: $0)
+                      }))
         }
     }
 

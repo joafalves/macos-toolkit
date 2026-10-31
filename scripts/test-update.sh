@@ -46,6 +46,7 @@ release good 0.99.0 "$IDENTITY" no
 release tampered 0.99.1 "$IDENTITY" yes
 release adhoc 0.99.2 - no
 release old 0.17.0 "$IDENTITY" no
+release rc 0.99.3-rc.1 "$IDENTITY" no
 signing_end
 ditto "$APP" "$OUT/target/MacOS Toolkit.app"
 

@@ -459,6 +459,8 @@
 
 /* Sources/Toolkit/App/AboutView.swift:104 */
 "Check automatically" = "Verificar automaticamente";
+"Include betas" = "Incluir versões beta";
+"Also offers release candidates, such as 0.25.0-rc.1, which come before a final version and are for testing. They can have bugs." = "Propõe também versões candidatas, como 0.25.0-rc.1, que saem antes da versão final e servem para testar. Podem ter erros.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:35 */
 "Check for updates" = "Verificar atualizações";

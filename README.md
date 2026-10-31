@@ -814,6 +814,10 @@ is also what keeps the permissions you gave it; then the app restarts, and Finde
 Finder extension is on. No quarantine flag to remove. If you build the app yourself, it's signed with
 your own certificate, so releases from GitHub won't install over it: update with `git pull` instead.
 
+**Include betas**, off to start with, also offers release candidates such as `0.25.0-rc.1`, which come
+before a final version and are for testing. They come before their version in order, so the final one
+still arrives if you turn this off again.
+
 ### Build it yourself
 
 You only need the Xcode Command Line Tools (`xcode-select --install`, skip if `swift --version`

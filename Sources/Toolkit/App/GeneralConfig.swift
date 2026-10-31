@@ -65,6 +65,8 @@ struct GeneralConfig: Codable, Equatable {
     var menuBarOrder = MenuBarTool.defaultOrder
     /// Looks for a new version at launch and once a day; it only says so.
     var checkForUpdates = true
+    /// Release candidates (0.25.0-rc.1) count as new versions too.
+    var betaUpdates = false
     var language = AppLanguage.system
 
     init() {}
@@ -79,6 +81,7 @@ struct GeneralConfig: Codable, Equatable {
         let order = (try? c.decodeIfPresent([String].self, forKey: .menuBarOrder)) ?? nil
         menuBarOrder = MenuBarTool.complete((order ?? []).compactMap(MenuBarTool.init(rawValue:)))
         checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? true
+        betaUpdates = (try? c.decodeIfPresent(Bool.self, forKey: .betaUpdates)) ?? false
         language = (try? c.decodeIfPresent(AppLanguage.self, forKey: .language)) ?? .system
     }
 

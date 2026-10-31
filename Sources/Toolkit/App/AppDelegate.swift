@@ -116,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 self?.menuBar.spacing = general.menuBarSpacing
                 self?.menuBar.setSeparators(between: general.menuBarSeparator, within: general.menuBarToolSeparator.resolved(general.menuBarSeparator))
                 // Not for a `--measure-idle` run, which should do nothing.
+                Updater.shared.betas = general.betaUpdates
                 Updater.shared.automatic = general.checkForUpdates && measureIdlePath == nil
                 redraw()
             },

@@ -7,6 +7,8 @@ worked on; it gets its date when it's released.
 
 ### Added
 
+- **Updates:** Include betas, off by default, on About: release candidates such as 0.25.0-rc.1 count as
+  new versions too. Works from this version on.
 - **Tweaks:** Keep my choices, off by default, puts what you've changed back when the toolkit starts and when
   the Mac wakes, since a macOS update can reset these, and tells you when it does.
 - **Audio Mixer:** right-click an app to show it, as clicking its Dock icon does.

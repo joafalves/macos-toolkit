@@ -34,6 +34,7 @@ extension SettingsIndex {
         SettingsEntry(.about, "License", caption: "Apache License 2.0. Copyright 2026 João Alves."),
         SettingsEntry(.about, "Updates", name: "Check for updates"),
         SettingsEntry(.about, "Check automatically", name: "Check for updates automatically", caption: "When the app starts and once a day, from the project's releases on GitHub. It asks before installing anything."),
+        SettingsEntry(.about, "Include betas", caption: "Also offers release candidates, such as 0.25.0-rc.1, which come before a final version and are for testing. They can have bugs."),
         SettingsEntry(.mouse, "All Mice", name: "Settings for all mice"),
         SettingsEntry(.mouse, "Restore macOS behavior on quit", caption: "When off, cursor settings stay applied after the app quits, until the mouse reconnects."),
         SettingsEntry(.mouse, "Show all pointing devices", caption: "Also list trackpads and keyboards that report a pointer."),

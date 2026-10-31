@@ -86,7 +86,8 @@ tool; keep it in step with the code.
   snapped again where macOS moved them and remember it (`home`); when it's back, they return. A display
   that arrives as the main one renumbers every frame, leaving windows on it at their old size: those
   are snapped again where they are, and a record for a window on another display than it says is dropped.
-- `App/Updater.swift`: updates from GitHub's `releases/latest`. It looks at launch and once a day
+- `App/Updater.swift`: updates from GitHub's list of releases (release candidates only with Include
+  betas: see Release candidates). It looks at launch and once a day
   and only says so; installing is a click. A download is installed only if it's the app at the
   release's version and passes `SecStaticCodeCheckValidity` against the running app's designated
   requirement (same certificate, Finder extension included), then swapped in with
@@ -520,6 +521,30 @@ The release is named `X.Y.Z` with tag `vX.Y.Z`. Its notes are the version's `CHA
 (without the heading), then the install block from the previous release (unzip into
 `/Applications`, `xattr -dr com.apple.quarantine`, grant Accessibility; the app is self-signed, not
 notarized), ending with the Claude Code attribution line. Delete the zip and notes file afterwards.
+
+### Release candidates (betas)
+
+A beta is a release candidate of the version being worked on, and only `-rc.N` counts: `0.26.0-rc.1`,
+then `0.26.0-rc.2`, then `0.26.0`. Only when the user asks for one; it's for trying a version on real
+installs before it's final. Installed copies from 0.25.0 on take it if **About → Include betas** is on
+(`GeneralConfig.betaUpdates`, off to start with). Earlier copies never do.
+
+It's published as above, with these differences:
+
+- `Resources/Info.plist`: `CFBundleShortVersionString` is `X.Y.Z-rc.N` (the updater refuses a download
+  whose version isn't the release's) and `CFBundleVersion` goes up by one, as ever. Back to `X.Y.Z` for the final one.
+- The tag is `vX.Y.Z-rc.N`, the zip `MacOS-Toolkit-X.Y.Z-rc.N.zip`, and the commit `chore: release X.Y.Z-rc.N`.
+- `CHANGELOG.md` stays `## X.Y.Z (unreleased)`: a candidate has no entry of its own. Its notes are that
+  entry so far, under a line saying it's a release candidate.
+- **Always `--prerelease`:** it's what keeps it from every copy before 0.25.0, which read an unmarked
+  `-rc.1` as newer than its final version, and off GitHub's "latest". Copies from 0.25.0 on go by the name.
+
+```bash
+gh release create vX.Y.Z-rc.N "MacOS-Toolkit-X.Y.Z-rc.N.zip" --title "X.Y.Z-rc.N" --notes-file notes.md --prerelease
+```
+
+A final version is offered over its candidates, with the toggle on or off, and its notes don't repeat
+theirs. `scripts/test-update.sh` checks the order and what's offered, and installs a candidate.
 
 ### After a release
 

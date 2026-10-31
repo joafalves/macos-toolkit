@@ -42,6 +42,17 @@ final class Updater: ObservableObject {
         didSet { if automatic != oldValue { schedule() } }
     }
 
+    /// Release candidates are on offer as well.
+    var betas = false
+
+    /// The switch moved: looks again, and a candidate on show goes if it's no
+    /// longer wanted.
+    func betasChanged(to value: Bool) {
+        betas = value
+        if !value, let available, Self.parse(available.version).candidate != nil { state = .idle }
+        check(quietly: true)
+    }
+
     private enum Keys {
         static let lastChecked = "updatesLastChecked"
         /// Development aid: another place to ask, for the update test.
@@ -112,6 +123,7 @@ final class Updater: ObservableObject {
         default: break
         }
         let before = state
+        let betas = betas
         state = .checking
         var request = URLRequest(url: feed, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -122,7 +134,7 @@ final class Updater: ObservableObject {
                 guard let response = response as? HTTPURLResponse, response.statusCode == 200, let data else {
                     throw UpdateError("GitHub didn't answer (\((response as? HTTPURLResponse)?.statusCode ?? 0)).")
                 }
-                return try Self.newer(in: data, than: Self.currentVersion)
+                return try Self.newer(in: data, than: Self.currentVersion, betas: betas)
             }
             DispatchQueue.main.async {
                 switch result {
@@ -138,8 +150,9 @@ final class Updater: ObservableObject {
 
     /// The newest release in GitHub's answer (a list of releases, or one),
     /// if it's newer than `version` and has the app's zip, with the notes of
-    /// every release since `version`.
-    static func newer(in data: Data, than version: String) throws -> Release? {
+    /// every release since `version`. A release candidate is only considered
+    /// with `betas`, and any other prerelease never is.
+    static func newer(in data: Data, than version: String, betas: Bool = false) throws -> Release? {
         struct Answer: Decodable {
             struct Asset: Decodable {
                 let name: String
@@ -160,10 +173,16 @@ final class Updater: ObservableObject {
         } else {
             answers = [try decoder.decode(Answer.self, from: data)]
         }
-        let newer = answers
-            .filter { $0.draft != true && $0.prerelease != true && isNewer($0.version, than: version) }
+        let on = answers
+            .filter { answer in
+                guard answer.draft != true, isNewer(answer.version, than: version) else { return false }
+                if parse(answer.version).candidate != nil { return betas }
+                return answer.prerelease != true && !answer.version.contains("-")
+            }
             .sorted { isNewer($0.version, than: $1.version) }
-        guard let top = newer.first else { return nil }
+        guard let top = on.first else { return nil }
+        // What a final version says covers its candidates, so they aren't repeated.
+        let newer = parse(top.version).candidate == nil ? on.filter { parse($0.version).candidate == nil } : on
         let tag = top.version
         guard let zip = top.assets.first(where: { $0.name == "MacOS-Toolkit-\(tag).zip" }) ?? top.assets.first(where: { $0.name.hasSuffix(".zip") })
         else { throw UpdateError("Version \(tag) has no app to download yet.") }
@@ -172,14 +191,28 @@ final class Updater: ObservableObject {
         return Release(version: tag, notes: notes, archive: zip.browser_download_url, page: top.html_url, versions: newer.map(\.version))
     }
 
-    /// By number, part by part: 0.10.0 comes after 0.9.1.
+    /// A version's numbers, and which release candidate it is, if one: 0.25.0-rc.2.
+    private static func parse(_ version: String) -> (numbers: [Int], candidate: Int?) {
+        let parts = version.components(separatedBy: "-rc.")
+        // Without whatever else follows, so another prerelease compares by its version.
+        let core = parts[0].split(separator: "-").first ?? ""
+        return (core.split(separator: ".").map { Int($0) ?? 0 }, parts.count == 2 ? Int(parts[1]) : nil)
+    }
+
+    /// By number, part by part: 0.10.0 comes after 0.9.1. A release candidate
+    /// comes before its version, and after the one before it: 0.25.0-rc.1, then
+    /// 0.25.0-rc.2, then 0.25.0.
     static func isNewer(_ version: String, than current: String) -> Bool {
-        let a = version.split(separator: ".").map { Int($0) ?? 0 }, b = current.split(separator: ".").map { Int($0) ?? 0 }
+        let (a, ac) = parse(version), (b, bc) = parse(current)
         for i in 0..<max(a.count, b.count) {
             let (x, y) = (i < a.count ? a[i] : 0, i < b.count ? b[i] : 0)
             if x != y { return x > y }
         }
-        return false
+        switch (ac, bc) {
+        case let (x?, y?): return x > y
+        case (nil, _?): return true
+        default: return false
+        }
     }
 
     // MARK: - Installing
@@ -341,11 +374,35 @@ extension Updater {
         let before = version(of: copy)
         lines.append("     this app \(currentVersion), the copy \(before ?? "missing")")
         check("isNewer: 0.10.0 after 0.9.1, not 0.9.1 after 0.10.0, not the same", isNewer("0.10.0", than: "0.9.1") && !isNewer("0.9.1", than: "0.10.0") && !isNewer("0.18.0", than: "0.18.0"))
+        check("isNewer: rc.2 after rc.1, rc.10 after rc.9, the same rc isn't", isNewer("0.25.0-rc.2", than: "0.25.0-rc.1") && isNewer("0.25.0-rc.10", than: "0.25.0-rc.9") && !isNewer("0.25.0-rc.1", than: "0.25.0-rc.1"))
+        check("isNewer: a version after its rc, its rc not after it", isNewer("0.25.0", than: "0.25.0-rc.9") && !isNewer("0.25.0-rc.9", than: "0.25.0"))
+        check("isNewer: an rc after the version before it, and before the next", isNewer("0.25.0-rc.1", than: "0.24.5") && isNewer("0.25.1", than: "0.25.0-rc.3"))
 
-        for (name, wants) in [("tampered.json", "refused"), ("adhoc.json", "refused"), ("old.json", "nothing"), ("good.json", "installed")] {
+        // Which is offered, from made-up lists: nothing downloaded.
+        func answer(_ tag: String, prerelease: Bool = false) -> String {
+            #"{"tag_name": "v\#(tag)", "html_url": "https://example.invalid", "body": "\#(tag) notes", "prerelease": \#(prerelease), "assets": [{"name": "MacOS-Toolkit-\#(tag).zip", "browser_download_url": "https://example.invalid/\#(tag).zip"}]}"#
+        }
+        func offered(_ tags: [String], over version: String, betas: Bool) -> String {
+            (try? newer(in: Data("[\(tags.joined(separator: ","))]".utf8), than: version, betas: betas))?.version ?? "nothing"
+        }
+        let list = [answer("0.25.0-rc.1", prerelease: true), answer("0.25.0-rc.2", prerelease: true), answer("0.24.5")]
+        check("off: a candidate isn't offered, even if it's newer", offered(list, over: "0.24.5", betas: false) == "nothing")
+        check("off: nor one by mistake not marked as a prerelease", offered([answer("0.25.0-rc.1")], over: "0.24.5", betas: false) == "nothing")
+        check("on: the newest candidate is", offered(list, over: "0.24.5", betas: true) == "0.25.0-rc.2")
+        check("on, at the newest candidate: nothing", offered(list, over: "0.25.0-rc.2", betas: true) == "nothing")
+        let final = list + [answer("0.25.0")]
+        check("on: the final version over its candidates", offered(final, over: "0.25.0-rc.2", betas: true) == "0.25.0")
+        check("off, on a candidate: the final version still is", offered(final, over: "0.25.0-rc.2", betas: false) == "0.25.0")
+        check("off, on a candidate: no newer candidate", offered(list, over: "0.25.0-rc.1", betas: false) == "nothing")
+        check("on: only rc counts, not another prerelease", offered([answer("0.26.0-beta.1", prerelease: true), answer("0.26.0-rc", prerelease: true), answer("0.26.0", prerelease: true)], over: "0.25.0", betas: true) == "nothing")
+        let notes = (try? newer(in: Data("[\(final.joined(separator: ","))]".utf8), than: "0.24.5", betas: true))?.notes ?? ""
+        check("a final version's notes don't repeat its candidates", notes == "0.25.0 notes", notes)
+
+        for (name, wants, betas) in [("tampered.json", "refused", false), ("adhoc.json", "refused", false), ("old.json", "nothing", false),
+                                     ("rc.json", "nothing", false), ("rc.json", "installed", true), ("good.json", "installed", false)] {
             guard let data = feed(name) else { check("\(name): served", false); continue }
             do {
-                guard let release = try newer(in: data, than: currentVersion) else {
+                guard let release = try newer(in: data, than: currentVersion, betas: betas) else {
                     check("\(name): no update offered", wants == "nothing")
                     continue
                 }
