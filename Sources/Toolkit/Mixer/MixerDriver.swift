@@ -81,8 +81,14 @@ struct DriverRoutes {
     /// What was there last time, by UID. Nil until the first look, when what's
     /// there is simply what's there.
     private var known: Set<String>?
-    /// The outputs used, oldest first.
-    private(set) var used: [String] = []
+    /// The outputs chosen, oldest first: by a person, or headphones taking over.
+    /// Not one the sound only fell back to when a chosen one went, so that one
+    /// is still the latest, and gets the sound back when it returns.
+    private(set) var used: [String]
+
+    init(used: [String] = []) {
+        self.used = used
+    }
 
     mutating func use(_ uid: String) {
         used.removeAll { $0 == uid }
@@ -90,10 +96,21 @@ struct DriverRoutes {
         if used.count > 8 { used.removeFirst() }
     }
 
+    /// The first look, with `current` what macOS has as its default. That's a
+    /// choice made while the toolkit was away, unless the latest choice just
+    /// isn't here: then it's what macOS fell back to, and the choice stands.
+    mutating func begin(among outputs: [OutputDevice], current: String?) {
+        known = Set(outputs.map(\.uid))
+        guard let current else { return }
+        if let latest = used.last, !outputs.contains(where: { $0.uid == latest }) { return }
+        use(current)
+    }
+
     /// Headphones take over as they appear, as they do on a Mac whose default is
     /// a real output: Bluetooth, and the jack, which is an output of its own on
     /// Apple silicon. Not a display or a dock, which appear with no one asking
-    /// for their sound; macOS making one the default is still followed.
+    /// for their sound, unless they're the output chosen and only went away;
+    /// macOS making one the default is still followed.
     static func takesOver(_ device: OutputDevice) -> Bool {
         switch device.transport {
         case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: return true
@@ -103,19 +120,23 @@ struct DriverRoutes {
     }
 
     /// The output to move to, if any, given what's there now and what's playing.
-    /// A new pair of headphones first; if the current output has gone, the last
-    /// one used that's still there, else the built-in one, else any.
+    /// A new pair of headphones first, then the latest choice if it has just
+    /// returned; if the current output has gone, the latest choice still there,
+    /// else the built-in one, else any.
     mutating func next(among outputs: [OutputDevice], current: String?) -> OutputDevice? {
         let previous = known
         known = Set(outputs.map(\.uid))
-        if let previous, let arrived = outputs.first(where: { !previous.contains($0.uid) && Self.takesOver($0) }), arrived.uid != current {
-            return arrived
+        let arrived = previous.map { previous in outputs.filter { !previous.contains($0.uid) } } ?? []
+        if let headphones = arrived.first(where: Self.takesOver), headphones.uid != current {
+            use(headphones.uid)
+            return headphones
         }
-        if let current, outputs.contains(where: { $0.uid == current }) { return nil }
-        for uid in used.reversed() where uid != current {
-            if let output = outputs.first(where: { $0.uid == uid }) { return output }
+        let latest = used.reversed().lazy.compactMap { uid in outputs.first { $0.uid == uid } }.first
+        if let current, outputs.contains(where: { $0.uid == current }) {
+            guard let latest, latest.uid != current, arrived.contains(where: { $0.uid == latest.uid }) else { return nil }
+            return latest
         }
-        return outputs.first { $0.transport == kAudioDeviceTransportTypeBuiltIn && !Self.takesOver($0) } ?? outputs.first
+        return latest ?? outputs.first { $0.transport == kAudioDeviceTransportTypeBuiltIn && !Self.takesOver($0) } ?? outputs.first
     }
 
     /// `--test-driver-outputs`: every case, with made-up outputs.
@@ -142,23 +163,45 @@ struct DriverRoutes {
         check("a display appears: stays", routes.next(among: [speakers, display], current: speakers.uid), nil)
         check("a USB device appears: stays", routes.next(among: [speakers, display, usb], current: speakers.uid), nil)
         check("Bluetooth headphones appear: move", routes.next(among: [speakers, display, usb, airPods], current: speakers.uid), airPods)
-        routes.use(airPods.uid)
         check("still there: stays", routes.next(among: [speakers, display, usb, airPods], current: airPods.uid), nil)
         check("they go: back to the last one used", routes.next(among: [speakers, display, usb], current: airPods.uid), speakers)
-        routes.use(speakers.uid)
         check("they come back: move again", routes.next(among: [speakers, display, usb, airPods], current: speakers.uid), airPods)
-        routes.use(airPods.uid)
         check("Bluetooth LE appears too: the newest", routes.next(among: [speakers, airPods, beats], current: airPods.uid), beats)
-        routes.use(beats.uid)
         check("those go: back to the first pair", routes.next(among: [speakers, airPods], current: beats.uid), airPods)
-        routes.use(airPods.uid)
         check("the jack: takes over", routes.next(among: [speakers, airPods, jack], current: airPods.uid), jack)
-        routes.use(jack.uid)
         check("the jack and the pair both go: speakers", routes.next(among: [speakers], current: jack.uid), speakers)
         routes = DriverRoutes()
         routes.use(display.uid)
         _ = routes.next(among: [speakers, display], current: display.uid)
         check("a chosen display goes, nothing else used: built-in", routes.next(among: [speakers], current: display.uid), speakers)
+        check("nothing changed on the fallback: stays", routes.next(among: [speakers], current: speakers.uid), nil)
+        check("the chosen display returns: back to it", routes.next(among: [speakers, display], current: speakers.uid), display)
+        check("and stays there", routes.next(among: [speakers, display], current: display.uid), nil)
+        _ = routes.next(among: [speakers], current: display.uid)
+        routes.use(speakers.uid)
+        check("speakers chosen while it was away: it returns, sound stays", routes.next(among: [speakers, display], current: speakers.uid), nil)
+        routes = DriverRoutes()
+        routes.use(speakers.uid)
+        routes.use(display.uid)
+        _ = routes.next(among: [speakers, display, usb], current: display.uid)
+        check("the display goes: back to the speakers", routes.next(among: [speakers, usb], current: display.uid), speakers)
+        routes.use(usb.uid)
+        check("USB chosen meanwhile: the display returns, sound stays", routes.next(among: [speakers, usb, display], current: usb.uid), nil)
+        routes = DriverRoutes()
+        routes.use(display.uid)
+        _ = routes.next(among: [speakers, display], current: display.uid)
+        _ = routes.next(among: [speakers], current: display.uid)
+        check("headphones while the display is away: move", routes.next(among: [speakers, airPods], current: speakers.uid), airPods)
+        check("the display returns under the headphones: stays", routes.next(among: [speakers, airPods, display], current: airPods.uid), nil)
+        check("the headphones go: the display, not the speakers", routes.next(among: [speakers, display], current: airPods.uid), display)
+        routes = DriverRoutes(used: [speakers.uid, display.uid])
+        routes.begin(among: [speakers], current: speakers.uid)
+        check("saved, restarted with the display away: stays", routes.next(among: [speakers], current: speakers.uid), nil)
+        check("saved, the display returns: back to it", routes.next(among: [speakers, display], current: speakers.uid), display)
+        routes = DriverRoutes(used: [speakers.uid, display.uid])
+        routes.begin(among: [speakers, display], current: speakers.uid)
+        check("saved, speakers made the default with both here: that's the choice", routes.next(among: [speakers], current: speakers.uid), nil)
+        check("and the display returning doesn't take it", routes.next(among: [speakers, display], current: speakers.uid), nil)
         routes = DriverRoutes()
         _ = routes.next(among: [usb, display], current: usb.uid)
         check("nothing used or built in: any", routes.next(among: [display], current: usb.uid), display)
@@ -181,7 +224,14 @@ final class MixerDriver {
     /// Where the sound goes on to.
     private(set) var output: AudioObjectID = .unknown
     private var systemOutput: AudioObjectID = .unknown
-    var routes = DriverRoutes()
+    /// Saved so a choice outlives a restart with its output away: an update, or
+    /// a display that's off.
+    var routes = DriverRoutes(used: UserDefaults.standard.stringArray(forKey: MixerDriver.outputsChosenKey) ?? []) {
+        didSet {
+            if routes.used != oldValue.used { UserDefaults.standard.set(routes.used, forKey: Self.outputsChosenKey) }
+        }
+    }
+    private static let outputsChosenKey = "driverOutputsChosen"
     private var outputListeners: [AudioListener] = []
     /// The output's shape when it last started, so the same news twice doesn't
     /// restart it, which on Bluetooth is a second without sound.
@@ -218,7 +268,6 @@ final class MixerDriver {
         guard let found = DriverLink.device else { return false }
         device = found
         output = real == found ? fallback ?? .unknown : real
-        output.readString(kAudioDevicePropertyDeviceUID).map { routes.use($0) }
         systemOutput = AudioObjectID.system.read(kAudioHardwarePropertyDefaultSystemOutputDevice, as: AudioObjectID.self) ?? real
         watchOutput()
         shape = currentShape
@@ -239,12 +288,18 @@ final class MixerDriver {
         return true
     }
 
+    /// `real` was chosen, even if it's what's playing already: the sound having
+    /// fallen back to it doesn't make it the choice, picking it does.
+    func setOutput(_ real: AudioObjectID) {
+        real.readString(kAudioDevicePropertyDeviceUID).map { routes.use($0) }
+        move(to: real)
+    }
+
     /// Plays on `real` from now on. The device's rate follows it, which a
     /// playing app has no way to hear but as a moment's stop.
-    func setOutput(_ real: AudioObjectID) {
+    func move(to real: AudioObjectID) {
         guard real != output else { return }
         output = real
-        real.readString(kAudioDevicePropertyDeviceUID).map { routes.use($0) }
         watchOutput()
         restart()
     }

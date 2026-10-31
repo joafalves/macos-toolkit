@@ -308,8 +308,10 @@ tool; keep it in step with the code.
   - While it's on, its device is macOS's default output and `output` is the real one behind it, chosen in
     the mixer's list. macOS's own picker works too: another output made the default is followed, and the
     device goes back in front (`MixerDriver.follow`). macOS has nothing to move while the default stays, so
-    `DriverRoutes` does what it would: headphones take over as they appear, and when an output goes, the last
-    one used comes back. The real output starts and stops off the main thread, since Bluetooth can take a second.
+    `DriverRoutes` does what it would: headphones take over as they appear, when an output goes the latest
+    choice still there comes back, and the chosen output gets the sound back when it returns (a monitor
+    unplugged or asleep). Only a choice counts, not an output the sound fell back to; the list is saved
+    (`driverOutputsChosen`, in the defaults, so not in an export). The real output starts and stops off the main thread, since Bluetooth can take a second.
   - The real output comes up after a sound has started, so what's come since it last read is played rather
     than dropped, up to 0.3 s and with no leading silence, and the clock (or a moment of silence) takes the
     extra away. It stays up 3 s after the sound stops. After a gap in what's playing, the backlog is dropped.

@@ -669,7 +669,7 @@ final class MixerController: ObservableObject {
             // On the way up: sound still plays on the output it's on.
             let fallback = outputs.first { $0.transport == kAudioDeviceTransportTypeBuiltIn && !DriverRoutes.takesOver($0) } ?? outputs.first
             guard driver.adopt(real: current, fallback: fallback?.id) else { return current }
-            _ = driver.routes.next(among: outputs, current: outputs.first { $0.id == driver.output }?.uid)
+            driver.routes.begin(among: outputs, current: outputs.first { $0.id == driver.output }?.uid)
             driverRetries = 0
             driverDeadline?.cancel()
             driverDeadline = nil
@@ -692,7 +692,7 @@ final class MixerController: ObservableObject {
         let playing = outputs.first { $0.id == driver.output }?.uid
         if let next = driver.routes.next(among: outputs, current: playing) {
             Log.mixer.notice("driver: \(playing.map { "\($0) gives way to" } ?? "the output is gone, so sound goes on to", privacy: .public) \(next.uid, privacy: .public)")
-            driver.setOutput(next.id)
+            driver.move(to: next.id)
         }
         return driver.output
     }
