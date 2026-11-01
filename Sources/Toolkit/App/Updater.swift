@@ -62,7 +62,14 @@ final class Updater: ObservableObject {
     /// The recent releases, not only the latest: the notes of every version
     /// skipped are shown too.
     private static let releases = URL(string: "https://api.github.com/repos/joafalves/macos-toolkit/releases?per_page=30")!
-    private var feed: URL { UserDefaults.standard.string(forKey: Keys.feed).flatMap(URL.init(string:)) ?? Self.releases }
+    /// Only a dev build listens to the setting: any process can write it, and
+    /// with it hide updates from a released copy or offer a made-up one.
+    private var feed: URL {
+        #if TOOLKIT_DEV
+        if let url = UserDefaults.standard.string(forKey: Keys.feed).flatMap(URL.init(string:)) { return url }
+        #endif
+        return Self.releases
+    }
     private var timer: Timer?
     private var launchCheck: DispatchWorkItem?
 

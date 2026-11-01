@@ -176,7 +176,7 @@ final class WindowTabs {
         let grow = {
             for member in members { LayoutWindow.find(id: member.id, pid: member.pid)?.setFrame(frame, within: area) }
         }
-        if waiting { work.sync(execute: grow) } else { work.async(execute: grow) }
+        if waiting { work.runWaiting(limit: 3, grow) } else { work.async(execute: grow) }
     }
 
     func dissolveAll(restore: Bool, waiting: Bool = false) {

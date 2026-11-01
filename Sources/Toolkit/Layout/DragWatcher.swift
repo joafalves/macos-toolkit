@@ -60,7 +60,7 @@ final class DragWatcher {
 
     func start(active: Bool) -> Bool {
         if tap != nil, active == self.active { return true }
-        stop()
+        stop(waiting: true)
         self.active = active
         tap = EventTap(name: "drags", events: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .flagsChanged],
                        place: .tailAppendEventTap, listenOnly: !active) { [weak self] type, event in
@@ -70,18 +70,23 @@ final class DragWatcher {
         return tap != nil
     }
 
-    func stop() {
+    /// `waiting`: until the old tap's thread has let go of the state, for a new
+    /// tap about to take it over. A moment at most: it may be gone already.
+    func stop(waiting: Bool = false) {
         guard let tap else { return }
         self.tap = nil
+        let done = DispatchSemaphore(value: 0)
         // Finished on the tap's own thread, in order with its events.
         tap.perform { [self] in
             releaseCursor()
             if case .moving = state { main { $0.onCancel?() } }
             state = .idle
             tap.stop()
+            done.signal()
         }
         // In case the thread is gone before it gets there.
         CGAssociateMouseAndMouseCursorPosition(1)
+        if waiting { _ = done.wait(timeout: .now() + 0.2) }
     }
 
     /// Lets the cursor move again, if it was stopped. For Esc.

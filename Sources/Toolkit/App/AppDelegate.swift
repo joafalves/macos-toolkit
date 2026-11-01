@@ -179,6 +179,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Window Layout lets the main queue run while it finishes: a `kill` now
+        // mustn't quit a second time from inside this one.
+        termSource?.cancel()
         if mouse.config.restoreOnQuit { mouse.restoreAll() }
         switcher.stop()
         layout.stop()

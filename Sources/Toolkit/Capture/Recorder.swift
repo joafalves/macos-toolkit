@@ -141,18 +141,30 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         self.writer = writer
 
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
-        try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
-        if options.systemAudio { try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue) }
-        if options.microphone { try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue) }
-        try await stream.startCapture()
+        do {
+            try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
+            if options.systemAudio { try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue) }
+            if options.microphone { try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue) }
+            try await stream.startCapture()
+        } catch {
+            // The writer has made the file by now.
+            discard(writer)
+            throw error
+        }
         self.stream = stream
         if stopRequested.value {
             try? await stream.stopCapture()
             self.stream = nil
-            // Nothing was kept: the file `stop` may have missed goes too.
-            writer.cancelWriting()
-            try? FileManager.default.removeItem(at: url)
+            // A frame had come in time for `stop`, which kept the file and said
+            // so. Otherwise nothing was kept: the file it may have missed goes too.
+            if !queue.sync(execute: { started }) { discard(writer) }
         }
+    }
+
+    /// Throws the file away. The writer can only be cancelled while it's writing.
+    private func discard(_ writer: AVAssetWriter?) {
+        if writer?.status == .writing { writer?.cancelWriting() }
+        try? FileManager.default.removeItem(at: url)
     }
 
     /// Sized for screen content, which is mostly flat and sharp: enough that
@@ -188,30 +200,39 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         }
     }
 
-    /// Ends the file. Returns false when nothing was recorded, and the file is
-    /// removed then.
-    func stop() async -> Bool {
+    /// Ends the file. Returns false when nothing was recorded, and throws when
+    /// it couldn't be written (a full disk); the file is removed in both cases.
+    func stop() async throws -> Bool {
         stopRequested.value = true
         try? await stream?.stopCapture()
         stream = nil
-        let writer: AVAssetWriter? = await withCheckedContinuation { continuation in
+        let (writer, end): (AVAssetWriter?, CMTime) = await withCheckedContinuation { continuation in
             queue.async { [self] in
                 finished = true
-                continuation.resume(returning: started ? self.writer : nil)
+                // Now, or when a pause still going began, less the pauses. Frames
+                // only come when something changes, and without this the file
+                // would end at the last one, however long the screen then stayed still.
+                let now = CMTimeSubtract(pausedAt ?? CMClockGetTime(CMClockGetHostTimeClock()), offset)
+                let end = last.values.reduce(now) { CMTimeMaximum($0, $1) }
+                continuation.resume(returning: (started ? self.writer : nil, end))
             }
         }
         guard let writer else {
-            self.writer?.cancelWriting()
-            try? FileManager.default.removeItem(at: url)
+            discard(self.writer)
             return false
         }
-        video?.markAsFinished()
-        audio?.markAsFinished()
-        mic?.markAsFinished()
-        await writer.finishWriting()
+        if writer.status == .writing {
+            video?.markAsFinished()
+            audio?.markAsFinished()
+            mic?.markAsFinished()
+            writer.endSession(atSourceTime: end)
+            await writer.finishWriting()
+        }
         guard writer.status == .completed else {
             Log.capture.error("recording failed: \(writer.error?.localizedDescription ?? "unknown", privacy: .public)")
-            return false
+            // An MP4 that wasn't ended doesn't play, so there's nothing to keep.
+            try? FileManager.default.removeItem(at: url)
+            throw writer.error ?? CaptureError.failed
         }
         if audio != nil, mic != nil { await Self.mixDown(url) }
         return true
@@ -333,7 +354,19 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
                     }
                 }
             }
-            await withCheckedContinuation { continuation in group.notify(queue: .global()) { continuation.resume() } }
+            // A writer that fails (a full disk) stops asking for samples, so the
+            // pumps may never finish.
+            let pumped = Locked(false)
+            group.notify(queue: .global()) { pumped.value = true }
+            while !pumped.value {
+                if writer.status == .failed {
+                    reader.cancelReading()
+                    throw writer.error ?? CaptureError.failed
+                }
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+            guard writer.status == .writing else { throw writer.error ?? CaptureError.failed }
+            writer.endSession(atSourceTime: try await asset.load(.duration))
             await writer.finishWriting()
             guard reader.status == .completed, writer.status == .completed else { throw writer.error ?? CaptureError.failed }
             _ = try FileManager.default.replaceItemAt(url, withItemAt: temp)

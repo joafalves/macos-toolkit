@@ -486,6 +486,10 @@ final class EqualizerFilters {
     /// the equalized one, or a fade between them, 1.5 ms later.
     @inline(__always)
     func process(_ left: inout Float, _ right: inout Float) {
+        // One such sample from an app would stay in the filters' memory, and
+        // nothing but NaN would come out from then on.
+        if !left.isFinite { left = 0 }
+        if !right.isFinite { right = 0 }
         var (plainLeft, plainRight) = (left, right)
         dry.pass(&plainLeft, &plainRight)
         guard isOn || mix > 0 else {

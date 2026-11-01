@@ -62,8 +62,9 @@ final class WheelEngine {
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            // The wheel button's release may have gone by unseen.
+            // The wheel button's release may have gone by unseen, and a side button's.
             autoscroller.cancel()
+            swallowedButtons.removeAll()
             return pass
         }
         if type == .otherMouseDown || type == .otherMouseUp || type == .otherMouseDragged {
@@ -196,6 +197,8 @@ final class WheelEngine {
         if type == .otherMouseUp {
             return swallowedButtons.remove(button) != nil
         }
+        // A new press: a release still waited for from an earlier one went by unseen.
+        swallowedButtons.remove(button)
         guard let profile = profileProvider(), profile.navigationButtons,
               let decision = Self.navigation(button: button, profile: profile, frontApp: FrontApp.bundleID),
               let pid = FrontApp.pid

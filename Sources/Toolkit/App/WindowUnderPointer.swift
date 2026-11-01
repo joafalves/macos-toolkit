@@ -4,13 +4,15 @@ extension NSRunningApplication {
     /// The app that owns the topmost window at `point`, in global coordinates
     /// from the top of the main display. Only normal windows (layer 0) count:
     /// the Dock keeps an invisible window over the whole screen on a higher
-    /// layer, and menus and panels belong to whatever is under them.
+    /// layer, and menus and panels belong to whatever is under them. Nor do
+    /// windows nobody can see, which some apps keep over others.
     static func owningWindow(at point: CGPoint) -> NSRunningApplication? {
         guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
         else { return nil }
         for window in windows where window[kCGWindowLayer as String] as? Int == 0 {
             guard let bounds = window[kCGWindowBounds as String] as? NSDictionary,
-                  let rect = CGRect(dictionaryRepresentation: bounds), rect.contains(point)
+                  let rect = CGRect(dictionaryRepresentation: bounds), rect.contains(point),
+                  (window[kCGWindowAlpha as String] as? Double ?? 1) > 0
             else { continue }
             return (window[kCGWindowOwnerPID as String] as? pid_t).flatMap { NSRunningApplication(processIdentifier: $0) }
         }

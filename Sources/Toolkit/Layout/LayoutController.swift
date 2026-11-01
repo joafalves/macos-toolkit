@@ -385,7 +385,7 @@ final class LayoutController: ObservableObject {
     /// Hands everything back to macOS.
     func stop() {
         // What's waiting to be saved, now: this may be a quit.
-        work.sync { placementsSave?.perform() }
+        work.runWaiting(limit: 3) { self.placementsSave?.perform() }
         accessTimer?.invalidate()
         accessTimer = nil
         keys.stop()

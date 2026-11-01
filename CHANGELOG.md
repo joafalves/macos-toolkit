@@ -3,6 +3,26 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.25.2 (unreleased)
+
+### Fixed
+
+- **Updates:** a released copy only asks GitHub for new versions. A setting left in for testing let any
+  program on the Mac point it elsewhere, to hide updates or show made-up ones; a download still had to be
+  signed like the app, so it couldn't install anything.
+- **Screen Capture:** a recording lasts as long as you recorded. With no sound, it ended at the last change
+  on screen, however long the screen stayed still after that.
+- **Screen Capture:** a recording that can't be written, on a full disk say, now says so when it stops,
+  rather than leaving a file that doesn't play. One that can't start leaves no empty file behind.
+- **Screen Capture:** stopping a recording the moment it starts no longer deletes a file already reported as saved.
+- **Audio Mixer:** a bad sample from an app, one that isn't a number, no longer silences the equalized sound
+  until the equalizer is turned off.
+- **Window Layout:** quitting no longer hangs if one of the toolkit's own windows was being moved.
+- **Window Layout:** turning Hold at edges on or off no longer risks missing a snap right at that moment.
+- **Mouse:** a side button's release is no longer lost after macOS pauses the toolkit's event tap.
+- **Mouse, Finder:** autoscroll's excluded apps and Finder's swipes go by the window you can see under the
+  pointer, not an invisible one over it.
+
 ## 0.25.1 (2026-10-31)
 
 ### Fixed

@@ -159,7 +159,7 @@ extension MixerController {
                 let recorder = Recorder(url: url)
                 try await recorder.start(.area(CGRect(x: 0, y: 0, width: 64, height: 64)), options: .init(frameRate: 15, microphone: true), excluding: [])
                 try await Task.sleep(nanoseconds: 2_000_000_000)
-                let saved = await recorder.stop()
+                let saved = try await recorder.stop()
                 let asset = AVURLAsset(url: url)
                 let tracks = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
                 let peak = tracks.first.flatMap { loudest(in: asset, track: $0) }
@@ -295,6 +295,11 @@ extension MixerController {
         // Down 18 dB on one sample, as a clipper or the limiter before did, is a click; ramped over
         // the 1.5 ms look-ahead it's well under a dB a sample.
         print("\(chordGain.1 < 1 ? "ok  " : "DIFF") the limiter on that chord: turns down \(String(format: "%.1f", -20 * log10(chordGain.0))) dB, never more than \(String(format: "%.2f", chordGain.1)) dB from one sample to the next")
+        // A sample that's no number, from an app: gone, and the sound goes on.
+        let tone = sine(1000, 0.2)
+        let poisoned = run(EqualizerPreset.all[1].gains, { i in i == 24_000 ? (.nan, .infinity) : tone(i) }, frames: 48_000)
+        let survived = poisoned.allSatisfy(\.isFinite) && rms(poisoned[36_000...]) > 0.1
+        print("\(survived ? "ok  " : "DIFF") NaN and Inf in the middle of a tone: every sample after is a number, and the tone is still there at \(String(format: "%.3f", rms(poisoned[36_000...])))")
         // A preset picked while a 64 Hz tone plays: the change glides, so the
         // wave never jumps much more than a clean one does.
         let out = run(EqualizerPreset.all[0].gains, sine(62.5, 0.2), frames: 48_000, change: (24_000, EqualizerPreset.all[1].gains))

@@ -54,7 +54,7 @@ extension CaptureController {
                 try await Task.sleep(nanoseconds: 1_000_000_000)
                 recorder.setPaused(false)
                 try await Task.sleep(nanoseconds: 1_000_000_000)
-                let ok = await recorder.stop()
+                let ok = try await recorder.stop()
                 let asset = AVURLAsset(url: url)
                 let duration = (try? await asset.load(.duration).seconds) ?? 0
                 let audio = (try? await asset.loadTracks(withMediaType: .audio).count) ?? 0
@@ -69,7 +69,7 @@ extension CaptureController {
                 do {
                     try await recorder.start(.display(main), options: .init(quality: quality, frameRate: 30), excluding: [])
                     try await Task.sleep(nanoseconds: 3_000_000_000)
-                    let ok = await recorder.stop()
+                    let ok = try await recorder.stop()
                     let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
                     let asset = AVURLAsset(url: url)
                     let duration = (try? await asset.load(.duration).seconds) ?? 0

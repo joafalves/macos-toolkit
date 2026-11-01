@@ -491,14 +491,20 @@ final class CaptureController: ObservableObject {
         recording = nil
         let screen = recordingScreen
         Task { @MainActor in
-            let saved = await recorder.stop()
-            if saved, !keep {
-                try? FileManager.default.removeItem(at: recorder.url)
-            } else if saved {
-                let board = NSPasteboard.general
-                board.clearContents()
-                board.writeObjects([recorder.url as NSURL])
-                ThumbnailStack.show(video: recorder.url, in: self.thumbnails, on: screen)
+            do {
+                let saved = try await recorder.stop()
+                if saved, !keep {
+                    try? FileManager.default.removeItem(at: recorder.url)
+                } else if saved {
+                    let board = NSPasteboard.general
+                    board.clearContents()
+                    board.writeObjects([recorder.url as NSURL])
+                    ThumbnailStack.show(video: recorder.url, in: self.thumbnails, on: screen)
+                }
+            } catch {
+                // Not while quitting, which an alert would hold up, nor for a
+                // recording being thrown away anyway.
+                if keep, done == nil { self.report(error) }
             }
             done?()
         }

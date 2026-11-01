@@ -1,6 +1,24 @@
 import AppKit
 import ApplicationServices
 
+extension DispatchQueue {
+    /// Runs `body` on this queue while the main thread waits, `limit` seconds at
+    /// most, for a quit. Not `sync`: what's on the queue may itself be waiting
+    /// for the main thread (`LayoutWindow.onMain`), and neither would ever go on,
+    /// so the main queue keeps running meanwhile.
+    func runWaiting(limit: TimeInterval, _ body: @escaping () -> Void) {
+        let done = DispatchSemaphore(value: 0)
+        async {
+            body()
+            done.signal()
+        }
+        let deadline = Date().addingTimeInterval(limit)
+        while done.wait(timeout: .now()) == .timedOut, Date() < deadline {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
+    }
+}
+
 /// A window to move: another app's, through Accessibility, or one of the
 /// toolkit's own. Accessibility calls to our own process run on the calling
 /// thread, where AppKit refuses them, so ours go through AppKit instead.
@@ -25,9 +43,7 @@ enum LayoutWindow {
     }
 
     /// Our own windows are AppKit's, so on the main thread. Run in place when
-    /// already there: a `sync` to the work queue from the main thread (tabs
-    /// put back on quit) runs its block on the main thread, and `main.sync`
-    /// from there crashes.
+    /// already there: `main.sync` from there crashes.
     private static func onMain<T>(_ body: () -> T) -> T {
         Thread.isMainThread ? body() : DispatchQueue.main.sync(execute: body)
     }
