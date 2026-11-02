@@ -3,6 +3,22 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.25.3 (unreleased)
+
+### Added
+
+- **Mouse:** Copy to Another Mouse… on a mouse's page gives the mice you pick its cursor, wheel and button
+  settings. Their names stay.
+
+### Fixed
+
+- **Screen Capture:** a click on the area kept on screen no longer makes it bigger. Moving it keeps its size.
+- **System Stats:** the CPU and memory panels no longer stay at "Measuring…" when their part is clicked
+  several times quickly.
+- **Menu bar:** the toolkit's item lines up with the other icons on every display at once, when they're
+  of different kinds (a MacBook's and a monitor): it was a point low beside the notch, or a point off on
+  whichever display wasn't the main one.
+
 ## 0.25.2 (2026-11-01)
 
 ### Fixed

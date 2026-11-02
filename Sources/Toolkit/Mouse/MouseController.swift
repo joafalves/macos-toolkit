@@ -213,6 +213,18 @@ final class MouseController: ObservableObject {
         config.profiles[device.id]?.resetToMacOS()
     }
 
+    /// The mouse's settings onto each of `targets`, in one change of the config.
+    func copySettings(of device: MouseDevice, to targets: [MouseDevice]) {
+        let source = profile(for: device)
+        var config = config
+        for target in targets where target.id != device.id {
+            var profile = config.profiles[target.id] ?? newProfile(for: target)
+            profile.takeSettings(of: source)
+            config.profiles[target.id] = profile
+        }
+        self.config = config
+    }
+
     /// Puts the mouse back to macOS and drops what's saved for it. A connected
     /// one stays in the list, with nothing changed.
     func forget(_ device: MouseDevice) {

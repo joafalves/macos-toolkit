@@ -98,8 +98,10 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
     var isShown: Bool { popover != nil && shownFor != nil }
     var kind: MenuBarSegment.Kind? { isShown ? shownFor : nil }
 
-    /// On the next pass of the run loop, once any menu has closed.
-    func show<Content: View>(from kind: MenuBarSegment.Kind, @ViewBuilder content: () -> Content) {
+    /// On the next pass of the run loop, once any menu has closed. `opened`
+    /// runs then, once the last panel is let go of: until that pass, it may
+    /// still finish closing and call `onClose`, which would undo it.
+    func show<Content: View>(from kind: MenuBarSegment.Kind, opened: @escaping () -> Void = {}, @ViewBuilder content: () -> Content) {
         let host = NSHostingController(rootView: AnyView(content()))
         DispatchQueue.main.async { [self] in
             // The part may be gone by now; whoever opened it is told it's closed.
@@ -110,6 +112,7 @@ final class MenuBarPopover: NSObject, NSPopoverDelegate {
             // The last one closes on its own; it's no longer the one shown.
             popover?.performClose(nil)
             forget()
+            opened()
             menuBar.setPressed(kind)
             let popover = NSPopover()
             // Closed by us, not by AppKit, whose transient closing also took

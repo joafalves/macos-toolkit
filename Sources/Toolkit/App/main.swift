@@ -80,6 +80,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writePermissionsSheet(to: rest[0], light: rest.contains("light"), done: rest.contains("done"), restart: rest.contains("restart"))
         exit(0)
     }
+    if rest.contains("mouse-copy") {
+        Snapshot.writeMouseCopy(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
     if rest.contains("toolkit-panel") {
         Snapshot.writeToolkitPanel(to: rest[0], light: rest.contains("light"))
         exit(0)

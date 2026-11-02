@@ -242,6 +242,7 @@ private struct MousePage: View {
     @StateObject private var renaming = ViewState(false)
     @StateObject private var newName = ViewState("")
     @StateObject private var forgetting = ViewState(false)
+    @StateObject private var copying = ViewState(false)
 
     var body: some View {
         // As System Settings heads a device's page: the toolbar has its name,
@@ -275,6 +276,8 @@ private struct MousePage: View {
                 newName.value = device.name
                 renaming.value = true
             }
+            Button("Copy to Another Mouse…") { copying.value = true }
+                .disabled(!mouse.devices.contains { $0.id != device.id })
             Spacer()
             Button("Forget This Mouse…", role: .destructive) { forgetting.value = true }
                 .disabled(mouse.config.profiles[device.id] == nil)
@@ -286,6 +289,9 @@ private struct MousePage: View {
         } message: {
             Text("Leave it empty for the name macOS gives it, \(mouse.systemName(of: device)).")
         }
+        .sheet(isPresented: $copying.value) {
+            CopySettingsSheet(mouse: mouse, device: device) { copying.value = false }
+        }
         .confirmationDialog(Text("Forget \(mouse.label(for: device))?"), isPresented: $forgetting.value) {
             Button("Forget", role: .destructive) {
                 mouse.openID = nil
@@ -295,6 +301,91 @@ private struct MousePage: View {
         } message: {
             Text(device.connected ? "Its settings go back to macOS's." : "Its settings go back to macOS's, and it leaves this list.")
         }
+    }
+}
+
+/// The other mice, to give one or more of them this mouse's settings.
+struct CopySettingsSheet: View {
+    @ObservedObject var mouse: MouseController
+    let device: MouseDevice
+    let close: () -> Void
+    @StateObject private var chosen: ViewState<Set<String>>
+
+    init(mouse: MouseController, device: MouseDevice, chosen: Set<String> = [], close: @escaping () -> Void) {
+        self.mouse = mouse
+        self.device = device
+        self.close = close
+        _chosen = StateObject(wrappedValue: ViewState(chosen))
+    }
+
+    private var others: [MouseDevice] { mouse.devices.filter { $0.id != device.id } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                IconTile(symbol: AppSection.mouse.symbol, color: AppSection.mouse.color, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Copy Settings").font(.title3.weight(.semibold))
+                    Text("Give other mice the cursor, wheel and button settings of \(mouse.label(for: device)).")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(others.enumerated()), id: \.element.id) { index, other in
+                    if index > 0 { Divider() }
+                    row(other)
+                }
+            }
+            .padding(.horizontal, 12)
+            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
+
+            Text("Their own settings are replaced. Their names stay.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Spacer()
+                Button("Cancel", action: close)
+                    .keyboardShortcut(.cancelAction)
+                Button("Copy") {
+                    mouse.copySettings(of: device, to: others.filter { chosen.value.contains($0.id) })
+                    close()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(chosen.value.isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
+    }
+
+    /// The checkbox apart from its label, so it sits in the middle of the
+    /// row's two lines rather than on the first one's baseline; a click
+    /// anywhere on the row ticks it.
+    private func row(_ other: MouseDevice) -> some View {
+        let isOn = Binding(get: { chosen.value.contains(other.id) },
+                           set: { on in if on { chosen.value.insert(other.id) } else { chosen.value.remove(other.id) } })
+        return HStack(spacing: 10) {
+            Toggle(isOn: isOn) { Text(verbatim: mouse.label(for: other)) }
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+            IconTile(symbol: AppSection.mouse.symbol, color: other.connected ? AppSection.mouse.color : .gray, size: 26)
+                .opacity(other.connected ? 1 : 0.6)
+                .padding(.leading, 4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: mouse.label(for: other))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                MouseConnection(device: other)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onTapGesture { isOn.wrappedValue.toggle() }
     }
 }
 

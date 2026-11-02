@@ -315,10 +315,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }
     }
 
-    /// Its panel reads everything it shows while it's open, from now.
+    /// Its panel reads everything it shows while it's open, from when it shows.
+    /// Not before: clicked quickly, the panel before it was seen to finish
+    /// closing in between, and its close stopped the reading for good.
     private func showStats(_ kinds: [StatKind], from kind: MenuBarSegment.Kind) {
-        stats.panel = kinds
-        panel.show(from: kind) {
+        panel.show(from: kind, opened: { [weak self] in self?.stats.panel = kinds }) {
             StatsPanelView(stats: stats, kinds: kinds, maxHeight: panel.room, close: { [weak self] in self?.panel.close() }) { [weak self] in
                 self?.panel.close()
                 self?.show(.stats)

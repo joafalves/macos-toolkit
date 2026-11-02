@@ -284,16 +284,20 @@ final class SelectionOverlay {
         case .create(let anchor, let bounds):
             // One display at a time: that's what a capture can cover.
             let p = NSPoint(x: min(max(point.x, bounds.minX), bounds.maxX), y: min(max(point.y, bounds.minY), bounds.maxY))
-            selection = NSRect(x: min(anchor.x, p.x), y: min(anchor.y, p.y), width: abs(p.x - anchor.x), height: abs(p.y - anchor.y)).integral
+            selection = NSRect(x: min(anchor.x, p.x), y: min(anchor.y, p.y), width: abs(p.x - anchor.x), height: abs(p.y - anchor.y)).rounded
         case .move(let from, let original):
             var moved = original.offsetBy(dx: point.x - from.x, dy: point.y - from.y)
             if let bounds = NSScreen.screens.first(where: { $0.frame.intersects(original) })?.frame {
                 moved.origin.x = min(max(moved.minX, bounds.minX), bounds.maxX - moved.width)
                 moved.origin.y = min(max(moved.minY, bounds.minY), bounds.maxY - moved.height)
             }
-            selection = moved.integral
+            // Moved whole: its size stays as it is. `integral` grows a rect off
+            // whole points by one each way, and the pointer often is, so every
+            // click on the area made it bigger.
+            moved.origin = NSPoint(x: moved.minX.rounded(), y: moved.minY.rounded())
+            selection = moved
         case .resize(let handle, let original):
-            selection = handle.resize(original, to: point).integral
+            selection = handle.resize(original, to: point).rounded
         }
     }
 
@@ -368,6 +372,14 @@ final class WindowHighlight {
         view.layer?.cornerRadius = 10
         panel.contentView = view
         return panel
+    }
+}
+
+private extension NSRect {
+    /// Each edge to the nearest whole point, where `integral` goes outwards.
+    var rounded: NSRect {
+        let x = minX.rounded(), y = minY.rounded()
+        return NSRect(x: x, y: y, width: maxX.rounded() - x, height: maxY.rounded() - y)
     }
 }
 

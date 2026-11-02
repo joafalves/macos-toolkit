@@ -404,6 +404,13 @@ enum Snapshot {
         writePanel(MousePanelView(mouse: .preview()), to: path, light: light)
     }
 
+    /// Copy Settings for the first made-up mouse, with one of the others ticked.
+    static func writeMouseCopy(to path: String, light: Bool) {
+        let mouse = MouseController.preview()
+        guard let device = mouse.devices.first else { return }
+        writePanel(CopySettingsSheet(mouse: mouse, device: device, chosen: [mouse.devices[1].id]) {}, to: path, light: light)
+    }
+
     /// The Window Layout panel, for a window of TextEdit (macOS's own, the
     /// same on any Mac), with two displays so every command shows.
     static func writeLayoutPanel(to path: String, light: Bool) {

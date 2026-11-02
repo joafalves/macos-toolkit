@@ -199,11 +199,12 @@ tool; keep it in step with the code.
   - A template image filled with a colour uses `.sourceIn`, keeping the colour's own opacity as
     macOS does. macOS puts the item's 22 pt place off the middle of some menu bars (a point high
     in a 30 pt one) and in the middle of others (33 pt, beside a notch); `MenuBarItem.lower` works
-    it out from that place's frame (the button's superview, not the button, which is taller), and
+    it out from that place's frame (the button's superview, not the button, which is taller), against the bar's middle (a point less than the visible frame leaves, which stops a point below the bar; the item's window is 33 pt whatever the bar), and
     again when the item moves or changes display. Each display needs its own, for the item and
-    macOS's copy of it alike (measured), and they share the image: with several displays the main
-    one's is kept, measured while the item was on it, so nothing moves as the active display
-    changes, and another display can be a point off.
+    macOS's copy of it alike (measured), and they share the image. macOS draws it again at each
+    display's scale, so displays of different scales each get their own (`MenuBarLower`); two of the
+    same scale share the main one's, and the other can be a point off. Each is remembered by its UUID
+    and bar height (`menuBarLower` in the defaults), so it's right from launch.
   - The row isn't in a window, so nothing lays it out later: a part lays its content out as soon
     as its size or insets change.
   - **No `NSTextField` in it**, not even a hidden one: on macOS 27 a text field inside a status item
@@ -374,6 +375,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png switcher no-access [light]   # any page as without Accessibility: locked settings, sidebar warnings
 .build/debug/Toolkit --snapshot out.png permissions-sheet [light] [done|restart]   # the sheet a tool shows as it's turned on
 .build/debug/Toolkit --snapshot out.png mouse-panel [light]     # the Mouse panel, with the made-up mice
+.build/debug/Toolkit --snapshot out.png mouse-copy [light]      # Copy Settings from the made-up mouse, one of the others ticked
 .build/debug/Toolkit --snapshot out.png layout-panel [light]    # the Window Layout panel, for a TextEdit window
 .build/debug/Toolkit --snapshot out.png awake-panel [light] [off]   # Keep Awake's panel, part way through a session or off
 .build/debug/Toolkit --snapshot out.png menu-bar-strip [light]  # the item in a drawn menu bar, for the top of the README

@@ -216,6 +216,16 @@ struct Profile: Codable, Equatable {
         reset.shortUnit = shortUnit
         self = reset
     }
+
+    /// Every setting from `other`; which mouse this is, and its name, stay.
+    mutating func takeSettings(of other: Profile) {
+        var copy = other
+        copy.name = name
+        copy.label = label
+        copy.transport = transport
+        copy.shortUnit = shortUnit
+        self = copy
+    }
 }
 
 struct MouseConfig: Codable, Equatable {
