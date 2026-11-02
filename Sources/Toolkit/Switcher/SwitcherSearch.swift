@@ -199,6 +199,12 @@ enum SwitcherSearch {
         let narrow = grid(3, .fit, 30, on: laptop), area = SwitcherPanel.gridArea(on: laptop, percent: 30)
         check("a tile is never wider than the grid may be", narrow.size.width <= area.width, "\(Int(narrow.size.width)) of \(Int(area.width)) pt")
         check("few windows aren't spread out", grid(2, .medium, largeWidth, on: large).size.width < 600)
+        // Each turn in the list in the same place, however many windows there are.
+        let places = (9...14).map { grid($0, .medium, 92, on: laptop) }
+        check("the same columns for 9 to 14 windows", Set(places.map(\.columns)) == [5], "\(places.map(\.columns))")
+        check("the sixth window always starts the second row", Set(places.map { $0.frame(of: 5).origin }).count == 1)
+        check("the last row starts at the left", places[0].frame(of: 5).minX == places[0].frame(of: 0).minX)
+        check("a point less of width is one column less, not two", grid(9, .medium, 91, on: laptop).columns == 4)
         func display(_ uuid: String) -> LayoutDisplay {
             LayoutDisplay(id: 0, uuid: uuid, name: uuid, frame: CGRect(x: 0, y: 0, width: 2800, height: 1400), usable: CGRect(x: 0, y: 0, width: 2800, height: 1400))
         }

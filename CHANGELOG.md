@@ -3,6 +3,15 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.26.1 (unreleased)
+
+### Fixed
+
+- **Window Switcher:** the grid keeps the same columns however many windows there are, and fills its
+  rows from the left, the last one too: each window in the list has the same place every time. It used
+  to even out its rows, which moved every window when one opened or closed, and could drop from five
+  across to three for a point less of width.
+
 ## 0.26.0 (2026-11-02)
 
 ### Added

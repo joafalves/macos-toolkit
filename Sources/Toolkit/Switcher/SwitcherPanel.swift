@@ -113,7 +113,11 @@ private struct SwitcherBadge: View {
 
 /// Where each tile of the grid goes. Tiles are as wide as the size setting
 /// allows, and narrower when that's what it takes for every window to fit.
-/// Rows are filled evenly and centred. Coordinates start at the top left.
+/// The columns come from the width alone, not from how many windows there
+/// are, and rows fill from the left, the last one too: a window's place
+/// depends only on its turn in the list, so the second is always in the same
+/// spot. (Rows evened out moved every window when one opened or closed.)
+/// Coordinates start at the top left.
 struct GridLayout: Equatable {
     static let spacing: CGFloat = 12
     static let padding: CGFloat = 14
@@ -142,9 +146,7 @@ struct GridLayout: Equatable {
             if height <= area.height || width <= Self.minimumWidth { break }
             width -= 4
         }
-        // As few columns as the same number of rows needs, so rows come out even.
-        let rows = Int(ceil(Double(n) / Double(columns)))
-        self.columns = Int(ceil(Double(n) / Double(rows)))
+        self.columns = columns
         tile = CGSize(width: width.rounded(), height: (width * Self.aspect + Self.extraHeight).rounded())
     }
 
@@ -166,10 +168,7 @@ struct GridLayout: Equatable {
 
     func frame(of index: Int) -> CGRect {
         let row = index / columns, column = index % columns
-        let inRow = tiles(inRow: row)
-        let rowWidth = CGFloat(inRow) * tile.width + CGFloat(inRow - 1) * Self.spacing
-        // On a whole point: half of one would blur everything on the tile on a 1x display.
-        let x = ((size.width - rowWidth) / 2).rounded() + CGFloat(column) * (tile.width + Self.spacing)
+        let x = Self.padding + CGFloat(column) * (tile.width + Self.spacing)
         let y = Self.padding + CGFloat(row) * (tile.height + Self.spacing)
         return CGRect(x: x, y: y, width: tile.width, height: tile.height)
     }

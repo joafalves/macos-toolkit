@@ -310,6 +310,8 @@ permission, or a list of rows. **App icons** shows each app's icon in the grid s
 in the bar, or large in the top right corner of the picture, with the app's badge. Each tile names the app, then
 the window: on one line, or one above the other with a medium icon.
 Under **Sizing**, each display's grid width sets how much of it the grid can use; windows that don't fit go on another row.
+How many go across depends only on that width and the size, not on how many windows there are, and rows fill
+from the left, so each place in the list is always in the same spot.
 Each display keeps its own, a new one starts with what suits its size, and **Use on All Displays** applies
 one display's width to the rest, and to any new one.
 
