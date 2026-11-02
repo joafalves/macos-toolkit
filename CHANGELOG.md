@@ -12,6 +12,8 @@ worked on; it gets its date when it's released.
   and ⌃⌥⇧S centers it on the grid at about its size. Then, until ↩, plain keys adjust it a step at a
   time: the arrows move it, ⇧ and the arrows size it (→ wider, ↓ taller; with ⌥ too, from the middle), =
   and − change every side, C centers it, and Esc puts it back.
+- **Window Switcher:** with the Audio Mixer on its driver, the windows of an app making sound show the
+  mixer's moving bars, at the bottom right of the picture in the grid and at the end of the row in the list.
 
 ### Changed
 

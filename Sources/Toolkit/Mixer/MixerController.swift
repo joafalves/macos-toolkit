@@ -109,7 +109,9 @@ final class MixerController: ObservableObject {
     @Published private(set) var keysInstalled = false
     @Published private(set) var permission = AudioPermission.status
     /// Sound goes through the audio driver now, not taps.
-    @Published private(set) var driverActive = false
+    @Published private(set) var driverActive = false {
+        didSet { if !driverActive { AudioActivity.shared.set([]) } }
+    }
     /// Why it doesn't, though it was asked to.
     @Published private(set) var driverProblem: DriverProblem?
     /// The driver asked for isn't the one this app brought, or isn't there: the
@@ -321,6 +323,7 @@ final class MixerController: ObservableObject {
         levelTimer = nil
         lastSound = [:]
         audible = []
+        AudioActivity.shared.set([])
         groups = [:]
         lastPlayed = [:]
         apps = []
@@ -1064,6 +1067,7 @@ final class MixerController: ObservableObject {
 
     private func updateList() {
         audible = currentlyAudible()
+        AudioActivity.shared.set(driverActive ? audible : [])
         lastSound = lastSound.filter { key, _ in groups.values.contains { $0.app.bundleIdentifier == key } }
         let now = Date()
         var played = config.played

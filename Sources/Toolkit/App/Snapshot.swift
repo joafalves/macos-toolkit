@@ -58,8 +58,9 @@ enum Snapshot {
                 .first(where: FileManager.default.fileExists) ?? "/System/Applications/\(app).app"
             return NSWorkspace.shared.icon(forFile: path)
         }
+        // Each its own made-up process, so one can be making sound.
         func row(_ id: Int, _ title: String, _ app: String, _ state: SwitcherItem.State = .window) -> SwitcherItem {
-            SwitcherItem(id: "\(id)", window: state == .window || state == .minimized ? CGWindowID(id) : nil, pid: 0,
+            SwitcherItem(id: "\(id)", window: state == .window || state == .minimized ? CGWindowID(id) : nil, pid: pid_t(1000 + id),
                          title: title, appName: app, icon: icon(app), state: state, appURL: URL(fileURLWithPath: "/\(app).app"))
         }
         let model = SwitcherListModel()
@@ -76,6 +77,7 @@ enum Snapshot {
             row(8, "Calculator", "Calculator", .noWindows),
         ]
         if colors { tint(&model.items) }
+        model.sounding = Set(model.items.filter { ["Music", "Safari"].contains($0.appName) }.map(\.pid))
         model.previewIcons = SwitcherPanel.previewIcons
         model.selection = 1
         // A search for this, with an app that isn't running among what it finds.

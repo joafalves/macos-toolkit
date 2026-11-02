@@ -101,6 +101,10 @@ final class SwitcherController: ObservableObject {
         SwitcherPanel.previewIcons = config.previewIcons
         catalog.onChange = { [weak self] in self?.refresh() }
         AppIndex.shared.onChange = { [weak self] in self?.refresh() }
+        AudioActivity.shared.onChange = { [weak self] in
+            guard let self, self.panel.isVisible else { return }
+            self.panel.model.sounding = AudioActivity.shared.apps
+        }
         // The pointer only marks a row: the keys go on from the selection
         // they made, as a mouse resting over the list shouldn't move it.
         panel.hoverSelects = false
@@ -438,6 +442,7 @@ final class SwitcherController: ObservableObject {
             }
             self.panel.query = self.query
             self.panel.model.badges = DockBadges.shared.last
+            self.panel.model.sounding = AudioActivity.shared.apps
             self.panel.show(self.items, selection: self.selection, on: self.config.placement)
             if previews { self.startPreviews() }
             self.catalog.heal()

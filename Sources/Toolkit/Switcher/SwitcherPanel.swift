@@ -23,9 +23,15 @@ final class SwitcherListModel: ObservableObject {
     @Published var query = ""
     /// The numbers on apps' icons, by the file name of the app.
     @Published var badges: [String: String] = [:]
+    /// Apps making sound, by process (`AudioActivity`).
+    @Published var sounding: Set<pid_t> = []
 
     func badge(of item: SwitcherItem) -> String? {
         item.appURL.flatMap { badges[$0.lastPathComponent] }
+    }
+
+    func sounds(_ item: SwitcherItem) -> Bool {
+        !sounding.isEmpty && sounding.contains(item.pid)
     }
 
     var visible: ArraySlice<SwitcherItem> {
@@ -192,6 +198,7 @@ struct SwitcherGridView: View {
                 PreviewTile(item: item, image: item.window.flatMap { model.previews[$0] },
                             number: index < 9 ? index + 1 : nil, selected: index == model.selection,
                             hovered: index == model.hovered && index != model.selection, badge: model.badge(of: item),
+                            sounds: model.sounds(item),
                             width: frame.width, icons: model.previewIcons)
                     .frame(width: frame.width, height: frame.height)
                     .offset(x: frame.minX, y: frame.minY)
@@ -220,6 +227,7 @@ private struct PreviewTile: View {
     let selected: Bool
     let hovered: Bool
     let badge: String?
+    let sounds: Bool
     let width: CGFloat
     let icons: PreviewIcons
 
@@ -302,6 +310,18 @@ private struct PreviewTile: View {
         .overlay(alignment: .topTrailing) {
             // On the corner of the large icon, as on the Dock's.
             if let badge { SwitcherBadge(text: badge).padding(largeIcon == nil ? 6 : 2) }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            // The picture's bottom right, above the bar: the Mixer's bars, on
+            // a dark chip so they read over any window.
+            if sounds {
+                PlayingBars(color: .white, scale: 1.2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 5)
+                    .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .padding(.trailing, 6)
+                    .padding(.bottom, barHeight + 6)
+            }
         }
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
             .strokeBorder(selected ? (item.tint == nil ? Color.accentColor : Color.primary)
@@ -406,7 +426,8 @@ struct SwitcherListView: View {
             ForEach(Array(model.visible.enumerated()), id: \.element.id) { offset, item in
                 let index = model.first + offset
                 SwitcherRow(item: item, number: index < 9 ? index + 1 : nil, selected: index == model.selection,
-                            hovered: index == model.hovered && index != model.selection, badge: model.badge(of: item))
+                            hovered: index == model.hovered && index != model.selection, badge: model.badge(of: item),
+                            sounds: model.sounds(item))
             }
         }
         .padding(Self.padding)
@@ -420,6 +441,7 @@ private struct SwitcherRow: View {
     let selected: Bool
     let hovered: Bool
     let badge: String?
+    let sounds: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -454,6 +476,8 @@ private struct SwitcherRow: View {
             if item.state == .notListed {
                 Text("Open").opacity(0.6)
             }
+            // As in the Mixer, beside the app. White where the row has a colour.
+            if sounds { PlayingBars(color: selected || item.tint != nil ? .white : nil) }
             // Last, so it's always in the same place, whatever comes before it.
             if let badge { SwitcherBadge(text: badge) }
         }

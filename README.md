@@ -318,7 +318,9 @@ list with only the windows of the app you're in.
 
 **App colours**, off by default, gives each app a flat colour on its rows, also in Window Layout's suggestions. Each
 colour is made to look different from those of the apps open with it, close to the icon's where there's
-room. An app keeps its colour, unless it's open beside an older app it looks too much like. Rows also show the number on an app's Dock icon, read once the list is up.
+room. An app keeps its colour, unless it's open beside an older app it looks too much like. Rows also show the number on an app's Dock icon, read once the list is up. With the Audio Mixer on its
+driver, a window of an app making sound shows the mixer's moving bars: at the bottom right of its picture
+in the grid, at the end of its row in the list.
 
 ### Previews
 
