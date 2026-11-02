@@ -122,7 +122,7 @@ section in the sidebar and (where it makes sense) an entry in the menu bar.
 | --- | --- |
 | 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, plus an equalizer and volume control for outputs that have none. |
 | 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps, across all Spaces. |
-| 🔲 **[Window Layout](#window-layout)** | Shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, snapping by dragging, and stacks of windows sharing a slot (a preview). |
+| 🔲 **[Window Layout](#window-layout)** | Shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, a finer grid of dots to line any window up on, snapping by dragging, and stacks of windows sharing a slot (a preview). |
 | 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse, autoscroll on the wheel button, plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings, with window backdrops and small H.264 files, and ⇧⌘2 to copy the text on screen. |
