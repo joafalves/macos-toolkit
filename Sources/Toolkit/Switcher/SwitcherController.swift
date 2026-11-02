@@ -101,7 +101,9 @@ final class SwitcherController: ObservableObject {
         SwitcherPanel.previewIcons = config.previewIcons
         catalog.onChange = { [weak self] in self?.refresh() }
         AppIndex.shared.onChange = { [weak self] in self?.refresh() }
-        panel.onHover = { [weak self] in self?.select($0) }
+        // The pointer only marks a row: the keys go on from the selection
+        // they made, as a mouse resting over the list shouldn't move it.
+        panel.hoverSelects = false
         previews.onUpdate = { [weak self] id, image in
             guard let self, self.panel.isVisible, self.panel.style == .previews else { return }
             self.panel.model.previews[id] = image

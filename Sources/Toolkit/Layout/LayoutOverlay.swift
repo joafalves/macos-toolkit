@@ -20,6 +20,21 @@ struct LayoutOverlayContent: Equatable {
     var joining = false
     /// Windows that can be stacked with, outlined.
     var outlines: [CGRect] = []
+    /// The snap grid, drawn as dots, and the block the window goes to on it,
+    /// which has none inside it. Dots only with `dots`.
+    var snapGrid: SnapGrid?
+    var snapCells: SnapCells?
+    var dots = true
+    /// The hint in parts, when some of them share a note on a line below,
+    /// tied to them by a bracket: used instead of `hint`.
+    var hintParts: [String] = []
+    var hintNote: HintNote?
+
+    struct HintNote: Equatable {
+        /// The parts it's under, first to last.
+        let parts: ClosedRange<Int>
+        let text: String
+    }
 }
 
 /// One display's worth of grid, selection and snap preview. As the keyboard
@@ -46,7 +61,8 @@ final class LayoutOverlay {
     /// For the self-test: the panel on screen, to see that it's freed after.
     var window: NSWindow? { panel }
 
-    func show(on display: LayoutDisplay, interactive: Bool) {
+    /// `interactive`: takes the keys and, unless `clicks` is false, the clicks.
+    func show(on display: LayoutDisplay, interactive: Bool, clicks: Bool? = nil) {
         // Called on every move of a drag: once it's up, there's nothing to do.
         if panel != nil, self.display == display, self.interactive == interactive { return }
         hide()
@@ -62,7 +78,7 @@ final class LayoutOverlay {
         view.content = content
         view.overlay = self
         panel.contentView = view
-        panel.ignoresMouseEvents = !interactive
+        panel.ignoresMouseEvents = !(clicks ?? interactive)
         panel.onKey = { [weak self] event in self?.onKey?(event) ?? false }
         // Weak both ways: a panel holding itself through its own handler was
         // never freed, and each kept a display-sized picture in memory.
@@ -111,6 +127,10 @@ final class LayoutOverlayView: NSView {
         didSet { rebuild() }
     }
     private var drag: CellRange?
+    /// The snap grid's dots, kept while the grid stays the same: a key held
+    /// down moves the block many times a second, and a large display has
+    /// a thousand dots.
+    private var dotsLayer: (key: String, layer: CALayer, dots: [(i: Int, j: Int, layer: CALayer)])?
 
     init(display: LayoutDisplay) {
         self.display = display
@@ -160,8 +180,12 @@ final class LayoutOverlayView: NSView {
             shape(local(outline).insetBy(dx: 1.5, dy: 1.5), fill: accent.withAlphaComponent(0.08), stroke: accent.withAlphaComponent(0.8), width: 2, radius: 12)
         }
         if let highlight = content.highlight {
-            shape(local(highlight).insetBy(dx: 1.5, dy: 1.5), fill: accent.withAlphaComponent(0.3), stroke: accent, width: 3, radius: 12)
+            // Only an outline on the snap grid: the window is there already,
+            // and this shows where it was meant to go if the app kept it larger.
+            let snap = content.snapGrid != nil
+            shape(local(highlight).insetBy(dx: 1.5, dy: 1.5), fill: snap ? nil : accent.withAlphaComponent(0.3), stroke: accent, width: 3, radius: 12)
         }
+        if let grid = content.snapGrid { dots(grid) }
         if let grid = content.grid, !content.labels.isEmpty {
             for row in 0..<grid.rows {
                 for column in 0..<grid.columns {
@@ -178,8 +202,50 @@ final class LayoutOverlayView: NSView {
         if let title = content.title, !title.isEmpty {
             pill(title, centerX: usable.midX, y: usable.minY + 18, bold: true)
         }
-        if let hint = content.hint {
+        if !content.hintParts.isEmpty {
+            notedPill(content.hintParts, note: content.hintNote, centerX: usable.midX, bottom: usable.maxY - 18)
+        } else if let hint = content.hint {
             pill(hint, centerX: usable.midX, y: usable.maxY - 18, bold: false, fromBottom: true)
+        }
+    }
+
+    /// A small round layer each, no picture behind any of them: one shape of
+    /// the whole display would be drawn into a display-sized picture.
+    private func dots(_ grid: SnapGrid) {
+        let area = local(display.usable), gap = content.gap
+        if content.dots {
+            let key = "\(grid.columns)×\(grid.rows) \(gap) \(area) \(scale)"
+            if dotsLayer?.key != key {
+                let container = CALayer()
+                container.frame = bounds
+                let fill = NSColor.white.withAlphaComponent(0.7).cgColor, edge = NSColor.black.withAlphaComponent(0.35).cgColor
+                let size: CGFloat = 4
+                var dots: [(Int, Int, CALayer)] = []
+                for i in 0...grid.columns {
+                    for j in 0...grid.rows {
+                        let p = grid.dot(i, j, in: area, gap: gap)
+                        let dot = CALayer()
+                        dot.frame = CGRect(x: p.x - size / 2, y: p.y - size / 2, width: size, height: size)
+                        dot.cornerRadius = size / 2
+                        dot.backgroundColor = fill
+                        dot.borderColor = edge
+                        dot.borderWidth = 0.5
+                        container.addSublayer(dot)
+                        dots.append((i, j, dot))
+                    }
+                }
+                dotsLayer = (key, container, dots)
+            }
+            if let (_, container, dots) = dotsLayer {
+                // None over the window or along its edges, where they'd look
+                // like handles to drag: the grid goes on around it.
+                let cells = content.snapCells
+                for dot in dots {
+                    let inside = cells.map { dot.i >= $0.left && dot.i <= $0.right && dot.j >= $0.top && dot.j <= $0.bottom } ?? false
+                    if dot.layer.isHidden != inside { dot.layer.isHidden = inside }
+                }
+                layer?.addSublayer(container)
+            }
         }
     }
 
@@ -272,6 +338,42 @@ final class LayoutOverlayView: NSView {
                          width: size.width + 24, height: size.height + 10)
         shape(box, fill: .black.withAlphaComponent(0.6), radius: box.height / 2)
         self.text(text, at: CGPoint(x: box.minX + 12, y: box.minY + 5))
+    }
+
+    /// A hint whose note sits under the parts it adds to, with a bracket from
+    /// the first of them to the last: "⌥ both sides" under larger and smaller.
+    private func notedPill(_ parts: [String], note: LayoutOverlayContent.HintNote?, centerX: CGFloat, bottom: CGFloat) {
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13), .foregroundColor: NSColor.white]
+        let separator = "  ·  "
+        func width(_ string: String) -> CGFloat { NSAttributedString(string: string, attributes: attributes).size().width }
+        let line = NSAttributedString(string: parts.joined(separator: separator), attributes: attributes)
+        let size = line.size()
+        let noteText = note.map {
+            NSAttributedString(string: $0.text, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium),
+                                                              .foregroundColor: NSColor.white.withAlphaComponent(0.8)])
+        }
+        let noteHeight = noteText.map { $0.size().height + 8 } ?? 0
+        let box = CGRect(x: centerX - size.width / 2 - 12, y: bottom - size.height - 10 - noteHeight,
+                         width: size.width + 24, height: size.height + 10 + noteHeight)
+        shape(box, fill: .black.withAlphaComponent(0.6), radius: min(box.height / 2, 16))
+        text(line, at: CGPoint(x: box.minX + 12, y: box.minY + 5))
+        guard let note, let noteText, parts.indices.contains(note.parts.lowerBound), parts.indices.contains(note.parts.upperBound) else { return }
+        // Where the parts are along the line, from the text before each.
+        let first = box.minX + 12 + width(parts[..<note.parts.lowerBound].map { $0 + separator }.joined())
+        let last = box.minX + 12 + width(parts[...note.parts.upperBound].joined(separator: separator))
+        let noteSize = noteText.size()
+        let y = box.minY + 5 + size.height + 3 + noteSize.height / 2
+        let colour = NSColor.white.withAlphaComponent(0.45)
+        // At least as wide as the note, with room for the bracket's ends.
+        let middle = (first + last) / 2, gap = noteSize.width / 2 + 6
+        let reach = max((last - first) / 2, gap + 14)
+        let start = middle - reach, end = middle + reach
+        // ⎣── note ──⎦: up at each end to the parts, broken for the note.
+        shape(CGRect(x: start, y: y, width: max(middle - gap - start, 0), height: 1), fill: colour, radius: 0)
+        shape(CGRect(x: middle + gap, y: y, width: max(end - middle - gap, 0), height: 1), fill: colour, radius: 0)
+        shape(CGRect(x: start, y: y - 4, width: 1, height: 5), fill: colour, radius: 0)
+        shape(CGRect(x: end - 1, y: y - 4, width: 1, height: 5), fill: colour, radius: 0)
+        text(noteText, at: CGPoint(x: middle - noteSize.width / 2, y: y - noteSize.height / 2))
     }
 
     // MARK: - Mouse

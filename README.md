@@ -292,7 +292,8 @@ a window come last, dimmed.
 | 1 – 9 | Go straight to that row, also while searching: numbers aren't searched for |
 | letters | Search what's listed: apps by name, then windows by title. Below those, a few apps it doesn't list, to open them |
 | ⌫, esc | Take back a letter; esc clears the search, then cancels |
-| release ⌘, or click | Go to the selected row |
+| release ⌘ | Go to the selected row |
+| click | Go to the row clicked. The pointer only marks the row it's over: the keys carry on from the one they selected |
 | esc | Cancel |
 | ⇧W, ⇧M | Close / minimize the window |
 | ⇧H, ⇧Q | Hide / quit the app |
@@ -380,6 +381,8 @@ Snaps the focused window to part of its display. Each key can be changed or clea
 | ⌃⌥= ⌃⌥- | Larger, smaller: 30 points on every side |
 | ⌃⌥⌫ | Restore the size and place it had before it was snapped |
 | ⌃⌥⌘ ← → | Previous, next display. A snapped window stays snapped the same way |
+| ⌃⌥S | Snap to the grid: each edge to the nearest dot of the snap grid (see below) |
+| ⌃⌥⇧S | Center on the snap grid, at about the size it is |
 | ⌃⌥⌘D | Show the desktop, as with macOS's own gesture: every window slides aside, and the same keys (or a click on one) bring them back where they were, snapped ones still snapped |
 
 With **Show in the menu bar** on, its part of the menu bar opens a panel for the window in front:
@@ -415,6 +418,52 @@ Dragging across the cells with the mouse works too.
 - **Each display has its own grid**, up to 10 columns and 4 rows, set in the settings. Until it has
   one, a display gets halves (2 × 1), an ultrawide quarters (4 × 1), and one standing upright 1 × 2.
   Grids are kept per monitor, so two monitors that take turns on the same cable each keep theirs.
+
+### The snap grid
+
+A finer grid than the one above, for windows of any size rather than set blocks, drawn as dots so it
+isn't taken for that one's cells. **⌃⌥S** lines the window in front up with the dots nearest its edges,
+so a window you placed by hand ends up in line with the others, a little bigger or smaller. **⌃⌥⇧S**
+puts it in the middle of the display instead, at about the size it is.
+
+The window moves at once, and the dots stay on screen until you press ↩ or esc. Until then, plain keys
+adjust it, a step at a time; nothing has to be held down:
+
+| Key (while the dots show) | Action |
+| --- | --- |
+| ← → ↑ ↓ | Move it |
+| ⇧ ← → ↑ ↓ | Size it: → wider, ← narrower, ↓ taller, ↑ shorter, as dragging its bottom right corner. A side against the edge of the display stays there, so a window in the right half grows to the left |
+| ⇧⌥ ← → ↑ ↓ | The same from the middle: both ends at once |
+| = − | Larger or smaller on every side, staying centered |
+| C | Center it, at the size it has |
+| ↩ | Done. So is space, or the shortcut again |
+| esc | Undo: back where it was before the shortcut |
+
+To make a maximized window smaller, for example: ⌃⌥S, then − a few times.
+
+- **Each display has its own snap grid**, set on the Snapping tab: 24 columns to start with (halves,
+  thirds, quarters and sixths fall on dots), 48 on an ultrawide, and rows that make the steps about
+  square. Up to 64 × 40.
+- A window centered on the grid has as many steps on each side, so it grows or shrinks a step at each
+  side at a time.
+- Snapped this way, a window is like any other snapped one: ⌃⌥⌫ puts it back, the gap and the
+  displays coming and going move it, and one that fills half the grid counts as the half for ⌃⌥ ← →.
+- While the dots show, the other Window Layout shortcuts wait, so ⌃⌥← still held from the shortcut
+  moves the window a step rather than to the left half.
+- Each step after the first is sent once and not waited on, so holding an arrow down moves the window
+  along as fast as the app takes it.
+- A window that won't get any smaller (an app's smallest size) stays at the last size it took, with a
+  beep, and the outline with it.
+- Dragged away, a window on the snap grid keeps its size: it was chosen there, so it isn't put back to
+  the one it had before.
+- **Show the dots** turns the dots off, leaving the window's outline.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-snap-dark.png">
+    <img src="docs/images/layout-snap-light.png" width="620" alt="The snap grid's dots over a display around a window just snapped to it, outlined, and the keys to adjust it at the bottom">
+  </picture>
+</p>
 
 ### Dragging
 

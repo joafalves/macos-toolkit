@@ -34,6 +34,7 @@ final class LayoutController: ObservableObject {
     private let drags = DragWatcher()
     private let gridOverlay = LayoutOverlay()
     private let dragOverlay = LayoutOverlay()
+    private let snapOverlay = LayoutOverlay()
     private let assist = WindowSuggestions()
     /// Windows sharing a slot as tabs.
     private(set) lazy var tabs = WindowTabs(work: work)
@@ -48,6 +49,7 @@ final class LayoutController: ObservableObject {
     private var accessTimer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var grid: GridSession?
+    private var snap: SnapSession?
     /// The next `apply` turns macOS's tiling on rather than putting back
     /// what it was.
     private var handBack = false
@@ -82,6 +84,9 @@ final class LayoutController: ObservableObject {
         /// Where it was snapped on a display that has gone since, to go back
         /// to when that display comes back.
         var home: Home?
+        /// Put on the snap grid, at a size chosen there: dragged away, it
+        /// keeps that size rather than going back to the one from before.
+        var onSnapGrid: Bool?
 
         struct Home: Codable {
             let uuid: String
@@ -107,6 +112,24 @@ final class LayoutController: ObservableObject {
         var pending = false
         var labels: [Int: String]
     }
+
+    /// A window just put on the snap grid, while the grid is up to adjust it.
+    private struct SnapSession {
+        let window: LayoutWindow
+        let display: LayoutDisplay
+        let grid: SnapGrid
+        var cells: SnapCells
+        /// The last block the window really took: what it goes back to when
+        /// it won't get as small as the one asked for.
+        var fitted: SnapCells?
+        /// Where the window was, and how it was snapped, for Esc.
+        let before: CGRect
+        fileprivate let record: Placement?
+    }
+
+    /// Moves asked for while the grid is up, and the latest, which `work` reads.
+    private var snapMoves = 0
+    private let snapMovesWanted = Locked(0)
 
     private struct DragSession {
         let grab: DragWatcher.Grab
@@ -142,6 +165,8 @@ final class LayoutController: ObservableObject {
         gridOverlay.onKey = { [weak self] event in self?.gridKey(event) ?? false }
         gridOverlay.onCells = { [weak self] range, done in self?.gridCells(range, done: done) }
         gridOverlay.onCancel = { [weak self] in self?.closeGrid() }
+        snapOverlay.onKey = { [weak self] event in self?.snapKey(event) ?? false }
+        snapOverlay.onCancel = { [weak self] in self?.endSnap(undo: false) }
         drags.onStart = { [weak self] grab in self?.dragStarted(grab) }
         drags.onMove = { [weak self] point, flags in self?.dragMoved(point, flags) }
         drags.onDrop = { [weak self] point, flags in self?.dropped(point, flags) }
@@ -187,7 +212,7 @@ final class LayoutController: ObservableObject {
             self?.refreshDisplays()
         })
         observers.append(center.addObserver(forName: ShortcutRecording.changed, object: nil, queue: .main) { [weak self] _ in
-            self?.keys.suspend(ShortcutRecording.active)
+            self?.suspendKeys()
         })
         let workspace = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
@@ -391,6 +416,7 @@ final class LayoutController: ObservableObject {
         keys.stop()
         drags.stop()
         closeGrid()
+        endSnap(undo: false)
         dragOverlay.hide()
         assist.dismiss()
         // Waited for: the app is about to go.
@@ -421,6 +447,7 @@ final class LayoutController: ObservableObject {
         } else {
             keys.stop()
             closeGrid()
+            endSnap(undo: false)
             if !failedShortcuts.isEmpty { failedShortcuts = [] }
         }
         let dragTiling = Dictionary(uniqueKeysWithValues: SystemTiling.dragKeys.map { ($0, false) })
@@ -491,6 +518,7 @@ final class LayoutController: ObservableObject {
         }
         // A grid on a display that went away has nothing left to stand on.
         if let grid, !fresh.contains(grid.display) { closeGrid() }
+        if let snap, !fresh.contains(snap.display) { endSnap(undo: false) }
         tabs.displaysChanged(fresh)
     }
 
@@ -525,6 +553,11 @@ final class LayoutController: ObservableObject {
     /// The grid this display uses: its own, or one that suits its shape.
     func gridSize(for display: LayoutDisplay) -> GridSize {
         config.grids[display.uuid] ?? GridSize.suggested(for: display.frame.size)
+    }
+
+    /// The snap grid this display uses: its own, or one with about square steps.
+    func snapGrid(for display: LayoutDisplay) -> SnapGrid {
+        config.snapGrids[display.uuid] ?? SnapGrid.suggested(for: display.usable.size)
     }
 
     // MARK: - Shortcuts
@@ -579,6 +612,10 @@ final class LayoutController: ObservableObject {
             closeGrid()
             assist.dismiss()
             runTabs(action)
+        case .action(let action) where action == .snapToGrid || action == .centerOnGrid:
+            closeGrid()
+            assist.dismiss()
+            openSnap(centered: action == .centerOnGrid)
         case .action(.showDesktop):
             closeGrid()
             assist.dismiss()
@@ -748,12 +785,16 @@ final class LayoutController: ObservableObject {
     /// `cycle`: at the outer edge, left and right go on through ⅔ and ⅓.
     /// `original`: where it was before, when that isn't where it is now:
     /// before the drag that brought it here.
+    /// `quick`: a step from where we just put it, sent once (see `LayoutWindow.setFrame`).
     func place(_ window: LayoutWindow, _ target: Target, displays: [LayoutDisplay], gap: CGFloat, cycle: Bool, afterDrag: Bool = false,
-               original: CGRect? = nil) {
+               original: CGRect? = nil, quick: Bool = false) {
         guard let frame = window.frame, let current = LayoutGeometry.display(of: frame, in: displays) else { return Self.beep() }
         // Only counts if the window is still where we put it.
         let record = placements[window.id].flatMap { LayoutWindow.close($0.applied, frame) ? $0 : nil }
         var placement = Placement(original: record?.original ?? original ?? frame, applied: frame, pid: window.pid)
+        // Placed again in the same block (a display that went and came): still
+        // on the snap grid. Anywhere else, the grid or a layout chose its size.
+        if case .unit(let unit, _) = target, record?.onSnapGrid == true, record?.unit == unit { placement.onSnapGrid = true }
         var display = current
         let rect: CGRect
 
@@ -874,11 +915,12 @@ final class LayoutController: ObservableObject {
         // gap: Fill only knows macOS's own margin, a window it filled can't be
         // moved to fit ours, and some apps take the command and do nothing.
         // (macOS darkens the menu bar only over a window it filled.)
-        guard let actual = window.setFrame(rect, within: display.usable, tiled: record?.tiledByMacOS ?? false, afterDrag: afterDrag) else { return Self.beep() }
+        guard let actual = window.setFrame(rect, within: display.usable, tiled: record?.tiledByMacOS ?? false, afterDrag: afterDrag, quick: quick)
+        else { return Self.beep() }
         placement.applied = actual
         // Moved by us, it may still be in macOS's tiling, which then puts it
-        // back by itself when it's dragged away.
-        placement.tiledByMacOS = window.isTiledByMacOS
+        // back by itself when it's dragged away. A quick step changes nothing there.
+        placement.tiledByMacOS = quick ? record?.tiledByMacOS ?? false : window.isTiledByMacOS
         placement.display = display.id
         placement.displayUUID = display.uuid
         placements[window.id] = placement
@@ -1039,6 +1081,183 @@ final class LayoutController: ObservableObject {
         }
     }
 
+    // MARK: - Snap grid
+
+    /// Ours step aside while a recorder in the settings is listening, and
+    /// while the snap grid is up, whose keys (⌃⌥ arrows among them, if
+    /// still held) then mean something else.
+    private func suspendKeys() {
+        keys.suspend(ShortcutRecording.active || snap != nil)
+    }
+
+    private func openSnap(centered: Bool) {
+        // Again while it's up (from the menu bar's panel): as its key there would be.
+        if snap != nil { return centered ? adjustSnap { $0.grid.centered($0.cells) } : showSnap() }
+        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        let displays = self.displays, gap = CGFloat(config.gap)
+        work.async {
+            guard let window = LayoutWindow.focused(pid: pid), let frame = window.frame,
+                  let display = LayoutGeometry.display(of: frame, in: displays) else { return Self.beep() }
+            let record = self.placements[window.id]
+            DispatchQueue.main.async { self.beginSnap(window, frame: frame, record: record, on: display, centered: centered, gap: gap) }
+        }
+    }
+
+    /// The window goes onto the grid at once, as any shortcut would place
+    /// it, and the grid stays up for it to be adjusted with plain keys until
+    /// ↩ or Esc: nothing has to be held.
+    private func beginSnap(_ window: LayoutWindow, frame: CGRect, record: Placement?, on display: LayoutDisplay, centered: Bool, gap: CGFloat) {
+        guard snap == nil, config.enabled else { return }
+        let grid = snapGrid(for: display)
+        let cells = centered ? grid.centering(frame, in: display.usable, gap: gap) : grid.snapping(frame, in: display.usable, gap: gap)
+        snap = SnapSession(window: window, display: display, grid: grid, cells: cells, fitted: nil, before: frame, record: record)
+        Log.layout.notice("snap grid: \(centered ? "centered" : "snapped", privacy: .public) \(String(describing: cells), privacy: .public) on \(grid.columns)×\(grid.rows)")
+        suspendKeys()
+        placeSnap(quick: false)
+        showSnap()
+        // Only ↩ and Esc end it, and they need the keyboard: an overlay that
+        // didn't get it (another app holding it, as a password field can)
+        // would stay up with our shortcuts off. The window is placed; it ends there.
+        // Looked at a moment later, once the window server has moved the keyboard.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self, self.snap != nil, self.snapOverlay.window?.isKeyWindow != true else { return }
+            Log.layout.error("snap grid: the overlay didn't get the keyboard")
+            self.endSnap(undo: false)
+        }
+    }
+
+    private func showSnap() {
+        guard let snap else { return }
+        let gap = CGFloat(config.gap)
+        let hint = [String(localized: "←↑↓→ move"), String(localized: "⇧ + arrows size"),
+                    String(localized: "= − all round"), String(localized: "C center"), String(localized: "↩ done"), String(localized: "esc undo")]
+        // ⌥ only goes with ⇧, so it's said under it.
+        let note = LayoutOverlayContent.HintNote(parts: 1...1, text: String(localized: "with ⌥, from the middle"))
+        snapOverlay.content = LayoutOverlayContent(
+            highlight: LayoutGeometry.place(snap.grid.unit(of: snap.cells), in: snap.display.usable, gap: gap),
+            gap: gap, snapGrid: snap.grid, snapCells: snap.cells, dots: config.snapDots, hintParts: hint, hintNote: note)
+        // Clicks go through to the windows below, and one ends it.
+        snapOverlay.show(on: snap.display, interactive: true, clicks: false)
+    }
+
+    /// Where the window is sent each time the block changes. Only the latest
+    /// is sent, so a held arrow doesn't queue up a move for each repeat.
+    /// A window that won't get as small as the block (an app's smallest
+    /// size) goes back to the last block it took, or, the first time, to the
+    /// smallest it fits in: the outline never shows a size the window isn't.
+    /// The first placement is a full one (the window may be in macOS's
+    /// tiling, or on its way somewhere); the steps after are `quick`.
+    private func placeSnap(quick: Bool = true) {
+        guard let snap else { return }
+        snapMoves += 1
+        let move = snapMoves
+        snapMovesWanted.value = move
+        let cells = snap.cells, grid = snap.grid, display = snap.display
+        let unit = grid.unit(of: cells), displays = self.displays, gap = CGFloat(config.gap)
+        let target = LayoutGeometry.place(unit, in: display.usable, gap: gap)
+        // Rounding to whole characters (a terminal) is well within half a step.
+        let slack = grid.step(in: display.usable, gap: gap)
+        work.async {
+            // Skipped if another is already waiting behind this one.
+            guard move == self.snapMovesWanted.value else { return }
+            self.place(snap.window, .unit(unit, display), displays: displays, gap: gap, cycle: false, quick: quick)
+            self.placements[snap.window.id]?.onSnapGrid = true
+            guard let actual = self.placements[snap.window.id]?.applied else { return }
+            let fits = actual.width <= target.width + slack.width / 2 && actual.height <= target.height + slack.height / 2
+            DispatchQueue.main.async {
+                guard var session = self.snap, session.window.id == snap.window.id else { return }
+                if fits {
+                    if session.cells == cells { session.fitted = cells }
+                    self.snap = session
+                    return
+                }
+                guard move == self.snapMoves else { return }
+                let back = session.fitted ?? grid.covering(actual, in: display.usable, gap: gap)
+                Log.layout.info("snap grid: the window stays larger than \(String(describing: cells), privacy: .public), back to \(String(describing: back), privacy: .public)")
+                guard back != cells else { return }
+                if session.fitted != nil { NSSound.beep() }
+                session.cells = back
+                self.snap = session
+                self.placeSnap()
+                self.showSnap()
+            }
+        }
+    }
+
+    private func adjustSnap(_ change: (SnapSession) -> SnapCells) {
+        guard var session = snap else { return }
+        let cells = change(session)
+        guard cells != session.cells else { return }
+        session.cells = cells
+        snap = session
+        placeSnap()
+        showSnap()
+    }
+
+    /// Keys while the grid is up: the arrows move the window a step; with ⇧
+    /// they size it as dragging its bottom right corner would (→ wider,
+    /// ↓ taller), keeping a side that's against the display; with ⇧⌥, from
+    /// the middle, both ends at once. ⌃ and ⌥ still held from the shortcut
+    /// make no difference. By what the key types where that's what's meant
+    /// (= is ⇧0 on some keyboards), by where it is otherwise. Only ↩ (or
+    /// space, or the shortcut again) and Esc end it, as in the keyboard grid.
+    private func snapKey(_ event: NSEvent) -> Bool {
+        guard let session = snap else { return false }
+        let flags = event.modifierFlags
+        let size = flags.contains(.shift)
+        // Not while ⌃ is still down, when ⌥ is the shortcut's own, still held.
+        let middle = flags.contains(.option) && !flags.contains(.control)
+        let typed = event.charactersIgnoringModifiers?.lowercased() ?? ""
+        let code = Int(event.keyCode)
+        // S with the shortcut's ⌃ or ⌥ still down is the shortcut; a plain one is typing.
+        let again = !flags.intersection([.control, .option]).isEmpty
+        Log.layout.info("snap grid: key \(code) with \(Shortcut.glyphs(flags), privacy: .public)")
+        let arrows: [Int: (dx: Int, dy: Int)] = [kVK_LeftArrow: (-1, 0), kVK_RightArrow: (1, 0), kVK_UpArrow: (0, -1), kVK_DownArrow: (0, 1)]
+        if code == kVK_Escape {
+            endSnap(undo: true)
+        } else if code == kVK_Return || code == kVK_ANSI_KeypadEnter || code == kVK_Space {
+            endSnap(undo: false)
+        } else if let (dx, dy) = arrows[code] {
+            // → and ↓ larger, ← and ↑ smaller.
+            let across = dx != 0, d = dx + dy
+            adjustSnap { s in
+                guard size else { return s.cells.moved(dx: dx, dy: dy, in: s.grid) }
+                return middle ? s.cells.spread(across: across, by: d, in: s.grid) : s.cells.resized(across: across, by: d, in: s.grid)
+            }
+        } else if ["=", "+"].contains(typed) || [kVK_ANSI_Equal, kVK_ANSI_KeypadPlus].contains(code) {
+            adjustSnap { $0.cells.inflated(by: 1, in: $0.grid) }
+        } else if ["-", "_"].contains(typed) || [kVK_ANSI_Minus, kVK_ANSI_KeypadMinus].contains(code) {
+            adjustSnap { $0.cells.inflated(by: -1, in: $0.grid) }
+        } else if typed == "c" || code == kVK_ANSI_C || (code == kVK_ANSI_S && again && size) {
+            adjustSnap { $0.grid.centered($0.cells) }
+        } else if code == kVK_ANSI_S && again {
+            // The shortcut again ends it, as the keyboard grid's does; its key held down doesn't.
+            if !event.isARepeat { endSnap(undo: false) }
+        } else {
+            NSSound.beep()
+        }
+        return true
+    }
+
+    /// `undo`: Esc, back where the window was before the shortcut.
+    private func endSnap(undo: Bool) {
+        guard let session = snap else { return }
+        Log.layout.notice("snap grid: \(undo ? "undone" : "done", privacy: .public) at \(String(describing: session.cells), privacy: .public)")
+        snap = nil
+        snapOverlay.hide()
+        suspendKeys()
+        guard undo else { return }
+        // Any move still waiting is dropped.
+        snapMovesWanted.value = 0
+        work.async {
+            guard let actual = session.window.setFrame(session.before, within: session.display.usable) else { return }
+            // Snapped as before, if it was, from where it really is now.
+            var record = session.record
+            record?.applied = actual
+            self.placements[session.window.id] = record
+        }
+    }
+
     // MARK: - Dragging
 
     func dragStarted(_ grab: DragWatcher.Grab) {
@@ -1063,7 +1282,8 @@ final class LayoutController: ObservableObject {
                 self.placements[grab.id] = nil
                 LayoutTrace.log("layout: drag of \(grab.id) on \(here.name), not where it was snapped: no longer snapped")
             }
-            let snappedBefore = self.placements[grab.id].flatMap { LayoutWindow.close($0.applied, before) ? $0.original : nil }
+            // One on the snap grid has the size it was given there as its own.
+            let snappedBefore = self.placements[grab.id].flatMap { LayoutWindow.close($0.applied, before) && $0.onSnapGrid != true ? $0.original : nil }
             let original = snappedBefore ?? before
             DispatchQueue.main.async {
                 if self.drag?.grab.id == grab.id { self.drag?.original = original }
@@ -1085,7 +1305,8 @@ final class LayoutController: ObservableObject {
             // pointer at the same place across it.
             // A window macOS filled is put back by macOS.
             LayoutTrace.log("layout: drag of \(grab.id), record \(self.placements[grab.id].map { "applied \(LayoutTrace.text($0.applied)), original \(LayoutTrace.text($0.original)), tiled by macOS \($0.tiledByMacOS)" } ?? "none")")
-            guard restore, let record = self.placements[grab.id], !record.tiledByMacOS, LayoutWindow.close(record.applied.size, grab.frame.size),
+            guard restore, let record = self.placements[grab.id], !record.tiledByMacOS, record.onSnapGrid != true,
+                  LayoutWindow.close(record.applied.size, grab.frame.size),
                   let frame = window.frame, let pointer = CGEvent(source: nil)?.location
             else { return }
             self.placements[grab.id] = nil

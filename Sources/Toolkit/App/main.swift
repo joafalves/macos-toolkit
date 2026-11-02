@@ -104,8 +104,8 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeLayoutSuggest(to: rest[0], light: rest.contains("light"))
         exit(0)
     }
-    if rest.contains("layout-grid") || rest.contains("layout-slots") {
-        Snapshot.writeLayoutGrid(to: rest[0], light: rest.contains("light"), slots: rest.contains("layout-slots"))
+    if rest.contains("layout-grid") || rest.contains("layout-slots") || rest.contains("layout-snap") {
+        Snapshot.writeLayoutGrid(to: rest[0], light: rest.contains("light"), slots: rest.contains("layout-slots"), snap: rest.contains("layout-snap"))
         exit(0)
     }
     if rest.contains("volume-hud") {

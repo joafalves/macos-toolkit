@@ -129,9 +129,11 @@ enum LayoutWindow {
     /// as close as it goes, centred on the target and kept within `area`.
     /// `tiled`: known to be in macOS's tiling, which the menu can't tell
     /// while macOS is still animating it there. `afterDrag`: just dropped,
-    /// when macOS may still put it back where the mouse left it.
+    /// when macOS may still put it back where the mouse left it. `quick`: a
+    /// step from where it was just put, sent once and not waited on, as the
+    /// snap grid's keys send many in a row.
     @discardableResult
-    func setFrame(_ target: CGRect, within area: CGRect, tiled known: Bool = false, afterDrag: Bool = false) -> CGRect? {
+    func setFrame(_ target: CGRect, within area: CGRect, tiled known: Bool = false, afterDrag: Bool = false, quick: Bool = false) -> CGRect? {
         switch self {
         case .other(let window, let app, _, _):
             // With this on (VoiceOver, some window managers, Chrome and
@@ -147,7 +149,7 @@ enum LayoutWindow {
                 set(position: target.origin, of: window)
                 set(size: target.size, of: window)
             }
-            let tiled = known || isTiledByMacOS
+            let tiled = !quick && (known || isTiledByMacOS)
             let before = frame
             send()
             guard var actual = frame else { return nil }
@@ -159,7 +161,7 @@ enum LayoutWindow {
             // where the mouse left it, for as long as it hasn't moved at all.
             let deadline = Date().addingTimeInterval(1.5)
             var tries = 0
-            while !Self.close(actual, target),
+            while !quick, !Self.close(actual, target),
                   tries < 2 || (afterDrag && (before.map { Self.near(actual, $0) } ?? false) && Date() < deadline) {
                 tries += 1
                 usleep(60_000)

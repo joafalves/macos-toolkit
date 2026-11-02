@@ -8,6 +8,9 @@ final class SwitcherListModel: ObservableObject {
     @Published var size = CGSize.zero
     @Published var items: [SwitcherItem] = []
     @Published var selection = 0
+    /// The row under the pointer, when that isn't what selects: shown apart
+    /// from the selection, which stays the keyboard's.
+    @Published var hovered: Int?
     /// Index of the first row on screen.
     @Published var first = 0
     @Published var shown = 0
@@ -187,7 +190,8 @@ struct SwitcherGridView: View {
             ForEach(Array(model.items.enumerated()), id: \.element.id) { index, item in
                 let frame = model.layout.frame(of: index)
                 PreviewTile(item: item, image: item.window.flatMap { model.previews[$0] },
-                            number: index < 9 ? index + 1 : nil, selected: index == model.selection, badge: model.badge(of: item),
+                            number: index < 9 ? index + 1 : nil, selected: index == model.selection,
+                            hovered: index == model.hovered && index != model.selection, badge: model.badge(of: item),
                             width: frame.width, icons: model.previewIcons)
                     .frame(width: frame.width, height: frame.height)
                     .offset(x: frame.minX, y: frame.minY)
@@ -214,6 +218,7 @@ private struct PreviewTile: View {
     let image: CGImage?
     let number: Int?
     let selected: Bool
+    let hovered: Bool
     let badge: String?
     let width: CGFloat
     let icons: PreviewIcons
@@ -299,7 +304,8 @@ private struct PreviewTile: View {
             if let badge { SwitcherBadge(text: badge).padding(largeIcon == nil ? 6 : 2) }
         }
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .strokeBorder(selected ? (item.tint == nil ? Color.accentColor : Color.primary) : Color.clear, lineWidth: 3))
+            .strokeBorder(selected ? (item.tint == nil ? Color.accentColor : Color.primary)
+                                   : hovered ? Color.primary.opacity(0.45) : Color.clear, lineWidth: selected ? 3 : 2))
         // With a colour, only the content fades: the colour stays the app's.
         .opacity(item.tint == nil && item.dimmed ? 0.55 : 1)
     }
@@ -399,7 +405,8 @@ struct SwitcherListView: View {
         VStack(spacing: 0) {
             ForEach(Array(model.visible.enumerated()), id: \.element.id) { offset, item in
                 let index = model.first + offset
-                SwitcherRow(item: item, number: index < 9 ? index + 1 : nil, selected: index == model.selection, badge: model.badge(of: item))
+                SwitcherRow(item: item, number: index < 9 ? index + 1 : nil, selected: index == model.selection,
+                            hovered: index == model.hovered && index != model.selection, badge: model.badge(of: item))
             }
         }
         .padding(Self.padding)
@@ -411,6 +418,7 @@ private struct SwitcherRow: View {
     let item: SwitcherItem
     let number: Int?
     let selected: Bool
+    let hovered: Bool
     let badge: String?
 
     var body: some View {
@@ -463,6 +471,16 @@ private struct SwitcherRow: View {
                     .padding(.vertical, 1.5)
             } else if selected {
                 RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.accentColor)
+            } else if hovered {
+                RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.primary.opacity(0.1))
+            }
+        }
+        .overlay {
+            // A coloured row has its fill already: an outline says it's under the pointer.
+            if hovered, item.tint != nil {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.45), lineWidth: 1.5)
+                    .padding(.vertical, 1.5)
             }
         }
     }
@@ -475,8 +493,11 @@ private struct SwitcherRow: View {
 /// toolkit the active app.
 final class SwitcherPanel {
     let model = SwitcherListModel()
-    /// The pointer moved onto the row at this index.
+    /// The pointer moved onto the row at this index, when `hoverSelects`.
     var onHover: (Int) -> Void = { _ in }
+    /// Whether the row under the pointer is the selection. When not, it's
+    /// only marked, and the keys go on from where they left the selection.
+    var hoverSelects = true
     var onClick: (Int) -> Void = { _ in }
     /// Keys, when it `takesKeys`; and the keyboard went elsewhere.
     var onKey: (NSEvent) -> Void = { _ in }
@@ -603,6 +624,7 @@ final class SwitcherPanel {
             let area = fills ? CGSize(width: screen.width - Self.inset * 2, height: screen.height - Self.inset * 2)
                              : Self.gridArea(on: screen.size, percent: gridWidth)
             let layout = GridLayout(count: items.count, maxTileWidth: previewSize.maxTileWidth, area: area)
+            if model.items.map(\.id) != items.map(\.id) { model.hovered = nil }
             model.items = items
             model.selection = selection
             if layout != model.layout { model.layout = layout }
@@ -611,6 +633,7 @@ final class SwitcherPanel {
         }
         let height = fills ? screen.height - Self.inset * 2 : screen.height * 0.7
         let room = Int((height - header - SwitcherListView.padding * 2) / SwitcherListView.rowHeight)
+        if model.items.map(\.id) != items.map(\.id) { model.hovered = nil }
         model.items = items
         model.selection = selection
         model.shown = min(items.count, max(room, fills ? 1 : 3))
@@ -646,6 +669,7 @@ final class SwitcherPanel {
     func hide() {
         guard isVisible else { return }
         isVisible = false
+        model.hovered = nil
         searchTop = nil
         query = ""
         model.query = ""
@@ -688,7 +712,7 @@ private final class MouseCatcher: NSView {
 
     override func updateTrackingAreas() {
         trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: self))
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
         super.updateTrackingAreas()
     }
 
@@ -696,9 +720,19 @@ private final class MouseCatcher: NSView {
         panel?.index(at: convert(event.locationInWindow, from: nil))
     }
 
-    // Only real movement selects, so the list can open under a resting pointer.
+    // Only real movement counts, so the list can open under a resting pointer.
     override func mouseMoved(with event: NSEvent) {
-        if let index = index(of: event) { panel?.onHover(index) }
+        guard let panel else { return }
+        let index = index(of: event)
+        if panel.hoverSelects {
+            if let index { panel.onHover(index) }
+        } else if panel.model.hovered != index {
+            panel.model.hovered = index
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        if panel?.model.hovered != nil { panel?.model.hovered = nil }
     }
 
     override func mouseDown(with event: NSEvent) {

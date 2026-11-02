@@ -383,6 +383,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png layout-slots [light]    # its layouts bar while dragging
 .build/debug/Toolkit --snapshot out.png layout-suggest [light]  # the windows it offers for the rest of a display
 .build/debug/Toolkit --snapshot out.png layout-tabs [light]     # windows sharing a slot, with their tabs
+.build/debug/Toolkit --snapshot out.png layout-snap [light]     # the snap grid's dots, and where ⌃⌥S puts a window a little off them
 .build/debug/Toolkit --snapshot out.png layout [tabs|keyboard] [light]  # that tab of the Window Layout page
 .build/debug/Toolkit --test-capture <folder> [app]   # each screenshot kind and short recordings, with a report
 .build/debug/Toolkit --test-recording        # the app's recording path: start, stop button, discard

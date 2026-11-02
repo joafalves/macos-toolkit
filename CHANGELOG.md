@@ -3,6 +3,22 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.26.0 (unreleased)
+
+### Added
+
+- **Window Layout:** a snap grid, apart from the keyboard grid: finer (24 columns, 48 on an ultrawide), set
+  for each display, and drawn as dots. ⌃⌥S lines the window in front up with the dots nearest its edges,
+  and ⌃⌥⇧S centers it on the grid at about its size. Then, until ↩, plain keys adjust it a step at a
+  time: the arrows move it, ⇧ and the arrows size it (→ wider, ↓ taller; with ⌥ too, from the middle), =
+  and − change every side, C centers it, and Esc puts it back.
+
+### Changed
+
+- **Window Switcher:** the pointer over a row or picture only marks it, apart from the selection. ⇥ and
+  the arrows carry on from the row they selected, and letting go of ⌘ goes there; a click still goes to
+  the row clicked.
+
 ## 0.25.3 (2026-11-02)
 
 ### Added

@@ -9,6 +9,9 @@ enum LayoutAction: String, Codable, CaseIterable {
     case firstThird, centerThird, lastThird, firstTwoThirds, lastTwoThirds
     case maximize, almostMaximize, maximizeHeight, center, larger, smaller, restore
     case previousDisplay, nextDisplay
+    /// Onto the snap grid, as it is or in the middle of the display, then
+    /// adjusted with the keys while the shortcut's modifiers are held.
+    case snapToGrid, centerOnGrid
     /// macOS's Show Desktop, on and off: no one window.
     case showDesktop
     /// For windows sharing a slot as tabs.
@@ -41,6 +44,8 @@ enum LayoutAction: String, Codable, CaseIterable {
         case .restore: return String(localized: "Restore")
         case .previousDisplay: return String(localized: "Previous display")
         case .nextDisplay: return String(localized: "Next display")
+        case .snapToGrid: return String(localized: "Snap to the grid")
+        case .centerOnGrid: return String(localized: "Center on the grid")
         case .showDesktop: return String(localized: "Show the desktop")
         case .nextTab: return String(localized: "Next window in the stack")
         case .previousTab: return String(localized: "Previous window in the stack")
@@ -77,6 +82,8 @@ enum LayoutAction: String, Codable, CaseIterable {
         case .restore: return key(kVK_Delete)
         case .previousDisplay: return key(kVK_LeftArrow, nil, co.union(.command))
         case .nextDisplay: return key(kVK_RightArrow, nil, co.union(.command))
+        case .snapToGrid: return key(kVK_ANSI_S, "S")
+        case .centerOnGrid: return key(kVK_ANSI_S, "S", co.union(.shift))
         // ⌃⌥D is the first third.
         case .showDesktop: return key(kVK_ANSI_D, "D", co.union(.command))
         case .nextTab: return key(kVK_Tab)
@@ -251,6 +258,11 @@ struct LayoutConfig: Codable, Equatable {
     var gridShortcut = Self.defaultGridShortcut
     /// By display UUID, so each monitor keeps its own.
     var grids: [String: GridSize] = [:]
+    /// The grid ⌃⌥S snaps to, by display UUID like `grids`.
+    var snapGrids: [String: SnapGrid] = [:]
+    /// The snap grid's dots while a window is being snapped; the block it
+    /// goes to shows either way.
+    var snapDots = true
     /// Points between windows and around the edges of the display. 8 is
     /// macOS's own margin, so its Fill and ours look the same.
     var gap: Double = 8
@@ -294,6 +306,8 @@ struct LayoutConfig: Codable, Equatable {
         shortcuts = (try? c.decodeIfPresent([String: Shortcut].self, forKey: .shortcuts)) ?? [:]
         gridShortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .gridShortcut)) ?? Self.defaultGridShortcut
         grids = (try? c.decodeIfPresent([String: GridSize].self, forKey: .grids)) ?? [:]
+        snapGrids = (try? c.decodeIfPresent([String: SnapGrid].self, forKey: .snapGrids)) ?? [:]
+        snapDots = (try? c.decodeIfPresent(Bool.self, forKey: .snapDots)) ?? true
         gap = min(max(try c.decodeIfPresent(Double.self, forKey: .gap) ?? 8, 0), 40)
         cycleAtEdge = try c.decodeIfPresent(Bool.self, forKey: .cycleAtEdge) ?? false
         edgeSnapping = try c.decodeIfPresent(Bool.self, forKey: .edgeSnapping) ?? true

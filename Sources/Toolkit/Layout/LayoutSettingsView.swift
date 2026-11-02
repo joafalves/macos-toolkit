@@ -33,6 +33,17 @@ struct LayoutSettingsView: View {
         ("With the mouse", "drag across the cells"),
     ]
 
+    /// While the snap grid is up after its shortcut, plain keys change the window.
+    private static let snapKeys: [(LocalizedStringResource, LocalizedStringKey?, LocalizedStringKey)] = [
+        ("Move it", nil, "←  ↑  →  ↓"),
+        ("Size it", "→ wider, ← narrower, ↓ taller, ↑ shorter, as dragging its bottom right corner. A side against the edge of the display stays there.", "⇧ ←  ↑  →  ↓"),
+        ("Size it from the middle", "The same at both ends at once, so it stays where it's centered.", "⇧⌥ ←  ↑  →  ↓"),
+        ("Larger or smaller all round", "A step on every side, staying where it's centered.", "=   −"),
+        ("Center it", nil, "C"),
+        ("Done", "Or space, or the shortcut again.", "↩"),
+        ("Undo", "Back where it was before the shortcut.", "esc"),
+    ]
+
     private func caption(_ action: LayoutAction) -> LocalizedStringKey? {
         switch action {
         case .firstThird, .centerThird, .lastThird, .firstTwoThirds, .lastTwoThirds:
@@ -43,6 +54,8 @@ struct LayoutSettingsView: View {
         case .restore: return "Back to the size and place it had before it was snapped."
         case .previousDisplay, .nextDisplay: return action == .nextDisplay ? "A snapped window stays snapped the same way." : nil
         case .showDesktop: return "Every window slides aside, as with macOS's own gesture, and the same keys bring them back where they were, snapped ones still snapped. So does a click on one."
+        case .snapToGrid: return "Lines the window in front up with the dots nearest its edges. It may change size a little."
+        case .centerOnGrid: return "Puts the window in front in the middle of the display, about the size it is, lined up with the dots."
         case .joinTabs: return "The window you're in joins the window under it."
         case .takeOutOfTabs: return "It stays where it is, on its own."
         default: return nil
@@ -126,6 +139,18 @@ struct LayoutSettingsView: View {
                 GridRow(layout: layout, display: display)
             }
         }
+
+        Card(title: "Snap Grid",
+             footnote: "For \(config.shortcut(.snapToGrid).display) and \(config.shortcut(.centerOnGrid).display). Apart from the grids above: finer, and only where the edges of windows land.") {
+            ForEach(Array(layout.displays.enumerated()), id: \.element.uuid) { index, display in
+                if index > 0 { RowDivider() }
+                SnapGridRow(layout: layout, display: display)
+            }
+            RowDivider()
+            ToggleRow(title: "Show the dots",
+                      caption: "After the shortcut, the grid shows over the display as dots. Off, only the window's outline shows.",
+                      isOn: $layout.config.snapDots)
+        }
     }
 
     @ViewBuilder private var tabsPage: some View {
@@ -181,6 +206,29 @@ struct LayoutSettingsView: View {
                 RowDivider()
                 SettingRow(title: key.0) {
                     Text(key.1).font(.callout).foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        Card(title: "Snap Grid",
+             footnote: "The snap grid of each display is on the Snapping tab.") {
+            ForEach(Array([LayoutAction.snapToGrid, .centerOnGrid].enumerated()), id: \.offset) { index, action in
+                if index > 0 { RowDivider() }
+                ShortcutRow(title: .verbatim(action.title), caption: caption(action), shortcut: binding(action),
+                            defaultValue: action.defaultShortcut, taken: taken(except: action))
+            }
+        }
+
+        Card(title: "Then, Until You're Done",
+             footnote: "For example, to make a maximized window smaller: \(config.shortcut(.snapToGrid).display), then − a few times.") {
+            SettingRow(title: "Plain keys adjust the window",
+                       caption: "The dots stay after the shortcut until you press ↩ or esc. Nothing has to be held down.") {
+                EmptyView()
+            }
+            ForEach(Array(Self.snapKeys.enumerated()), id: \.offset) { _, key in
+                RowDivider()
+                SettingRow(title: key.0, caption: key.1) {
+                    Text(key.2).font(.callout).foregroundStyle(.secondary)
                 }
             }
         }
@@ -308,6 +356,74 @@ private struct GridRow: View {
             }
             .fixedSize()
         }
+    }
+}
+
+/// One display's snap grid: its dots, and its columns and rows.
+private struct SnapGridRow: View {
+    @ObservedObject var layout: LayoutController
+    let display: LayoutDisplay
+
+    private var grid: SnapGrid { layout.snapGrid(for: display) }
+    private var custom: Bool { layout.config.snapGrids[display.uuid] != nil }
+
+    private func set(columns: Int? = nil, rows: Int? = nil) {
+        layout.config.snapGrids[display.uuid] = SnapGrid(columns: columns ?? grid.columns, rows: rows ?? grid.rows)
+    }
+
+    var body: some View {
+        SettingRow(title: .verbatim(display.name), caption: custom ? "\(grid.columns) × \(grid.rows)" : "\(grid.columns) × \(grid.rows), to suit its shape") {
+            HStack(spacing: 14) {
+                SnapGridThumbnail(grid: grid, aspect: display.usable.width / max(display.usable.height, 1))
+                Stepper(value: Binding(get: { grid.columns }, set: { set(columns: $0) }), in: SnapGrid.columnRange) {
+                    Text("\(grid.columns) across").monospacedDigit()
+                }
+                Stepper(value: Binding(get: { grid.rows }, set: { set(rows: $0) }), in: SnapGrid.rowRange) {
+                    Text("\(grid.rows) down").monospacedDigit()
+                }
+                Button { layout.config.snapGrids[display.uuid] = nil } label: { Image(systemName: "arrow.uturn.backward") }
+                    .buttonStyle(.borderless)
+                    .help("Back to the grid that suits its shape")
+                    .opacity(custom ? 1 : 0)
+                    .disabled(!custom)
+            }
+            .fixedSize()
+        }
+    }
+}
+
+/// A dot where each line of the snap grid crosses another, as on screen.
+private struct SnapDots: Shape {
+    let grid: SnapGrid
+
+    func path(in area: CGRect) -> Path {
+        var path = Path()
+        let inset: CGFloat = 3
+        let r: CGFloat = grid.columns > 32 ? 0.55 : 0.75
+        let w = (area.width - inset * 2) / CGFloat(grid.columns), h = (area.height - inset * 2) / CGFloat(grid.rows)
+        for i in 0...grid.columns {
+            for j in 0...grid.rows {
+                path.addEllipse(in: CGRect(x: inset + CGFloat(i) * w - r, y: inset + CGFloat(j) * h - r, width: r * 2, height: r * 2))
+            }
+        }
+        return path
+    }
+}
+
+/// A display drawn small, at its shape, with the snap grid's dots: dots
+/// rather than cells, so it doesn't read as the grid above.
+private struct SnapGridThumbnail: View {
+    let grid: SnapGrid
+    let aspect: CGFloat
+
+    var body: some View {
+        // Taller than the grids' pictures: a dot every two points runs together.
+        let height: CGFloat = 52
+        SnapDots(grid: grid)
+            .fill(Color.primary.opacity(0.5))
+            .frame(width: min(max(height * aspect, 30), 150), height: height)
+            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Color.primary.opacity(0.2)))
     }
 }
 

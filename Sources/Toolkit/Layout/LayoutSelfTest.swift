@@ -53,6 +53,39 @@ extension LayoutController {
         check("a resized one too", !LayoutController.leftByDisplays(CGRect(x: 0, y: 25, width: 900, height: 957), applied: snapped, shift: nil))
         check("a display gets halves", GridSize.suggested(for: laptop.frame.size) == GridSize(columns: 2, rows: 1))
         check("an ultrawide gets quarters", GridSize.suggested(for: wide.frame.size) == GridSize(columns: 4, rows: 1))
+        // The snap grid: each edge to the nearest line, the middle on the dots.
+        let dots = SnapGrid(columns: 24, rows: 12)
+        let area = laptop.usable, g: CGFloat = 8
+        let step = dots.step(in: area, gap: g)
+        let block = SnapCells(left: 2, top: 1, right: 10, bottom: 7)
+        let placed = LayoutGeometry.place(dots.unit(of: block), in: area, gap: g)
+        check("snap grid suggestions", SnapGrid.suggested(for: laptop.usable.size).columns == 24 && SnapGrid.suggested(for: wide.usable.size).columns == 48)
+        check("a snapped window snaps where it is", dots.snapping(placed, in: area, gap: g) == block, "\(dots.snapping(placed, in: area, gap: g))")
+        check("a window a little off goes to the nearest lines",
+              dots.snapping(placed.offsetBy(dx: step.width * 0.4, dy: -step.height * 0.4), in: area, gap: g) == block)
+        check("one smaller than a step gets a step",
+              dots.snapping(CGRect(x: placed.minX + 5, y: placed.minY + 5, width: 10, height: 10), in: area, gap: g).width == 1)
+        check("one bigger than the display fills it", dots.snapping(area.insetBy(dx: -50, dy: -50), in: area, gap: g) == SnapCells(left: 0, top: 0, right: 24, bottom: 12))
+        let centered = dots.centering(placed.offsetBy(dx: 37, dy: 21), in: area, gap: g)
+        check("centered keeps about the size, the same each side",
+              centered.width == 8 && centered.left == 24 - centered.right && centered.top == 12 - centered.bottom, "\(centered)")
+        check("odd sizes centre on an even grid a step larger or smaller", SnapGrid.centered(steps: 7.4, of: 24) == 8 && SnapGrid.centered(steps: 6.6, of: 24) == 6)
+        check("and odd ones on an odd grid", SnapGrid.centered(steps: 7.2, of: 15) == 7)
+        check("moving stops at the edge", SnapCells(left: 0, top: 0, right: 4, bottom: 4).moved(dx: -1, dy: 1, in: dots) == SnapCells(left: 0, top: 1, right: 4, bottom: 5))
+        check("a side pulled in stops at one step", SnapCells(left: 3, top: 3, right: 4, bottom: 5).pushed(.right, by: -1, in: dots) == SnapCells(left: 3, top: 3, right: 4, bottom: 5))
+        check("growing every side at an edge grows the others",
+              SnapCells(left: 0, top: 2, right: 6, bottom: 6).inflated(by: 1, in: dots) == SnapCells(left: 0, top: 1, right: 7, bottom: 7))
+        check("a window that stays larger is covered by the block", dots.covering(placed.insetBy(dx: -10, dy: -5), in: area, gap: g) == SnapCells(left: 1, top: 0, right: 11, bottom: 8))
+        check("and one that fits needs no more", dots.covering(placed, in: area, gap: g) == block)
+        check("⇧→ widens from the top left", SnapCells(left: 2, top: 2, right: 6, bottom: 6).resized(across: true, by: 1, in: dots) == SnapCells(left: 2, top: 2, right: 7, bottom: 6))
+        check("against the right edge it widens to the left", SnapCells(left: 12, top: 0, right: 24, bottom: 12).resized(across: true, by: 1, in: dots) == SnapCells(left: 11, top: 0, right: 24, bottom: 12))
+        check("and narrows from the left", SnapCells(left: 12, top: 0, right: 24, bottom: 12).resized(across: true, by: -1, in: dots) == SnapCells(left: 13, top: 0, right: 24, bottom: 12))
+        check("filling the width, it only narrows", SnapCells(left: 0, top: 0, right: 24, bottom: 12).resized(across: true, by: 1, in: dots) == SnapCells(left: 0, top: 0, right: 24, bottom: 12)
+              && SnapCells(left: 0, top: 0, right: 24, bottom: 12).resized(across: true, by: -1, in: dots) == SnapCells(left: 0, top: 0, right: 23, bottom: 12))
+        check("against the bottom it grows up", SnapCells(left: 0, top: 6, right: 24, bottom: 12).resized(across: false, by: 1, in: dots) == SnapCells(left: 0, top: 5, right: 24, bottom: 12))
+        check("a step is as small as it gets", SnapCells(left: 3, top: 3, right: 4, bottom: 4).resized(across: true, by: -1, in: dots) == SnapCells(left: 3, top: 3, right: 4, bottom: 4))
+        check("half the snap grid is the half", LayoutWindow.near(LayoutGeometry.place(dots.unit(of: SnapCells(left: 0, top: 0, right: 12, bottom: 12)), in: area, gap: g),
+                                                               LayoutGeometry.place(LayoutGeometry.unit(for: .leftHalf)!, in: area, gap: g)))
         // Stopping at the edge between displays. While held, the cursor
         // doesn't move, so events keep coming at the held point and only
         // their movement says where the mouse went. The first event after

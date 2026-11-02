@@ -150,7 +150,7 @@ enum Snapshot {
     /// The Window Layout grid over a made-up desktop: a drawn backdrop and
     /// stand-in windows, nothing from the screen. With `slots`, the bar of
     /// layouts shown while a window is dragged with ⌥.
-    static func writeLayoutGrid(to path: String, light: Bool, slots: Bool = false) {
+    static func writeLayoutGrid(to path: String, light: Bool, slots: Bool = false, snap: Bool = false) {
         _ = NSApplication.shared
         let size = CGSize(width: 1512, height: 982)
         let display = LayoutDisplay(id: 1, uuid: "preview", name: "Built-in Display",
@@ -160,7 +160,16 @@ enum Snapshot {
         range.cursor = CellRange.Cell(column: 2, row: 1)
         let gap: CGFloat = 8
         let overlay = LayoutOverlayView(display: display)
-        if slots {
+        // A window just put on the snap grid by ⌃⌥S, with the grid still up.
+        let snapGrid = SnapGrid.suggested(for: display.usable.size)
+        let snapCells = SnapCells(left: 3, top: 2, right: 13, bottom: 10)
+        if snap {
+            overlay.content = LayoutOverlayContent(
+                highlight: LayoutGeometry.place(snapGrid.unit(of: snapCells), in: display.usable, gap: gap),
+                gap: gap, snapGrid: snapGrid, snapCells: snapCells,
+                hintParts: ["←↑↓→ move", "⇧ + arrows size", "= − all round", "C center", "↩ done", "esc undo"],
+                hintNote: .init(parts: 1...1, text: "with ⌥, from the middle"))
+        } else if slots {
             var picker = SlotPicker(display: display, pointer: CGPoint(x: 560, y: 360))
             picker.hovered = SlotPicker.Hit(layout: 4, zone: 0)
             overlay.content = LayoutOverlayContent(
@@ -179,7 +188,10 @@ enum Snapshot {
             NSGradient(colors: colors)?.draw(in: rect, angle: 60)
             (light ? NSColor(white: 1, alpha: 0.7) : NSColor(white: 0.1, alpha: 0.7)).setFill()
             NSRect(x: 0, y: 0, width: rect.width, height: 33).fill()
-            let windows: [(NSColor, CGRect, Bool)] = [
+            let windows: [(NSColor, CGRect, Bool)] = snap ? [
+                (.systemOrange, CGRect(x: 960, y: 420, width: 420, height: 330), true),
+                (.systemBlue, CGRect(x: 196, y: 165, width: 619, height: 490), true),
+            ] : [
                 (.systemOrange, CGRect(x: 820, y: 120, width: 600, height: 420), true),
                 (.systemBlue, CGRect(x: 150, y: 300, width: 640, height: 400), true),
             ]
