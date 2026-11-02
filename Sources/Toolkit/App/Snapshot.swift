@@ -51,7 +51,7 @@ enum Snapshot {
 
     /// The window switcher's list, or with `grid` its previews, filled with
     /// made-up rows and drawn stand-ins for windows: nothing from the screen.
-    static func writeSwitcher(to path: String, light: Bool, grid: Bool = false, colors: Bool = false, many: Bool = false, query: String? = nil) {
+    static func writeSwitcher(to path: String, light: Bool, grid: Bool = false, colors: Bool = false, many: Bool = false, oneRow: Bool = false, query: String? = nil) {
         _ = NSApplication.shared
         func icon(_ app: String) -> NSImage {
             let path = ["/System/Applications/\(app).app", "/System/Applications/Utilities/\(app).app", "/Applications/\(app).app"]
@@ -93,7 +93,12 @@ enum Snapshot {
         if grid {
             model.style = .previews
             model.layout = GridLayout(count: model.items.count, maxTileWidth: PreviewSize.medium.maxTileWidth,
-                                      area: SwitcherPanel.gridArea(on: CGSize(width: 2560, height: 1409), percent: 55))
+                                      area: SwitcherPanel.gridArea(on: CGSize(width: 2560, height: 1409), percent: 55), oneRow: oneRow)
+            // In one row, some way along it.
+            if oneRow, model.layout.scrolls {
+                model.selection = min(6, model.items.count - 1)
+                model.layout = model.layout.showing(model.selection)
+            }
             let colors: [NSColor] = [.systemBlue, .darkGray, .systemOrange, .systemYellow, .systemRed, .systemGray]
             for (index, item) in model.items.enumerated() where item.state == .window || item.state == .minimized {
                 guard let id = item.window, let image = fakeWindow(accent: colors[index % colors.count], dark: !light, wide: index % 3 != 2) else { continue }

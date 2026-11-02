@@ -205,6 +205,16 @@ enum SwitcherSearch {
         check("the sixth window always starts the second row", Set(places.map { $0.frame(of: 5).origin }).count == 1)
         check("the last row starts at the left", places[0].frame(of: 5).minX == places[0].frame(of: 0).minX)
         check("a point less of width is one column less, not two", grid(9, .medium, 91, on: laptop).columns == 4)
+        // One row that scrolls.
+        let row = GridLayout(count: 14, maxTileWidth: PreviewSize.medium.maxTileWidth, area: SwitcherPanel.gridArea(on: laptop, percent: 92), oneRow: true)
+        check("one row as many across as the grid", row.columns == 5 && row.rows == 1 && row.scrolls)
+        check("it starts at the start", row.showing(1).first == 0)
+        check("the next one shows beside the selection", row.showing(4).first == 1 && row.showing(4).onScreen == 1..<6)
+        check("and going back, the one before", row.showing(4).showing(1).first == 0 && row.showing(9).showing(5).first == 4)
+        check("never past the end", row.showing(13).first == 9 && row.scrolled(to: 40).first == 9)
+        check("its dots under it", row.size.height == grid(5, .medium, 92, on: laptop).size.height + GridLayout.dotsHeight)
+        let few = GridLayout(count: 4, maxTileWidth: PreviewSize.medium.maxTileWidth, area: SwitcherPanel.gridArea(on: laptop, percent: 92), oneRow: true)
+        check("windows that all fit don't scroll", !few.scrolls && few.showing(3).first == 0)
         func display(_ uuid: String) -> LayoutDisplay {
             LayoutDisplay(id: 0, uuid: uuid, name: uuid, frame: CGRect(x: 0, y: 0, width: 2800, height: 1400), usable: CGRect(x: 0, y: 0, width: 2800, height: 1400))
         }

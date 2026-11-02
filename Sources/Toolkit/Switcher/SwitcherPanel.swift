@@ -126,23 +126,30 @@ struct GridLayout: Equatable {
     /// What a tile has beyond that, so its bar's two lines don't take from the picture.
     static let extraHeight: CGFloat = 14
     static let minimumWidth: CGFloat = 96
+    /// Under one row that scrolls: its dots.
+    static let dotsHeight: CGFloat = 22
 
     var tile = CGSize(width: 260, height: 260 * GridLayout.aspect + GridLayout.extraHeight)
     var columns = 1
     var count = 0
+    /// One row, `columns` tiles of it on screen at a time, from `first`.
+    var oneRow = false
+    var first = 0
 
     init() {}
 
-    init(count: Int, maxTileWidth: CGFloat, area: CGSize) {
+    init(count: Int, maxTileWidth: CGFloat, area: CGSize, oneRow: Bool = false) {
         self.count = count
+        self.oneRow = oneRow
         let n = max(count, 1)
         // Never wider than the area: one tile would be, with a narrow one.
         var width = max(min(maxTileWidth, area.width - Self.padding * 2), Self.minimumWidth)
         var columns = 1
         while true {
             columns = min(n, Self.across(area.width, tile: width))
-            let rows = Int(ceil(Double(n) / Double(columns)))
-            let height = CGFloat(rows) * (width * Self.aspect + Self.extraHeight) + CGFloat(rows - 1) * Self.spacing + Self.padding * 2
+            let rows = oneRow ? 1 : Int(ceil(Double(n) / Double(columns)))
+            let dots = oneRow && columns < n ? Self.dotsHeight : 0
+            let height = CGFloat(rows) * (width * Self.aspect + Self.extraHeight) + CGFloat(rows - 1) * Self.spacing + Self.padding * 2 + dots
             if height <= area.height || width <= Self.minimumWidth { break }
             width -= 4
         }
@@ -150,7 +157,10 @@ struct GridLayout: Equatable {
         tile = CGSize(width: width.rounded(), height: (width * Self.aspect + Self.extraHeight).rounded())
     }
 
-    var rows: Int { max(1, Int(ceil(Double(max(count, 1)) / Double(columns)))) }
+    var rows: Int { oneRow ? 1 : max(1, Int(ceil(Double(max(count, 1)) / Double(columns)))) }
+
+    /// More windows in the one row than are on screen.
+    var scrolls: Bool { oneRow && count > columns }
 
     /// How many tiles of this width fit across `width`, at most.
     static func across(_ width: CGFloat, tile: CGFloat) -> Int {
@@ -159,28 +169,51 @@ struct GridLayout: Equatable {
 
     var size: CGSize {
         CGSize(width: CGFloat(columns) * tile.width + CGFloat(columns - 1) * Self.spacing + Self.padding * 2,
-               height: CGFloat(rows) * tile.height + CGFloat(rows - 1) * Self.spacing + Self.padding * 2)
+               height: CGFloat(rows) * tile.height + CGFloat(rows - 1) * Self.spacing + Self.padding * 2 + (scrolls ? Self.dotsHeight : 0))
     }
 
     private func tiles(inRow row: Int) -> Int {
         min(columns, count - row * columns)
     }
 
+    /// Where a tile is; in one row, off to the side for one scrolled away.
     func frame(of index: Int) -> CGRect {
-        let row = index / columns, column = index % columns
+        let row = oneRow ? 0 : index / columns, column = oneRow ? index - first : index % columns
         let x = Self.padding + CGFloat(column) * (tile.width + Self.spacing)
         let y = Self.padding + CGFloat(row) * (tile.height + Self.spacing)
         return CGRect(x: x, y: y, width: tile.width, height: tile.height)
     }
 
+    /// The tiles on screen: all of them, or the stretch of the one row.
+    var onScreen: Range<Int> {
+        oneRow ? first..<min(count, first + columns) : 0..<count
+    }
+
     func index(at point: CGPoint) -> Int? {
-        (0..<count).first { frame(of: $0).contains(point) }
+        onScreen.first { frame(of: $0).contains(point) }
+    }
+
+    /// Scrolled so the selection is on screen, with a tile beside it on the
+    /// side it's heading for when there's room for one: what comes next shows.
+    func showing(_ selection: Int) -> GridLayout {
+        guard scrolls else { var layout = self; layout.first = 0; return layout }
+        let margin = columns >= 3 ? 1 : 0
+        var first = first
+        if selection < first + margin { first = selection - margin }
+        if selection > first + columns - 1 - margin { first = selection - columns + 1 + margin }
+        return scrolled(to: first)
+    }
+
+    func scrolled(to first: Int) -> GridLayout {
+        var layout = self
+        layout.first = scrolls ? min(max(first, 0), count - columns) : 0
+        return layout
     }
 
     /// The tile above (`rows` -1) or below (+1), the one nearest across.
     func neighbour(of index: Int, rows step: Int) -> Int {
         let row = index / columns + step
-        guard row >= 0, row < rows else { return index }
+        guard !oneRow, row >= 0, row < rows else { return index }
         let x = frame(of: index).midX
         let candidates = (row * columns)..<(row * columns + tiles(inRow: row))
         return candidates.min { abs(frame(of: $0).midX - x) < abs(frame(of: $1).midX - x) } ?? index
@@ -191,19 +224,96 @@ struct SwitcherGridView: View {
     @ObservedObject var model: SwitcherListModel
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            ForEach(Array(model.items.enumerated()), id: \.element.id) { index, item in
-                let frame = model.layout.frame(of: index)
-                PreviewTile(item: item, image: item.window.flatMap { model.previews[$0] },
-                            number: index < 9 ? index + 1 : nil, selected: index == model.selection,
-                            hovered: index == model.hovered && index != model.selection, badge: model.badge(of: item),
-                            sounds: model.sounds(item),
-                            width: frame.width, icons: model.previewIcons)
-                    .frame(width: frame.width, height: frame.height)
-                    .offset(x: frame.minX, y: frame.minY)
+        let layout = model.layout
+        VStack(spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(model.items.enumerated()), id: \.element.id) { index, item in
+                    let frame = layout.frame(of: index)
+                    PreviewTile(item: item, image: item.window.flatMap { model.previews[$0] },
+                                number: index < 9 ? index + 1 : nil, selected: index == model.selection,
+                                hovered: index == model.hovered && index != model.selection, badge: model.badge(of: item),
+                                sounds: model.sounds(item),
+                                width: frame.width, icons: model.previewIcons)
+                        .frame(width: frame.width, height: frame.height)
+                        .offset(x: frame.minX, y: frame.minY)
+                }
+            }
+            .frame(width: layout.size.width, height: layout.size.height - (layout.scrolls ? GridLayout.dotsHeight : 0), alignment: .topLeading)
+            // The one row slides; only while it moves, so nothing animates at rest.
+            .animation(.easeOut(duration: 0.18), value: layout.first)
+            .clipped()
+            .mask { if layout.scrolls { RowEdges(before: layout.first > 0, after: layout.first + layout.columns < layout.count) } else { Rectangle() } }
+            if layout.scrolls {
+                RowDots(count: layout.count, onScreen: layout.onScreen, selection: model.selection)
+                    .frame(height: GridLayout.dotsHeight, alignment: .top)
             }
         }
-        .frame(width: model.layout.size.width, height: model.layout.size.height, alignment: .topLeading)
+        .frame(width: layout.size.width, height: layout.size.height, alignment: .topLeading)
+    }
+}
+
+/// The one row fades out at an end with more beyond it.
+private struct RowEdges: View {
+    let before: Bool
+    let after: Bool
+    // Past the margin and a little way into the tile at the end.
+    private static let fade: CGFloat = 64
+
+    var body: some View {
+        HStack(spacing: 0) {
+            LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing).frame(width: before ? Self.fade : 0)
+            Rectangle()
+            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: after ? Self.fade : 0)
+        }
+    }
+}
+
+/// Where the one row is: a dot for each window, brighter for those on
+/// screen, the selection's long and in the accent colour. With more than
+/// `most`, only those around what's on screen, the outer two smaller where
+/// the row goes on, and how many more beside them.
+private struct RowDots: View {
+    let count: Int
+    let onScreen: Range<Int>
+    let selection: Int
+    static let most = 11
+
+    /// The windows that get a dot.
+    private var dotted: Range<Int> {
+        guard count > Self.most else { return 0..<count }
+        let middle = Double(onScreen.lowerBound + onScreen.upperBound) / 2
+        let from = min(max(Int((middle - Double(Self.most) / 2).rounded()), 0), count - Self.most)
+        return from..<from + Self.most
+    }
+
+    private func scale(_ index: Int) -> CGFloat {
+        guard index != selection else { return 1 }
+        let range = dotted
+        let fromEnd = min(range.lowerBound > 0 ? index - range.lowerBound : .max, range.upperBound < count ? range.upperBound - 1 - index : .max)
+        return fromEnd == 0 ? 0.45 : fromEnd == 1 ? 0.7 : 1
+    }
+
+    var body: some View {
+        let range = dotted
+        HStack(spacing: 8) {
+            Text(verbatim: range.lowerBound > 0 ? "+\(range.lowerBound)" : "")
+                .frame(minWidth: 26, alignment: .trailing)
+            HStack(spacing: 6) {
+                ForEach(range, id: \.self) { index in
+                    Capsule()
+                        .fill(index == selection ? Color.accentColor : Color.primary.opacity(onScreen.contains(index) ? 0.55 : 0.2))
+                        .frame(width: index == selection ? 14 : 6, height: 6)
+                        .scaleEffect(scale(index))
+                }
+            }
+            Text(verbatim: range.upperBound < count ? "+\(count - range.upperBound)" : "")
+                .frame(minWidth: 26, alignment: .leading)
+        }
+        .font(.system(size: 11, weight: .medium).monospacedDigit())
+        .foregroundStyle(.secondary)
+        .animation(.easeOut(duration: 0.18), value: selection)
+        .animation(.easeOut(duration: 0.18), value: onScreen)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -628,6 +738,8 @@ final class SwitcherPanel {
     /// Set before `show`, for the session.
     var style = SwitcherStyle.list
     var previewSize = PreviewSize.medium
+    /// The switcher's; Window Layout's suggestions keep the grid.
+    var previewLayout = PreviewLayout.grid
     var scale: CGFloat = 2
     /// The switcher's setting, for Window Layout's suggestions as well.
     static var previewIcons = PreviewIcons.small
@@ -651,7 +763,9 @@ final class SwitcherPanel {
         if style == .previews, !items.isEmpty || query.isEmpty {
             let area = fills ? CGSize(width: screen.width - Self.inset * 2, height: screen.height - Self.inset * 2)
                              : Self.gridArea(on: screen.size, percent: gridWidth)
-            let layout = GridLayout(count: items.count, maxTileWidth: previewSize.maxTileWidth, area: area)
+            var layout = GridLayout(count: items.count, maxTileWidth: previewSize.maxTileWidth, area: area, oneRow: previewLayout == .row)
+            // The one row stays scrolled where it was, as far as the selection allows.
+            layout = layout.scrolled(to: model.layout.oneRow ? model.layout.first : 0).showing(selection)
             if model.items.map(\.id) != items.map(\.id) { model.hovered = nil }
             model.items = items
             model.selection = selection
@@ -698,6 +812,8 @@ final class SwitcherPanel {
         guard isVisible else { return }
         isVisible = false
         model.hovered = nil
+        // The next time starts at the start of the row.
+        model.layout.first = 0
         // Closed under the pointer: no hand left behind over whatever's there.
         catcher?.pointing(false)
         searchTop = nil
@@ -784,11 +900,25 @@ private final class MouseCatcher: NSView {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        guard panel?.style == .list else { return }
+        guard let panel else { return }
+        if panel.style == .previews {
+            // The one row, a tile at a time, either way the wheel or the trackpad goes.
+            let layout = panel.model.layout
+            guard layout.scrolls else { return }
+            let delta = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) ? -event.scrollingDeltaX : -event.scrollingDeltaY
+            let step = layout.tile.width + GridLayout.spacing
+            scrolled += event.hasPreciseScrollingDeltas ? delta : delta * step
+            let tiles = Int(scrolled / step)
+            guard tiles != 0 else { return }
+            scrolled -= CGFloat(tiles) * step
+            panel.model.layout = layout.scrolled(to: layout.first + tiles)
+            return
+        }
+        guard panel.style == .list else { return }
         scrolled += event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * SwitcherListView.rowHeight
         let rows = Int(scrolled / SwitcherListView.rowHeight)
         guard rows != 0 else { return }
         scrolled -= CGFloat(rows) * SwitcherListView.rowHeight
-        panel?.model.scroll(by: -rows)
+        panel.model.scroll(by: -rows)
     }
 }

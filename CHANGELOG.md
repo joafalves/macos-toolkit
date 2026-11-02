@@ -5,6 +5,12 @@ worked on; it gets its date when it's released.
 
 ## 0.26.1 (unreleased)
 
+### Added
+
+- **Window Switcher:** Layout: One row, for the previews. Every window in one row, as many on screen as
+  fit, sliding along as you go with the next one always in sight. Dots below show where you are, and how
+  many more there are at either end. The wheel or a trackpad slides it too.
+
 ### Fixed
 
 - **Window Switcher:** the grid keeps the same columns however many windows there are, and fills its

@@ -89,6 +89,10 @@ struct SwitcherSettingsView: View {
                               isOn: $switcher.config.appColors)
                     if switcher.config.style == .previews {
                         RowDivider()
+                        OptionRow(title: "Layout", caption: "Rows of pictures, or one row that slides along as you go, with dots below for where you are in it.",
+                                  selection: $switcher.config.previewLayout,
+                                  options: PreviewLayout.allCases.map { ($0, $0.title) })
+                        RowDivider()
                         OptionRow(title: "App icons", caption: "Small and medium icons sit in the bar, beside the app's name. Large ones are in the top right corner of the picture, with the app's badge.",
                                   selection: $switcher.config.previewIcons,
                                   options: [(.small, "Small"), (.medium, "Medium"), (.large, "Large")])
@@ -101,7 +105,9 @@ struct SwitcherSettingsView: View {
 
                 if switcher.config.style == .previews {
                     Card(title: "Sizing",
-                         footnote: "How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with what suits its size.") {
+                         footnote: switcher.config.previewLayout == .row
+                            ? "How much of a display's width the row can use. Windows that don't fit are further along it. Each display keeps its own, and a new one starts with what suits its size."
+                            : "How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with what suits its size.") {
                         // Here because each display's "across" is its width divided by this.
                         OptionRow(title: "Tile size", caption: "The largest a tile gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows.",
                                   selection: $switcher.config.previewSize,

@@ -437,6 +437,7 @@ final class SwitcherController: ObservableObject {
             let previews = self.config.style == .previews && SwitcherPreviews.permitted
             self.panel.style = previews ? .previews : .list
             self.panel.previewSize = self.config.previewSize
+            self.panel.previewLayout = self.config.previewLayout
             if let screen = SwitcherPanel.screen(for: self.config.placement) {
                 self.panel.gridWidth = self.config.gridWidth(for: LayoutDisplay(screen))
             }
@@ -507,7 +508,8 @@ final class SwitcherController: ObservableObject {
         shownOn = nil
     }
 
-    private var grid: Bool { panel.isVisible && panel.style == .previews }
+    /// Up and down go between rows; in one row, as in the list, to the next and previous.
+    private var grid: Bool { panel.isVisible && panel.style == .previews && !panel.model.layout.oneRow }
 
     // MARK: - Previews
 
