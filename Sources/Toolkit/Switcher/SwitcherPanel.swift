@@ -338,7 +338,10 @@ private struct PreviewTile: View {
     private var label: some View {
         HStack(spacing: 8) {
             if icons != .large, let icon = item.icon {
+                // Less after it, for the icon's own empty margin (2 pt at 24 pt):
+                // the name then sits as far from it as the icon from the edge.
                 Image(nsImage: icon).resizable().interpolation(.high).frame(width: barIcon, height: barIcon)
+                    .padding(.trailing, -4)
             }
             let name = Text(item.appName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
             if icons == .medium {
@@ -363,9 +366,9 @@ private struct PreviewTile: View {
         }
         .foregroundStyle(.white)
         .opacity(item.tint != nil && item.dimmed ? 0.65 : 1)
-        // A 24 pt icon has 2 pt of empty margin of its own (measured): less here,
+        // An icon has 2 to 3 pt of empty margin of its own (measured): less here,
         // so the gap on its left looks like the one after the text on the right.
-        .padding(.leading, icons == .small && item.icon != nil ? 6 : 8)
+        .padding(.leading, icons != .large && item.icon != nil ? 6 : 8)
         .padding(.trailing, 8)
         .frame(height: barHeight)
         .background(item.tint.map(AppPalette.selected) ?? Color.black.opacity(0.55))
@@ -519,6 +522,7 @@ final class SwitcherPanel {
     let model = SwitcherListModel()
     /// The pointer moved onto the row at this index, when `hoverSelects`.
     var onHover: (Int) -> Void = { _ in }
+    private weak var catcher: MouseCatcher?
     /// Whether the row under the pointer is the selection. When not, it's
     /// only marked, and the keys go on from where they left the selection.
     var hoverSelects = true
@@ -570,6 +574,7 @@ final class SwitcherPanel {
         let list = NSHostingView(rootView: SwitcherView(model: model))
         let mouse = MouseCatcher()
         mouse.panel = self
+        catcher = mouse
         for view in [list, mouse] {
             view.frame = background.bounds
             view.autoresizingMask = [.width, .height]
@@ -694,6 +699,8 @@ final class SwitcherPanel {
         guard isVisible else { return }
         isVisible = false
         model.hovered = nil
+        // Closed under the pointer: no hand left behind over whatever's there.
+        catcher?.pointing(false)
         searchTop = nil
         query = ""
         model.query = ""
@@ -748,6 +755,7 @@ private final class MouseCatcher: NSView {
     override func mouseMoved(with event: NSEvent) {
         guard let panel else { return }
         let index = index(of: event)
+        pointing(index != nil)
         if panel.hoverSelects {
             if let index { panel.onHover(index) }
         } else if panel.model.hovered != index {
@@ -756,7 +764,20 @@ private final class MouseCatcher: NSView {
     }
 
     override func mouseExited(with event: NSEvent) {
+        pointing(false)
         if panel?.model.hovered != nil { panel?.model.hovered = nil }
+    }
+
+    private var pointingHand = false
+
+    /// The hand over a window, as over a link: a click goes there. The panel
+    /// is never in the active app, which macOS doesn't let set the cursor
+    /// unless asked, as the capture overlay does.
+    func pointing(_ on: Bool) {
+        guard on != pointingHand else { return }
+        pointingHand = on
+        if on { CaptureCursor.allowInBackground() }
+        (on ? NSCursor.pointingHand : NSCursor.arrow).set()
     }
 
     override func mouseDown(with event: NSEvent) {

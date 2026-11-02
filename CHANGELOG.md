@@ -19,7 +19,7 @@ worked on; it gets its date when it's released.
 
 - **Window Switcher:** the pointer over a row or picture only marks it, apart from the selection. ⇥ and
   the arrows carry on from the row they selected, and letting go of ⌘ goes there; a click still goes to
-  the row clicked.
+  the row clicked. Over a window, the pointer is a hand.
 
 ## 0.25.3 (2026-11-02)
 

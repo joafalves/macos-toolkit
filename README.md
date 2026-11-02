@@ -293,7 +293,7 @@ a window come last, dimmed.
 | letters | Search what's listed: apps by name, then windows by title. Below those, a few apps it doesn't list, to open them |
 | ⌫, esc | Take back a letter; esc clears the search, then cancels |
 | release ⌘ | Go to the selected row |
-| click | Go to the row clicked. The pointer only marks the row it's over: the keys carry on from the one they selected |
+| click | Go to the row clicked. The pointer, a hand over a window, only marks the row it's over: the keys carry on from the one they selected |
 | esc | Cancel |
 | ⇧W, ⇧M | Close / minimize the window |
 | ⇧H, ⇧Q | Hide / quit the app |
