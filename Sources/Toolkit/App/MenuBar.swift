@@ -124,6 +124,7 @@ final class MenuBarItem: NSObject {
             // Displays connected, removed or changed: a bar of another height
             // is another key, measured afresh.
             center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.bars = [:]
                 self?.render()
             },
         ]
@@ -234,24 +235,27 @@ final class MenuBarItem: NSObject {
     /// until the main one has, the display it's on stands in.
     /// Whole points, so it's sharp on a 1x display too.
     ///
-    /// The visible frame stops a point below the menu bar (measured: 34 pt
-    /// under a 33 pt bar beside a notch, 31 under a 30 pt one), so the bar is
-    /// a point less: taken whole, its middle was half a point low and, rounded,
-    /// the item a point under every other beside the notch. The item's window
-    /// is no measure: it's 33 pt on both, over the top of the 30 pt one.
+    /// The bar is the menu bar's own window, as the window server has it on
+    /// that display: the visible frame gave it a point short of the bar on
+    /// macOS 27 and right on macOS 26, and the item a point high there. The
+    /// item's window is no measure: it's 33 pt on both, over the top of the
+    /// 30 pt one. `--test-menu-bar-center` measures where it all ends up.
     private func lower() -> MenuBarLower {
-        guard let button, let place = button.superview, let window = button.window, let screen = window.screen else { return MenuBarLower() }
-        let bar = screen.frame.maxY - screen.visibleFrame.maxY - 1
-        // No menu bar showing (hidden, or full screen), or not placed yet.
-        guard bar > 0, window.frame.height >= place.frame.height else { return MenuBarLower() }
-        let middle = window.convertToScreen(place.convert(place.bounds, to: nil)).midY
-        let here = (middle - (screen.frame.maxY - bar / 2)).rounded()
-        if let key = Self.key(of: screen), measured[key] != here {
-            measured[key] = here
-            UserDefaults.standard.set(measured.mapValues(Double.init), forKey: Self.measuredKey)
+        var here: CGFloat?
+        // Not when no menu bar is showing (hidden, or full screen), or not placed yet:
+        // what was measured before stands.
+        if let button, let place = button.superview, let window = button.window, let screen = window.screen,
+           window.frame.height >= place.frame.height, let key = Self.key(of: screen), let bar = bar(on: screen, key: key) {
+            let middle = window.convertToScreen(place.convert(place.bounds, to: nil)).midY
+            let value = (middle - (screen.frame.maxY - bar / 2)).rounded()
+            here = value
+            if measured[key] != value {
+                measured[key] = value
+                UserDefaults.standard.set(measured.mapValues(Double.init), forKey: Self.measuredKey)
+            }
         }
         let main = NSScreen.screens.first
-        var result = MenuBarLower(fallback: main.flatMap(Self.key).flatMap { measured[$0] } ?? here)
+        var result = MenuBarLower(fallback: main.flatMap(Self.key).flatMap { measured[$0] } ?? here ?? 0)
         // The main display first, so it has its scale when another shares it.
         for display in NSScreen.screens {
             guard let key = Self.key(of: display), let value = measured[key],
@@ -262,8 +266,28 @@ final class MenuBarItem: NSObject {
     }
 
     /// What each display needs (`lower`), as measured while the item was on it.
+    /// One measured against a bar a point short (on macOS 26, before 0.26.2)
+    /// is put right the next time the item is on that display.
     private var measured = (UserDefaults.standard.dictionary(forKey: MenuBarItem.measuredKey) as? [String: Double] ?? [:]).mapValues { CGFloat($0) }
     private static let measuredKey = "menuBarLower"
+
+    /// Each display's menu bar height, by `key`: read once, since `lower`
+    /// runs on every update.
+    private var bars: [String: CGFloat] = [:]
+
+    private func bar(on screen: NSScreen, key: String) -> CGFloat? {
+        if let known = bars[key] { return known }
+        let level = Int(CGWindowLevelForKey(.mainMenuWindow)), frame = Coordinates.toCG(screen.frame)
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        let height = windows.lazy.compactMap { info -> CGFloat? in
+            guard info[kCGWindowLayer as String] as? Int == level,
+                  let bounds = (info[kCGWindowBounds as String] as? NSDictionary).flatMap({ CGRect(dictionaryRepresentation: $0) }),
+                  abs(bounds.minY - frame.minY) < 1, bounds.midX > frame.minX, bounds.midX < frame.maxX, bounds.height > 0 else { return nil }
+            return bounds.height
+        }.first
+        if let height { bars[key] = height }
+        return height
+    }
 
     /// A display by its UUID, which stays across restarts (its number may
     /// not), and the height of its bar, which a change of resolution or a

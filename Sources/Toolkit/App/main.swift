@@ -399,6 +399,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--log-wheel"), CommandLine.a
     WheelProbe.log(into: CommandLine.arguments[flag + 1], seconds: seconds)
     exit(0)
 }
+if let flag = CommandLine.arguments.firstIndex(of: "--test-menu-bar-center"), CommandLine.arguments.count > flag + 1 {
+    MenuBarCenterTest.run(into: CommandLine.arguments[flag + 1])
+    exit(0)
+}
 if let flag = CommandLine.arguments.firstIndex(of: "--test-menu-bar-tint"), CommandLine.arguments.count > flag + 1 {
     MenuBarRow.tintTest(into: CommandLine.arguments[flag + 1])
     exit(0)

@@ -199,7 +199,7 @@ tool; keep it in step with the code.
   - A template image filled with a colour uses `.sourceIn`, keeping the colour's own opacity as
     macOS does. macOS puts the item's 22 pt place off the middle of some menu bars (a point high
     in a 30 pt one) and in the middle of others (33 pt, beside a notch); `MenuBarItem.lower` works
-    it out from that place's frame (the button's superview, not the button, which is taller), against the bar's middle (a point less than the visible frame leaves, which stops a point below the bar; the item's window is 33 pt whatever the bar), and
+    it out from that place's frame (the button's superview, not the button, which is taller), against the middle of the bar, the menu bar's own window as the window server has it on that display (the visible frame stops a point below the bar on macOS 27 and right at it on macOS 26; the item's window is 33 pt whatever the bar), and
     again when the item moves or changes display. Each display needs its own, for the item and
     macOS's copy of it alike (measured), and they share the image. macOS draws it again at each
     display's scale, so displays of different scales each get their own (`MenuBarLower`); two of the
@@ -401,6 +401,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-menu-bar-idle    # each kind of part, in a real menu bar item, costs nothing left alone
 .build/debug/Toolkit --test-menu-bar-widths  # each part keeps its width as its figure changes
 .build/debug/Toolkit --test-menu-bar-tint <png>   # coloured text in a real menu bar item, captured (open -n; delete the png)
+.build/debug/Toolkit --test-menu-bar-center <report>   # where test items, the toolkit's and everyone else's are drawn against the middle of each menu bar (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of
 .build/debug/Toolkit --test-navigation       # what Navigate does with each button in each kind of app, posting nothing; with Accessibility (open -n the dev bundle), Finder's Back and Forward found
