@@ -11,6 +11,9 @@ struct MixerApp: Identifiable {
     let name: String
     let icon: NSImage?
     let isPlaying: Bool
+    /// On the driver, the output it plays to by itself, past the driver's
+    /// device, which none of the mixer's volumes reach.
+    var playsPast: String? = nil
 
     var id: pid_t { pid }
 }
@@ -816,7 +819,9 @@ final class MixerController: ObservableObject {
         // The input too, where it decides whether a tap runs.
         let objects = Set(groups.values.flatMap(\.objects))
         processListeners = processListeners.filter { objects.contains($0.key) }
-        let selectors = [kAudioProcessPropertyIsRunningOutput, kAudioProcessPropertyIsRunning] + (Self.inputsHeldUp ? [kAudioProcessPropertyIsRunningInput] : [])
+        // Its devices for the driver, as a call app can switch its output mid-call.
+        let selectors = [kAudioProcessPropertyIsRunningOutput, kAudioProcessPropertyIsRunning, kAudioProcessPropertyDevices]
+            + (Self.inputsHeldUp ? [kAudioProcessPropertyIsRunningInput] : [])
         for object in objects where processListeners[object] == nil {
             processListeners[object] = selectors.map {
                 AudioListener(object, $0) { [weak self] in self?.scheduleRefresh() }
@@ -1099,8 +1104,9 @@ final class MixerController: ObservableObject {
                     && (group.app.activationPolicy == .regular || config.played.contains(bundleID)))
             guard listed else { return nil }
             let playing = audible.contains(group.app.processIdentifier)
+            let past = driver?.device.flatMap { device in group.playing.lazy.compactMap { Self.output(of: $0, pastDriver: device) }.first }
             return MixerApp(pid: group.app.processIdentifier, bundleID: bundleID,
-                            name: group.app.localizedName ?? bundleID, icon: group.app.icon, isPlaying: playing)
+                            name: group.app.localizedName ?? bundleID, icon: group.app.icon, isPlaying: playing, playsPast: past)
         }
         .sorted { a, b in
             if a.isPlaying != b.isPlaying { return a.isPlaying }
@@ -1108,6 +1114,15 @@ final class MixerController: ObservableObject {
             if x != y { return x > y }
             return a.name.localizedStandardCompare(b.name) == .orderedAscending
         }
+    }
+
+    /// The output a process plays to other than the driver's device, by name:
+    /// one picked in an app's own settings, as a call app's speaker is. Not an
+    /// aggregate device with the driver's in, as voice processing makes.
+    private static func output(of object: AudioObjectID, pastDriver device: AudioObjectID) -> String? {
+        object.readArray(kAudioProcessPropertyDevices, scope: kAudioObjectPropertyScopeOutput, as: AudioObjectID.self).first {
+            $0 != device && !$0.readArray(kAudioAggregateDevicePropertyActiveSubDeviceList, as: AudioObjectID.self).contains(device)
+        }.map { $0.readString(kAudioObjectPropertyName) ?? "?" }
     }
 
     private func scheduleRetry() {

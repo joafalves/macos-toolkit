@@ -254,7 +254,8 @@ the **System Audio Recording** permission, which is asked for as the mixer is tu
   Installing the driver asks for your password and stops all sound for a moment. If the toolkit quits
   or crashes, its device goes and macOS moves sound back to a real output. It only answers an app in
   the Applications folder, and an app set to one particular output plays there directly, without its
-  volume or the equalizer. macOS shows the toolkit as the output: choose the real one in the mixer, or
+  volume or the equalizer, and on a display without the main volume either: its row shows a warning sign,
+  and choosing MacOS Toolkit or the default as the app's speaker brings it back. macOS shows the toolkit as the output: choose the real one in the mixer, or
   in macOS's own menu, which sends the sound there and keeps the toolkit in front. Headphones take over
   as they connect. When an output you chose goes, the last one you used before it takes over, and the
   sound returns to the one you chose when it's back, unless you chose another meanwhile. Deleting the app leaves

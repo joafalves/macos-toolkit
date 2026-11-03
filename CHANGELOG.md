@@ -3,6 +3,15 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.26.2 (unreleased)
+
+### Fixed
+
+- **Audio Mixer:** with the audio driver on, an app set in its own settings to play to an output by name,
+  as a call app's speaker setting can be, plays straight to it, past the driver, and none of the mixer's
+  volumes reach it: on a display, not even the main volume. Its row now says so, with a warning sign, and
+  how to fix it: choose MacOS Toolkit or the default as its speaker.
+
 ## 0.26.1 (2026-11-02)
 
 ### Added

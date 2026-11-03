@@ -615,6 +615,12 @@ struct AppRow: View {
                 if app.isPlaying, !setting.isSilent {
                     PlayingBars().help("Playing")
                 }
+                if let output = app.playsPast {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.orange)
+                        .help("\(app.name) plays straight to \(output), so the volume set here doesn't reach it. Choose MacOS Toolkit or the default as its speaker, in its own settings.")
+                }
             }
             .frame(width: nameWidth, alignment: .leading)
             .help(app.name)

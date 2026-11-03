@@ -31,6 +31,9 @@
 /* Sources/Toolkit/Stats/StatsPanel.swift:79 */
 "%@ of %@" = "%@ de %@";
 
+/* Sources/Toolkit/Mixer/MixerPopover.swift:622 */
+"%@ plays straight to %@, so the volume set here doesn't reach it. Choose MacOS Toolkit or the default as its speaker, in its own settings." = "%@ toca diretamente para %@, por isso o volume definido aqui não lhe chega. Escolha MacOS Toolkit ou o predefinido como altifalante, nas definições da própria aplicação.";
+
 /* Sources/Toolkit/App/ToolkitPanel.swift:251 */
 "%@ settings" = "Definições de %@";
 
@@ -67,7 +70,7 @@
 /* Sources/Toolkit/App/ToolkitPanel.swift:74 */
 "%lld of %lld on" = "%lld de %lld ativas";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:756 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:762 */
 "%lld percent" = "%lld por cento";
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:53 */
@@ -262,7 +265,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:26 */
 "All permissions" = "Todas as permissões";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:860 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:866 */
 "Allow…" = "Permitir…";
 
 /* Sources/Toolkit/Layout/LayoutConfig.swift:39 */
@@ -550,10 +553,10 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:94 */
 "Click an app to mute it; right-click it to show it, to hide it until it plays again, or to exclude it." = "Clique numa aplicação para lhe tirar o som; clique com o botão direito para a mostrar, para a ocultar até voltar a tocar, ou para a excluir.";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:764 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:770 */
 "Click the speaker to mute" = "Clique no altifalante para tirar o som";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:764 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:770 */
 "Click the speaker to unmute" = "Clique no altifalante para ligar o som";
 
 /* Sources/Toolkit/Capture/CaptureToolbar.swift:95 */
@@ -565,10 +568,10 @@
 /* Sources/Toolkit/UI/Shortcut.swift:174 */
 "Click to change" = "Clique para alterar";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:634 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:640 */
 "Click to mute %@" = "Clique para tirar o som de %@";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:634 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:640 */
 "Click to unmute %@" = "Clique para ligar o som de %@";
 
 /* Sources/Toolkit/App/AppDelegate.swift:569 */
@@ -874,7 +877,7 @@
 /* Sources/Toolkit/App/AboutView.swift:40 */
 "Everyone who has helped build it." = "Todos os que ajudaram a construí-la.";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:647 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:653 */
 "Exclude %@" = "Excluir %@";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:102 */
@@ -1105,7 +1108,7 @@
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:32 */
 "Hide the app" = "Ocultar a aplicação";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:645 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:651 */
 "Hide Until It Plays Again" = "Ocultar até voltar a tocar";
 
 /* Sources/Toolkit/Capture/CaptureConfig.swift:41 */
@@ -1240,7 +1243,7 @@
 /* Sources/Toolkit/App/PermissionsSheet.swift:28 */
 "It has every permission it needs." = "Tem todas as permissões de que precisa.";
 
-/* Sources/Toolkit/Mixer/MixerController.swift:1440 */
+/* Sources/Toolkit/Mixer/MixerController.swift:1455 */
 "It keeps working until the next restart, and then the Audio Mixer is off until it's installed again. Installing it asks for your password, and sound stops for a moment." = "Continua a funcionar até ao próximo reinício; depois, o Misturador de Áudio fica desativado até o voltar a instalar. A instalação pede a sua palavra-passe, e o som para por um momento.";
 
 /* Sources/Toolkit/System/TweaksView.swift:111 */
@@ -1345,7 +1348,7 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:156 */
 "Late Night" = "Noite";
 
-/* Sources/Toolkit/Mixer/MixerController.swift:1454 */
+/* Sources/Toolkit/Mixer/MixerController.swift:1469 */
 "Later" = "Mais tarde";
 
 /* Sources/Toolkit/App/MainView.swift:452 */
@@ -1591,10 +1594,10 @@
 /* Sources/Toolkit/Capture/CaptureThumbnail.swift:127 */
 "Move to Trash" = "Mover para o Lixo";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:641 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:647 */
 "Mute" = "Tirar o som";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:756 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:762 */
 "Muted" = "Sem som";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:286 */
@@ -1642,7 +1645,7 @@
 /* Sources/Toolkit/System/TweaksView.swift:71 */
 "No .DS_Store on USB drives" = "Sem .DS_Store em discos USB";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:836 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:842 */
 "No app has sound open." = "Nenhuma aplicação tem som aberto.";
 
 /* Sources/Toolkit/Switcher/SwitcherPanel.swift:64 */
@@ -1780,7 +1783,7 @@
 /* Sources/Toolkit/App/Permissions.swift:196 */
 "Open System Settings" = "Abrir Definições do Sistema";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:860 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:866 */
 "Open System Settings…" = "Abrir Definições do Sistema…";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:88 */
@@ -2110,7 +2113,7 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:219 */
 "Reset" = "Repor";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:642 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:648 */
 "Reset to 100%" = "Repor a 100%";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:273 */
@@ -2323,7 +2326,7 @@
 /* Sources/Toolkit/App/SettingsIndex.swift:117 */
 "Shortcuts" = "Atalhos";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:636 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:642 */
 "Show %@" = "Mostrar %@";
 
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:34 */
@@ -2623,7 +2626,7 @@
 /* Sources/Toolkit/App/Permissions.swift:17 */
 "System Audio Recording" = "Gravação de áudio do sistema";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:856 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:862 */
 "System Audio Recording is turned off for MacOS Toolkit, so the mixer can't change the sound." = "A Gravação de áudio do sistema está desativada para o MacOS Toolkit, por isso o misturador não pode alterar o som.";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:71 */
@@ -2686,7 +2689,7 @@
 /* Sources/Toolkit/App/MainView.swift:449 */
 "The app's own settings: startup, language, the menu bar and backups." = "As definições da própria aplicação: arranque, idioma, barra de menus e cópias de segurança.";
 
-/* Sources/Toolkit/Mixer/MixerController.swift:140 */
+/* Sources/Toolkit/Mixer/MixerController.swift:143 */
 "The audio driver is no longer on this Mac" = "O driver de áudio já não está neste Mac";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:89 */
@@ -2695,16 +2698,16 @@
 /* Sources/Toolkit/Mixer/MixerPopover.swift:88 */
 "The audio driver is no longer on this Mac. The mixer is off until it's installed again, and sound plays as usual." = "O driver de áudio já não está neste Mac. O misturador fica desativado até o voltar a instalar, e o som toca normalmente.";
 
-/* Sources/Toolkit/Mixer/MixerController.swift:141 */
+/* Sources/Toolkit/Mixer/MixerController.swift:144 */
 "The audio driver needs updating" = "O driver de áudio precisa de ser atualizado";
 
 /* Sources/Toolkit/Mixer/MixerPopover.swift:92 */
 "The audio driver needs updating. The mixer is off until it is, and sound plays as usual." = "O driver de áudio precisa de ser atualizado. O misturador fica desativado até lá, e o som toca normalmente.";
 
-/* Sources/Toolkit/Mixer/MixerController.swift:1439 */
+/* Sources/Toolkit/Mixer/MixerController.swift:1454 */
 "The Audio Mixer is off until it's installed again, and sound plays as usual. Installing it asks for your password, and sound stops for a moment." = "O Misturador de Áudio fica desativado até o voltar a instalar, e o som toca normalmente. A instalação pede a sua palavra-passe, e o som para por um momento.";
 
-/* Sources/Toolkit/Mixer/MixerController.swift:1428 */
+/* Sources/Toolkit/Mixer/MixerController.swift:1443 */
 "The Audio Mixer is off until it's updated, and sound plays as usual. Updating asks for your password, and sound stops for a moment." = "O Misturador de Áudio fica desativado até ser atualizado, e o som toca normalmente. A atualização pede a sua palavra-passe, e o som para por um momento.";
 
 /* Sources/Toolkit/Awake/AwakeController.swift:142 */
@@ -2785,7 +2788,7 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:75 */
 "The middle, from about 250 Hz to 4 kHz, where voices are. Double-click for 0 dB." = "Os médios, de cerca de 250 Hz a 4 kHz, onde estão as vozes. Clique duas vezes para 0 dB.";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:857 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:863 */
 "The mixer needs the System Audio Recording permission." = "O misturador precisa da permissão de Gravação de áudio do sistema.";
 
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:22 */
@@ -3028,7 +3031,7 @@
 /* Sources/Toolkit/App/MainView.swift:458 */
 "Unless you pick one, the app is in the first of your languages in macOS that it has." = "Com a predefinição do sistema, a aplicação usa o primeiro dos seus idiomas do macOS que tiver.";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:641 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:647 */
 "Unmute" = "Ligar o som";
 
 /* Sources/Toolkit/Awake/AwakePanel.swift:144 */
@@ -3115,7 +3118,7 @@
 /* Sources/Toolkit/Mixer/Equalizer.swift:141 */
 "Vocal" = "Vocal";
 
-/* Sources/Toolkit/Mixer/MixerPopover.swift:755 */
+/* Sources/Toolkit/Mixer/MixerPopover.swift:761 */
 "Volume" = "Volume";
 
 /* Sources/Toolkit/Mixer/MixerSettingsView.swift:74 */
