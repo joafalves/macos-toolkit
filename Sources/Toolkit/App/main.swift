@@ -399,6 +399,12 @@ if let flag = CommandLine.arguments.firstIndex(of: "--log-wheel"), CommandLine.a
     WheelProbe.log(into: CommandLine.arguments[flag + 1], seconds: seconds)
     exit(0)
 }
+if let flag = CommandLine.arguments.firstIndex(of: "--test-menu-bar-focus"), CommandLine.arguments.count > flag + 1 {
+    let rounds = CommandLine.arguments.count > flag + 2 ? Int(CommandLine.arguments[flag + 2]) ?? 1 : 1
+    if CommandLine.arguments.count > flag + 3 { MenuBarFocusTest.keep = URL(fileURLWithPath: CommandLine.arguments[flag + 3]) }
+    MenuBarFocusTest.run(into: CommandLine.arguments[flag + 1], rounds: rounds)
+    exit(0)
+}
 if let flag = CommandLine.arguments.firstIndex(of: "--test-menu-bar-center"), CommandLine.arguments.count > flag + 1 {
     MenuBarCenterTest.run(into: CommandLine.arguments[flag + 1])
     exit(0)

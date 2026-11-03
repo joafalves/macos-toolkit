@@ -197,14 +197,20 @@ tool; keep it in step with the code.
   item's menu and clicks it, which keeps the item lit); panels hang from a part with
   `MenuBarPopover`, which lights it and closes on a click elsewhere or Esc.
   - A template image filled with a colour uses `.sourceIn`, keeping the colour's own opacity as
-    macOS does. macOS puts the item's 22 pt place off the middle of some menu bars (a point high
-    in a 30 pt one) and in the middle of others (33 pt, beside a notch); `MenuBarItem.lower` works
-    it out from that place's frame (the button's superview, not the button, which is taller), against the middle of the bar, the menu bar's own window as the window server has it on that display (the visible frame stops a point below the bar on macOS 27 and right at it on macOS 26; the item's window is 33 pt whatever the bar), and
-    again when the item moves or changes display. Each display needs its own, for the item and
-    macOS's copy of it alike (measured), and they share the image. macOS draws it again at each
-    display's scale, so displays of different scales each get their own (`MenuBarLower`); two of the
-    same scale share the main one's, and the other can be a point off. Each is remembered by its UUID
-    and bar height (`menuBarLower` in the defaults), so it's right from launch.
+    macOS does.
+  - **Up and down is macOS's**, as for every other item: never move the drawing display by display
+    (it was, until 0.26.2: wrong on macOS 26, and jumping as the focus moved between displays). The
+    item's image is a point taller than the row (23 pt), the row in its lower 22, the same at every
+    scale. macOS centres an item's image in a 33 pt window: a 22 pt one lands half a point off, which
+    the item rounds down and macOS's copy on the other displays doesn't, so it jumped a pixel (and
+    blurred) with the focus; a 23 pt one lands on a whole point. The copy is made from the image as
+    drawn for the active display, scaled, so the row can't sit differently at 1x and 2x either: half
+    a point at 2x blurred once scaled to 1x. It ends level with the symbols on a 1x display with a
+    30 pt bar and half a point under the middle on a notched one, on every focus. An alignment rect
+    like a symbol's centres it too, but blurred on 1x: our hard edges showed it.
+    `--test-menu-bar-focus <report> [rounds] [folder]` puts the focus on each display in turn (a
+    window of its own, clicked) and measures a plain image, the toolkit's item and a symbol on every
+    bar, item and copy; `--test-menu-bar-center` does one display at a time.
   - The row isn't in a window, so nothing lays it out later: a part lays its content out as soon
     as its size or insets change.
   - **No `NSTextField` in it**, not even a hidden one: on macOS 27 a text field inside a status item
@@ -402,6 +408,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-menu-bar-widths  # each part keeps its width as its figure changes
 .build/debug/Toolkit --test-menu-bar-tint <png>   # coloured text in a real menu bar item, captured (open -n; delete the png)
 .build/debug/Toolkit --test-menu-bar-center <report>   # where test items, the toolkit's and everyone else's are drawn against the middle of each menu bar (build.sh --dev; open -n the bundle)
+.build/debug/Toolkit --test-menu-bar-focus <report> [rounds] [folder]   # the same with the focus on each display in turn, the item and macOS's copies; keeps the bars' pictures in folder (as above; clicks its own window, so leave the mouse alone)
 .build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of
 .build/debug/Toolkit --test-navigation       # what Navigate does with each button in each kind of app, posting nothing; with Accessibility (open -n the dev bundle), Finder's Back and Forward found

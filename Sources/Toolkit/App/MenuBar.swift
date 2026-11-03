@@ -81,13 +81,13 @@ final class MenuBarItem: NSObject {
     private let row = MenuBarRow()
     /// What the button's image shows now: a new image only when this changes.
     private var drawn: MenuBarDrawing?
-    private var drawnLower: MenuBarLower?
-    private var placeObservers: [NSObjectProtocol] = []
     private var appearanceObservation: NSKeyValueObservation?
     private var dark: Bool?
 
     override init() {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // What each display was moved by, kept before 0.26.2: nothing is now.
+        UserDefaults.standard.removeObject(forKey: "menuBarLower")
         super.init()
         // Remembers where it was dragged to with ⌘.
         item.autosaveName = "MacOS Toolkit"
@@ -111,23 +111,6 @@ final class MenuBarItem: NSObject {
                 self.render(again: true)
             }
         }
-        // Placed, moved to another display, or the displays changed: the
-        // middle of the menu bar is worked out again (`lower`).
-        let center = NotificationCenter.default
-        let placed: (Notification) -> Void = { [weak self] note in
-            guard let self, note.object as? NSWindow === self.button?.window else { return }
-            self.render()
-        }
-        placeObservers = [
-            center.addObserver(forName: NSWindow.didMoveNotification, object: nil, queue: .main, using: placed),
-            center.addObserver(forName: NSWindow.didChangeScreenNotification, object: nil, queue: .main, using: placed),
-            // Displays connected, removed or changed: a bar of another height
-            // is another key, measured afresh.
-            center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-                self?.bars = [:]
-                self?.render()
-            },
-        ]
     }
 
     var button: NSStatusBarButton? { item.button }
@@ -208,97 +191,16 @@ final class MenuBarItem: NSObject {
 
     /// A new image for the button, only if what it shows has changed: the
     /// same drawing again (a reading that didn't move) costs nothing.
+    /// Where it goes up and down is macOS's, as for every other item: moved
+    /// in the image by hand, display by display, it was off on some and moved
+    /// as the focus went from one display to another.
     private func render(again: Bool = false) {
-        let drawing = row.drawing(), lower = lower()
-        guard again || drawing != drawn || lower != drawnLower else { return }
+        let drawing = row.drawing()
+        guard again || drawing != drawn else { return }
         // Again only matters for colours of its own; macOS colours a template.
-        if again, drawing == drawn, lower == drawnLower, drawing.isTemplate { return }
+        if again, drawing == drawn, drawing.isTemplate { return }
         drawn = drawing
-        drawnLower = lower
-        button?.image = drawing.image(lower: lower)
-    }
-
-    /// How far below the middle of its place the image is drawn, so it's in
-    /// the middle of the menu bar. macOS puts an item's 22 pt place in the
-    /// middle of some menu bars and not others (a point high in a 30 pt one,
-    /// measured: 6 pt over a part, 8 under; centred in a 33 pt one beside a
-    /// notch), and the place's frame says which: it matched both.
-    ///
-    /// Each display needs its own, whether it shows the item or macOS's copy
-    /// of it (measured: the copy on the 30 pt bar was a point high too), and
-    /// they share the one image. But macOS draws it again for each display, at
-    /// that display's scale, so displays of different scales (a MacBook's 2x
-    /// and a 1x monitor) each get their own. Two of the same scale share one:
-    /// the main display's, so nothing moves as the active display changes,
-    /// and the other can be a point off. A display counts once the item has
-    /// been on it, and is remembered, so it's right from the next launch;
-    /// until the main one has, the display it's on stands in.
-    /// Whole points, so it's sharp on a 1x display too.
-    ///
-    /// The bar is the menu bar's own window, as the window server has it on
-    /// that display: the visible frame gave it a point short of the bar on
-    /// macOS 27 and right on macOS 26, and the item a point high there. The
-    /// item's window is no measure: it's 33 pt on both, over the top of the
-    /// 30 pt one. `--test-menu-bar-center` measures where it all ends up.
-    private func lower() -> MenuBarLower {
-        var here: CGFloat?
-        // Not when no menu bar is showing (hidden, or full screen), or not placed yet:
-        // what was measured before stands.
-        if let button, let place = button.superview, let window = button.window, let screen = window.screen,
-           window.frame.height >= place.frame.height, let key = Self.key(of: screen), let bar = bar(on: screen, key: key) {
-            let middle = window.convertToScreen(place.convert(place.bounds, to: nil)).midY
-            let value = (middle - (screen.frame.maxY - bar / 2)).rounded()
-            here = value
-            if measured[key] != value {
-                measured[key] = value
-                UserDefaults.standard.set(measured.mapValues(Double.init), forKey: Self.measuredKey)
-            }
-        }
-        let main = NSScreen.screens.first
-        var result = MenuBarLower(fallback: main.flatMap(Self.key).flatMap { measured[$0] } ?? here ?? 0)
-        // The main display first, so it has its scale when another shares it.
-        for display in NSScreen.screens {
-            guard let key = Self.key(of: display), let value = measured[key],
-                  result.byScale[display.backingScaleFactor] == nil else { continue }
-            result.byScale[display.backingScaleFactor] = value
-        }
-        return result
-    }
-
-    /// What each display needs (`lower`), as measured while the item was on it.
-    /// One measured against a bar a point short (on macOS 26, before 0.26.2)
-    /// is put right the next time the item is on that display.
-    private var measured = (UserDefaults.standard.dictionary(forKey: MenuBarItem.measuredKey) as? [String: Double] ?? [:]).mapValues { CGFloat($0) }
-    private static let measuredKey = "menuBarLower"
-
-    /// Each display's menu bar height, by `key`: read once, since `lower`
-    /// runs on every update.
-    private var bars: [String: CGFloat] = [:]
-
-    private func bar(on screen: NSScreen, key: String) -> CGFloat? {
-        if let known = bars[key] { return known }
-        let level = Int(CGWindowLevelForKey(.mainMenuWindow)), frame = Coordinates.toCG(screen.frame)
-        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
-        let height = windows.lazy.compactMap { info -> CGFloat? in
-            guard info[kCGWindowLayer as String] as? Int == level,
-                  let bounds = (info[kCGWindowBounds as String] as? NSDictionary).flatMap({ CGRect(dictionaryRepresentation: $0) }),
-                  abs(bounds.minY - frame.minY) < 1, bounds.midX > frame.minX, bounds.midX < frame.maxX, bounds.height > 0 else { return nil }
-            return bounds.height
-        }.first
-        if let height { bars[key] = height }
-        return height
-    }
-
-    /// A display by its UUID, which stays across restarts (its number may
-    /// not), and the height of its bar, which a change of resolution or a
-    /// hidden menu bar changes, and with it where macOS puts the item.
-    private static func key(of screen: NSScreen) -> String? {
-        guard let number = number(of: screen) else { return nil }
-        return "\(LayoutDisplay.uuid(of: number)):\(Int(screen.frame.maxY - screen.visibleFrame.maxY))"
-    }
-
-    private static func number(of screen: NSScreen) -> CGDirectDisplayID? {
-        screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+        button?.image = drawing.image()
     }
 
     @objc private func clicked() {
@@ -312,17 +214,6 @@ final class MenuBarItem: NSObject {
         // is made up, and its modifiers can't be trusted.
         let right = event?.type == .rightMouseUp || NSEvent.modifierFlags.contains(.control)
         onClick?(kind, rect, right)
-    }
-}
-
-/// How far down the item's image is drawn, for each display scale the item
-/// has been measured at (`MenuBarItem.lower`).
-struct MenuBarLower: Equatable {
-    var fallback: CGFloat = 0
-    var byScale: [CGFloat: CGFloat] = [:]
-
-    func at(scale: CGFloat) -> CGFloat {
-        byScale[abs(scale).rounded()] ?? fallback
     }
 }
 
@@ -819,12 +710,19 @@ struct MenuBarDrawing: Equatable {
         }
     }
 
-    /// `lower` moves everything down in the image, by the scale it's drawn at.
-    func image(lower: MenuBarLower) -> NSImage {
+    /// A point taller than the row, which is drawn in its lower 22. macOS
+    /// centres an item's image in a window of its own, 33 pt tall: a 22 pt one
+    /// lands half a point off, which the item rounds down and macOS's copy on
+    /// the other displays doesn't, so it moved a pixel (and blurred) as the
+    /// focus went from one display to another. A 23 pt one lands on a whole
+    /// point. The copy is made from the image as drawn for the item's display,
+    /// so the row is in the same place in it at every scale: half a point in
+    /// from the top on one that can halve a point would blur once scaled for
+    /// one that can't. `--test-menu-bar-focus` measures all of it.
+    func image() -> NSImage {
         let elements = self.elements, template = isTemplate
-        let image = NSImage(size: size, flipped: false) { _ in
+        let image = NSImage(size: NSSize(width: size.width, height: size.height + 1), flipped: false) { _ in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
-            context.translateBy(x: 0, y: -lower.at(scale: context.userSpaceToDeviceSpaceTransform.d))
             for element in elements {
                 context.saveGState()
                 switch element {

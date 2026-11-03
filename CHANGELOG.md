@@ -11,8 +11,9 @@ worked on; it gets its date when it's released.
   as a call app's speaker setting can be, plays straight to it, past the driver, and none of the mixer's
   volumes reach it: on a display, not even the main volume. Its row now says so, with a warning sign, and
   how to fix it: choose MacOS Toolkit or the default as its speaker.
-- **Menu bar:** on macOS 26, the toolkit's item no longer sits a point above the others on a monitor
-  without a notch. It goes by the menu bar's own height now, as the system has it on each display.
+- **Menu bar:** the toolkit's item no longer jumps a pixel as the focus moves from one display to
+  another, and is level with the icons beside it on a monitor: it was a point above them on macOS 26.
+  It isn't moved up or down by hand for each display any more.
 
 ## 0.26.1 (2026-11-02)
 
