@@ -1184,10 +1184,10 @@
 "How much further the cursor goes when you move quickly. Off is 1:1." = "Quanto mais longe o cursor vai quando move depressa. Desativado é 1:1.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:110 */
-"How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with what suits its size." = "Quanto da largura de um monitor a grelha pode usar. As janelas que não couberem passam para outra linha. Cada monitor guarda a sua, e um monitor novo começa com a que se adequa ao seu tamanho.";
+"How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with room for four tiles across." = "Quanto da largura de um monitor a grelha pode usar. As janelas que não couberem passam para outra linha. Cada monitor guarda a sua, e um monitor novo começa com espaço para quatro pré-visualizações na horizontal.";
 
 /* Sources/Toolkit/Switcher/SwitcherSettingsView.swift:109 */
-"How much of a display's width the row can use. Windows that don't fit are further along it. Each display keeps its own, and a new one starts with what suits its size." = "Quanto da largura de um monitor a linha pode usar. As janelas que não couberem ficam mais à frente nela. Cada monitor guarda a sua, e um monitor novo começa com a que se adequa ao seu tamanho.";
+"How much of a display's width the row can use. Windows that don't fit are further along it. Each display keeps its own, and a new one starts with room for four tiles across." = "Quanto da largura de um monitor a linha pode usar. As janelas que não couberem ficam mais à frente nela. Cada monitor guarda a sua, e um monitor novo começa com espaço para quatro pré-visualizações na horizontal.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:160 */
 "How often Stay available acts" = "Com que frequência o Manter disponível atua";
@@ -2771,7 +2771,7 @@
 "The highs, from about 2 kHz up. Double-click for 0 dB." = "Os agudos, a partir de cerca de 2 kHz. Clique duas vezes para 0 dB.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:61 */
-"The largest a tile gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows." = "O maior que uma pré-visualização fica. Com muitas janelas, encolhem para caberem todas. Ajustar torna-as tão grandes quanto o monitor permite.";
+"The largest a tile gets. Fit makes them as large as the display allows." = "O maior que uma pré-visualização fica. Ajustar torna-as tão grandes quanto o monitor permite.";
 
 /* Sources/Toolkit/App/SettingsIndex.swift:87 */
 "The letters are the keys in the grid's place on the keyboard, whatever the layout: the top left cell is always the key where Q is on a US keyboard." = "As letras são as teclas no lugar da grelha no teclado, seja qual for a disposição: a célula superior esquerda é sempre a tecla onde fica o Q num teclado dos EUA.";
@@ -3414,3 +3414,11 @@
 
 /* Sources/Toolkit/Layout/LayoutSettingsView.swift:30 */
 "⌫" = "⌫";
+"Rows" = "Linhas";
+"Rows of the grid" = "Linhas da grelha";
+"The most rows on screen. With more windows the grid scrolls a row at a time, with dots down its side for where you are in it." = "O máximo de linhas no ecrã. Com mais janelas, a grelha desloca-se uma linha de cada vez, com pontos ao lado a mostrar onde está.";
+"Keep the first row in the middle" = "Manter a primeira linha ao centro";
+"The first row stays in the middle of the display, where a grid of one row is, and more rows go below it, so the first windows are always in the same place. When off, the whole grid is centred." = "A primeira linha fica no centro do monitor, onde fica uma grelha de uma só linha, e as outras linhas vão para baixo dela, por isso as primeiras janelas estão sempre no mesmo sítio. Quando desativado, toda a grelha fica centrada.";
+"%lld across. Room for %lld of the %lld rows at this size." = "%lld na horizontal. Há espaço para %lld das %lld linhas neste tamanho.";
+"%lld across, %lld rows" = "%lld na horizontal, %lld linhas";
+"Fewer rows" = "Menos linhas";

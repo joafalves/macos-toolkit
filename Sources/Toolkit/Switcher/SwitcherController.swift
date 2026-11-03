@@ -438,6 +438,8 @@ final class SwitcherController: ObservableObject {
             self.panel.style = previews ? .previews : .list
             self.panel.previewSize = self.config.previewSize
             self.panel.previewLayout = self.config.previewLayout
+            self.panel.gridRows = self.config.gridRows
+            self.panel.firstRowInMiddle = self.config.firstRowInMiddle
             if let screen = SwitcherPanel.screen(for: self.config.placement) {
                 self.panel.gridWidth = self.config.gridWidth(for: LayoutDisplay(screen))
             }

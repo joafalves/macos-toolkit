@@ -316,7 +316,7 @@ from the left, so each place in the list is always in the same spot. **Layout: O
 one row instead, as many on screen as fit, that slides along as the selection moves, always with the next
 one in sight; dots below say where you are in it, with how many more there are at either end, and the
 wheel or a trackpad slides it too.
-Each display keeps its own, a new one starts with what suits its size, and **Use on All Displays** applies
+Each display keeps its own, a new one starts with room for four tiles across, in rows of three, and **Use on All Displays** applies
 one display's width to the rest, and to any new one.
 
 **Windows of the current app** is a second shortcut, ⌘ and the key above Tab by default, for the same
@@ -342,8 +342,15 @@ app and title along the bottom. ← → step through the tiles, ↑ ↓ go to th
 the other keys work as in the list. Minimized windows keep their last picture, dimmed; hidden apps
 and apps without a window show their icon.
 
-- **Tile size**, under Sizing: Small, Medium or Large is the largest a tile gets, and tiles shrink when
-  there are more windows than fit, so there's never any scrolling. **Fit** makes them as large as the display allows.
+- **Tile size**, under Sizing: Small, Medium or Large is the largest a tile gets; it never shrinks because
+  there are more windows. **Fit** makes them as large as the display allows for the rows the grid has.
+- **Rows**, under Sizing: the most rows on screen, 3 by default. With more windows, the grid scrolls a row
+  at a time as the selection moves, and the rows at an edge with more beyond fade out; dots down its right
+  side, one for each row, say where you are, and the wheel or a trackpad scrolls it too. A display with no
+  room for that many rows shows as many as fit, and its line under Sizing says so.
+- **Keep the first row in the middle**, under Sizing, off by default: the first row stays in the middle of
+  the display, where a grid of one row is, and more rows go below it, so the first windows are always in
+  the same place. Off, the whole grid is centred.
 - **Pictures**: **Cached** shows the last picture of each window at once and a new one a moment later,
   **Fresh** shows the app's icon until the new picture arrives, and **Live** keeps them updating
   while the switcher is open (more power).
@@ -510,7 +517,10 @@ To make a maximized window smaller, for example: ⌃⌥S, then − a few times.
   press its number (arrows and ↩ work too), and it goes there; in a layout of three, the part after
   that is offered next. Esc, a click elsewhere or typing makes it go away. Nothing is offered for a
   part that already has a window in it, or after keyboard moves. It uses the Window Switcher's list
-  and grid; **Previews** needs Screen Recording and shows the **List** until then.
+  and grid; **Previews** needs Screen Recording and shows the **List** until then. The pictures are
+  as large as the part allows for all of them, down to the switcher's Medium size; with more
+  windows than that, it scrolls a row at a time, with dots down its side, as the switcher's grid
+  does, whatever the switcher's own Sizing says.
 
 <p align="center">
   <picture>

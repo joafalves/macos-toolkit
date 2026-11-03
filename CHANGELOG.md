@@ -3,6 +3,29 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.26.3 (unreleased)
+
+### Added
+
+- **Window Switcher:** Rows, under Sizing: the most rows the grid has on screen, 3 by default. With more
+  windows it scrolls a row at a time as you go, the rows at an edge with more beyond fading out, with dots
+  down its right side for where you are, and the wheel or a trackpad scrolls it too. A display with no room
+  for that many rows says so under Sizing, and how many fit.
+- **Window Switcher:** Keep the first row in the middle, off by default: the grid's first row stays in the
+  middle of the display, where a grid of one row is, and more rows go below it.
+
+### Changed
+
+- **Window Switcher:** tiles no longer shrink to fit many windows, which with a lot of them open left them
+  too small to read: they stay the size chosen, and the grid scrolls. Fit makes them as large as the rows
+  allow.
+- **Window Switcher:** a display starts with room for four tiles across, at whatever tile size is chosen,
+  in rows of three. It used to start with a width by its size, which was five across on a 27-inch display.
+  A width already set for a display stays as it is.
+- **Window Layout:** the windows suggested for the rest of a display scroll too, as the switcher's grid does,
+  once there are more than fit at the switcher's Medium size, rather than shrinking until they're too small
+  to read. The switcher's own Sizing doesn't change them.
+
 ## 0.26.2 (2026-11-03)
 
 ### Fixed

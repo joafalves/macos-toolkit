@@ -22,10 +22,11 @@ enum SwitcherStyle: String, Codable, CaseIterable {
     case list, previews
 }
 
-/// The largest a preview tile gets. With many windows they shrink to fit.
+/// The largest a preview tile gets: narrower only where the display has no
+/// room for one. Fit makes them as large as the rows allow.
 enum PreviewSize: String, Codable, CaseIterable {
     case small, medium, large
-    /// As large as the display allows for the number of windows.
+    /// As large as the display allows for the windows, in as many rows as the grid has.
     case fit
 
     var title: String {
@@ -91,17 +92,15 @@ enum PreviewFreshness: String, Codable, CaseIterable {
 
 /// How much of a display's width the grid can use, in percent.
 enum GridWidth {
-    static let range = 30.0...92.0
-    /// About what can be taken in without turning the head, at the distance a
-    /// display is used from. In millimetres, since that's what the eye goes
-    /// by: 55% suits a 27" display, and on a laptop's would be two tiles across.
-    private static let reach = 330.0
-    /// The same for a display that doesn't say how large it is, in points.
-    private static let reachInPoints = 1400.0
+    /// Low enough for four tiles across even on a 5K ultrawide.
+    static let range = 20.0...92.0
+    /// A display starts with room for this many tiles across.
+    static let across = 4
 
-    static func suggested(points: Double, millimetres: Double) -> Double {
-        let percent = millimetres > 0 ? reach / millimetres * 100 : reachInPoints / max(points, 1) * 100
-        return min(max(percent.rounded(.up), range.lowerBound), range.upperBound)
+    /// The narrowest that has room for `across` tiles of this width.
+    static func suggested(points: Double, tile: CGFloat) -> Double {
+        let needed = Double(GridLayout.padding * 2 + CGFloat(across) * tile + CGFloat(across - 1) * GridLayout.spacing)
+        return min(max((needed / max(points, 1) * 100).rounded(.up), range.lowerBound), range.upperBound)
     }
 }
 
@@ -129,8 +128,16 @@ struct SwitcherConfig: Codable, Equatable {
     /// How wide the grid gets on each display, by its UUID, where it's been set.
     var gridWidths: [String: Double] = [:]
     /// For every other display, once it's been applied to all of them.
-    /// Otherwise a display starts with what suits its size.
+    /// Otherwise a display starts with room for four tiles across.
     var gridWidthForAll: Double?
+    /// The most rows of the grid on screen; with more windows it scrolls.
+    var gridRows = SwitcherConfig.gridRowsDefault
+    static let gridRowsRange = 2...6
+    static let gridRowsDefault = 3
+    /// The grid's first row in the middle of the display, where a grid of one
+    /// row is, and the rest below it, rather than the whole grid centred: the
+    /// first windows are always in the same place.
+    var firstRowInMiddle = false
     /// A flat colour per app on its rows, here and in Window Layout's offers.
     var appColors = false
 
@@ -151,14 +158,15 @@ struct SwitcherConfig: Codable, Equatable {
         previewLayout = (try? c.decodeIfPresent(PreviewLayout.self, forKey: .previewLayout)) ?? .grid
         gridWidths = (try? c.decodeIfPresent([String: Double].self, forKey: .gridWidths)) ?? [:]
         gridWidthForAll = try? c.decodeIfPresent(Double.self, forKey: .gridWidthForAll)
+        gridRows = min(max((try? c.decodeIfPresent(Int.self, forKey: .gridRows)) ?? Self.gridRowsDefault, Self.gridRowsRange.lowerBound), Self.gridRowsRange.upperBound)
+        firstRowInMiddle = try c.decodeIfPresent(Bool.self, forKey: .firstRowInMiddle) ?? false
         appColors = try c.decodeIfPresent(Bool.self, forKey: .appColors) ?? false
     }
 
     func gridWidth(for display: LayoutDisplay) -> Double {
-        // No number: a made-up display, for a test or a picture, which shouldn't
-        // be asked about, since macOS answers for a real one.
-        let millimetres = display.id == 0 ? 0 : CGDisplayScreenSize(display.id).width
-        let chosen = gridWidths[display.uuid] ?? gridWidthForAll ?? GridWidth.suggested(points: display.usable.width, millimetres: millimetres)
+        // Fit's tiles are as large as there's room for: four across goes by Large's.
+        let tile = (previewSize == .fit ? PreviewSize.large : previewSize).maxTileWidth
+        let chosen = gridWidths[display.uuid] ?? gridWidthForAll ?? GridWidth.suggested(points: display.usable.width, tile: tile)
         return min(max(chosen, GridWidth.range.lowerBound), GridWidth.range.upperBound)
     }
 

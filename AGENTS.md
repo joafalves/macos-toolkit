@@ -366,13 +366,14 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
 .build/debug/Toolkit --snapshot out.png mixer driver=<installing|removing|starting|on|outdated|removed|removed-loaded|failed-install> [light]   # the mixer's page, tall enough for the driver's line in that state
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
+.build/debug/Toolkit --snapshot out.png switcher rows=6 [light]   # the Window Switcher's page with that many rows set, more than the made-up laptop has room for
 .build/debug/Toolkit --snapshot out.png mixer-popover [light] [outputs] [software] [equalizer] [per-output] [simple]
 .build/debug/Toolkit --snapshot out.png capture-toolbar [light] [video]
 .build/debug/Toolkit --snapshot out.png capture-text [light] [none|reading]   # the card after ⇧⌘2, with made-up text
 .build/debug/Toolkit --snapshot out.png volume-hud [light]      # the volume keys' bar: whole steps, part of one, muted
 .build/debug/Toolkit --snapshot out.png switcher-grid [light]   # drawn stand-ins, no real windows
 .build/debug/Toolkit --snapshot out.png switcher-list [light] [colors] [many] [search=text]   # the list, with app colours, fourteen apps, or a search
-.build/debug/Toolkit --snapshot out.png switcher-grid [light] [colors] [many] [medium|large] [row]   # the grid, with medium or large app icons rather than small, or in one row some way along
+.build/debug/Toolkit --snapshot out.png switcher-grid [light] [colors] [many|crowded] [medium|large] [row]   # the grid, with medium or large app icons rather than small, or in one row some way along; crowded: 70 windows, scrolled some way down
 .build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
 .build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power ...] [light]
@@ -387,7 +388,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png menu-bar-strip [light]  # the item in a drawn menu bar, for the top of the README
 .build/debug/Toolkit --snapshot out.png layout-grid [light]     # the Window Layout grid over a drawn desktop
 .build/debug/Toolkit --snapshot out.png layout-slots [light]    # its layouts bar while dragging
-.build/debug/Toolkit --snapshot out.png layout-suggest [light]  # the windows it offers for the rest of a display
+.build/debug/Toolkit --snapshot out.png layout-suggest [light] [many]  # the windows it offers for the rest of a display; many: more than fit, scrolled some way down
 .build/debug/Toolkit --snapshot out.png layout-tabs [light]     # windows sharing a slot, with their tabs
 .build/debug/Toolkit --snapshot out.png layout-snap [light]     # the snap grid's dots, and where ⌃⌥S puts a window a little off them
 .build/debug/Toolkit --snapshot out.png layout [tabs|keyboard] [light]  # that tab of the Window Layout page

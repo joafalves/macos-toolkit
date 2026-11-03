@@ -187,13 +187,16 @@ enum SwitcherSearch {
             GridLayout(count: windows, maxTileWidth: size.maxTileWidth, area: SwitcherPanel.gridArea(on: display, percent: percent))
         }
         let large = CGSize(width: 2560, height: 1409), laptop = CGSize(width: 1512, height: 950)
-        let largeWidth = GridWidth.suggested(points: 2560, millimetres: 602), laptopWidth = GridWidth.suggested(points: 1512, millimetres: 301)
-        check("a 27-inch display starts around half", largeWidth == 55, "\(largeWidth)%")
-        check("a laptop's can use nearly all of it", laptopWidth == 92, "\(laptopWidth)%")
-        check("a display that doesn't say how large it is", GridWidth.suggested(points: 2800, millimetres: 0) == 50)
-        check("a very wide one stays within range", GridWidth.suggested(points: 5120, millimetres: 1190) == 30)
-        check("five medium across on the large display", grid(10, .medium, largeWidth, on: large).columns == 5)
-        check("and on the laptop", grid(10, .medium, laptopWidth, on: laptop).columns == 5)
+        let largeWidth = GridWidth.suggested(points: 2560, tile: 260), laptopWidth = GridWidth.suggested(points: 1512, tile: 260)
+        check("a large display starts with room for four", largeWidth == 44, "\(largeWidth)%")
+        check("a laptop too", laptopWidth == 74, "\(laptopWidth)%")
+        check("four medium across on the large display", grid(10, .medium, largeWidth, on: large).columns == 4)
+        check("and on the laptop", grid(10, .medium, laptopWidth, on: laptop).columns == 4)
+        check("four of each size across", [PreviewSize.small, .large].allSatisfy { size in
+            [large, laptop].allSatisfy { grid(10, size, GridWidth.suggested(points: $0.width, tile: size.maxTileWidth), on: $0).columns == 4 } })
+        let ultrawide = CGSize(width: 5120, height: 1409)
+        check("a very wide one too, within range", grid(10, .medium, GridWidth.suggested(points: 5120, tile: 260), on: ultrawide).columns == 4)
+        check("five on the large display at what it used to start with", grid(10, .medium, 55, on: large).columns == 5)
         check("at full size", grid(10, .medium, largeWidth, on: large).tile.width == 260)
         check("narrower, fewer across", grid(10, .medium, 35, on: large).columns == 3)
         let narrow = grid(3, .fit, 30, on: laptop), area = SwitcherPanel.gridArea(on: laptop, percent: 30)
@@ -215,13 +218,53 @@ enum SwitcherSearch {
         check("its dots under it", row.size.height == grid(5, .medium, 92, on: laptop).size.height + GridLayout.dotsHeight)
         let few = GridLayout(count: 4, maxTileWidth: PreviewSize.medium.maxTileWidth, area: SwitcherPanel.gridArea(on: laptop, percent: 92), oneRow: true)
         check("windows that all fit don't scroll", !few.scrolls && few.showing(3).first == 0)
+        // The switcher's grid: at most so many rows, then it scrolls a row at a time.
+        func capped(_ windows: Int, _ size: PreviewSize = .medium, rows: Int = 3, on display: CGSize = laptop, percent: Double = 92, middle: Bool = false) -> GridLayout {
+            SwitcherPanel.switcherGrid(count: windows, size: size, layout: .grid, rows: rows, firstRowInMiddle: middle, on: display, percent: percent)
+        }
+        let full = capped(15), scrolling = capped(60)
+        check("rows up to the limit don't scroll", !full.scrolls && full.shownRows == 3 && full.tile.width == 260)
+        check("one more window scrolls, at the same size", capped(16).scrolls && capped(16).shownRows == 3 && capped(16).tile.width == 260)
+        check("tiles never shrink for more windows", scrolling.tile.width == 260 && scrolling.columns == 5 && scrolling.rows == 12)
+        check("its rows and dots fit the area", scrolling.size.height <= SwitcherPanel.gridArea(on: laptop, percent: 92).height)
+        let five = capped(60, rows: 5), fiveLarge = capped(60, rows: 5, on: large, percent: largeWidth)
+        check("a display too small for the rows shows as many as fit", five.shownRows == 3 && five.tile.width == 260, "\(five.shownRows) rows")
+        check("and a larger one all of them", fiveLarge.shownRows == 5, "\(fiveLarge.shownRows) rows")
+        let fit = capped(60, .fit), fitFew = capped(2, .fit)
+        check("fit fills the rows", fit.shownRows == 3 && fit.tile.width > 260 && fit.size.height <= SwitcherPanel.gridArea(on: laptop, percent: 92).height,
+              "\(Int(fit.tile.width)) pt")
+        check("and is as large as it gets for a few", fitFew.tile.width == PreviewSize.fit.maxTileWidth && !fitFew.scrolls)
+        check("it starts at the top", scrolling.showing(3).first == 0 && scrolling.showing(3).onScreen.lowerBound == 0)
+        let lastRow = scrolling.rows - 1, down = scrolling.showing(scrolling.columns * (scrolling.shownRows - 1))
+        check("the row after the selection shows", down.first == 1 && down.onScreen.contains(scrolling.columns * scrolling.shownRows))
+        check("never past the last row", scrolling.showing(59).first == lastRow - scrolling.shownRows + 1 && scrolling.scrolled(to: 99).first == lastRow - scrolling.shownRows + 1)
+        check("a window keeps its column scrolled", down.frame(of: 7).minX == scrolling.frame(of: 7).minX && down.frame(of: 7).minY < scrolling.frame(of: 7).minY)
+        check("only the rows on screen are clicked", down.index(at: CGPoint(x: GridLayout.padding + 1, y: GridLayout.padding + 1)) == scrolling.columns)
+        check("up and down cross rows off screen", scrolling.neighbour(of: scrolling.columns * (scrolling.shownRows - 1), rows: 1) == scrolling.columns * scrolling.shownRows)
+        check("its dots are beside it, not below", scrolling.size.width == full.size.width + GridLayout.dotsWidth && scrolling.size.height == full.size.height)
+        // The first row in the middle, the rest below.
+        let below = capped(60, rows: 5, on: large, percent: largeWidth, middle: true)
+        check("from the middle, fewer rows fit", below.shownRows == 3 && below.tile.width == 260, "\(below.shownRows) rows")
+        check("and end above the display's bottom tenth", below.tilesSize.height - GridLayout.padding - below.tile.height / 2 <= large.height * 0.4)
+        check("a few windows are the same either way", capped(8, middle: true) == capped(8))
+        check("fit fills the rows below the middle too", capped(60, .fit, rows: 2, on: large, percent: largeWidth, middle: true).shownRows == 2)
+        // Window Layout's suggestions: a part of a display, filled as far as the switcher's default size.
+        func suggested(_ windows: Int) -> GridLayout {
+            GridLayout(count: windows, maxTileWidth: PreviewSize.large.maxTileWidth, area: CGSize(width: 1256, height: 1385),
+                       minTileWidth: SwitcherPanel.suggestionsMinTileWidth)
+        }
+        check("few suggestions are large", suggested(4).tile.width == PreviewSize.large.maxTileWidth && !suggested(4).scrolls)
+        check("more shrink to fit them all", !suggested(18).scrolls && suggested(18).tile.width < PreviewSize.large.maxTileWidth)
+        check("many stop at medium and scroll", suggested(60).scrolls && suggested(60).tile.width == PreviewSize.medium.maxTileWidth,
+              "\(suggested(60).shownRows) of \(suggested(60).rows) rows")
+        check("their rows fit the part", suggested(60).size.height <= 1385)
         func display(_ uuid: String) -> LayoutDisplay {
             LayoutDisplay(id: 0, uuid: uuid, name: uuid, frame: CGRect(x: 0, y: 0, width: 2800, height: 1400), usable: CGRect(x: 0, y: 0, width: 2800, height: 1400))
         }
         var widths = SwitcherConfig()
-        check("a new display gets what suits it", widths.gridWidth(for: display("new")) == 50)
+        check("a new display gets room for four", widths.gridWidth(for: display("new")) == 40)
         widths.gridWidths["a"] = 70
-        check("a display keeps its own", widths.gridWidth(for: display("a")) == 70 && widths.gridWidth(for: display("b")) == 50)
+        check("a display keeps its own", widths.gridWidth(for: display("a")) == 70 && widths.gridWidth(for: display("b")) == 40)
         widths.gridWidthForAll = 60
         widths.gridWidths = [:]
         check("applied to all, every display has it, and new ones", widths.gridWidth(for: display("a")) == 60 && widths.gridWidth(for: display("new")) == 60)

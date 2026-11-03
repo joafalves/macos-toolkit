@@ -106,12 +106,22 @@ struct SwitcherSettingsView: View {
                 if switcher.config.style == .previews {
                     Card(title: "Sizing",
                          footnote: switcher.config.previewLayout == .row
-                            ? "How much of a display's width the row can use. Windows that don't fit are further along it. Each display keeps its own, and a new one starts with what suits its size."
-                            : "How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with what suits its size.") {
+                            ? "How much of a display's width the row can use. Windows that don't fit are further along it. Each display keeps its own, and a new one starts with room for four tiles across."
+                            : "How much of a display's width the grid can use. Windows that don't fit go on another row. Each display keeps its own, and a new one starts with room for four tiles across.") {
                         // Here because each display's "across" is its width divided by this.
-                        OptionRow(title: "Tile size", caption: "The largest a tile gets. With many windows they shrink so all of them fit. Fit makes them as large as the display allows.",
+                        OptionRow(title: "Tile size", caption: "The largest a tile gets. Fit makes them as large as the display allows.",
                                   selection: $switcher.config.previewSize,
                                   options: PreviewSize.allCases.map { ($0, $0.title) })
+                        if switcher.config.previewLayout == .grid {
+                            RowDivider()
+                            OptionRow(title: "Rows", caption: "The most rows on screen. With more windows the grid scrolls a row at a time, with dots down its side for where you are in it.",
+                                      selection: $switcher.config.gridRows,
+                                      options: SwitcherConfig.gridRowsRange.map { ($0, LocalizedStringKey(String($0))) })
+                            RowDivider()
+                            ToggleRow(title: "Keep the first row in the middle",
+                                      caption: "The first row stays in the middle of the display, where a grid of one row is, and more rows go below it, so the first windows are always in the same place. When off, the whole grid is centred.",
+                                      isOn: $switcher.config.firstRowInMiddle)
+                        }
                         ForEach(displays.value, id: \.uuid) { display in
                             RowDivider()
                             GridWidthRow(switcher: switcher, display: display)
@@ -196,8 +206,23 @@ private struct GridWidthRow: View {
         GridLayout.across(display.usable.width * width / 100, tile: switcher.config.previewSize.maxTileWidth)
     }
 
+    /// How many of the grid's rows this display has room for, with as many
+    /// windows as fill them all.
+    private var rowsThatFit: Int {
+        let config = switcher.config
+        return SwitcherPanel.switcherGrid(count: across * SwitcherConfig.gridRowsRange.upperBound, size: config.previewSize, layout: .grid,
+                                          rows: config.gridRows, firstRowInMiddle: config.firstRowInMiddle,
+                                          on: display.usable.size, percent: width).shownRows
+    }
+
+    private var caption: LocalizedStringKey {
+        guard switcher.config.previewLayout == .grid else { return "\(across) across" }
+        let fit = rowsThatFit, rows = switcher.config.gridRows
+        return fit < rows ? "\(across) across. Room for \(fit) of the \(rows) rows at this size." : "\(across) across, \(rows) rows"
+    }
+
     var body: some View {
-        SettingRow(title: .verbatim(display.name), caption: "\(across) across") {
+        SettingRow(title: .verbatim(display.name), caption: caption, badge: rowsThatFit < switcher.config.gridRows && switcher.config.previewLayout == .grid ? "Fewer rows" : nil) {
             HStack(spacing: 10) {
                 Button { switcher.config.gridWidths[display.uuid] = nil } label: { Image(systemName: "arrow.uturn.backward") }
                     .buttonStyle(.borderless)

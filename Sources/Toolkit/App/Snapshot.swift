@@ -18,6 +18,10 @@ enum Snapshot {
                                                MixerController.preview(perOutput: CommandLine.arguments.contains("per-output"),
                                                                        simple: CommandLine.arguments.contains("simple")))
         let (finder, capture, awake) = (FinderController.preview(), CaptureController.preview(), AwakeController.preview())
+        // More rows than a display has room for, to show the warning.
+        if let rows = CommandLine.arguments.first(where: { $0.hasPrefix("rows=") }).flatMap({ Int($0.dropFirst(5)) }) {
+            switcher.config.gridRows = rows
+        }
         model.permissionNeeds = { section in
             switch section {
             case .mouse: return mouse.permissionNeeds
@@ -51,7 +55,7 @@ enum Snapshot {
 
     /// The window switcher's list, or with `grid` its previews, filled with
     /// made-up rows and drawn stand-ins for windows: nothing from the screen.
-    static func writeSwitcher(to path: String, light: Bool, grid: Bool = false, colors: Bool = false, many: Bool = false, oneRow: Bool = false, query: String? = nil) {
+    static func writeSwitcher(to path: String, light: Bool, grid: Bool = false, colors: Bool = false, many: Bool = false, crowded: Bool = false, oneRow: Bool = false, query: String? = nil) {
         _ = NSApplication.shared
         func icon(_ app: String) -> NSImage {
             let path = ["/System/Applications/\(app).app", "/System/Applications/Utilities/\(app).app", "/Applications/\(app).app"]
@@ -65,8 +69,10 @@ enum Snapshot {
         }
         let model = SwitcherListModel()
         model.badges = ["Mail.app": "3", "Notes.app": "1"]
-        model.items = many ? ["Mail", "Safari", "App Store", "Messages", "FaceTime", "Maps", "Photos", "Terminal", "Notes", "Calendar", "System Settings", "Reminders", "Finder", "Music"]
-            .enumerated().map { row($0.offset + 1, $0.element, $0.element) } : [
+        let apps = ["Mail", "Safari", "App Store", "Messages", "FaceTime", "Maps", "Photos", "Terminal", "Notes", "Calendar", "System Settings", "Reminders", "Finder", "Music"]
+        // Crowded: five windows of each, more than a grid has room for.
+        model.items = crowded ? (0..<apps.count * 5).map { row($0 + 1, $0 < apps.count ? apps[$0] : "\(apps[$0 % apps.count]) \($0 / apps.count + 1)", apps[$0 % apps.count]) }
+            : many ? apps.enumerated().map { row($0.offset + 1, $0.element, $0.element) } : [
             row(1, "Inbox — 3 new messages", "Mail"),
             row(2, "macos-toolkit — zsh — 120×40", "Terminal"),
             row(3, "A very long window title that will not fit in the space the row has for it at all", "TextEdit"),
@@ -93,10 +99,11 @@ enum Snapshot {
         if grid {
             model.style = .previews
             model.layout = GridLayout(count: model.items.count, maxTileWidth: PreviewSize.medium.maxTileWidth,
-                                      area: SwitcherPanel.gridArea(on: CGSize(width: 2560, height: 1409), percent: 55), oneRow: oneRow)
-            // In one row, some way along it.
-            if oneRow, model.layout.scrolls {
-                model.selection = min(6, model.items.count - 1)
+                                      area: SwitcherPanel.gridArea(on: CGSize(width: 2560, height: 1409), percent: GridWidth.suggested(points: 2560, tile: PreviewSize.medium.maxTileWidth)), oneRow: oneRow,
+                                      maxRows: SwitcherConfig.gridRowsDefault)
+            // Some way along the one row, or down the grid.
+            if model.layout.scrolls {
+                model.selection = min(oneRow ? 6 : 24, model.items.count - 1)
                 model.layout = model.layout.showing(model.selection)
             }
             let colors: [NSColor] = [.systemBlue, .darkGray, .systemOrange, .systemYellow, .systemRed, .systemGray]
@@ -468,7 +475,7 @@ enum Snapshot {
     /// window in the left half, and the switcher's grid of made-up windows
     /// in the right half. Nothing from the screen.
     /// The part offered is a frosted surface, the windows straight on it.
-    static func writeLayoutSuggest(to path: String, light: Bool) {
+    static func writeLayoutSuggest(to path: String, light: Bool, many: Bool = false) {
         _ = NSApplication.shared
         let size = CGSize(width: 1512, height: 982)
         let usable = CGRect(x: 0, y: 33, width: size.width, height: 949 - 70)
@@ -501,10 +508,12 @@ enum Snapshot {
                 .first(where: FileManager.default.fileExists) ?? "/System/Applications/\(app).app"
             return NSWorkspace.shared.icon(forFile: path)
         }
-        let rows: [(String, String, NSColor)] = [("Inbox — 3 new messages", "Mail", .systemBlue), ("Notes", "Notes", .systemYellow),
+        let five: [(String, String, NSColor)] = [("Inbox — 3 new messages", "Mail", .systemBlue), ("Notes", "Notes", .systemYellow),
                                                  ("October 2026", "Calendar", .systemRed), ("macos-toolkit — zsh", "Terminal", .darkGray),
                                                  ("Untitled", "TextEdit", .systemOrange)]
         let model = SwitcherListModel()
+        // Many: five of each, more than the half has room for.
+        let rows = many ? (0..<five.count * 5).map { five[$0 % five.count] } : five
         model.items = rows.enumerated().map { index, row in
             SwitcherItem(id: "\(index)", window: CGWindowID(index + 1), pid: 0, title: row.0, appName: row.1, icon: icon(row.1), state: .window)
         }
@@ -513,8 +522,10 @@ enum Snapshot {
         }
         model.style = .previews
         model.layout = GridLayout(count: rows.count, maxTileWidth: PreviewSize.large.maxTileWidth,
-                                  area: CGSize(width: rightHalf.width - 24, height: rightHalf.height - 24))
-        model.selection = 0
+                                  area: CGSize(width: rightHalf.width - 24, height: rightHalf.height - 24),
+                                  minTileWidth: SwitcherPanel.suggestionsMinTileWidth)
+        model.selection = many ? 9 : 0
+        model.layout = model.layout.showing(model.selection)
         let panelSize = model.layout.size
         model.size = panelSize
         // As the app's panel: the whole part, frosted, its corners rounded.

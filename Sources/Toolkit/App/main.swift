@@ -48,7 +48,7 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         if rest.contains("medium") { SwitcherPanel.previewIcons = .medium }
         if rest.contains("large") { SwitcherPanel.previewIcons = .large }
         Snapshot.writeSwitcher(to: rest[0], light: rest.contains("light"), grid: rest.contains("switcher-grid"), colors: rest.contains("colors"),
-                               many: rest.contains("many"), oneRow: rest.contains("row"), query: rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) })
+                               many: rest.contains("many"), crowded: rest.contains("crowded"), oneRow: rest.contains("row"), query: rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) })
         exit(0)
     }
     if rest.contains("mixer-popover") {
@@ -101,7 +101,7 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         exit(0)
     }
     if rest.contains("layout-suggest") {
-        Snapshot.writeLayoutSuggest(to: rest[0], light: rest.contains("light"))
+        Snapshot.writeLayoutSuggest(to: rest[0], light: rest.contains("light"), many: rest.contains("many"))
         exit(0)
     }
     if rest.contains("layout-grid") || rest.contains("layout-slots") || rest.contains("layout-snap") {
