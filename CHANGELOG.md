@@ -3,6 +3,15 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.27.0 (unreleased)
+
+### Added
+
+- **AI Usage:** a new tool, off until you turn it on, that shows how much of your AI plans' limits is left,
+  from what Claude and Codex write down on this Mac: no network and no credentials. Codex has its limits, with a mark
+  for an even pace; Claude's files only have tokens, so it shows those. In the menu bar and a panel if you like, and
+  a notification at 80% used if you turn it on.
+
 ## 0.26.3 (2026-11-03)
 
 ### Added

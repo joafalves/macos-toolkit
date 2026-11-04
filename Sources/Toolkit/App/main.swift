@@ -64,6 +64,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeStatsPanel(to: rest[0], light: rest.contains("light"), kinds: kinds.isEmpty ? StatKind.allCases : kinds)
         exit(0)
     }
+    if rest.contains("ai-usage-panel") {
+        Snapshot.writeAIUsagePanel(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
     if rest.contains("mouse-panel") {
         Snapshot.writeMousePanel(to: rest[0], light: rest.contains("light"))
         exit(0)
@@ -458,6 +462,15 @@ if CommandLine.arguments.contains("--test-navigation") {
 if CommandLine.arguments.contains("--test-tweaks") {
     TweaksModel.selfTest()
     exit(0)
+}
+if CommandLine.arguments.contains("--test-ai-usage") {
+    AIUsageSelfTest.run()
+}
+if let flag = CommandLine.arguments.firstIndex(of: "--measure-ai-usage") {
+    AIUsageSelfTest.measure(seconds: CommandLine.arguments.dropFirst(flag + 1).first.flatMap(Double.init) ?? 60)
+}
+if CommandLine.arguments.contains("--list-ai-usage") {
+    AIUsageSelfTest.list()
 }
 if CommandLine.arguments.contains("--test-stats-panels") {
     StatsController.panelTest()

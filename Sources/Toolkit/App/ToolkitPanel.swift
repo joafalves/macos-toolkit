@@ -29,6 +29,7 @@ struct ToolkitPanelView: View {
     @ObservedObject var capture: CaptureController
     @ObservedObject var awake: AwakeController
     @ObservedObject var stats: StatsController
+    @ObservedObject var aiUsage: AIUsageController
     @ObservedObject var updater = Updater.shared
     var actions = ToolkitPanelActions()
 
@@ -137,6 +138,7 @@ struct ToolkitPanelView: View {
         case .capture: return $capture.config.enabled
         case .awake: return $awake.config.enabled
         case .stats: return $stats.config.enabled
+        case .aiUsage: return $aiUsage.config.enabled
         case .welcome, .general, .permissions, .about, .tweaks: return .constant(true)
         }
     }

@@ -102,6 +102,7 @@ struct MainView: View {
     @ObservedObject var capture: CaptureController
     @ObservedObject var awake: AwakeController
     @ObservedObject var stats: StatsController
+    @ObservedObject var aiUsage: AIUsageController
 
     /// Whether a tool is on, for its tile on Overview and its sidebar row.
     private func enabled(_ section: AppSection) -> Bool {
@@ -114,6 +115,7 @@ struct MainView: View {
         case .capture: return capture.config.enabled
         case .awake: return awake.config.enabled
         case .stats: return stats.config.enabled
+        case .aiUsage: return aiUsage.config.enabled
         case .welcome, .general, .permissions, .about, .tweaks: return true
         }
     }
@@ -313,9 +315,10 @@ struct MainView: View {
             case .capture: CaptureSettingsView(capture: capture)
             case .awake: AwakeSettingsView(awake: awake, mouse: mouse)
             case .stats: StatsSettingsView(stats: stats)
+            case .aiUsage: AIUsageSettingsView(usage: aiUsage)
             case .permissions: PermissionsView()
             case .about: AboutView(model: model)
-            case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)
+            case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats, aiUsage: aiUsage)
             case .tweaks: TweaksView()
             }
         }
@@ -406,6 +409,7 @@ private struct GeneralView: View {
     @ObservedObject var capture: CaptureController
     @ObservedObject var awake: AwakeController
     @ObservedObject var stats: StatsController
+    @ObservedObject var aiUsage: AIUsageController
 
     /// Masculine in Portuguese, for a separator, unlike a gap's None.
     private static var noSeparator: LocalizedStringKey {
@@ -418,6 +422,7 @@ private struct GeneralView: View {
         switch tool {
         case .toolkit: return .always
         case .stats: return .shown(stats.config.enabled && !(stats.config.shown.isEmpty && stats.config.panelOnly.isEmpty))
+        case .aiUsage: return aiUsage.config.enabled ? .shown(aiUsage.config.inMenuBar) : .toolOff
         case .capture: return capture.config.enabled ? .shown(capture.config.standaloneIcon) : .toolOff
         case .awake: return awake.config.enabled ? .shown(awake.config.inMenuBar) : .toolOff
         case .mixer: return mixer.config.enabled ? .shown(mixer.config.inMenuBar) : .toolOff
@@ -436,6 +441,7 @@ private struct GeneralView: View {
                 stats.config.set(.cpu) { $0.shown = true }
                 stats.config.set(.memory) { $0.shown = true }
             }
+        case .aiUsage: aiUsage.config.inMenuBar = shown
         case .capture: capture.config.standaloneIcon = shown
         case .awake: awake.config.inMenuBar = shown
         case .mixer: mixer.config.inMenuBar = shown
@@ -498,8 +504,8 @@ private struct GeneralView: View {
             Card(title: "Backup") {
                 SettingRow(title: "Settings file", caption: "Save every setting to a file, or load them from one.") {
                     HStack(spacing: 8) {
-                        Button("Export…") { SettingsTransfer.exportSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats) }
-                        Button("Import…") { SettingsTransfer.importSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats) }
+                        Button("Export…") { SettingsTransfer.exportSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats, aiUsage: aiUsage) }
+                        Button("Import…") { SettingsTransfer.importSettings(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats, aiUsage: aiUsage) }
                     }
                 }
             }

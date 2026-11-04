@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private var capture: CaptureController!
     private var awake: AwakeController!
     private var stats: StatsController!
+    private var aiUsage: AIUsageController!
     /// The panel hanging from a part: the toolkit's, or System Stats'.
     private var panel: MenuBarPopover!
     /// The mixer while it's open; nil from the moment it starts closing, so
@@ -55,6 +56,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             stats.config.enabled = false
         }
         stats.start()
+        aiUsage = AIUsageController()
+        aiUsage.start()
         model.permissionNeeds = { [unowned self] section in
             switch section {
             case .mouse: return mouse.permissionNeeds
@@ -64,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             case .finder: return finder.permissionNeeds
             case .capture: return capture.permissionNeeds
             case .awake: return awake.permissionNeeds
-            case .stats, .welcome, .general, .permissions, .about, .tweaks: return []
+            case .stats, .aiUsage, .welcome, .general, .permissions, .about, .tweaks: return []
             }
         }
 
@@ -99,6 +102,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             mouse.$config.sink { _ in redraw() },
             layout.$config.sink { _ in redraw() },
             stats.live.$tick.sink { _ in redraw() },
+            aiUsage.$config.sink { _ in redraw() },
+            aiUsage.live.$usage.sink { _ in redraw() },
+            aiUsage.live.$now.sink { _ in redraw() },
             // Mouse checks Accessibility every couple of seconds anyway: a
             // change it sees updates the pages' locks, banners and warnings.
             mouse.$accessibilityGranted.removeDuplicates().dropFirst().sink { _ in
@@ -191,6 +197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         capture.stop()
         awake.stop()
         stats.stop()
+        aiUsage.stop()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -210,6 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private func updateMenuBar() {
         var segments = [MenuBarSegment(kind: .toolkit, glyph: MenuBarArt.toolkit, label: "MacOS Toolkit")]
         segments += stats.segments()
+        segments += aiUsage.segments()
         if let state = capture.recording {
             let config = capture.config
             // Two lines only with both settings on.
@@ -286,6 +294,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             showStats([stat] + stats.config.panelOnly, from: kind)
         case .stats:
             showStats(stats.config.shown + stats.config.panelOnly, from: kind)
+        case .aiUsage:
+            showAIUsage(from: kind)
         case .toolkit:
             showToolkitPanel()
         case .capture:
@@ -323,6 +333,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             StatsPanelView(stats: stats, kinds: kinds, maxHeight: panel.room, close: { [weak self] in self?.panel.close() }) { [weak self] in
                 self?.panel.close()
                 self?.show(.stats)
+            }
+        }
+    }
+
+    private func showAIUsage(from kind: MenuBarSegment.Kind) {
+        panel.show(from: kind) {
+            AIUsagePanelView(usage: aiUsage, maxHeight: panel.room) { [weak self] in
+                self?.panel.close()
+                self?.show(.aiUsage)
             }
         }
     }
@@ -408,7 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             })
         panel.show(from: .toolkit) {
             ToolkitPanelView(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder,
-                             capture: capture, awake: awake, stats: stats, actions: actions)
+                             capture: capture, awake: awake, stats: stats, aiUsage: aiUsage, actions: actions)
         }
     }
 
@@ -578,7 +597,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private func show(_ section: AppSection) {
         model.section = section
         if window == nil {
-            let window = MainWindow.make(MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats))
+            let window = MainWindow.make(MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats, aiUsage: aiUsage))
             window.setContentSize(NSSize(width: 860, height: 640))
             window.isReleasedWhenClosed = false
             window.delegate = self
