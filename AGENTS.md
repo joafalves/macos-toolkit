@@ -40,7 +40,7 @@ tool; keep it in step with the code.
   (which app owns the window under a point, for tools that act on it), `Navigator` (the settings
   window: `MainWindow.make`, its history, `WindowTitle`, `SwipeNavigation`), `MenuBarPopover` (the
   panels that hang from the menu bar item), and `SettingsSearch`/`SettingsIndex` (see Search).
-- `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`: one folder per tool. Screen
+- `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`, `AIUsage`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
   ⇧⌘2/3/4/5, Vision for the text in an area (`TextReader`), and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
   The Audio Mixer sends all sound through Core Audio process taps while it's on (`MixerController.applyTaps`):
@@ -64,6 +64,11 @@ tool; keep it in step with the code.
   settings, as the Bluetooth settings show them. A mouse with neither falls back to its model and
   transport (`modelKey`, the key before 0.20.0); a profile saved under that is copied to each
   connected mouse of the model that has an address or serial number, then dropped.
+  AI Usage reads what Claude and Codex write in their own files, on a queue of its own (`AIUsageReader`, FSEvents and a slow
+  timer). It never reads another tool's credentials nor uses the network: Claude's limits aren't in its files, and the only
+  other source, its OAuth endpoint, is undocumented and needs a credential Anthropic's terms keep to its own apps. From
+  transcripts it keeps figures only. They hold half their lines twice over, so `ClaudeSource` counts a response once, at
+  its last figure.
 - `Sources/Toolkit/System`: the pages under **System** in the sidebar, apart from the tools. For
   now **Tweaks** (`Tweaks.swift`, `TweaksView.swift`): macOS's own settings that System Settings
   doesn't show. See System pages below.
@@ -360,7 +365,7 @@ swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
 ./scripts/build.sh --dev [--install]         # with the development flags, for the tests run through the app bundle
-.build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|general|tweaks] [light]   # tweaks: macOS's defaults with two changed, not this Mac's (with `running`, Tips off and still running)
+.build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|stats|aiUsage|general|tweaks] [light]   # tweaks: macOS's defaults with two changed, not this Mac's (with `running`, Tips off and still running)
 .build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
 .build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
 .build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
@@ -411,6 +416,10 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-menu-bar-center <report>   # where test items, the toolkit's and everyone else's are drawn against the middle of each menu bar (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-menu-bar-focus <report> [rounds] [folder]   # the same with the focus on each display in turn, the item and macOS's copies; keeps the bars' pictures in folder (as above; clicks its own window, so leave the mouse alone)
 .build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
+.build/debug/Toolkit --test-ai-usage         # the sources on made-up files: limits, a response counted once, half a line, a restart, a new format; warnings
+.build/debug/Toolkit --list-ai-usage         # what's read from this Mac's own files, as figures, and what the first read costs
+.build/debug/Toolkit --measure-ai-usage [s]  # the reader on this Mac's files: time to the first figures, its cost left alone, stopping, and a changed file read
+.build/debug/Toolkit --snapshot out.png ai-usage-panel [light]   # AI Usage's panel, from made-up usage
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of
 .build/debug/Toolkit --test-navigation       # what Navigate does with each button in each kind of app, posting nothing; with Accessibility (open -n the dev bundle), Finder's Back and Forward found
 .build/debug/Toolkit --test-tweaks           # every tweak read from this Mac (changes nothing of macOS's), and the preference round trip on a scratch domain

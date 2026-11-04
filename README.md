@@ -128,6 +128,7 @@ section in the sidebar and (where it makes sense) an entry in the menu bar.
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings, with window backdrops and small H.264 files, and ⇧⌘2 to copy the text on screen. |
 | 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar, with a memory figure that leaves out what macOS only caches. |
 | ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off. |
+| ✨ **[AI Usage](#ai-usage)** | How much of your Codex limits is left and the tokens Claude has used, from their own files, with no network and no credentials. |
 
 Under **System** in the settings, **[Tweaks](#tweaks)** has macOS settings that System Settings
 doesn't show: background tasks such as Photos' analysis, and hidden Dock, Finder, typing and
@@ -823,6 +824,35 @@ panel.
   the CPU and GPU draw is read only while the power panel is open (on a desktop, whenever power is
   read). A reading of all six costs under 2 ms.
 
+## AI Usage
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/ai-usage-panel-dark.png">
+    <img src="docs/images/ai-usage-panel-light.png" width="300" alt="The AI Usage panel: Claude's tokens with a chart and a split by model, and Codex's limits as bars of what's left">
+  </picture>
+</p>
+
+How much of your AI plans' limits is left, and what you've used, from what the tools on this Mac
+write down. It's off until you turn it on. It uses no network and no credentials: only token counts
+and limits are read from the folders below, never what's in a conversation, and nothing leaves the Mac.
+
+- **Codex** has its limits, as Codex itself is told of them, in `~/.codex/sessions`: what's left of its
+  5-hour and weekly windows and when each resets. A mark on the bar shows where an even pace would put
+  you, and the bar turns red when this pace runs out before the reset. New figures only come while Codex
+  runs, so an older one says when it was read. Once a window has ended, what's left isn't known until
+  Codex reports again, so it says that rather than showing a figure.
+- **Claude** has tokens, in `~/.claude/projects`: the last 5 hours and 7 days, and a chart and split by
+  model for today, yesterday or 30 days, without what's read back from the cache. They're counted by the whole hour, so a figure can be up to an hour short. Claude's files don't
+  say how much of its limits is left, so there are no bars, and no cost: on a plan, tokens at API prices
+  aren't what you pay.
+- **Show in the menu bar** adds a pill with the limit closest to running out. With none running and read in the last hour, it's the
+  icon and Claude's tokens in the last 5 hours. A click opens the panel.
+- **Warn when a limit runs short**, off to start with, sends a notification at 80% used, once for each window.
+- Files are read when something in their folders changes, at most every half a minute, and only what's
+  new. The first read of a large history takes some seconds in the background; what's been added up is
+  kept in a small file, so a restart doesn't read it all again, and it's deleted when the tool is turned off.
+
 ## Tweaks
 
 <p align="center">
@@ -936,7 +966,7 @@ To remove it, quit the app, delete it from `/Applications`, and delete
   </picture>
 </p>
 
-The toolkit has one item in the menu bar. The toolkit's mark is always there, and System Stats, Screen
+The toolkit has one item in the menu bar. The toolkit's mark is always there, and System Stats, AI Usage, Screen
 Capture, Keep Awake, the Audio Mixer, Mouse and Window Layout join it when they're put there, side by side
 with the same size and spacing and a line between them (a dot between System Stats' stats). Each of those has **Show in the menu bar**
 at the top of its page, under its On switch, saying what a click on it does (System Stats is in the
@@ -1003,6 +1033,7 @@ Sources/Toolkit
 ├── Capture    the Screen Capture tool
 ├── Awake      the Keep Awake tool
 ├── Stats      the System Stats tool
+├── AIUsage    the AI Usage tool
 ├── System     Tweaks, macOS's own settings
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu
