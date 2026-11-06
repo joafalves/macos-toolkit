@@ -23,7 +23,7 @@ enum PublishingProbe {
         let window = MainWindow.make(MainView(
             model: model, mouse: mouse, switcher: SwitcherController.preview(), layout: LayoutController.preview(),
             mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview(),
-            awake: AwakeController.preview(), stats: StatsController.preview(), aiUsage: AIUsageController.preview(), dock: FloatingDockController.preview()))
+            awake: AwakeController.preview(), stats: StatsController.preview(), dock: FloatingDockController.preview()))
         window.setContentSize(NSSize(width: 780, height: 2400))
         settle()
 
@@ -55,7 +55,7 @@ enum PublishingProbe {
         // ordinary one (SwiftUI's aren't found this way). Switches only
         // on Tweaks, whose preview writes nothing: a tool's can start it for real.
         // Not Finder's or Settings', whose changes aren't all held back in a preview.
-        for section in [AppSection.switcher, .layout, .mixer, .capture, .awake, .stats, .aiUsage, .tweaks] {
+        for section in [AppSection.switcher, .layout, .mixer, .capture, .awake, .stats, .tweaks] {
             model.section = section
             settle()
             for control in controls(in: window.contentView!, menus: true) {

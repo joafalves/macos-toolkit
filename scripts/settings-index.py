@@ -28,7 +28,7 @@ PAGES = {
     "Sources/Toolkit/Capture/CaptureSettingsView.swift": "capture",
     "Sources/Toolkit/Awake/AwakeSettingsView.swift": "awake",
     "Sources/Toolkit/Stats/StatsSettingsView.swift": "stats",
-    "Sources/Toolkit/AIUsage/AIUsageSettingsView.swift": "aiUsage",
+    "Sources/Toolkit/AIUsage/AIUsageSettingsView.swift": "stats",
     "Sources/Toolkit/Dock/FloatingDockSettingsView.swift": "dock",
     "Sources/Toolkit/System/TweaksView.swift": "tweaks",
 }

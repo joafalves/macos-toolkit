@@ -2,11 +2,12 @@ import CoreServices
 import Foundation
 
 /// Reads the sources off the main thread: at the start, when something in
-/// their folders changes (at most every half a minute, while an agent writes
-/// constantly), and every ten minutes for a folder that has only just appeared.
-/// Hands over what's read only when it has changed.
+/// their folders changes (at most every ten seconds, while an agent writes
+/// constantly; what's read then is only what's new), and every ten minutes
+/// for a folder that has only just appeared. Hands over what's read only
+/// when it has changed.
 final class AIUsageReader {
-    private static let latency: CFTimeInterval = 30
+    private static let latency: CFTimeInterval = 10
     private static let rereadEvery = 600
 
     /// One for every reader: a new one starts after the last has finished with
@@ -72,7 +73,9 @@ final class AIUsageReader {
             guard let info else { return }
             Unmanaged<AIUsageReader>.fromOpaque(info).takeUnretainedValue().read()
         }
-        let paths = sources.map { $0.root.path } as CFArray
+        let roots = sources.flatMap(\.roots).map(\.path)
+        guard !roots.isEmpty else { return }
+        let paths = roots as CFArray
         guard let stream = FSEventStreamCreate(nil, callback, &context, paths, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), Self.latency,
                                                FSEventStreamCreateFlags(kFSEventStreamCreateFlagNone)) else {
             Log.aiUsage.error("Couldn't watch the usage folders")

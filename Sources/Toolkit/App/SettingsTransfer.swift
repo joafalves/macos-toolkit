@@ -21,7 +21,8 @@ struct SettingsFile: Codable {
     var general: GeneralConfig?
     /// Missing in files exported before System Stats existed.
     var stats: StatsConfig?
-    /// Missing in files exported before AI Usage existed.
+    /// System Stats' AI usage stat's own settings, in a file of their own.
+    /// Missing in files exported before it existed.
     var aiUsage: AIUsageConfig?
     /// Missing in files exported before the Floating Dock existed.
     var dock: FloatingDockConfig?
@@ -33,7 +34,7 @@ enum SettingsTransfer {
     /// leaves them alone. The mixer's audio driver is installed on this Mac only.
     static let localOnly: [String: Set<String>] = ["mixer": ["usesDriver"]]
 
-    static func exportSettings(model: AppModel, mouse: MouseController, switcher: SwitcherController, layout: LayoutController, mixer: MixerController, finder: FinderController, capture: CaptureController, awake: AwakeController, stats: StatsController, aiUsage: AIUsageController,
+    static func exportSettings(model: AppModel, mouse: MouseController, switcher: SwitcherController, layout: LayoutController, mixer: MixerController, finder: FinderController, capture: CaptureController, awake: AwakeController, stats: StatsController,
                                dock: FloatingDockController? = FloatingDockController.shared) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
@@ -41,7 +42,7 @@ enum SettingsTransfer {
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         do {
-            let file = SettingsFile(mouse: mouse.config, switcher: switcher.config, layout: layout.config, mixer: mixer.config, finder: finder.config, capture: capture.config, awake: awake.config, general: model.general, stats: stats.config, aiUsage: aiUsage.config, dock: dock?.config)
+            let file = SettingsFile(mouse: mouse.config, switcher: switcher.config, layout: layout.config, mixer: mixer.config, finder: finder.config, capture: capture.config, awake: awake.config, general: model.general, stats: stats.config, aiUsage: stats.ai.config, dock: dock?.config)
             try exported(file).write(to: url, options: .atomic)
         } catch {
             show(error: String(localized: "The settings could not be exported."), detail: error.localizedDescription)
@@ -59,7 +60,7 @@ enum SettingsTransfer {
         return try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
     }
 
-    static func importSettings(model: AppModel, mouse: MouseController, switcher: SwitcherController, layout: LayoutController, mixer: MixerController, finder: FinderController, capture: CaptureController, awake: AwakeController, stats: StatsController, aiUsage: AIUsageController,
+    static func importSettings(model: AppModel, mouse: MouseController, switcher: SwitcherController, layout: LayoutController, mixer: MixerController, finder: FinderController, capture: CaptureController, awake: AwakeController, stats: StatsController,
                                dock: FloatingDockController? = FloatingDockController.shared) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
@@ -93,7 +94,7 @@ enum SettingsTransfer {
         merge(&awake.config, json["awake"], tool: "awake")
         merge(&model.general, json["general"], tool: "general")
         merge(&stats.config, json["stats"], tool: "stats")
-        merge(&aiUsage.config, json["aiUsage"], tool: "aiUsage")
+        merge(&stats.ai.config, json["aiUsage"], tool: "aiUsage")
         if let dock { merge(&dock.config, json["dock"], tool: "dock") }
     }
 

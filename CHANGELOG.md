@@ -7,10 +7,6 @@ worked on; it gets its date when it's released.
 
 ### Added
 
-- **AI Usage:** a new tool, off until you turn it on, that shows how much of your AI plans' limits is left,
-  from what Claude and Codex write down on this Mac: no network and no credentials. Codex has its limits, with a mark
-  for an even pace; Claude's files only have tokens, so it shows those. In the menu bar and a panel if you like, and
-  a notification at 80% used if you turn it on.
 - **Floating Dock:** a new tool: your apps in a ring that opens at the pointer, beside the macOS Dock and
   without touching it. Hold the right ⌘ (or a shortcut, or a mouse button given it on the Mouse page),
   point at an app and let go to bring it forward; carry on past the ring for one of its windows, which
@@ -29,6 +25,10 @@ worked on; it gets its date when it's released.
 - **Mouse:** the buttons a mouse keeps to itself, like the DPI button of some mice, can be given an action
   too, on mice that report them through their maker's channel: the mouse lets the toolkit have them while
   it runs, and has them back when it quits.
+- **System Stats:** an AI usage stat, off until you turn it on: what's left of your Codex limits and
+  the tokens Claude Code has used, from the files they write on this Mac, with no network and no
+  credentials. A pill with the limit closest to running out, a panel with an overview and a tab for
+  each, and a notification at 80% used if you like.
 
 ## 0.26.3 (2026-11-03)
 

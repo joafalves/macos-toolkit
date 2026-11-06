@@ -40,7 +40,7 @@ enum Snapshot {
         // read from it. The glass sidebar and toolbar are drawn by the window
         // server, not the views, so the page draws stand-ins for them here.
         MainView.drawnChrome = true
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: StatsController.preview(), aiUsage: AIUsageController.preview(), dock: dock)))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: StatsController.preview(), dock: dock)))
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -343,8 +343,8 @@ enum Snapshot {
         // The default, every stat as a number, then the pills, small and not, then the charts.
         let looks: [[StatKind: StatLook]] = [
             [.cpu: .number, .memory: .number, .network: .number, .power: .number],
-            [.cpu: .pill, .memory: .pill, .gpu: .pill, .disk: .pill],
-            [.cpu: .smallPill, .memory: .smallPill, .gpu: .smallPill, .disk: .smallPill],
+            [.cpu: .pill, .memory: .pill, .gpu: .pill, .disk: .pill, .ai: .pill],
+            [.cpu: .smallPill, .memory: .smallPill, .gpu: .smallPill, .disk: .smallPill, .ai: .smallPill],
             [.cpu: .chart, .memory: .chart, .network: .chart, .power: .chart],
         ]
         var rows: [[MenuBarSegment]] = [[toolkit] + StatsController.preview().segments()]
@@ -387,12 +387,10 @@ enum Snapshot {
         // Two off, to show how that looks; the previews start with every tool on.
         finder.config.enabled = false
         stats.config.enabled = false
-        let aiUsage = AIUsageController.preview()
-        aiUsage.config.enabled = false
         capture.config.standaloneIcon = false
         awake.config.menuBarIcon = .none
         let view = ToolkitPanelView(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder,
-                                    capture: capture, awake: awake, stats: stats, aiUsage: aiUsage, dock: FloatingDockController.preview())
+                                    capture: capture, awake: awake, stats: stats, dock: FloatingDockController.preview())
         let host = NSHostingController(rootView: view.background(Color(nsColor: .windowBackgroundColor)))
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.borderless]
@@ -542,20 +540,6 @@ enum Snapshot {
     private static func writePanel(_ panel: some View, to path: String, light: Bool) {
         _ = NSApplication.shared
         let host = NSHostingController(rootView: panel.background(Color(nsColor: .windowBackgroundColor)))
-        let window = NSWindow(contentViewController: host)
-        window.styleMask = [.borderless]
-        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
-        window.setContentSize(host.view.fittingSize)
-        onRetina(window)
-        window.layoutIfNeeded()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
-        if let view = window.contentView { save(view, to: path) }
-    }
-
-    /// AI Usage's panel, from made-up usage.
-    static func writeAIUsagePanel(to path: String, light: Bool) {
-        _ = NSApplication.shared
-        let host = NSHostingController(rootView: AIUsagePanelView(usage: .preview()).background(Color(nsColor: .windowBackgroundColor)))
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.borderless]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)

@@ -9,8 +9,17 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
     /// A product's name, the same in every language.
     var title: String {
         switch self {
-        case .claude: return "Claude"
+        case .claude: return "Claude Code"
         case .codex: return "Codex"
+        }
+    }
+
+    /// Its own pill's symbol, so two side by side can be told apart. Plain
+    /// shapes, not either product's mark.
+    var symbol: String {
+        switch self {
+        case .claude: return "asterisk"
+        case .codex: return "hexagon"
         }
     }
 }
@@ -122,8 +131,8 @@ struct ProviderUsage: Equatable {
 /// Reads one provider's files. Called on the reader's queue only.
 protocol AIUsageSource: AnyObject {
     var provider: AIProvider { get }
-    /// The folder it reads, which the reader watches.
-    var root: URL { get }
+    /// The folders it reads, which the reader watches.
+    var roots: [URL] { get }
     /// `cancelled` is checked along the way: a first read can take a while,
     /// and turning the tool off shouldn't wait for it.
     func read(cancelled: () -> Bool) -> ProviderUsage
@@ -167,5 +176,29 @@ enum AIUsageFormat {
         let words = parts.filter { !$0.allSatisfy(\.isNumber) }.map { $0.prefix(1).uppercased() + $0.dropFirst() }
         guard !words.isEmpty else { return id }
         return (words + (numbers.isEmpty ? [] : [numbers.joined(separator: ".")])).joined(separator: " ")
+    }
+}
+
+/// Memory to read files into, straight from the system and back to it:
+/// malloc keeps a large block it's freed for reuse, so a buffer grown for a
+/// long line, or a file's last megabytes, went on counting against the app,
+/// 20 MB after Claude Code's first read and 13 after Codex's.
+enum ReadPages {
+    /// Empty if the system has none to give, and then nothing's read this time.
+    static func take(_ count: Int) -> UnsafeMutableRawBufferPointer {
+        guard count > 0, let start = mmap(nil, count, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0), start != MAP_FAILED else {
+            return UnsafeMutableRawBufferPointer(start: nil, count: 0)
+        }
+        return UnsafeMutableRawBufferPointer(start: start, count: count)
+    }
+
+    static func release(_ pages: UnsafeMutableRawBufferPointer) {
+        guard let start = pages.baseAddress else { return }
+        munmap(start, pages.count)
+    }
+
+    static func contains(_ bytes: UnsafeBufferPointer<UInt8>, _ needle: [UInt8]) -> Bool {
+        guard let base = bytes.baseAddress, bytes.count >= needle.count else { return false }
+        return needle.withUnsafeBytes { memmem(base, bytes.count, $0.baseAddress, needle.count) } != nil
     }
 }

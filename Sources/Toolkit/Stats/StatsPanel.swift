@@ -58,6 +58,14 @@ struct StatsPanelView: View {
 
     @ViewBuilder
     private func section(_ kind: StatKind) -> some View {
+        if kind == .ai {
+            AIUsageStatSection(usage: stats.ai)
+        } else {
+            statSection(kind)
+        }
+    }
+
+    private func statSection(_ kind: StatKind) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Label(kind.title, systemImage: kind.symbol)
@@ -99,6 +107,7 @@ struct StatsPanelView: View {
         case .power: HistoryChart(series: [(stats.history[.power] ?? [], .orange)], ceiling: nil)
         case .network: HistoryChart(series: [(stats.history[.down] ?? [], .teal), (stats.history[.up] ?? [], .orange)], ceiling: nil)
         case .disk: HistoryChart(series: [(stats.history[.read] ?? [], .purple), (stats.history[.write] ?? [], .orange)], ceiling: nil)
+        case .ai: EmptyView()
         }
     }
 
@@ -120,7 +129,7 @@ struct StatsPanelView: View {
         case .memory: memoryDetails
         case .network: networkDetails
         case .disk: diskDetails
-        case .gpu: EmptyView()
+        case .gpu, .ai: EmptyView()
         case .power: powerDetails
         }
     }
@@ -365,7 +374,6 @@ private struct CoreCharts: View {
     }
 }
 
-/// Where memory goes, as one bar: what apps need, then what macOS could free.
 /// Shares of a whole, side by side, in a bar like `ShareBar`.
 struct StackedBar: View {
     let parts: [(share: Double, color: Color)]
@@ -386,6 +394,7 @@ struct StackedBar: View {
     }
 }
 
+/// Where memory goes, as one bar: what apps need, then what macOS could free.
 private struct MemoryBar: View {
     let memory: MemoryReading
 

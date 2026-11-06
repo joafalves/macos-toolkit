@@ -2,7 +2,7 @@ import Foundation
 
 /// One thing System Stats watches.
 enum StatKind: String, Codable, CaseIterable, Identifiable {
-    case cpu, memory, network, disk, gpu, power
+    case cpu, memory, network, disk, gpu, power, ai
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
         case .disk: return String(localized: "Disk")
         case .gpu: return String(localized: "GPU")
         case .power: return String(localized: "Power")
+        case .ai: return String(localized: "AI Usage")
         }
     }
 
@@ -26,6 +27,7 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
         case .disk: return String(localized: "SSD")
         case .gpu: return String(localized: "GPU")
         case .power: return String(localized: "PWR")
+        case .ai: return String(localized: "AI")
         }
     }
 
@@ -37,6 +39,7 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
         case .disk: return String(localized: "Free space on the startup disk.")
         case .gpu: return String(localized: "How busy the graphics processor is.")
         case .power: return String(localized: "What the Mac draws, in watts.")
+        case .ai: return String(localized: "What's left of your Codex limits, and Claude Code's tokens, from their own files.")
         }
     }
 
@@ -48,6 +51,7 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
         case .disk: return "internaldrive"
         case .gpu: return "cube"
         case .power: return "bolt"
+        case .ai: return "sparkles"
         }
     }
 
@@ -55,7 +59,7 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
     var looks: [StatLook] {
         switch self {
         case .cpu, .memory, .gpu: return [.number, .pill, .smallPill, .chart]
-        case .disk: return [.number, .pill, .smallPill]
+        case .disk, .ai: return [.number, .pill, .smallPill]
         case .network, .power: return [.number, .chart]
         }
     }

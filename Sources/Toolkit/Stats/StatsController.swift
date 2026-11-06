@@ -19,6 +19,10 @@ final class StatsController: ObservableObject {
     /// object, and would otherwise be drawn again with every reading.
     let live = StatsLive()
 
+    /// The AI usage stat, read on its own as its files change rather than on
+    /// this timer, and only while the stat is in the menu bar or the panel.
+    private(set) var ai = AIUsageController()
+
     var cpu: CPUReading? { live.cpu }
     var memory: MemoryReading? { live.memory }
     var network: NetworkReading? { live.network }
@@ -60,7 +64,13 @@ final class StatsController: ObservableObject {
     }
 
     func start() {
+        ai.start(active: aiActive)
         apply()
+    }
+
+    /// Not for a self-test's or a snapshot's controller: they'd read this Mac's files.
+    private var aiActive: Bool {
+        persists && config.enabled && config.setting(.ai).place != .off
     }
 
     /// Made-up readings and history, for `--snapshot`: nothing from this Mac.
@@ -76,7 +86,10 @@ final class StatsController: ObservableObject {
                 if let shown { $0.shown = shown.contains(kind) }
             }
         }
+        // The page with its AI usage card, which shows while the stat isn't off.
+        if shown == nil { config.set(.ai) { $0.place = .panel } }
         stats.config = config
+        stats.ai = AIUsageController.preview()
         let gb: UInt64 = 1 << 30
         stats.live.cpu = CPUReading(total: 0.23, user: 0.15, system: 0.08,
                                cores: [0.42, 0.31, 0.18, 0.12, 0.08, 0.05, 0.36, 0.22, 0.14, 0.09],
@@ -117,6 +130,7 @@ final class StatsController: ObservableObject {
         timer?.invalidate()
         timer = nil
         wasReading = []
+        ai.stop()
     }
 
     /// What's being read now.
@@ -132,7 +146,9 @@ final class StatsController: ObservableObject {
     /// as a speed or a share of time read moments after the last one is noise.
     func apply() {
         guard !isPreview else { return }
-        let reading = reading
+        ai.active = aiActive
+        // Read by its own reader: nothing for the timer to do.
+        let reading = self.reading.subtracting([.ai])
         if !reading.contains(.cpu) { cpuReader = nil; live.cpu = nil }
         if !reading.contains(.memory) { live.memory = nil }
         if !reading.contains(.network) { networkReader = nil; live.network = nil }
@@ -211,6 +227,7 @@ final class StatsController: ObservableObject {
         case .disk: return [.read, .write]
         case .gpu: return [.gpu]
         case .power: return [.power]
+        case .ai: return []
         }
     }
 
@@ -332,6 +349,7 @@ final class StatsController: ObservableObject {
         case .disk: return "888 GB"
         case .power: return "888 W"
         case .network: return "↓888 MB/s"
+        case .ai: return AIUsageFormat.widestTokens
         }
     }
 
@@ -342,6 +360,7 @@ final class StatsController: ObservableObject {
         case .memory: return memory?.neededShare
         case .gpu: return gpu
         case .disk: return disk?.usedShare
+        case .ai: return ai.share(at: ai.live.now)
         case .network, .power: return nil
         }
     }
@@ -355,12 +374,14 @@ final class StatsController: ObservableObject {
         case .disk: return disk.map { Self.bytes($0.free) } ?? "–"
         case .power: return power?.drawn.map { Self.watts($0) } ?? "–"
         case .network: return network.map { "↓" + Self.speed($0.down) } ?? "–"
+        case .ai: return ai.figure(at: ai.live.now) ?? "–"
         }
     }
 
     /// Up to 100: the pill has room for it, as wide as Keep Awake's times.
     private func pillText(_ kind: StatKind) -> String {
-        share(kind).map { "\(min(100, Int(($0 * 100).rounded())))" } ?? "–"
+        if kind == .ai { return ai.pillText(at: ai.live.now) ?? "–" }
+        return share(kind).map { "\(min(100, Int(($0 * 100).rounded())))" } ?? "–"
     }
 
     private func chartValues(_ kind: StatKind) -> (values: [Double], ceiling: Double?) {
@@ -372,6 +393,7 @@ final class StatsController: ObservableObject {
         case .power: return (last(.power), nil)
         case .disk: return (last(.read), nil)
         case .network: return (last(.down), nil)
+        case .ai: return ([], nil)
         }
     }
 
@@ -395,6 +417,7 @@ final class StatsController: ObservableObject {
     /// Memory turns yellow, then red, as macOS reports it running short, if
     /// that's turned on.
     func tint(_ kind: StatKind) -> NSColor? {
+        if kind == .ai { return ai.isOverPace(at: ai.live.now) ? .systemRed : nil }
         guard kind == .memory, config.memoryColors, let pressure = memory?.pressure else { return nil }
         switch pressure {
         case .normal: return nil

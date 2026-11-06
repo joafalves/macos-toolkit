@@ -69,11 +69,16 @@ tool; keep it in step with the code.
   channel (`Mouse/HIDPP.swift`, `HIDPPButtons`: feature 0x1B04, on a thread of its own). A divert is gone
   when the mouse disconnects, so it's made again on each connection and undone on quit (`MouseController.stop`).
   Only mice connected directly: behind a receiver the channel is the receiver's.
-  AI Usage reads what Claude and Codex write in their own files, on a queue of its own (`AIUsageReader`, FSEvents and a slow
-  timer). It never reads another tool's credentials nor uses the network: Claude's limits aren't in its files, and the only
-  other source, its OAuth endpoint, is undocumented and needs a credential Anthropic's terms keep to its own apps. From
-  transcripts it keeps figures only. They hold half their lines twice over, so `ClaudeSource` counts a response once, at
-  its last figure.
+  `AIUsage` is System Stats' AI usage stat (`StatKind.ai`), owned by `StatsController` (`ai`), which sets it `active`
+  while the stat isn't off; its card goes on System Stats' page. It reads only what a tool writes down itself, on a
+  queue of its own (`AIUsageReader`: FSEvents and a slow timer, not System Stats' tick): no credentials, no network,
+  no screen scraping, no changes to another tool's settings. Codex writes its
+  limits into its session files (`CodexSource`, read from the end of the latest few). Claude Code's limits are only in
+  its own `/usage` (no file, no documented interface without its credential), so it has tokens only, and it's off
+  until turned on as its transcripts hold conversations. A provider is a source (`AIUsageSource`) and a tab. Token
+  reading (`ClaudeTranscripts`) picks the figures out of each line's bytes (`TranscriptLine`) into a buffer from
+  `ReadPages`: decoding lines whole took 280 MB on a first read, and malloc kept the large blocks it freed. A
+  response's lines are counted once, at its last figure.
 - The Floating Dock (`Sources/Toolkit/Dock`): a ring of apps at the pointer, held open by the right ⌘, a
   shortcut or a mouse button with its action, and picked by direction. One event tap for its keys, clicks,
   wheel and moves. While it's open the real pointer is held still and hidden (`CGAssociateMouseAndMouseCursorPosition(0)`,
@@ -430,8 +435,8 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-menu-bar-center <report>   # where test items, the toolkit's and everyone else's are drawn against the middle of each menu bar (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-menu-bar-focus <report> [rounds] [folder]   # the same with the focus on each display in turn, the item and macOS's copies; keeps the bars' pictures in folder (as above; clicks its own window, so leave the mouse alone)
 .build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
-.build/debug/Toolkit --test-ai-usage         # the sources on made-up files: limits, a response counted once, half a line, a restart, a new format; warnings
-.build/debug/Toolkit --list-ai-usage         # what's read from this Mac's own files, as figures, and what the first read costs
+.build/debug/Toolkit --test-ai-usage         # the sources on made-up files: limits, a response counted once, half a line, a restart, a new format; the transcript scanner; /usage screens and reset times; warnings
+.build/debug/Toolkit --list-ai-usage         # what's read from this Mac: Claude Code asked for /usage once, the files as figures, and what the first read costs
 .build/debug/Toolkit --measure-ai-usage [s]  # the reader on this Mac's files: time to the first figures, its cost left alone, stopping, and a changed file read
 .build/debug/Toolkit --snapshot out.png ai-usage-panel [light]   # AI Usage's panel, from made-up usage
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of

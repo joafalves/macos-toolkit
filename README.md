@@ -128,7 +128,6 @@ section in the sidebar and (where it makes sense) an entry in the menu bar.
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings, with window backdrops and small H.264 files, and ⇧⌘2 to copy the text on screen. |
 | 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar, with a memory figure that leaves out what macOS only caches. |
 | ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off. |
-| ✨ **[AI Usage](#ai-usage)** | How much of your Codex limits is left and the tokens Claude has used, from their own files, with no network and no credentials. |
 | ⭕ **[Floating Dock](#floating-dock)** | Your apps in a ring at the pointer: point and let go to switch, further out for one of their windows. |
 
 Under **System** in the settings, **[Tweaks](#tweaks)** has macOS settings that System Settings
@@ -887,29 +886,40 @@ panel.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/ai-usage-panel-dark.png">
-    <img src="docs/images/ai-usage-panel-light.png" width="300" alt="The AI Usage panel: Claude's tokens with a chart and a split by model, and Codex's limits as bars of what's left">
+    <img src="docs/images/ai-usage-panel-light.png" width="300" alt="The AI Usage panel's overview: Claude Code's and Codex's limits as bars of what's left, the one closest to running out first">
   </picture>
 </p>
 
-How much of your AI plans' limits is left, and what you've used, from what the tools on this Mac
-write down. It's off until you turn it on. It uses no network and no credentials: only token counts
-and limits are read from the folders below, never what's in a conversation, and nothing leaves the Mac.
+What's left of your Claude Code and Codex limits, from what they write on this Mac. It's off until you
+turn it on. It uses no network and no credentials, and nothing leaves the Mac. These two are the ones
+that keep their limits on the Mac: the others only give them out to a program signed in as you.
 
-- **Codex** has its limits, as Codex itself is told of them, in `~/.codex/sessions`: what's left of its
-  5-hour and weekly windows and when each resets. A mark on the bar shows where an even pace would put
-  you, and the bar turns red when this pace runs out before the reset. New figures only come while Codex
-  runs, so an older one says when it was read. Once a window has ended, what's left isn't known until
-  Codex reports again, so it says that rather than showing a figure.
-- **Claude** has tokens, in `~/.claude/projects`: the last 5 hours and 7 days, and a chart and split by
-  model for today, yesterday or 30 days, without what's read back from the cache. They're counted by the whole hour, so a figure can be up to an hour short. Claude's files don't
-  say how much of its limits is left, so there are no bars, and no cost: on a plan, tokens at API prices
-  aren't what you pay.
-- **Show in the menu bar** adds a pill with the limit closest to running out. With none running and read in the last hour, it's the
-  icon and Claude's tokens in the last 5 hours. A click opens the panel.
+- **Claude Code** shows its 5-hour and weekly limits in its own `/usage` screen, and nowhere else.
+  So the toolkit asks it: now and then it starts Claude Code where no one sees it, with its
+  customizations off, types `/usage`, reads the figures and quits. Claude Code signs in on its own;
+  the toolkit never sees a password or token, and `/usage` asks no model anything. It's every 15
+  minutes while Claude Code is in use, hourly otherwise, and when the panel opens. It works with a
+  terminal install or the copy inside the Claude app, which has to be signed in once with
+  `claude auth login`. The limits are your account's, so they count your use in the Claude app and
+  on the web too. As it reads a screen, a change to that screen shows as one it can't read.
+- **Codex** has its limits in its session files, `~/.codex/sessions`, as Codex itself is told of them,
+  from the app and the command line alike. New figures only come while Codex runs.
+- Each limit is a bar of what's left, with a mark where an even pace would put you, red when this pace
+  runs out before the reset. Once a window has ended, what's left isn't known until the next report, so
+  it says that rather than showing a figure.
+- **Token history**, for Claude Code and off to start with, adds its tokens by hour and model from its
+  transcripts in `~/.claude/projects`: the last 5 hours and 7 days, and on this page a chart and split
+  for today, yesterday or 30 days, without what's read back from the cache. Only the figures are
+  picked out of each line, never what was said, and only what's new is read. What's been added up is
+  kept in a small file, so a restart doesn't read it all again, and it's deleted when token history
+  is turned off. The first read of a long history takes some seconds in the background.
+- **The panel** opens from the menu bar on an overview of every provider, the one closest to running
+  out first, with a tab for each.
+- **Show in the menu bar** adds a pill: **Merged**, the limit closest to running out, or **One per
+  provider**. A switch for each provider says whether it counts. With no limit read in the last hour,
+  a pill shows Claude Code's tokens in the last 5 hours, if token history is on, or its symbol.
 - **Warn when a limit runs short**, off to start with, sends a notification at 80% used, once for each window.
-- Files are read when something in their folders changes, at most every half a minute, and only what's
-  new. The first read of a large history takes some seconds in the background; what's been added up is
-  kept in a small file, so a restart doesn't read it all again, and it's deleted when the tool is turned off.
+- Files are read when something in their folders changes, at most every ten seconds, and only what's new.
 
 ## Tweaks
 

@@ -6,6 +6,7 @@ import Foundation
 final class CodexSource: AIUsageSource {
     let provider = AIProvider.codex
     let root: URL
+    var roots: [URL] { [root] }
     /// A session's last lines are what count, and one tool's output can be long.
     private let tail = 2 << 20
     /// How many of the latest files can hold the latest report.
@@ -77,23 +78,44 @@ final class CodexSource: AIUsageSource {
     }
 
     /// The last line with limits in the file; nil if it has no such line.
+    /// Read from the end, line by line, without copying the rest.
     private func latest(in url: URL) -> ProviderUsage? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
-        defer { try? handle.close() }
-        guard let size = try? handle.seekToEnd() else { return nil }
-        try? handle.seek(toOffset: size > UInt64(tail) ? size - UInt64(tail) : 0)
-        guard let data = try? handle.readToEnd() else { return nil }
+        let descriptor = open(url.path, O_RDONLY)
+        guard descriptor >= 0 else { return nil }
+        defer { close(descriptor) }
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, info.st_size > 0 else { return nil }
+        let size = Int(info.st_size)
+        let from = max(0, size - tail)
+        let pages = ReadPages.take(size - from)
+        defer { ReadPages.release(pages) }
+        guard let base = pages.baseAddress else { return nil }
+        var length = 0
+        while length < pages.count {
+            let count = pread(descriptor, base + length, pages.count - length, off_t(from + length))
+            guard count > 0 else { break }
+            length += count
+        }
+        let bytes = UnsafeBufferPointer(start: base.assumingMemoryBound(to: UInt8.self), count: length)
         var sawUnreadable = false
-        for line in data.split(separator: UInt8(ascii: "\n")).reversed() {
-            guard line.range(of: Data("\"rate_limits\"".utf8)) != nil else { continue }
-            switch Self.parse(Data(line)) {
-            case .limits(let usage): return usage
-            case .unreadable: sawUnreadable = true
-            case .none: break
+        var end = length
+        while end > 0 {
+            var start = end
+            while start > 0, bytes[start - 1] != 0x0A { start -= 1 }
+            let line = UnsafeBufferPointer(rebasing: bytes[start..<end])
+            if ReadPages.contains(line, Self.marker) {
+                switch Self.parse(Data(buffer: line)) {
+                case .limits(let usage): return usage
+                case .unreadable: sawUnreadable = true
+                case .none: break
+                }
             }
+            end = start - 1
         }
         return sawUnreadable ? ProviderUsage(provider: provider, state: .unreadable) : nil
     }
+
+    private static let marker = Array("\"rate_limits\"".utf8)
 
     enum Parsed {
         case limits(ProviderUsage)

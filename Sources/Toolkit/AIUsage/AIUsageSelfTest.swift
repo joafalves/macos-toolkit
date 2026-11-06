@@ -1,3 +1,4 @@
+#if TOOLKIT_DEV
 import Foundation
 
 enum AIUsageSelfTest {
@@ -19,6 +20,7 @@ enum AIUsageSelfTest {
         formats()
         codex(in: folder.appendingPathComponent("codex"))
         claude(in: folder.appendingPathComponent("claude"), cache: folder.appendingPathComponent("cache.plist"))
+        scanner()
         print(failures == 0 ? "all ok" : "\(failures) failed")
         exit(failures == 0 ? 0 : 1)
     }
@@ -33,7 +35,7 @@ enum AIUsageSelfTest {
             return Double(info.phys_footprint) / 1_048_576
         }
         let now = Date()
-        for source in [ClaudeSource(cacheURL: nil), CodexSource()] as [AIUsageSource] {
+        for source in [ClaudeTranscripts(cacheURL: nil), CodexSource()] as [AIUsageSource] {
             let (start, before) = (Date(), memory())
             let usage = source.read(cancelled: { false })
             let first = Date().timeIntervalSince(start)
@@ -66,7 +68,7 @@ enum AIUsageSelfTest {
         }
         var delivered = 0
         let start = Date()
-        var reader: AIUsageReader? = AIUsageReader(sources: [ClaudeSource(cacheURL: nil), CodexSource()]) { _ in delivered += 1 }
+        var reader: AIUsageReader? = AIUsageReader(sources: [ClaudeTranscripts(cacheURL: nil), CodexSource()]) { _ in delivered += 1 }
         reader?.start()
         while delivered == 0, Date().timeIntervalSince(start) < 120 { RunLoop.main.run(until: Date().addingTimeInterval(0.1)) }
         check(delivered > 0, String(format: "first figures after %.1f s", Date().timeIntervalSince(start)))
@@ -84,7 +86,7 @@ enum AIUsageSelfTest {
         defer { try? FileManager.default.removeItem(at: folder) }
         write(usageLine(id: "w1", output: 5, input: 0, at: Date()), to: folder.appendingPathComponent("a.jsonl"))
         var latest = 0
-        let watching = AIUsageReader(sources: [ClaudeSource(root: folder, cacheURL: nil)]) { usage in
+        let watching = AIUsageReader(sources: [ClaudeTranscripts(root: folder, cacheURL: nil)]) { usage in
             latest = usage.first?.tokens?.total(from: Date().addingTimeInterval(-3600), to: Date()) ?? 0
         }
         watching.start()
@@ -231,14 +233,14 @@ enum AIUsageSelfTest {
     }
 
     private static func claude(in root: URL, cache: URL) {
-        func read(_ source: ClaudeSource) -> ProviderUsage { source.read(cancelled: { false }) }
+        func read(_ source: ClaudeTranscripts) -> ProviderUsage { source.read(cancelled: { false }) }
         let now = Date()
         let day = now.addingTimeInterval(-86400)
         func total(_ usage: ProviderUsage) -> Int { usage.tokens?.total(from: now.addingTimeInterval(-40 * 86400), to: now) ?? -1 }
 
-        check(read(ClaudeSource(root: root, cacheURL: cache)).state == .notFound, "claude: no folder")
+        check(read(ClaudeTranscripts(root: root, cacheURL: cache)).state == .notFound, "claude: no folder")
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let source = ClaudeSource(root: root, cacheURL: cache)
+        let source = ClaudeTranscripts(root: root, cacheURL: cache)
         check(read(source).state == .noData, "claude: an empty folder")
 
         let file = root.appendingPathComponent("project/a.jsonl")
@@ -278,9 +280,9 @@ enum AIUsageSelfTest {
         check(total(read(source)) == 150, "claude: older than it keeps is left out")
 
         // A restart reads nothing again, from what was saved.
-        let saving = ClaudeSource(root: root, cacheURL: cache)
+        let saving = ClaudeTranscripts(root: root, cacheURL: cache)
         check(total(read(saving)) == 150, "claude: read from nothing, the same figure")
-        let restarted = ClaudeSource(root: root, cacheURL: cache)
+        let restarted = ClaudeTranscripts(root: root, cacheURL: cache)
         let started = Date()
         check(total(read(restarted)) == 150, "claude: after a restart, the same figure")
         print(String(format: "      restart's read: %.1f ms", Date().timeIntervalSince(started) * 1000))
@@ -288,7 +290,7 @@ enum AIUsageSelfTest {
         // Told to stop on the way: gives up, and nothing's counted twice afterwards.
         let other = root.deletingLastPathComponent().appendingPathComponent("claude-stop")
         write(usageLine(id: "s1", output: 5, input: 0, at: now), to: other.appendingPathComponent("a.jsonl"))
-        let stopping = ClaudeSource(root: other, cacheURL: nil)
+        let stopping = ClaudeTranscripts(root: other, cacheURL: nil)
         check(stopping.read(cancelled: { true }).tokens == nil, "claude: stopped, it says nothing")
         check(total(read(stopping)) == 5, "claude: carried on, it's all there")
 
@@ -296,16 +298,16 @@ enum AIUsageSelfTest {
         let future = root.deletingLastPathComponent().appendingPathComponent("claude-new")
         let odd = (0..<12).map { "{\"timestamp\":\(1000 + $0),\"usage\":{\"input_tokens\":\"many\"}}" }.joined(separator: "\n") + "\n"
         write(odd, to: future.appendingPathComponent("a.jsonl"))
-        check(ClaudeSource(root: future, cacheURL: nil).read(cancelled: { false }).state == .unreadable, "claude: a new format says so, rather than looking like no use")
+        check(ClaudeTranscripts(root: future, cacheURL: nil).read(cancelled: { false }).state == .unreadable, "claude: a new format says so, rather than looking like no use")
 
         // Figures no response could have don't bring the app down.
         let huge = root.deletingLastPathComponent().appendingPathComponent("claude-huge")
         write(usageLine(id: "h1", output: Int.max, input: Int.max, at: now) + usageLine(id: "h2", output: -5, at: now) + usageLine(id: "h3", output: 9, input: 0, at: now), to: huge.appendingPathComponent("a.jsonl"))
-        check(total(read(ClaudeSource(root: huge, cacheURL: nil))) == 9, "claude: impossible figures are passed over")
+        check(total(read(ClaudeTranscripts(root: huge, cacheURL: nil))) == 9, "claude: impossible figures are passed over")
 
         // The format changing while it runs, and a line of the old one later.
         let changing = root.deletingLastPathComponent().appendingPathComponent("claude-changing")
-        let running = ClaudeSource(root: changing, cacheURL: nil)
+        let running = ClaudeTranscripts(root: changing, cacheURL: nil)
         write(usageLine(id: "c1", output: 5, input: 0, at: now), to: changing.appendingPathComponent("a.jsonl"))
         check(read(running).state == .read, "claude: read before the format changes")
         write(odd, to: changing.appendingPathComponent("b.jsonl"))
@@ -313,4 +315,37 @@ enum AIUsageSelfTest {
         write(usageLine(id: "c2", output: 5, input: 0, at: now), to: changing.appendingPathComponent("c.jsonl"))
         check(read(running).state == .read, "claude: back to read with a line it can read")
     }
+
+    /// The transcript scanner against Foundation's decoder, on lines shaped
+    /// as Claude Code writes them and on the ways a line can go wrong.
+    private static func scanner() {
+        func scan(_ text: String) -> TranscriptLine.Fields? {
+            Array(text.utf8).withUnsafeBufferPointer { TranscriptLine.scan($0) }
+        }
+        let real = #"{"parentUuid":"p","isSidechain":false,"type":"assistant","message":{"model":"claude-opus-5-5","id":"msg_1","type":"message","role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Agent","input":{"model":"sonnet","id":"fake","usage":{"input_tokens":999},"prompt":"say \"hi\" {not json"}}],"stop_reason":null,"usage":{"input_tokens":12,"cache_creation_input_tokens":300,"cache_read_input_tokens":5000,"cache_creation":{"ephemeral_5m_input_tokens":300},"output_tokens":45,"service_tier":"standard"}},"requestId":"req_1","timestamp":"2033-05-18T03:00:00.000Z"}"#
+        let fields = scan(real)
+        check(fields == TranscriptLine.Fields(timestamp: "2033-05-18T03:00:00.000Z", requestId: "req_1", id: "msg_1", model: "claude-opus-5-5", input: 12, output: 45, cacheCreation: 300),
+              "scanner: a response's own figures, not those in a tool's input")
+        check(fields?.tokens == 357, "scanner: input, output and cache writes, without cache reads")
+        check(scan(#"{"type":"user","message":{"role":"user","content":"what does \"usage\" mean?"}}"#).map { $0.id == nil && $0.output == nil } == true, "scanner: a question about usage has none")
+        check(scan(#"{"message":{"id":"m","usage":{"input_tokens":"many"}}}"#) == nil, "scanner: a figure that isn't a number is a format it can't read")
+        check(scan(#"{"message":{"id":"m","usage":{"input_tokens":1.5}}}"#) == nil, "scanner: nor is a fraction")
+        check(scan(#"{"message":{"id":"m","usage":{"input_tokens":99999999999999999999}}}"#) == nil, "scanner: nor a figure too large to hold")
+        check(scan(#"{"message":{"id":"m","usage""#) == nil, "scanner: half a line")
+        check(scan(#"{"message":{"id":"m","usage":{"output_tokens":7}},"timestamp":"t"}"#)?.output == 7, "scanner: keys in any order")
+        check(scan(#"{ "message" : { "id" : "m" , "usage" : { "output_tokens" : 7 } } }"#)?.output == 7, "scanner: spaces between the parts")
+
+        // The same figures as decoding the line whole, the way it was done before.
+        struct Line: Decodable {
+            struct Message: Decodable {
+                struct Usage: Decodable { let input_tokens: Int?; let output_tokens: Int?; let cache_creation_input_tokens: Int? }
+                let id: String?; let model: String?; let usage: Usage?
+            }
+            let timestamp: String?; let requestId: String?; let message: Message?
+        }
+        let decoded = try? JSONDecoder().decode(Line.self, from: Data(real.utf8))
+        check(decoded?.message?.id == fields?.id && decoded?.message?.model == fields?.model && decoded?.message?.usage?.output_tokens == fields?.output
+              && decoded?.message?.usage?.input_tokens == fields?.input && decoded?.requestId == fields?.requestId, "scanner: what the decoder reads")
+    }
 }
+#endif

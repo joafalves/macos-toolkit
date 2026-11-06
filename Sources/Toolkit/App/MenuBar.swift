@@ -3,7 +3,7 @@ import AppKit
 /// One piece of the toolkit's menu bar item.
 struct MenuBarSegment: Equatable {
     enum Kind: Hashable {
-        case toolkit, capture, recording, awake, mixer, mouse, layout, aiUsage
+        case toolkit, capture, recording, awake, mixer, mouse, layout
         /// One of System Stats' stats, or all of them in the compact layout.
         case stat(StatKind), stats
 
@@ -12,7 +12,6 @@ struct MenuBarSegment: Equatable {
             switch self {
             case .toolkit: return .toolkit
             case .stat, .stats: return .stats
-            case .aiUsage: return .aiUsage
             case .capture, .recording: return .capture
             case .awake: return .awake
             case .mixer: return .mixer

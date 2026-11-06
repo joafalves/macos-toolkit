@@ -2,16 +2,27 @@ import AppKit
 import Combine
 import UserNotifications
 
-/// AI Usage: what the AI tools on this Mac have already written down about
-/// their limits and tokens, read from their own files. No network and no
-/// credentials. With the tool off there's no reader, no watcher, no timer and
-/// nothing held.
+/// System Stats' AI usage stat: what the AI tools on this Mac have already
+/// written down about their limits and tokens, read from their own files. No
+/// network and no credentials. Read on its own, when the files change, not on
+/// System Stats' timer; with the stat off there's no reader, no watcher, no
+/// timer and nothing held.
 final class AIUsageController: ObservableObject {
     @Published var config: AIUsageConfig {
         didSet {
             guard config != oldValue else { return }
             if persists { config.save() }
             if config.warnings, !oldValue.warnings { askToNotify() }
+            apply()
+        }
+    }
+
+    /// Set by System Stats: the stat is in the menu bar or the panel, and
+    /// System Stats is on.
+    var active = false {
+        didSet {
+            guard active != oldValue else { return }
+            if !active, persists { UserDefaults.standard.removeObject(forKey: Self.warnedKey) }
             apply()
         }
     }
@@ -23,6 +34,7 @@ final class AIUsageController: ObservableObject {
     var persists = true
     private var isPreview = false
     private var reader: AIUsageReader?
+    /// What the running reader reads: a change starts it afresh.
     private var readerProviders: [AIProvider] = []
     /// Goes up as a reader stops: what it had already sent is out of date.
     private var readerGeneration = 0
@@ -34,10 +46,11 @@ final class AIUsageController: ObservableObject {
         config = AIUsageConfig.load()
     }
 
-    func start() {
+    /// At launch, before System Stats sets `active`.
+    func start(active: Bool) {
         // Turned off and quit before the reader got to it.
-        if !(config.enabled && config.claude) { ClaudeSource.forgetCache() }
-        apply()
+        if !(active && config.claude) { ClaudeTranscripts.forgetCache() }
+        self.active = active
     }
 
     func stop() {
@@ -54,8 +67,7 @@ final class AIUsageController: ObservableObject {
         usage.persists = false
         usage.isPreview = true
         var config = AIUsageConfig()
-        config.enabled = true
-        config.inMenuBar = true
+        config.claude = true
         usage.config = config
         usage.live.usage = previewUsage(at: usage.live.now)
         return usage
@@ -78,59 +90,53 @@ final class AIUsageController: ObservableObject {
 
     // MARK: - The menu bar
 
-    /// The limit closest to running out, of those whose windows are running
-    /// and read lately: the pill has no room to say how old a figure is, so
-    /// an old one would pass for now. The panel shows those, with their age.
-    func tightestLimit(at now: Date) -> UsageLimit? {
-        live.usage.flatMap(\.limits).filter { $0.isRunning(at: now) && $0.isFresh(at: now) }.min { ($0.leftShare(at: now) ?? 1) < ($1.leftShare(at: now) ?? 1) }
+    /// The limit closest to running out among `providers`, of those whose
+    /// windows are running and read lately: the pill has no room to say how
+    /// old a figure is, so an old one would pass for now. The panel shows
+    /// those, with their age.
+    func tightestLimit(at now: Date, among providers: [AIProvider] = AIProvider.allCases) -> UsageLimit? {
+        live.usage.filter { providers.contains($0.provider) }.flatMap(\.limits)
+            .filter { $0.isRunning(at: now) && $0.isFresh(at: now) }
+            .min { ($0.leftShare(at: now) ?? 1) < ($1.leftShare(at: now) ?? 1) }
     }
 
-    /// A pill for that limit, or without one Claude's latest tokens, or the icon.
-    func segments() -> [MenuBarSegment] {
-        guard config.enabled, config.inMenuBar else { return [] }
-        let now = live.now
-        let symbol = AppSection.aiUsage.symbol
-        if let limit = tightestLimit(at: now) {
-            let left = limit.leftShare(at: now) ?? 0
-            let figure = Int((left * 100).rounded())
-            return [MenuBarSegment(kind: .aiUsage, glyph: MenuBarArt.fillBadge(symbol: symbol, fraction: left, text: "\(figure)"),
-                                   tint: limit.isOverPace(at: now) ? .systemRed : nil,
-                                   label: String(localized: "\(limit.provider.title), \(limit.title): \(figure)% left"))]
-        }
+    /// What the stat's pill fills to: what's left of the tightest limit.
+    func share(at now: Date) -> Double? {
+        tightestLimit(at: now).flatMap { $0.leftShare(at: now) }
+    }
+
+    /// The stat's figure: what's left of the tightest limit, or with none
+    /// read lately, Claude Code's tokens in the last 5 hours.
+    func figure(at now: Date) -> String? {
+        if let left = share(at: now) { return StatsController.percent(left) }
         if let tokens = live.usage.compactMap(\.tokens).first {
-            let text = AIUsageFormat.tokens(tokens.total(from: now.addingTimeInterval(-5 * 3600), to: now))
-            return [MenuBarSegment(kind: .aiUsage, glyph: MenuBarArt.glyph(symbol), text: text, widthOf: AIUsageFormat.widestTokens,
-                                   label: String(localized: "AI Usage, \(text) tokens in the last 5 hours"))]
+            return AIUsageFormat.tokens(tokens.total(from: now.addingTimeInterval(-5 * 3600), to: now))
         }
-        return [MenuBarSegment(kind: .aiUsage, glyph: MenuBarArt.glyph(symbol), label: AppSection.aiUsage.title)]
+        return nil
     }
 
-    /// A reader for what's turned on. A change of providers starts it afresh.
+    /// The figure in words, for the panel: what's left, or tokens.
+    func headline(at now: Date) -> String? {
+        if let left = share(at: now) { return String(localized: "\(min(100, Int((left * 100).rounded())))% left") }
+        return figure(at: now).map { String(localized: "\($0) tokens") }
+    }
+
+    /// The pill's text: a percent without its sign, as the other stats', or tokens.
+    func pillText(at now: Date) -> String? {
+        if let left = share(at: now) { return "\(min(100, Int((left * 100).rounded())))" }
+        return figure(at: now)
+    }
+
+    /// Red when the tightest limit runs out before its reset at this pace.
+    func isOverPace(at now: Date) -> Bool {
+        tightestLimit(at: now)?.isOverPace(at: now) ?? false
+    }
+
+    /// A reader for what's turned on. A change of what it reads starts it afresh.
     func apply() {
         guard !isPreview else { return }
-        let providers = config.enabled ? config.providers : []
-        if providers != readerProviders {
-            // After the reader has done with it, as it could save it once more.
-            let forget = readerProviders.contains(.claude) && !providers.contains(.claude)
-            reader?.stop(afterwards: forget ? ClaudeSource.forgetCache : nil)
-            reader = nil
-            readerGeneration += 1
-            readerProviders = providers
-            live.usage = live.usage.filter { providers.contains($0.provider) }
-            if !providers.isEmpty {
-                live.isReading = true
-                let generation = readerGeneration
-                let reader = AIUsageReader(sources: providers.map(Self.source)) { [weak self] usage in
-                    guard let self, generation == readerGeneration else { return }
-                    live.isReading = false
-                    received(usage)
-                }
-                self.reader = reader
-                reader.start()
-            } else {
-                live.isReading = false
-            }
-        }
+        let providers = active ? config.providers : []
+        if providers != readerProviders { restartReader(providers) }
         if providers.isEmpty {
             clock?.invalidate()
             clock = nil
@@ -142,11 +148,33 @@ final class AIUsageController: ObservableObject {
         }
     }
 
-    private static func source(_ provider: AIProvider) -> AIUsageSource {
-        switch provider {
-        case .claude: return ClaudeSource()
-        case .codex: return CodexSource()
+    private func restartReader(_ providers: [AIProvider]) {
+        // After the reader has done with it, as it could save it once more.
+        let forget = readerProviders.contains(.claude) && !providers.contains(.claude)
+        reader?.stop(afterwards: forget ? ClaudeTranscripts.forgetCache : nil)
+        reader = nil
+        readerGeneration += 1
+        readerProviders = providers
+        live.usage = live.usage.filter { providers.contains($0.provider) }
+        guard !providers.isEmpty else {
+            live.isReading = false
+            return
         }
+        live.isReading = true
+        let generation = readerGeneration
+        let sources: [AIUsageSource] = providers.map { provider in
+            switch provider {
+            case .claude: return ClaudeTranscripts()
+            case .codex: return CodexSource()
+            }
+        }
+        let reader = AIUsageReader(sources: sources) { [weak self] usage in
+            guard let self, generation == readerGeneration else { return }
+            live.isReading = false
+            received(usage)
+        }
+        self.reader = reader
+        reader.start()
     }
 
     private func received(_ usage: [ProviderUsage]) {

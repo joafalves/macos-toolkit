@@ -1,26 +1,32 @@
 import Foundation
 
+/// AI usage's own settings, apart from System Stats' for its stat: where
+/// it shows and how is the stat's.
 struct AIUsageConfig: Codable, Equatable {
-    /// Off until it's turned on: it reads folders that hold conversations,
-    /// which an update shouldn't start doing by itself.
-    var enabled = false
-    var inMenuBar = false
-    var claude = true
+    /// Claude Code's transcripts hold conversations, and a long history takes
+    /// a while to read first, so it's off until it's asked for. Codex is a
+    /// few lines at the end of its latest files.
+    var claude = false
     var codex = true
     /// A notification when a limit runs short.
     var warnings = false
 
     var providers: [AIProvider] {
-        AIProvider.allCases.filter { $0 == .claude ? claude : codex }
+        AIProvider.allCases.filter(isOn)
+    }
+
+    func isOn(_ provider: AIProvider) -> Bool {
+        switch provider {
+        case .claude: return claude
+        case .codex: return codex
+        }
     }
 
     init() {}
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
-        inMenuBar = try c.decodeIfPresent(Bool.self, forKey: .inMenuBar) ?? false
-        claude = try c.decodeIfPresent(Bool.self, forKey: .claude) ?? true
+        claude = try c.decodeIfPresent(Bool.self, forKey: .claude) ?? false
         codex = try c.decodeIfPresent(Bool.self, forKey: .codex) ?? true
         warnings = try c.decodeIfPresent(Bool.self, forKey: .warnings) ?? false
     }
