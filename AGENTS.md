@@ -384,7 +384,7 @@ swift build                                  # compile check
 ./scripts/build.sh                           # build "build/MacOS Toolkit.app"
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
 ./scripts/build.sh --dev [--install]         # with the development flags, for the tests run through the app bundle
-.build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|stats|aiUsage|general|tweaks] [light]   # tweaks: macOS's defaults with two changed, not this Mac's (with `running`, Tips off and still running)
+.build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|stats|general|tweaks] [light]   # tweaks: macOS's defaults with two changed, not this Mac's (with `running`, Tips off and still running)
 .build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
 .build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
 .build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
@@ -400,7 +400,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png switcher-grid [light] [colors] [many|crowded] [medium|large] [row]   # the grid, with medium or large app icons rather than small, or in one row some way along; crowded: 70 windows, scrolled some way down
 .build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
-.build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power ...] [light]
+.build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power|ai ...] [light]
 .build/debug/Toolkit --snapshot out.png toolkit-panel [light]   # the panel the toolkit's mark opens, from the tools' previews
 .build/debug/Toolkit --snapshot out.png permissions [light]     # the Permissions page, every one granted
 .build/debug/Toolkit --snapshot out.png switcher no-access [light]   # any page as without Accessibility: locked settings, sidebar warnings
@@ -435,10 +435,9 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-menu-bar-center <report>   # where test items, the toolkit's and everyone else's are drawn against the middle of each menu bar (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-menu-bar-focus <report> [rounds] [folder]   # the same with the focus on each display in turn, the item and macOS's copies; keeps the bars' pictures in folder (as above; clicks its own window, so leave the mouse alone)
 .build/debug/Toolkit --test-stats            # every stat read from this Mac, what a reading costs, and nothing read while off
-.build/debug/Toolkit --test-ai-usage         # the sources on made-up files: limits, a response counted once, half a line, a restart, a new format; the transcript scanner; /usage screens and reset times; warnings
-.build/debug/Toolkit --list-ai-usage         # what's read from this Mac: Claude Code asked for /usage once, the files as figures, and what the first read costs
+.build/debug/Toolkit --test-ai-usage         # the sources on made-up files: limits, a response counted once, half a line, a restart, a new format; the transcript scanner; warnings
+.build/debug/Toolkit --list-ai-usage         # what's read from this Mac's own files, as figures, and what the first read costs
 .build/debug/Toolkit --measure-ai-usage [s]  # the reader on this Mac's files: time to the first figures, its cost left alone, stopping, and a changed file read
-.build/debug/Toolkit --snapshot out.png ai-usage-panel [light]   # AI Usage's panel, from made-up usage
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of
 .build/debug/Toolkit --test-navigation       # what Navigate does with each button in each kind of app, posting nothing; with Accessibility (open -n the dev bundle), Finder's Back and Forward found
 .build/debug/Toolkit --test-tweaks           # every tweak read from this Mac (changes nothing of macOS's), and the preference round trip on a scratch domain

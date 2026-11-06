@@ -126,7 +126,7 @@ section in the sidebar and (where it makes sense) an entry in the menu bar.
 | 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse, autoscroll on the wheel button, an action for any other button (even one the mouse keeps to itself), plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings, with window backdrops and small H.264 files, and ⇧⌘2 to copy the text on screen. |
-| 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar, with a memory figure that leaves out what macOS only caches. |
+| 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU, power and AI usage in the menu bar, with a memory figure that leaves out what macOS only caches. |
 | ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off. |
 | ⭕ **[Floating Dock](#floating-dock)** | Your apps in a ring at the pointer: point and let go to switch, further out for one of their windows. |
 
@@ -850,8 +850,8 @@ of an hour at a time. Keep the display on and Stay available are switches at the
   </picture>
 </p>
 
-What the Mac is doing, in the menu bar: **CPU**, **memory**, **network**, **disk**, **GPU** and
-**power**. CPU and memory are on by default; turn on the others in the settings. Each stat is a
+What the Mac is doing, in the menu bar: **CPU**, **memory**, **network**, **disk**, **GPU**,
+**power** and **AI usage**. CPU and memory are on by default; turn on the others in the settings. Each stat is a
 number with its icon, a pill that fills (up to 100), a small pill without the number, or a chart
 of the last minute, or they all go in one **compact** part as small labels. Pills are the same
 width as every other pill in the menu bar, Keep Awake's and the mixer's too, so they line up. Click one for its last five minutes and the details. A stat can
@@ -881,43 +881,37 @@ panel.
   the CPU and GPU draw is read only while the power panel is open (on a desktop, whenever power is
   read). A reading of all six costs under 2 ms.
 
-## AI Usage
+### AI usage
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/ai-usage-panel-dark.png">
-    <img src="docs/images/ai-usage-panel-light.png" width="300" alt="The AI Usage panel's overview: Claude Code's and Codex's limits as bars of what's left, the one closest to running out first">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/stats-ai-dark.png">
+    <img src="docs/images/stats-ai-light.png" width="300" alt="The AI usage panel's overview: Claude Code's tokens in the last 5 hours, and Codex's limits as bars of what's left">
   </picture>
 </p>
 
-What's left of your Claude Code and Codex limits, from what they write on this Mac. It's off until you
-turn it on. It uses no network and no credentials, and nothing leaves the Mac. These two are the ones
-that keep their limits on the Mac: the others only give them out to a program signed in as you.
+What's left of your Codex limits and what Claude Code has used, from the files they write on this
+Mac, as a stat like the others: off until you turn it on, a number, a pill or a small pill in the
+menu bar (what's left of the limit closest to running out), and in the panel an overview with a tab
+for each. It uses no network and no credentials, and nothing leaves the Mac. Only what a tool writes
+down itself is read: the other AI tools only give their limits to a program signed in as you, so
+they aren't here. It's read on its own, when the files change, not every couple of seconds.
 
-- **Claude Code** shows its 5-hour and weekly limits in its own `/usage` screen, and nowhere else.
-  So the toolkit asks it: now and then it starts Claude Code where no one sees it, with its
-  customizations off, types `/usage`, reads the figures and quits. Claude Code signs in on its own;
-  the toolkit never sees a password or token, and `/usage` asks no model anything. It's every 15
-  minutes while Claude Code is in use, hourly otherwise, and when the panel opens. It works with a
-  terminal install or the copy inside the Claude app, which has to be signed in once with
-  `claude auth login`. The limits are your account's, so they count your use in the Claude app and
-  on the web too. As it reads a screen, a change to that screen shows as one it can't read.
 - **Codex** has its limits in its session files, `~/.codex/sessions`, as Codex itself is told of them,
-  from the app and the command line alike. New figures only come while Codex runs.
+  from the app and the command line alike: what's left of its 5-hour and weekly windows, when each
+  resets, and the plan. New figures only come while Codex runs, so an older one says when it was read.
+- **Claude Code**, off to start with, has its tokens by hour and model in its transcripts,
+  `~/.claude/projects`: the last 5 hours and 7 days, and on System Stats' page a chart and split for today,
+  yesterday or 30 days, without what's read back from the cache. Only the figures are picked out of
+  each line, never what was said, and only what's new is read. What's been added up is kept in a
+  small file, so a restart doesn't read it all again, and it's deleted when Claude Code is turned off
+  here. The first read of a long history takes some seconds in the background. Claude Code doesn't
+  give other apps its limits, so there are none to show for it.
 - Each limit is a bar of what's left, with a mark where an even pace would put you, red when this pace
   runs out before the reset. Once a window has ended, what's left isn't known until the next report, so
   it says that rather than showing a figure.
-- **Token history**, for Claude Code and off to start with, adds its tokens by hour and model from its
-  transcripts in `~/.claude/projects`: the last 5 hours and 7 days, and on this page a chart and split
-  for today, yesterday or 30 days, without what's read back from the cache. Only the figures are
-  picked out of each line, never what was said, and only what's new is read. What's been added up is
-  kept in a small file, so a restart doesn't read it all again, and it's deleted when token history
-  is turned off. The first read of a long history takes some seconds in the background.
-- **The panel** opens from the menu bar on an overview of every provider, the one closest to running
-  out first, with a tab for each.
-- **Show in the menu bar** adds a pill: **Merged**, the limit closest to running out, or **One per
-  provider**. A switch for each provider says whether it counts. With no limit read in the last hour,
-  a pill shows Claude Code's tokens in the last 5 hours, if token history is on, or its symbol.
+- With no limit read in the last hour, its figure is Claude Code's tokens in the last 5 hours, and
+  it's red when a limit runs out before its reset at this pace.
 - **Warn when a limit runs short**, off to start with, sends a notification at 80% used, once for each window.
 - Files are read when something in their folders changes, at most every ten seconds, and only what's new.
 
@@ -1034,7 +1028,7 @@ To remove it, quit the app, delete it from `/Applications`, and delete
   </picture>
 </p>
 
-The toolkit has one item in the menu bar. The toolkit's mark is always there, and System Stats, AI Usage, Screen
+The toolkit has one item in the menu bar. The toolkit's mark is always there, and System Stats, Screen
 Capture, Keep Awake, the Audio Mixer, Mouse and Window Layout join it when they're put there, side by side
 with the same size and spacing and a line between them (a dot between System Stats' stats). Each of those has **Show in the menu bar**
 at the top of its page, under its On switch, saying what a click on it does (System Stats is in the
@@ -1101,7 +1095,7 @@ Sources/Toolkit
 ├── Capture    the Screen Capture tool
 ├── Awake      the Keep Awake tool
 ├── Stats      the System Stats tool
-├── AIUsage    the AI Usage tool
+├── AIUsage    System Stats' AI usage stat
 ├── Dock       the Floating Dock tool
 ├── System     Tweaks, macOS's own settings
 └── UI         shared settings-page components
