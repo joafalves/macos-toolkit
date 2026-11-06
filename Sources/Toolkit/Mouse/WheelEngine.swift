@@ -50,6 +50,7 @@ final class WheelEngine {
         self.tap = nil
         // Wound down on the tap's own thread, where the smoothing and autoscroll live.
         tap.perform { [self] in
+            releaseHeld()
             autoscroller.cancel()
             timer?.invalidate()
             timer = nil
@@ -65,7 +66,13 @@ final class WheelEngine {
             // The wheel button's release may have gone by unseen, and a side button's.
             autoscroller.cancel()
             swallowedButtons.removeAll()
+            releaseHeld()
             return pass
+        }
+        if type == .otherMouseDown || type == .otherMouseUp || type == .otherMouseDragged,
+           event.getIntegerValueField(.eventSourceUserData) != Self.marker,
+           let taken = handleAssigned(type: type, event: event) {
+            return taken ? nil : pass
         }
         if type == .otherMouseDown || type == .otherMouseUp || type == .otherMouseDragged {
             if event.getIntegerValueField(.mouseEventButtonNumber) == 2,
@@ -180,6 +187,43 @@ final class WheelEngine {
         guard lines != 0 else { return 0 }
         let scaled = (lines * speed).rounded()
         return scaled == 0 ? (lines > 0 ? 1 : -1) : Int64(scaled)
+    }
+
+    // MARK: - Buttons with an action
+
+    /// Buttons held down whose press went to their action: the drags and the
+    /// release go there too, never to the app under the pointer.
+    private var held: [Int64: ButtonAssignment] = [:]
+
+    /// A button given an action of its own: true when taken, nil when it has none.
+    private func handleAssigned(type: CGEventType, event: CGEvent) -> Bool? {
+        let button = event.getIntegerValueField(.mouseEventButtonNumber)
+        if type == .otherMouseDown {
+            // A press, so a release still waited for went by unseen.
+            if let stale = held.removeValue(forKey: button) { Self.main(stale, down: false) }
+            guard let assignment = profileProvider()?.assignment(for: .number(Int(button))) else { return nil }
+            held[button] = assignment
+            Self.main(assignment, down: true)
+            return true
+        }
+        guard let assignment = held[button] else { return nil }
+        // The Floating Dock follows the mouse by its drags: let them on to its tap,
+        // which keeps them from the apps.
+        if type == .otherMouseDragged, assignment.action == .floatingDock { return false }
+        if type == .otherMouseUp {
+            held[button] = nil
+            Self.main(assignment, down: false)
+        }
+        return true
+    }
+
+    private func releaseHeld() {
+        for assignment in held.values { Self.main(assignment, down: false) }
+        held.removeAll()
+    }
+
+    private static func main(_ assignment: ButtonAssignment, down: Bool) {
+        DispatchQueue.main.async { ButtonActions.perform(assignment, down: down) }
     }
 
     // MARK: - Side buttons

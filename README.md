@@ -123,12 +123,13 @@ section in the sidebar and (where it makes sense) an entry in the menu bar.
 | 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, plus an equalizer and volume control for outputs that have none. |
 | 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps, across all Spaces. |
 | 🔲 **[Window Layout](#window-layout)** | Shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, a finer grid of dots to line any window up on, snapping by dragging, and stacks of windows sharing a slot (a preview). |
-| 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse, autoscroll on the wheel button, plus battery level. |
+| 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse, autoscroll on the wheel button, an action for any other button (even one the mouse keeps to itself), plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings, with window backdrops and small H.264 files, and ⇧⌘2 to copy the text on screen. |
 | 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU and power in the menu bar, with a memory figure that leaves out what macOS only caches. |
 | ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off. |
 | ✨ **[AI Usage](#ai-usage)** | How much of your Codex limits is left and the tokens Claude has used, from their own files, with no network and no credentials. |
+| ⭕ **[Floating Dock](#floating-dock)** | Your apps in a ring at the pointer: point and let go to switch, further out for one of their windows. |
 
 Under **System** in the settings, **[Tweaks](#tweaks)** has macOS settings that System Settings
 doesn't show: background tasks such as Photos' analysis, and hidden Dock, Finder, typing and
@@ -611,6 +612,7 @@ soon as the mouse is connected again.
 | Wheel smoothing | macOS / smooth | scroll event tap |
 | Back and forward buttons | macOS / navigate, with which buttons they are (4 and 5 unless changed) | event tap; in Apple's apps, which ignore the buttons, a navigation swipe, or a press of Back or Forward in their menus where they ignore that too (System Settings) |
 | Wheel button | macOS / autoscroll, with a speed | event tap; posts scroll events while the button is held |
+| Give a button an action | Floating Dock, back, forward, Mission Control, Show Desktop, a keyboard shortcut, open an app, or nothing | event tap; for the buttons a mouse keeps to itself, its HID++ channel |
 
 Cursor settings need no permission. The wheel and button settings that go through the event tap need
 **Accessibility**. Trackpad scrolling is never modified. Fixed and curve set how far the wheel scrolls
@@ -626,6 +628,15 @@ to get the app's own behaviour for that press, such as its own autoscroll or pan
 up autoscroll in that app. Apps that should always get the button (design apps that pan with it,
 remote desktops, virtual machines) can be added to **Leave the wheel button to these apps**; the app
 under the cursor when you press decides. Both count for every mouse.
+
+**Give a button an action** gives any button past the left and right one of its own, in every app:
+press it on the mouse to add it. It wins over Navigate and Autoscroll for that button. Some mice keep
+buttons to themselves, such as a DPI button that changes the cursor speed inside the mouse, and never
+tell macOS about them. When a mouse connected directly reports them through its maker's HID++ channel,
+they're listed under **Buttons the mouse keeps to itself**: one given an action is asked for (diverted)
+while the toolkit runs, every time the mouse connects, and handed back when the action is removed, the
+tool is turned off or the toolkit quits. Taken that way, the button no longer does its own thing; another
+app that also takes the mouse's buttons should leave that one alone.
 
 ## Finder
 
@@ -745,6 +756,53 @@ It needs the **Screen Recording** permission (and the microphone one, if you tur
 asks again every so often to confirm it for apps that aren't Apple's. macOS's own screenshot
 shortcuts are switched off only where they clash with the toolkit's, and back on when the toolkit
 quits or the tool is turned off.
+
+## Floating Dock
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dock-ring-dark.png">
+    <img src="docs/images/dock-ring-light.png" width="520" alt="The Floating Dock: apps in a ring around the pointer, one pointed at, its windows following the ring beyond it">
+  </picture>
+</p>
+
+Your apps in a ring that opens where the pointer is, alongside the macOS Dock, which it leaves alone and
+reserves no room for. Hold the **right ⌘** on its own (or a shortcut set on the page, or a mouse button
+given the Floating Dock on the Mouse page), point at an app and let go to bring it forward. The pick goes
+by direction: a short flick is enough, and a quick one never even shows the ring.
+
+Carry on past the ring and the app's windows follow the ring just beyond it, the most recent in the
+app's direction and the others either side; let go on one to bring it forward. With more than three
+windows, a card at the start shows them all, as App Exposé does. For a new window, hold **⌥** as you let
+go on the app, or right-click it, as the Dock's own menu offers: the app comes forward and is asked for
+another, through its own menu item with ⌘N. Window pictures need **Screen Recording**, as in the Window Switcher; without it
+the cards show the app's icon and the window's title. Back in the centre, letting go cancels.
+
+| While it's open | |
+| --- | --- |
+| point, let go | Bring the app forward, or its most recent window |
+| further out | One of its windows; into a folder, which opens as a ring of its own |
+| ⌥ as you let go, or right-click | A new window of the app (⌥ and a letter: of the app with that letter) |
+| the centre | Back out of a folder; let go there to cancel |
+| scroll | The apps that are open but not on the ring, then what doesn't fit |
+| a letter | The app with that letter, shown on its icon (from its name, or chosen on the page) |
+| ⇥ | Search every app on the Mac by name; ↩ opens the one selected |
+| esc | Close |
+
+A tap of the trigger, without moving, leaves the ring open for a click, a letter or ⇥, and only then
+are the letters shown on the icons. With the right ⌘ as the trigger, the right ⌘ and an app's letter
+bring that app forward at once, without the ring (with ⌥ too, a new window of it); any other key with
+the right ⌘ is a ⌘ shortcut as ever. It can be turned off on the page. The apps come from the Dock, in its order (read each time it
+opens), or from **My own list**, which can have folders and starts from the Dock with **Copy from the
+Dock**. The ring has ten places by default, six to twelve; what doesn't fit goes in the last place, as
+a folder, or on a layer of its own.
+
+While the ring is open your pointer stays where it was, hidden and held still, and the ring draws a
+pointer of its own, moved by the mouse, that starts at its centre. Near an edge or a corner the ring
+moves in to fit and the gesture is still the same; its pointer never stops at the edge of the screen;
+the apps below see no movement, so nothing there lights up or changes the pointer; and when it closes
+your pointer is where you left it. It needs **Accessibility** for its key and to follow the mouse. The
+right ⌘ with another key, a click or the wheel is still a ⌘ shortcut, as ever.
 
 ## Keep Awake
 
@@ -1034,6 +1092,7 @@ Sources/Toolkit
 ├── Awake      the Keep Awake tool
 ├── Stats      the System Stats tool
 ├── AIUsage    the AI Usage tool
+├── Dock       the Floating Dock tool
 ├── System     Tweaks, macOS's own settings
 └── UI         shared settings-page components
 Sources/FinderExtension   the Finder extension behind the right-click menu

@@ -11,6 +11,24 @@ worked on; it gets its date when it's released.
   from what Claude and Codex write down on this Mac: no network and no credentials. Codex has its limits, with a mark
   for an even pace; Claude's files only have tokens, so it shows those. In the menu bar and a panel if you like, and
   a notification at 80% used if you turn it on.
+- **Floating Dock:** a new tool: your apps in a ring that opens at the pointer, beside the macOS Dock and
+  without touching it. Hold the right ⌘ (or a shortcut, or a mouse button given it on the Mouse page),
+  point at an app and let go to bring it forward; carry on past the ring for one of its windows, which
+  follow the ring beyond the app, or hold ⌥ as you let go (or right-click it) for a new one. The right ⌘
+  and an app's letter bring it forward at once, without the ring. A tap leaves it open for a click, an app's letter or Tab to search every app.
+- **Floating Dock:** apps from the Dock, in its order with Finder first, or a list of your own with folders, which open as
+  a ring of their own. Ten places by default, six to twelve; what doesn't fit goes in the last place, as a
+  folder, or on a layer of its own. The scroll wheel switches to the apps that are open but not on the ring.
+- **Floating Dock:** while it's open, your pointer stays where it was, hidden, and the ring has a pointer of
+  its own that starts at its centre: the gesture is the same near an edge or a corner, it never stops at
+  the edge of the screen, and nothing below lights up as it moves. Opened over the macOS Dock, which
+  keeps the pointer showing, the ring follows your pointer instead.
+- **Mouse:** Give a button an action, on a mouse's page: any button past the left and right can open the
+  Floating Dock, go back or forward in any app, open Mission Control, show the desktop, press a keyboard
+  shortcut or open an app. Pressed on the mouse to add it.
+- **Mouse:** the buttons a mouse keeps to itself, like the DPI button of some mice, can be given an action
+  too, on mice that report them through their maker's channel: the mouse lets the toolkit have them while
+  it runs, and has them back when it quits.
 
 ## 0.26.3 (2026-11-03)
 

@@ -6,7 +6,7 @@ import ServiceManagement
 /// The pages of the main window: Overview, Settings (the app's own),
 /// Permissions, About, the tools, and System's pages, which change macOS itself.
 enum AppSection: String, CaseIterable, Identifiable {
-    case welcome, mouse, switcher, layout, mixer, finder, capture, awake, stats, aiUsage, general, permissions, about, tweaks
+    case welcome, mouse, switcher, layout, mixer, finder, capture, awake, stats, aiUsage, dock, general, permissions, about, tweaks
 
     var id: String { rawValue }
 
@@ -32,6 +32,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .awake: return String(localized: "Keep Awake")
         case .stats: return String(localized: "System Stats")
         case .aiUsage: return String(localized: "AI Usage")
+        case .dock: return String(localized: "Floating Dock")
         // Stored as "general", as it was called before.
         case .general: return String(localized: "Settings")
         case .permissions: return String(localized: "Permissions")
@@ -53,6 +54,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .awake: return .brown
         case .stats: return .green
         case .aiUsage: return .purple
+        case .dock: return .mint
         case .general: return .gray
         case .permissions: return .gray
         case .about: return .gray
@@ -72,6 +74,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .awake: return AwakeController.symbol(on: true)
         case .stats: return "gauge.with.dots.needle.50percent"
         case .aiUsage: return "sparkles"
+        case .dock: return "circle.circle"
         case .general: return "gearshape"
         case .permissions: return "hand.raised.fill"
         case .about: return "info.circle"
@@ -92,6 +95,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .awake: return String(localized: "Keeps the Mac awake for as long as you need.")
         case .stats: return String(localized: "CPU, memory and more in the menu bar.")
         case .aiUsage: return String(localized: "How much of your AI plans' limits is left.")
+        case .dock: return String(localized: "Your apps in a ring at the pointer, and their windows.")
         case .general, .permissions, .about, .tweaks: return ""
         }
     }

@@ -41,6 +41,19 @@ extension WheelEngine {
             check(profile?.backButton == 3 && profile?.forwardButton == 4, "\(what) in a file falls back to the defaults")
         }
 
+        // Buttons with an action: read back, a later version's action kept as Nothing, an unreadable button and a second row for one left out.
+        let assigned = decoded(#"{"name":"A","buttonActions":[{"button":"control:00FD","action":"floatingDock"},{"button":"button:5","action":"later"},{"button":"left","action":"back"},{"button":"button:5","action":"back"}]}"#)
+        check(assigned?.buttonActions.count == 2, "button actions: the unreadable row and the second row for a button left out")
+        check(assigned?.assignment(for: .control(0x00FD))?.action == .floatingDock, "button actions: a control the mouse keeps to itself is read back")
+        check(assigned?.assignment(for: .number(5))?.action == .nothing, "button actions: an action from a later version does nothing")
+        check(assigned?.divertedControls == [0x00FD], "button actions: only the control is diverted")
+        check(assigned?.needsEventTap == true, "button actions: a numbered button needs the event tap")
+        check(decoded(#"{"name":"A","buttonActions":[{"button":"control:00FD","action":"back"}]}"#)?.needsEventTap == false,
+              "button actions: a diverted control alone needs no event tap")
+        if let assigned, let data = try? JSONEncoder().encode(assigned), let back = try? JSONDecoder().decode(Profile.self, from: data) {
+            check(back.buttonActions == assigned.buttonActions, "button actions: written and read back the same")
+        }
+
         if AXIsProcessTrusted(), let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first {
             check(AppNavigation.backAndForward(in: finder.processIdentifier) != nil, "Finder's Back and Forward menu items are found by title")
         } else {

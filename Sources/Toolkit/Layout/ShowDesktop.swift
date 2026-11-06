@@ -22,4 +22,20 @@ enum ShowDesktop {
         send("com.apple.showdesktop.awake" as CFString, 0)
         return true
     }
+
+    /// The front app's windows, as App Exposé shows them.
+    @discardableResult
+    static func appWindows() -> Bool {
+        guard let send else { return false }
+        send("com.apple.expose.front.awake" as CFString, 0)
+        return true
+    }
+
+    /// Mission Control, as its key opens it, through the same notification.
+    @discardableResult
+    static func missionControl() -> Bool {
+        guard let send else { return false }
+        send("com.apple.expose.awake" as CFString, 0)
+        return true
+    }
 }

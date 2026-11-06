@@ -313,6 +313,13 @@ extension CaptureController {
     }
 }
 
+extension FloatingDockController {
+    var permissionNeeds: [PermissionNeed] {
+        [.required(.accessibility, String(localized: "To open it with its key or a mouse button, and follow the pointer.")),
+         .optional(.screenRecording, String(localized: "For pictures of the windows."))]
+    }
+}
+
 extension AwakeController {
     var permissionNeeds: [PermissionNeed] {
         config.stayAvailable ? [.optional(.accessibility, String(localized: "For Stay available."))] : []

@@ -19,4 +19,5 @@ enum Log {
     static let capture = Logger(subsystem: subsystem, category: "capture")
     static let awake = Logger(subsystem: subsystem, category: "awake")
     static let aiUsage = Logger(subsystem: subsystem, category: "ai-usage")
+    static let dock = Logger(subsystem: subsystem, category: "dock")
 }

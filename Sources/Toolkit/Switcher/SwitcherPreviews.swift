@@ -10,6 +10,8 @@ final class SwitcherPreviews {
 
     private var cache: [CGWindowID: CGImage] = [:]
     private var task: Task<Void, Never>?
+    /// Takings added with `add`, which run alongside each other.
+    private var added: [Task<Void, Never>] = []
     /// The window list, asked for ahead of the pictures (see `prepare`).
     private var content: Task<SCShareableContent?, Never>?
     private(set) var busy = false
@@ -39,20 +41,33 @@ final class SwitcherPreviews {
         content = nil
         task = Task { [weak self] in
             defer { Task { @MainActor in self?.busy = false } }
-            guard let content = await pending.value else { return }
-            let windows = Dictionary(content.windows.map { ($0.windowID, $0) }, uniquingKeysWith: { first, _ in first })
-            await withTaskGroup(of: (CGWindowID, CGImage?).self) { group in
-                for id in ids {
-                    guard let window = windows[id], window.frame.width > 0, window.frame.height > 0 else { continue }
-                    group.addTask { (id, await Self.capture(window, width: width)) }
-                }
-                for await (id, image) in group {
-                    guard !Task.isCancelled else { return }
-                    guard let image else { continue }
-                    await MainActor.run { [weak self] in
-                        self?.cache[id] = image
-                        self?.onUpdate?(id, image)
-                    }
+            await self?.take(ids, width: width, from: pending)
+        }
+    }
+
+    /// Takes pictures of `ids` alongside any under way, all from one window list
+    /// kept until `cancel`: the Floating Dock takes every one it can show as it opens.
+    func add(_ ids: [CGWindowID], width: Int) {
+        guard !ids.isEmpty else { return }
+        let pending = content ?? Task { try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false) }
+        content = pending
+        added.append(Task { [weak self] in await self?.take(ids, width: width, from: pending) })
+    }
+
+    private func take(_ ids: [CGWindowID], width: Int, from pending: Task<SCShareableContent?, Never>) async {
+        guard let content = await pending.value else { return }
+        let windows = Dictionary(content.windows.map { ($0.windowID, $0) }, uniquingKeysWith: { first, _ in first })
+        await withTaskGroup(of: (CGWindowID, CGImage?).self) { group in
+            for id in ids {
+                guard let window = windows[id], window.frame.width > 0, window.frame.height > 0 else { continue }
+                group.addTask { (id, await Self.capture(window, width: width)) }
+            }
+            for await (id, image) in group {
+                guard !Task.isCancelled else { return }
+                guard let image else { continue }
+                await MainActor.run { [weak self] in
+                    self?.cache[id] = image
+                    self?.onUpdate?(id, image)
                 }
             }
         }
@@ -61,6 +76,8 @@ final class SwitcherPreviews {
     func cancel() {
         task?.cancel()
         task = nil
+        added.forEach { $0.cancel() }
+        added = []
         content = nil
         busy = false
     }

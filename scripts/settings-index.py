@@ -29,6 +29,7 @@ PAGES = {
     "Sources/Toolkit/Awake/AwakeSettingsView.swift": "awake",
     "Sources/Toolkit/Stats/StatsSettingsView.swift": "stats",
     "Sources/Toolkit/AIUsage/AIUsageSettingsView.swift": "aiUsage",
+    "Sources/Toolkit/Dock/FloatingDockSettingsView.swift": "dock",
     "Sources/Toolkit/System/TweaksView.swift": "tweaks",
 }
 # On the Mouse page, the rows of a mouse's own page are in these views.

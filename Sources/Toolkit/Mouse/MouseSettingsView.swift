@@ -437,6 +437,165 @@ private struct NavigationButtons: View {
     }
 }
 
+/// The buttons given an action of their own, and adding one: by pressing it,
+/// or from the buttons the mouse keeps to itself, which only it can report.
+private struct ButtonAssignments: View {
+    @Binding var profile: Profile
+    let controls: [HIDPPChannel.Control]
+    /// Starts (with what to do with a press) or stops listening to the buttons
+    /// the mouse keeps to itself, which only its own channel reports.
+    let learnControls: (((UInt16) -> Void)?) -> Void
+    @StateObject private var learning = ViewState(false)
+    @StateObject private var listener = ButtonListener()
+
+    var body: some View {
+        ForEach(profile.buttonActions) { assignment in
+            RowDivider()
+            AssignmentRow(assignment: binding(assignment.button)) {
+                profile.buttonActions.removeAll { $0.button == assignment.button }
+            }
+        }
+        RowDivider()
+        HStack(spacing: 10) {
+            if learning.value {
+                Text("Press the button on the mouse.")
+                    .foregroundStyle(.secondary)
+                Button("Cancel") { stopLearning() }
+                    .buttonStyle(.link)
+            } else {
+                let offered = controls.filter { profile.assignment(for: .control($0.cid)) == nil }
+                Menu("Give a button an action") {
+                    Button("Press It on the Mouse…") { startLearning() }
+                    if !offered.isEmpty {
+                        Section("Buttons the mouse keeps to itself") {
+                            ForEach(offered, id: \.cid) { control in
+                                Button(String(localized: ButtonNames.title(.control(control.cid)))) { add(.control(control.cid)) }
+                            }
+                        }
+                    }
+                }
+                .fixedSize()
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.subheadline)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .settingAnchor("Give a button an action")
+        .onDisappear { stopLearning() }
+    }
+
+    private func binding(_ button: MouseButtonID) -> Binding<ButtonAssignment> {
+        Binding(get: { profile.assignment(for: button) ?? ButtonAssignment(button: button, action: .nothing) },
+                set: { new in
+                    if let i = profile.buttonActions.firstIndex(where: { $0.button == button }) { profile.buttonActions[i] = new }
+                })
+    }
+
+    private func add(_ button: MouseButtonID) {
+        stopLearning()
+        guard profile.assignment(for: button) == nil else { return }
+        profile.buttonActions.append(ButtonAssignment(button: button, action: .floatingDock))
+    }
+
+    private func startLearning() {
+        learning.value = true
+        // The left and right buttons are never offered: losing them would leave no way to click.
+        listener.start { button in
+            guard button >= 2 else { return }
+            add(.number(button))
+        }
+        learnControls { cid in add(.control(cid)) }
+    }
+
+    private func stopLearning() {
+        listener.stop()
+        if learning.value { learnControls(nil) }
+        learning.value = false
+    }
+}
+
+private struct AssignmentRow: View {
+    @Binding var assignment: ButtonAssignment
+    let remove: () -> Void
+
+    var body: some View {
+        SettingRow(title: ButtonNames.title(assignment.button)) {
+            HStack(spacing: 8) {
+                Picker("Action", selection: $assignment.action) {
+                    ForEach(ButtonAction.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+                Button(action: remove) { Image(systemName: "minus.circle") }
+                    .buttonStyle(.borderless)
+                    .help("Back to what the mouse does on its own")
+            }
+        } extra: {
+            switch assignment.action {
+            case .shortcut:
+                HStack {
+                    Text("Keys it presses").foregroundStyle(.secondary)
+                    Spacer()
+                    ShortcutRecorder(shortcut: $assignment.shortcut, defaultValue: .none)
+                }
+                .font(.subheadline)
+            case .openApp:
+                HStack {
+                    Text(verbatim: assignment.appName ?? String(localized: "No app chosen")).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Choose…") { choose() }
+                }
+                .font(.subheadline)
+            default:
+                EmptyView()
+            }
+        }
+    }
+
+    private func choose() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        assignment.appPath = url.path
+        assignment.appName = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+    }
+}
+
+/// What the page calls each button.
+enum ButtonNames {
+    static func title(_ button: MouseButtonID) -> LocalizedStringResource {
+        switch button {
+        case .number(2): return "Wheel button"
+        case .number(let n): return "Button \(n + 1)"
+        case .control(0x00FD): return "DPI button"
+        case .control(0x00C3): return "Gesture button"
+        case .control(0x00C4): return "Wheel mode button"
+        case .control(0x0052): return "Wheel button"
+        case .control(0x0053): return "Back button"
+        case .control(0x0056): return "Forward button"
+        case .control(let cid): return "Mouse button \(String(format: "%04X", cid))"
+        }
+    }
+}
+
+extension ButtonAction {
+    var title: String {
+        switch self {
+        case .nothing: return String(localized: "Nothing")
+        case .floatingDock: return String(localized: "Floating Dock")
+        case .back: return String(localized: "Back")
+        case .forward: return String(localized: "Forward")
+        case .missionControl: return String(localized: "Mission Control")
+        case .showDesktop: return String(localized: "Show Desktop")
+        case .shortcut: return String(localized: "Keyboard shortcut")
+        case .openApp: return String(localized: "Open an app")
+        }
+    }
+}
+
 /// A mouse's extra buttons pressed over the app's windows, taken from them
 /// while a button is being chosen, so the settings window doesn't go back.
 private final class ButtonListener: ObservableObject {
@@ -545,7 +704,7 @@ private struct ProfileEditor: View {
                           selection: p.smoothScrolling, options: [(false, "macOS"), (true, "Smooth")])
             }
 
-            Card(title: "Buttons", footnote: "Other apps receive the back and forward buttons unchanged; most browsers and editors already handle them. A wheel click without moving stays a normal middle click.") {
+            Card(title: "Buttons", footnote: "Other apps receive the back and forward buttons unchanged; most browsers and editors already handle them. A wheel click without moving stays a normal middle click. A button given its own action does only that, in every app.") {
                 OptionRow(title: "Back and forward buttons", caption: "Go back and forward in Finder, Safari and other Apple apps.",
                           selection: p.navigationButtons, options: [(false, "macOS"), (true, "Navigate")]) {
                     if p.wrappedValue.navigationButtons {
@@ -562,6 +721,9 @@ private struct ProfileEditor: View {
                 if p.wrappedValue.autoscroll {
                     RowDivider()
                     AutoscrollExceptions(mouse: mouse)
+                }
+                ButtonAssignments(profile: p, controls: mouse.hidppControls[device.id] ?? []) { handler in
+                    mouse.learnControls(handler.map { add in { key, cid in if key == device.id { add(cid) } } })
                 }
             }
         }

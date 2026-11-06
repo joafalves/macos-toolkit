@@ -76,6 +76,11 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeLayoutPanel(to: rest[0], light: rest.contains("light"))
         exit(0)
     }
+    // `dock-ring [light] [far] [letters]`: the Floating Dock's ring, made-up apps, one pointed at; far, out on its windows; letters, as after a tap.
+    if rest.contains("dock-ring") {
+        Snapshot.writeDockRing(to: rest[0], light: rest.contains("light"), far: rest.contains("far"))
+        exit(0)
+    }
     if rest.contains("awake-panel") {
         Snapshot.writeAwakePanel(to: rest[0], light: rest.contains("light"), off: rest.contains("off"))
         exit(0)
@@ -301,6 +306,27 @@ if CommandLine.arguments.contains("--test-publishing") {
 // what each is keyed by and its charge.
 if CommandLine.arguments.contains("--list-mice") {
     MouseController.dumpMice()
+    exit(0)
+}
+
+// Development aid: `--list-mouse-controls [file]` asks each mouse with a HID++
+// channel for its features and buttons, changing nothing (open -n the bundle).
+if let flag = CommandLine.arguments.firstIndex(of: "--list-mouse-controls") {
+    HIDPPChannel.dumpControls(to: CommandLine.arguments.count > flag + 1 ? CommandLine.arguments[flag + 1] : nil)
+    exit(0)
+}
+
+// Development aid: `--test-dock-cursor <report>` puts the pointer over macOS's Dock,
+// opens the Floating Dock with each way of hiding it, and looks for it (open -n the bundle).
+if let flag = CommandLine.arguments.firstIndex(of: "--test-dock-cursor"), CommandLine.arguments.count > flag + 1 {
+    FloatingDockController.cursorTest(to: CommandLine.arguments[flag + 1])
+    exit(0)
+}
+
+// Development aid: `--capture-dock <folder>` opens the real Floating Dock at the
+// pointer, with this Mac's apps, and pictures it three ways (open -n the bundle).
+if let flag = CommandLine.arguments.firstIndex(of: "--capture-dock"), CommandLine.arguments.count > flag + 1 {
+    FloatingDockController.liveCapture(to: CommandLine.arguments[flag + 1])
     exit(0)
 }
 
