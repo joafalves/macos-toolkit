@@ -18,6 +18,7 @@ enum Snapshot {
                                                MixerController.preview(perOutput: CommandLine.arguments.contains("per-output"),
                                                                        simple: CommandLine.arguments.contains("simple")))
         let (finder, capture, awake) = (FinderController.preview(), CaptureController.preview(), AwakeController.preview())
+        let dock = FloatingDockController.preview()
         // More rows than a display has room for, to show the warning.
         if let rows = CommandLine.arguments.first(where: { $0.hasPrefix("rows=") }).flatMap({ Int($0.dropFirst(5)) }) {
             switcher.config.gridRows = rows
@@ -31,6 +32,7 @@ enum Snapshot {
             case .finder: return finder.permissionNeeds
             case .capture: return capture.permissionNeeds
             case .awake: return awake.permissionNeeds
+            case .dock: return dock.permissionNeeds
             default: return []
             }
         }
@@ -38,7 +40,7 @@ enum Snapshot {
         // read from it. The glass sidebar and toolbar are drawn by the window
         // server, not the views, so the page draws stand-ins for them here.
         MainView.drawnChrome = true
-        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: StatsController.preview())))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: StatsController.preview(), dock: dock)))
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -388,7 +390,7 @@ enum Snapshot {
         capture.config.standaloneIcon = false
         awake.config.menuBarIcon = .none
         let view = ToolkitPanelView(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder,
-                                    capture: capture, awake: awake, stats: stats)
+                                    capture: capture, awake: awake, stats: stats, dock: FloatingDockController.preview())
         let host = NSHostingController(rootView: view.background(Color(nsColor: .windowBackgroundColor)))
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.borderless]
@@ -401,6 +403,97 @@ enum Snapshot {
     }
 
     /// Keep Awake's panel, on part way through a session, or `off`.
+    /// The Floating Dock's ring over a drawn desktop: made-up apps and windows, the first pointed at.
+    static func writeDockRing(to path: String, light: Bool, far: Bool) {
+        _ = NSApplication.shared
+        func icon(_ symbol: String, _ hue: CGFloat, saturation: CGFloat = 0.7) -> NSImage {
+            NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
+                let shape = NSBezierPath(roundedRect: rect.insetBy(dx: 3, dy: 3), xRadius: 14, yRadius: 14)
+                NSGradient(starting: NSColor(hue: hue, saturation: saturation, brightness: 0.85, alpha: 1),
+                           ending: NSColor(hue: hue, saturation: saturation, brightness: 0.62, alpha: 1))?.draw(in: shape, angle: -90)
+                if let glyph = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+                    .withSymbolConfiguration(.init(pointSize: 28, weight: .medium).applying(.init(paletteColors: [.white]))) {
+                    let s = glyph.size
+                    glyph.draw(in: NSRect(x: (64 - s.width) / 2, y: (64 - s.height) / 2, width: s.width, height: s.height))
+                }
+                return true
+            }
+        }
+        func windows(_ app: String, _ titles: [String]) -> [SwitcherItem] {
+            titles.enumerated().map { SwitcherItem(id: "\(app)\($0.offset)", window: CGWindowID(100 + $0.offset), pid: 1, title: $0.element, appName: app, icon: nil, state: .window) }
+        }
+        let apps: [(String, String, CGFloat, [String])] = [
+            ("Navigator", "safari", 0.57, ["Morning news", "Documentation", "Neighbourhood map", "Order 4471"]),
+            ("Mail", "envelope.fill", 0.6, ["Inbox", "Re: March budget"]),
+            ("Messages", "message.fill", 0.36, []), ("Editor", "chevron.left.forwardslash.chevron.right", 0.75, ["main.swift"]),
+            ("Terminal", "terminal.fill", 0.62, []), ("Notes", "note.text", 0.13, []), ("Files", "folder.fill", 0.58, []),
+        ]
+        var slots = apps.enumerated().map { i, app -> RingSlot in
+            var slot = RingSlot(id: "app\(i)", kind: .app(DockApp(path: "/Applications/\(app.0).app", bundleID: nil, name: app.0)), name: app.0,
+                                icon: icon(app.1, app.2, saturation: app.0 == "Terminal" ? 0.1 : 0.7))
+            slot.windows = windows(app.0, app.3)
+            slot.running = true
+            return slot
+        }
+        let letters = DockRings.letters(for: slots.compactMap(\.app), chosen: [:])
+        for i in slots.indices { slots[i].letter = slots[i].app.flatMap { letters[$0.path] } }
+        slots[1].badge = "3"
+        var folder = RingSlot(id: "folder", kind: .folder([]), name: "Create", icon: nil)
+        folder.minis = [icon("paintbrush.fill", 0.05), icon("camera.fill", 0.45), icon("music.note", 0.95), icon("photo.fill", 0.8)]
+        slots.append(folder)
+        let model = DockRingModel()
+        model.slots = slots
+        model.geometry = RingGeometry(n: slots.count, room: 10)
+        model.title = "Pinned"
+        model.layers = 2
+        // `slot=N`: pointed at another place, with the same windows, to see where its cards go.
+        let pointed = CommandLine.arguments.compactMap { $0.hasPrefix("slot=") ? Int($0.dropFirst(5)) : nil }.first ?? 0
+        model.hover = pointed
+        model.moved = true
+        let g = model.geometry
+        // As the dock lays it out: two windows of four, the rest at the start.
+        let kinds: [FanItem.Kind] = Array(slots[0].windows.prefix(2).map { .window($0) }) + [.all(2)]
+        let offsets: [CGFloat] = [0, 1, -1]
+        let centres = g.cardCentres(slot: pointed, places: offsets)
+        model.fan = kinds.enumerated().map { k, kind in FanItem(id: "fan\(k)", kind: kind, center: centres[k]) }
+        if far { model.far = true; model.fanHover = 1 }
+        // Drawn stand-ins for the windows' pictures: a dark window and a light one.
+        func window(dark: Bool) -> CGImage? {
+            let image = NSImage(size: NSSize(width: 320, height: 200), flipped: true) { rect in
+                (dark ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.97, alpha: 1)).setFill()
+                rect.fill()
+                (dark ? NSColor(white: 0.2, alpha: 1) : NSColor(white: 0.9, alpha: 1)).setFill()
+                NSRect(x: 0, y: 0, width: 320, height: 28).fill()
+                for (k, color) in [NSColor.systemRed, .systemYellow, .systemGreen].enumerated() {
+                    color.setFill()
+                    NSBezierPath(ovalIn: NSRect(x: 10 + CGFloat(k) * 16, y: 9, width: 10, height: 10)).fill()
+                }
+                (dark ? NSColor(white: 1, alpha: 0.22) : NSColor(white: 0, alpha: 0.14)).setFill()
+                for row in 0..<6 {
+                    NSBezierPath(roundedRect: NSRect(x: 20, y: 48 + CGFloat(row) * 22, width: row % 3 == 2 ? 170 : 270, height: 9), xRadius: 4, yRadius: 4).fill()
+                }
+                return true
+            }
+            return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        }
+        model.previews = [100: window(dark: true), 101: window(dark: false)].compactMapValues { $0 }
+        // As after a tap, when the letters show.
+        model.letters = CommandLine.arguments.contains("letters")
+        DockRingView.drawnGlass = true
+        let view = DockRingView(model: model)
+            // A plain desktop: a gradient made the README's picture five times the size.
+            .background(light ? Color(red: 0.62, green: 0.68, blue: 0.82) : Color(red: 0.13, green: 0.16, blue: 0.27))
+        let host = NSHostingController(rootView: view)
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.borderless]
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.setContentSize(NSSize(width: g.ex * 2, height: g.ey * 2))
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        if let view = window.contentView { save(view, to: path) }
+    }
+
     static func writeAwakePanel(to path: String, light: Bool, off: Bool) {
         _ = NSApplication.shared
         let awake = AwakeController.preview()

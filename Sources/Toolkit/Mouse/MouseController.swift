@@ -39,9 +39,14 @@ final class MouseController: ObservableObject {
     /// Accessibility is granted but macOS still refused the event tap; this
     /// happens when the grant predates the running process.
     @Published private(set) var wheelTapFailed = false
+    /// The buttons each connected mouse keeps to itself and can be asked for
+    /// through its HID++ channel, by `MouseIdentity.key`.
+    @Published private(set) var hidppControls: [String: [HIDPPChannel.Control]] = [:]
 
     private let monitor = ActivityMonitor()
     private let wheel = WheelEngine()
+    private let hidpp = HIDPPButtons()
+    private var divertedLast: [String: Set<UInt16>]?
     private var services: [PointerService] = []
     /// Values we have written this session, by "registryID/key".
     private var written: [String: Int32] = [:]
@@ -62,6 +67,9 @@ final class MouseController: ObservableObject {
         profile.accelMode = .custom
         profile.accel = 0.5
         profile.smoothScrolling = true
+        var shortcut = ButtonAssignment(button: .number(5), action: .shortcut)
+        shortcut.shortcut = Shortcut(keyCode: 13, flags: [.command], key: "W")
+        profile.buttonActions = [ButtonAssignment(button: .control(0x00FD), action: .floatingDock), shortcut]
         mouse.config = MouseConfig()
         mouse.config.profiles[id] = profile
         mouse.config.profiles["unit:00:00:00:00:00:03"] = Profile(name: "Travel Mouse")
@@ -73,6 +81,8 @@ final class MouseController: ObservableObject {
         ]
         if previewOpen { mouse.openID = id }
         mouse.batteries = ["00:00:00:00:00:01": 80]
+        mouse.hidppControls = [id: [HIDPPChannel.Control(cid: 0x00FD, task: 0, flags: 0x30, position: 0, group: 0),
+                                    HIDPPChannel.Control(cid: 0x00C3, task: 0, flags: 0x30, position: 0, group: 0)]]
         mouse.accessibilityGranted = true
         return mouse
     }
@@ -88,6 +98,10 @@ final class MouseController: ObservableObject {
         let choice = wheelChoice
         wheel.autoscroller.excludedApps = { choice.value.autoscrollExcluded }
         wheel.autoscroller.bypassKey = { choice.value.autoscrollBypass }
+        hidpp.onPress = { [weak self] key, cid, down in self?.controlPressed(key: key, cid: cid, down: down) }
+        hidpp.onControls = { [weak self] controls in
+            if self?.hidppControls != controls { self?.hidppControls = controls }
+        }
         monitor.onDevicesChanged = { [weak self] in
             // The event service appears slightly after the device itself.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self?.refresh(force: false) }
@@ -189,6 +203,44 @@ final class MouseController: ObservableObject {
         } else if !config.enabled, wheel.isRunning {
             wheel.stop()
         }
+
+        // The mice's own buttons, asked for whenever the tool is on: so their list
+        // shows on the page, and the ones given an action report to us.
+        if config.enabled, trusted {
+            if !hidpp.isRunning { hidpp.start(); divertedLast = nil }
+            let wanted = config.profiles.mapValues(\.divertedControls).filter { !$0.value.isEmpty }
+            if wanted != divertedLast {
+                divertedLast = wanted
+                hidpp.set(wanted)
+            }
+        } else if hidpp.isRunning {
+            stop()
+        }
+    }
+
+    /// Gives the mice back the buttons they keep to themselves: on quit, and when the tool goes off.
+    func stop() {
+        hidpp.stop()
+        divertedLast = nil
+        if !hidppControls.isEmpty { hidppControls = [:] }
+    }
+
+    /// While a button is being chosen on a mouse's page: told of a press of one
+    /// the mouse keeps to itself, instead of its action.
+    private var learner: ((String, UInt16) -> Void)?
+
+    func learnControls(_ handler: ((String, UInt16) -> Void)?) {
+        learner = handler
+        hidpp.learn(handler != nil)
+    }
+
+    private func controlPressed(key: String, cid: UInt16, down: Bool) {
+        if let learner {
+            if down { learner(key, cid) }
+            return
+        }
+        guard config.enabled, let assignment = config.profiles[key]?.assignment(for: .control(cid)) else { return }
+        ButtonActions.perform(assignment, down: down)
     }
 
     func profile(for device: MouseDevice) -> Profile {

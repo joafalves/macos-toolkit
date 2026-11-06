@@ -55,6 +55,65 @@ enum ScrollCurve: String, Codable, CaseIterable {
 
 /// Per-mouse settings. Every field defaults to "macOS", meaning the toolkit leaves
 /// that behaviour to System Settings.
+/// One of a mouse's buttons: one macOS numbers from 0 (the left button), or
+/// one the mouse keeps to itself (a DPI switch) and reports only through its
+/// HID++ channel, by control ID, once it's told to.
+enum MouseButtonID: Hashable, Codable {
+    case number(Int)
+    case control(UInt16)
+
+    /// As a single string in the file, `button:4` or `control:00FD`.
+    init(from decoder: Decoder) throws {
+        let text = try decoder.singleValueContainer().decode(String.self)
+        if text.hasPrefix("button:"), let n = Int(text.dropFirst(7)), (2...31).contains(n) {
+            self = .number(n)
+        } else if text.hasPrefix("control:"), let cid = UInt16(text.dropFirst(8), radix: 16) {
+            self = .control(cid)
+        } else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "unknown button \(text)"))
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .number(let n): try c.encode("button:\(n)")
+        case .control(let cid): try c.encode(String(format: "control:%04X", cid))
+        }
+    }
+}
+
+/// What a button does instead of what macOS makes of it.
+enum ButtonAction: String, Codable, CaseIterable {
+    case nothing, floatingDock, back, forward, missionControl, showDesktop, shortcut, openApp
+}
+
+struct ButtonAssignment: Codable, Equatable, Identifiable {
+    var button: MouseButtonID
+    var action: ButtonAction
+    /// For `.shortcut`: the keys it presses.
+    var shortcut: Shortcut = .none
+    /// For `.openApp`: the app, and its name to show while it's not there.
+    var appPath: String?
+    var appName: String?
+    var id: MouseButtonID { button }
+
+    init(button: MouseButtonID, action: ButtonAction) {
+        self.button = button
+        self.action = action
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        button = try c.decode(MouseButtonID.self, forKey: .button)
+        // An action from a later version does nothing here rather than lose the row.
+        action = (try? c.decodeIfPresent(ButtonAction.self, forKey: .action)) ?? .nothing
+        shortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .shortcut)) ?? .none
+        appPath = try? c.decodeIfPresent(String.self, forKey: .appPath)
+        appName = try? c.decodeIfPresent(String.self, forKey: .appName)
+    }
+}
+
 struct Profile: Codable, Equatable {
     /// What macOS calls the mouse.
     var name: String
@@ -107,6 +166,18 @@ struct Profile: Codable, Equatable {
     /// as it goes (`Autoscroller.pace`).
     var autoscrollPace = 1.0
     static let autoscrollPaceRange: ClosedRange<Double> = 0.25...4
+    /// Buttons given an action of their own, which wins over Navigate and
+    /// Autoscroll for that button.
+    var buttonActions: [ButtonAssignment] = []
+
+    func assignment(for button: MouseButtonID) -> ButtonAssignment? {
+        buttonActions.first { $0.button == button }
+    }
+
+    /// The control IDs to take from the mouse through its HID++ channel.
+    var divertedControls: Set<UInt16> {
+        Set(buttonActions.compactMap { if case .control(let cid) = $0.button { return cid } else { return nil } })
+    }
 
     init(name: String) {
         self.name = name
@@ -159,6 +230,15 @@ struct Profile: Codable, Equatable {
             // picked by hand stays as fast; the 1 nobody changed is the new 1.
             autoscrollPace = within(speed * 4, Self.autoscrollPaceRange, 1.0)
         }
+        // One row a button, the first kept; a row whose button can't be read is left out.
+        var seen = Set<MouseButtonID>()
+        buttonActions = ((try? c.decodeIfPresent([LossyAssignment].self, forKey: .buttonActions)) ?? [])
+            .compactMap(\.value).filter { seen.insert($0.button).inserted }
+    }
+
+    private struct LossyAssignment: Decodable {
+        let value: ButtonAssignment?
+        init(from decoder: Decoder) throws { value = try? ButtonAssignment(from: decoder) }
     }
 
     /// Before one setting for the distance, a speed and an acceleration, each
@@ -193,6 +273,7 @@ struct Profile: Codable, Equatable {
     /// True when any setting needs the event tap (and so Accessibility).
     var needsEventTap: Bool {
         rewritesWheelEvents || navigationButtons || autoscroll
+            || buttonActions.contains { if case .number = $0.button { return true } else { return false } }
     }
 
     var rewritesWheelEvents: Bool {
@@ -205,7 +286,7 @@ struct Profile: Codable, Equatable {
     var isAllMacOS: Bool {
         cursorSpeedMode == .macOS && accelMode == .macOS && scrollMode == .macOS && scrollSpeed == 1
             && !verticalInverted && !horizontalInverted && !smoothScrolling && !navigationButtons
-            && !autoscroll
+            && !autoscroll && buttonActions.isEmpty
     }
 
     /// Every setting back to macOS; which mouse it is, and its name, stay.

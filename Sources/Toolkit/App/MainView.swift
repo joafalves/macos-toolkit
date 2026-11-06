@@ -102,6 +102,7 @@ struct MainView: View {
     @ObservedObject var capture: CaptureController
     @ObservedObject var awake: AwakeController
     @ObservedObject var stats: StatsController
+    @ObservedObject var dock: FloatingDockController
 
     /// Whether a tool is on, for its tile on Overview and its sidebar row.
     private func enabled(_ section: AppSection) -> Bool {
@@ -114,6 +115,7 @@ struct MainView: View {
         case .capture: return capture.config.enabled
         case .awake: return awake.config.enabled
         case .stats: return stats.config.enabled
+        case .dock: return dock.config.enabled
         case .welcome, .general, .permissions, .about, .tweaks: return true
         }
     }
@@ -313,6 +315,7 @@ struct MainView: View {
             case .capture: CaptureSettingsView(capture: capture)
             case .awake: AwakeSettingsView(awake: awake, mouse: mouse)
             case .stats: StatsSettingsView(stats: stats)
+            case .dock: FloatingDockSettingsView(dock: dock, mouse: mouse)
             case .permissions: PermissionsView()
             case .about: AboutView(model: model)
             case .general: GeneralView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats)

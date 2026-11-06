@@ -40,7 +40,7 @@ tool; keep it in step with the code.
   (which app owns the window under a point, for tools that act on it), `Navigator` (the settings
   window: `MainWindow.make`, its history, `WindowTitle`, `SwipeNavigation`), `MenuBarPopover` (the
   panels that hang from the menu bar item), and `SettingsSearch`/`SettingsIndex` (see Search).
-- `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`: one folder per tool. Screen
+- `Sources/Toolkit/Mouse`, `Switcher`, `Layout`, `Mixer`, `Finder`, `Capture`, `Awake`, `Stats`, `Dock`: one folder per tool. Screen
   Capture uses ScreenCaptureKit for stills and recordings (AVAssetWriter, H.264), Carbon hotkeys for
   ⇧⌘2/3/4/5, Vision for the text in an area (`TextReader`), and non-activating panels (`CapturePanel`) so the app being captured keeps focus.
   The Audio Mixer sends all sound through Core Audio process taps while it's on (`MixerController.applyTaps`):
@@ -64,6 +64,20 @@ tool; keep it in step with the code.
   settings, as the Bluetooth settings show them. A mouse with neither falls back to its model and
   transport (`modelKey`, the key before 0.20.0); a profile saved under that is copied to each
   connected mouse of the model that has an address or serial number, then dropped.
+  A button can be given an action (`ButtonAssignment`, `Mouse/ButtonActions.swift`): one macOS numbers goes
+  through the wheel tap, and one the mouse keeps to itself (a DPI switch) is diverted through its HID++ 2.0
+  channel (`Mouse/HIDPP.swift`, `HIDPPButtons`: feature 0x1B04, on a thread of its own). A divert is gone
+  when the mouse disconnects, so it's made again on each connection and undone on quit (`MouseController.stop`).
+  Only mice connected directly: behind a receiver the channel is the receiver's.
+- The Floating Dock (`Sources/Toolkit/Dock`): a ring of apps at the pointer, held open by the right ⌘, a
+  shortcut or a mouse button with its action, and picked by direction. One event tap for its keys, clicks,
+  wheel and moves. While it's open the real pointer is held still and hidden (`CGAssociateMouseAndMouseCursorPosition(0)`,
+  `CGDisplayHideCursor` with `SetsCursorInBackground`) and the ring draws its own, moved by each event's deltas,
+  which the tap then swallows, so apps below see no hover. Both are undone on close and belong to the process's
+  connection, so a crash undoes them. A mouse button held for it lets its drags through the wheel tap to the dock's.
+  Over macOS's Dock the pointer can't be hidden (the Dock keeps it showing), so a ring opened there draws no pointer of its
+  own and follows the real one instead.
+  It reads the Dock's `persistent-apps`, never writes it, and leaves the Dock alone.
 - `Sources/Toolkit/System`: the pages under **System** in the sidebar, apart from the tools. For
   now **Tweaks** (`Tweaks.swift`, `TweaksView.swift`): macOS's own settings that System Settings
   doesn't show. See System pages below.
@@ -436,6 +450,10 @@ swift build                                  # compile check
 .build/debug/Toolkit --dump-menus <app> [file]  # an app's menu items with key equivalents and identifiers
 .build/debug/Toolkit --list-audio            # what the Audio Mixer sees
 .build/debug/Toolkit --list-mice             # the mice the Mouse tool sees, what each is saved under, and its charge
+.build/debug/Toolkit --list-mouse-controls [file]   # each device's HID++ features and controls, which can be diverted, asked without changing anything (build.sh --dev; open -n the bundle; a Bluetooth one asleep doesn't answer)
+.build/debug/Toolkit --snapshot out.png dock-ring [light] [far] [letters] [slot=N]   # the Floating Dock's ring, made-up apps, one pointed at (the top one, or place N, to see where its cards go); far, out on one of its windows
+.build/debug/Toolkit --capture-dock <folder>   # the real ring, glass and all, at the pointer with this Mac's apps, pictured with what's behind it (build.sh --dev; open -n the bundle; delete the pictures)
+.build/debug/Toolkit --test-dock-cursor <report>   # the pointer put over macOS's Dock and in the middle, the ring opened: whether one pointer shows (build.sh --dev; open -n the bundle; moves the pointer, so ask and leave the mouse alone)
 .build/debug/Toolkit --test-publishing       # each control on the made-up mouse's page, then the other pages' segmented controls, Tweaks' switches and the sidebar, changed in code in a window never shown: no SwiftUI publishing-in-update issue, and the mouse's setting changes
 .build/debug/Toolkit --test-audio-access <report>   # the microphone and an audio tap work as signed (build.sh --dev; open -n the bundle)
 .build/debug/Toolkit --test-mixer-engine <report>   # the mixer on a quiet tone from a helper app: clicks when it pauses, has its volume changed or the equalizer switched, and sleep once it stops (build.sh --dev; open -n the bundle; nothing else using the mixer, so quit the installed app)

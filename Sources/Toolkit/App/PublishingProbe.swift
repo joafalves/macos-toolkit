@@ -23,7 +23,7 @@ enum PublishingProbe {
         let window = MainWindow.make(MainView(
             model: model, mouse: mouse, switcher: SwitcherController.preview(), layout: LayoutController.preview(),
             mixer: MixerController.preview(), finder: FinderController.preview(), capture: CaptureController.preview(),
-            awake: AwakeController.preview(), stats: StatsController.preview()))
+            awake: AwakeController.preview(), stats: StatsController.preview(), dock: FloatingDockController.preview()))
         window.setContentSize(NSSize(width: 780, height: 2400))
         settle()
 

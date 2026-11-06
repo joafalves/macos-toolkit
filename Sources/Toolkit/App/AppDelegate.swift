@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private var finder: FinderController!
     private var capture: CaptureController!
     private var awake: AwakeController!
+    private var dock: FloatingDockController!
     private var stats: StatsController!
     /// The panel hanging from a part: the toolkit's, or System Stats'.
     private var panel: MenuBarPopover!
@@ -46,6 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         capture.start()
         awake = AwakeController()
         awake.start()
+        dock = FloatingDockController()
+        dock.start()
         TweaksKeeper.shared.start()
         stats = StatsController()
         // `--measure-idle` with `--without-stats`: the cost of the rest, with
@@ -64,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             case .finder: return finder.permissionNeeds
             case .capture: return capture.permissionNeeds
             case .awake: return awake.permissionNeeds
+            case .dock: return dock.permissionNeeds
             case .stats, .welcome, .general, .permissions, .about, .tweaks: return []
             }
         }
@@ -74,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             case .switcher: return switcher.tapFailed
             case .layout: return layout.tapFailed
             case .finder: return finder.tapFailed
+            case .dock: return dock.tapFailed
             default: return false
             }
         }
@@ -183,6 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         // mustn't quit a second time from inside this one.
         termSource?.cancel()
         if mouse.config.restoreOnQuit { mouse.restoreAll() }
+        mouse.stop()
         switcher.stop()
         layout.stop()
         mixer.stop()
@@ -190,6 +196,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         finder.stop()
         capture.stop()
         awake.stop()
+        dock.stop()
         stats.stop()
     }
 
@@ -408,7 +415,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             })
         panel.show(from: .toolkit) {
             ToolkitPanelView(mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder,
-                             capture: capture, awake: awake, stats: stats, actions: actions)
+                             capture: capture, awake: awake, stats: stats, dock: dock, actions: actions)
         }
     }
 
@@ -578,7 +585,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private func show(_ section: AppSection) {
         model.section = section
         if window == nil {
-            let window = MainWindow.make(MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats))
+            let window = MainWindow.make(MainView(model: model, mouse: mouse, switcher: switcher, layout: layout, mixer: mixer, finder: finder, capture: capture, awake: awake, stats: stats, dock: dock))
             window.setContentSize(NSSize(width: 860, height: 640))
             window.isReleasedWhenClosed = false
             window.delegate = self
