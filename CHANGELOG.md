@@ -25,6 +25,10 @@ worked on; it gets its date when it's released.
 - **Mouse:** the buttons a mouse keeps to itself, like the DPI button of some mice, can be given an action
   too, on mice that report them through their maker's channel: the mouse lets the toolkit have them while
   it runs, and has them back when it quits.
+- **System Stats:** an AI usage stat, off until you turn it on: what's left of your Codex limits and
+  the tokens Claude Code has used, from the files they write on this Mac, with no network and no
+  credentials. A pill with the limit closest to running out, a panel with an overview and a tab for
+  each, and a notification at 80% used if you like.
 
 ## 0.26.3 (2026-11-03)
 

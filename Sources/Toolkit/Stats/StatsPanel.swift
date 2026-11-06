@@ -58,6 +58,14 @@ struct StatsPanelView: View {
 
     @ViewBuilder
     private func section(_ kind: StatKind) -> some View {
+        if kind == .ai {
+            AIUsageStatSection(usage: stats.ai)
+        } else {
+            statSection(kind)
+        }
+    }
+
+    private func statSection(_ kind: StatKind) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Label(kind.title, systemImage: kind.symbol)
@@ -99,6 +107,7 @@ struct StatsPanelView: View {
         case .power: HistoryChart(series: [(stats.history[.power] ?? [], .orange)], ceiling: nil)
         case .network: HistoryChart(series: [(stats.history[.down] ?? [], .teal), (stats.history[.up] ?? [], .orange)], ceiling: nil)
         case .disk: HistoryChart(series: [(stats.history[.read] ?? [], .purple), (stats.history[.write] ?? [], .orange)], ceiling: nil)
+        case .ai: EmptyView()
         }
     }
 
@@ -120,7 +129,7 @@ struct StatsPanelView: View {
         case .memory: memoryDetails
         case .network: networkDetails
         case .disk: diskDetails
-        case .gpu: EmptyView()
+        case .gpu, .ai: EmptyView()
         case .power: powerDetails
         }
     }
@@ -197,7 +206,7 @@ struct StatsPanelView: View {
 }
 
 /// A label and its value, on one line.
-private struct Row: View {
+struct Row: View {
     let title: LocalizedStringKey
     let value: String
 
@@ -216,7 +225,7 @@ private struct Row: View {
     }
 }
 
-private struct Legend: View {
+struct Legend: View {
     let items: [(LocalizedStringKey, Color)]
 
     var body: some View {
@@ -302,7 +311,7 @@ private struct ChartLine: Shape {
 }
 
 /// A share of something, as a thin bar.
-private struct ShareBar: View {
+struct ShareBar: View {
     let share: Double
     let color: Color
 
@@ -365,6 +374,26 @@ private struct CoreCharts: View {
     }
 }
 
+/// Shares of a whole, side by side, in a bar like `ShareBar`.
+struct StackedBar: View {
+    let parts: [(share: Double, color: Color)]
+
+    var body: some View {
+        GeometryReader { geometry in
+            HStack(spacing: 1) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
+                    Rectangle().fill(part.color)
+                        .frame(width: geometry.size.width * CGFloat(part.share))
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(height: 8)
+        .background(Color.primary.opacity(0.08))
+        .clipShape(Capsule())
+    }
+}
+
 /// Where memory goes, as one bar: what apps need, then what macOS could free.
 private struct MemoryBar: View {
     let memory: MemoryReading
@@ -376,18 +405,7 @@ private struct MemoryBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            GeometryReader { geometry in
-                HStack(spacing: 1) {
-                    ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
-                        Rectangle().fill(part.2)
-                            .frame(width: geometry.size.width * CGFloat(Double(part.1) / Double(max(memory.total, 1))))
-                    }
-                    Spacer(minLength: 0)
-                }
-            }
-            .frame(height: 8)
-            .background(Color.primary.opacity(0.08))
-            .clipShape(Capsule())
+            StackedBar(parts: parts.map { (Double($0.1) / Double(max(memory.total, 1)), $0.2) })
             LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], spacing: 4) {
                 ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
                     HStack(spacing: 4) {
@@ -487,7 +505,7 @@ private struct TopList: View {
 /// says: the other, with a mouse connected or set to Always, is a thick bar
 /// that takes its width from a panel 320 pt wide. Set again after each change
 /// of the preference, which puts every scroll view back to the system's.
-private struct OverlayScroller: NSViewRepresentable {
+struct OverlayScroller: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { View() }
     func updateNSView(_ nsView: NSView, context: Context) {}
 

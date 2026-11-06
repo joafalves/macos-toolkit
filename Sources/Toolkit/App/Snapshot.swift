@@ -343,8 +343,8 @@ enum Snapshot {
         // The default, every stat as a number, then the pills, small and not, then the charts.
         let looks: [[StatKind: StatLook]] = [
             [.cpu: .number, .memory: .number, .network: .number, .power: .number],
-            [.cpu: .pill, .memory: .pill, .gpu: .pill, .disk: .pill],
-            [.cpu: .smallPill, .memory: .smallPill, .gpu: .smallPill, .disk: .smallPill],
+            [.cpu: .pill, .memory: .pill, .gpu: .pill, .disk: .pill, .ai: .pill],
+            [.cpu: .smallPill, .memory: .smallPill, .gpu: .smallPill, .disk: .smallPill, .ai: .smallPill],
             [.cpu: .chart, .memory: .chart, .network: .chart, .power: .chart],
         ]
         var rows: [[MenuBarSegment]] = [[toolkit] + StatsController.preview().segments()]

@@ -21,6 +21,9 @@ struct SettingsFile: Codable {
     var general: GeneralConfig?
     /// Missing in files exported before System Stats existed.
     var stats: StatsConfig?
+    /// System Stats' AI usage stat's own settings, in a file of their own.
+    /// Missing in files exported before it existed.
+    var aiUsage: AIUsageConfig?
     /// Missing in files exported before the Floating Dock existed.
     var dock: FloatingDockConfig?
 }
@@ -39,7 +42,7 @@ enum SettingsTransfer {
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         do {
-            let file = SettingsFile(mouse: mouse.config, switcher: switcher.config, layout: layout.config, mixer: mixer.config, finder: finder.config, capture: capture.config, awake: awake.config, general: model.general, stats: stats.config, dock: dock?.config)
+            let file = SettingsFile(mouse: mouse.config, switcher: switcher.config, layout: layout.config, mixer: mixer.config, finder: finder.config, capture: capture.config, awake: awake.config, general: model.general, stats: stats.config, aiUsage: stats.ai.config, dock: dock?.config)
             try exported(file).write(to: url, options: .atomic)
         } catch {
             show(error: String(localized: "The settings could not be exported."), detail: error.localizedDescription)
@@ -91,6 +94,7 @@ enum SettingsTransfer {
         merge(&awake.config, json["awake"], tool: "awake")
         merge(&model.general, json["general"], tool: "general")
         merge(&stats.config, json["stats"], tool: "stats")
+        merge(&stats.ai.config, json["aiUsage"], tool: "aiUsage")
         if let dock { merge(&dock.config, json["dock"], tool: "dock") }
     }
 
@@ -156,6 +160,7 @@ extension SettingsTransfer {
         same(AwakeConfig.load(), "awake")
         same(GeneralConfig.load(), "general")
         same(StatsConfig.load(), "stats")
+        same(AIUsageConfig.load(), "aiUsage")
         same(FloatingDockConfig.load(), "dock")
         print(failures == 0 ? "all ok" : "\(failures) failed")
     }

@@ -6,7 +6,7 @@ struct StatsSettingsView: View {
 
     var body: some View {
         Page {
-            ToolHeader(section: .stats, subtitle: "CPU, memory, network, disk, GPU and power, in the menu bar or a panel.",
+            ToolHeader(section: .stats, subtitle: "CPU, memory, network, disk, GPU, power and AI usage, in the menu bar or a panel.",
                        enabled: $stats.config.enabled)
 
             WhenEnabled(enabled: stats.config.enabled) {
@@ -38,11 +38,15 @@ struct StatsSettingsView: View {
                               isOn: $stats.config.topAppsOfWholeCPU)
                 }
 
-                Card(title: "Stats", footnote: "The panel shows the stat you click, then those only in the panel. Those are read only while the panel is open, so their charts start when it opens.") {
+                Card(title: "Stats", footnote: "The panel shows the stat you click, then those only in the panel. Those are read only while the panel is open, so their charts start when it opens; AI usage is read from its files whenever it isn't off.") {
                     ForEach(Array(StatKind.allCases.enumerated()), id: \.element) { index, kind in
                         if index > 0 { RowDivider() }
                         StatRow(kind: kind, stats: stats)
                     }
+                }
+
+                if stats.config.setting(.ai).place != .off {
+                    AIUsageCard(usage: stats.ai)
                 }
             }
         }

@@ -104,6 +104,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             mouse.$config.sink { _ in redraw() },
             layout.$config.sink { _ in redraw() },
             stats.live.$tick.sink { _ in redraw() },
+            // The AI usage stat is read apart from the others' timer.
+            stats.ai.live.$usage.sink { _ in redraw() },
+            stats.ai.live.$now.sink { _ in redraw() },
             // Mouse checks Accessibility every couple of seconds anyway: a
             // change it sees updates the pages' locks, banners and warnings.
             mouse.$accessibilityGranted.removeDuplicates().dropFirst().sink { _ in
