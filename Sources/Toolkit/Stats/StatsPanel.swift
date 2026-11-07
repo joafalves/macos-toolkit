@@ -36,7 +36,8 @@ struct StatsPanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(kinds.enumerated()), id: \.element) { index, kind in
+                    // AI usage with none of its tools on has nothing to say.
+                    ForEach(Array(kinds.filter { $0 != .ai || stats.ai.hasSomething }.enumerated()), id: \.element) { index, kind in
                         if index > 0 { Divider().padding(.vertical, 10) }
                         section(kind)
                     }

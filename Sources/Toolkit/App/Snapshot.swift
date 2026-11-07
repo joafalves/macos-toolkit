@@ -551,9 +551,12 @@ enum Snapshot {
     }
 
     /// A System Stats panel, from made-up readings.
-    static func writeStatsPanel(to path: String, light: Bool, kinds: [StatKind]) {
+    /// `claudeOnly`: AI usage with Claude Code alone, which opens on its tokens' chart.
+    static func writeStatsPanel(to path: String, light: Bool, kinds: [StatKind], claudeOnly: Bool = false) {
         _ = NSApplication.shared
-        let host = NSHostingController(rootView: StatsPanelView(stats: .preview(), kinds: kinds).background(Color(nsColor: .windowBackgroundColor)))
+        let stats = StatsController.preview()
+        if claudeOnly { stats.ai.live.usage = stats.ai.live.usage.filter { $0.provider == .claude } }
+        let host = NSHostingController(rootView: StatsPanelView(stats: stats, kinds: kinds).background(Color(nsColor: .windowBackgroundColor)))
         let window = NSWindow(contentViewController: host)
         window.styleMask = [.borderless]
         window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)

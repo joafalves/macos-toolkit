@@ -36,31 +36,44 @@ enum AIUsageTab: Hashable {
     case provider(AIProvider)
 }
 
-/// How far back the tokens' chart and split go.
+/// How far back the tokens' chart and split go: up to now, as every stat's
+/// chart does, so one is never empty just past midnight.
 enum AIUsagePeriod: CaseIterable {
-    case today, yesterday, month
+    case day, week, month
 
     var title: LocalizedStringKey {
         switch self {
-        case .today: return "Today"
-        case .yesterday: return "Yesterday"
+        case .day: return "24 Hours"
+        case .week: return "7 Days"
         case .month: return "30 Days"
         }
     }
 
     func range(at now: Date) -> (from: Date, to: Date) {
-        let today = Calendar.current.startOfDay(for: now)
         switch self {
-        case .today: return (today, now)
-        case .yesterday: return (Calendar.current.date(byAdding: .day, value: -1, to: today) ?? today, today.addingTimeInterval(-1))
+        case .day: return (now.addingTimeInterval(-24 * 3600), now)
+        case .week: return (now.addingTimeInterval(-7 * 86400), now)
         case .month: return (now.addingTimeInterval(-30 * 86400), now)
         }
     }
 
     /// Hours to a point on the chart.
-    var step: Int { self == .month ? 24 : 1 }
-    /// Points across the chart: today's fills as the day goes on.
-    var slots: Int { self == .month ? 30 : 24 }
+    var step: Int {
+        switch self {
+        case .day: return 1
+        case .week: return 6
+        case .month: return 24
+        }
+    }
+
+    /// Points across the chart.
+    var slots: Int {
+        switch self {
+        case .day: return 24
+        case .week: return 28
+        case .month: return 30
+        }
+    }
 }
 
 /// The tabs, in a row that scrolls sideways once there are more than fit,
@@ -110,15 +123,15 @@ struct AIUsageTabs: View {
     }
 }
 
-/// What's read of each provider, for the panel (`detailed` false) and the
-/// tool's page, which adds the token history's chart and split.
+/// What's read of each provider, for the panel and System Stats' page,
+/// which (`detailed`) also lists a tool turned on that isn't on this Mac.
 struct AIUsageContent: View {
     let usage: AIUsageController
     @ObservedObject private var live: AIUsageLive
     @ObservedObject private var tab: ViewState<AIUsageTab>
     let detailed: Bool
     var openSettings: () -> Void = {}
-    @StateObject private var period = ViewState(AIUsagePeriod.today)
+    @StateObject private var period = ViewState(AIUsagePeriod.day)
 
     init(usage: AIUsageController, tab: ViewState<AIUsageTab>, detailed: Bool, openSettings: @escaping () -> Void = {}) {
         self.usage = usage
@@ -258,7 +271,8 @@ struct AIUsageContent: View {
         let now = live.now
         Row("Last 5 hours", AIUsageFormat.tokens(tokens.total(from: now.addingTimeInterval(-5 * 3600), to: now)))
         Row("Last 7 days", AIUsageFormat.tokens(tokens.total(from: now.addingTimeInterval(-7 * 86400), to: now)))
-        if detailed { history(tokens) }
+        // A chart in the panel too, as every stat's panel has.
+        history(tokens)
     }
 
     @ViewBuilder
@@ -277,6 +291,7 @@ struct AIUsageContent: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+        .frame(maxWidth: .infinity)
         HistoryChart(series: [(tokens.series(from: range.from, to: range.to, step: period.value.step), .purple)], ceiling: nil, slots: period.value.slots)
         StackedBar(parts: parts.map { (Double($0.tokens) / Double(total), $0.color) })
         ForEach(parts, id: \.name) { part in
@@ -288,7 +303,9 @@ struct AIUsageContent: View {
             }
             .font(.caption)
         }
-        note("Without what's read back from the cache. Counted by the whole hour, so a figure can be up to an hour short.")
+        if detailed {
+            note("Without what's read back from the cache. Counted by the whole hour, so a figure can be up to an hour short.")
+        }
     }
 }
 

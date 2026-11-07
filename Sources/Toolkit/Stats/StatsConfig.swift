@@ -51,7 +51,7 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
         case .disk: return "internaldrive"
         case .gpu: return "cube"
         case .power: return "bolt"
-        case .ai: return "sparkles"
+        case .ai: return "sparkle"
         }
     }
 

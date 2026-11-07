@@ -3,11 +3,10 @@ import Foundation
 /// AI usage's own settings, apart from System Stats' for its stat: where
 /// it shows and how is the stat's.
 struct AIUsageConfig: Codable, Equatable {
-    /// Claude Code's transcripts hold conversations, and a long history takes
-    /// a while to read first, so it's off until it's asked for. Codex is a
-    /// few lines at the end of its latest files.
+    /// Nothing is read until it's asked for: Claude Code's transcripts hold
+    /// conversations, and Codex's sessions too.
     var claude = false
-    var codex = true
+    var codex = false
     /// A notification when a limit runs short.
     var warnings = false
 
@@ -27,7 +26,7 @@ struct AIUsageConfig: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         claude = try c.decodeIfPresent(Bool.self, forKey: .claude) ?? false
-        codex = try c.decodeIfPresent(Bool.self, forKey: .codex) ?? true
+        codex = try c.decodeIfPresent(Bool.self, forKey: .codex) ?? false
         warnings = try c.decodeIfPresent(Bool.self, forKey: .warnings) ?? false
     }
 

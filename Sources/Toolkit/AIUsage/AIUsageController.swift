@@ -68,6 +68,7 @@ final class AIUsageController: ObservableObject {
         usage.isPreview = true
         var config = AIUsageConfig()
         config.claude = true
+        config.codex = true
         usage.config = config
         usage.live.usage = previewUsage(at: usage.live.now)
         return usage
@@ -98,6 +99,12 @@ final class AIUsageController: ObservableObject {
         live.usage.filter { providers.contains($0.provider) }.flatMap(\.limits)
             .filter { $0.isRunning(at: now) && $0.isFresh(at: now) }
             .min { ($0.leftShare(at: now) ?? 1) < ($1.leftShare(at: now) ?? 1) }
+    }
+
+    /// Something for the panel: a first read under way, or a provider turned
+    /// on that's on this Mac. With nothing, the stat isn't shown at all.
+    var hasSomething: Bool {
+        live.isReading || live.usage.contains { $0.state != .notFound }
     }
 
     /// What the stat's pill fills to: what's left of the tightest limit.

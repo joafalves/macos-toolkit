@@ -299,7 +299,8 @@ final class StatsController: ObservableObject {
     /// or, with every stat only in the panel, an icon that opens it.
     func segments() -> [MenuBarSegment] {
         guard config.enabled else { return [] }
-        let shown = config.shown
+        // AI usage with nothing to show, none of its tools on or read yet, has no part.
+        let shown = config.shown.filter { $0 != .ai || ai.figure(at: ai.live.now) != nil }
         if shown.isEmpty {
             guard !config.panelOnly.isEmpty else { return [] }
             return [MenuBarSegment(kind: .stats, glyph: MenuBarArt.glyph(AppSection.stats.symbol), label: AppSection.stats.title)]
@@ -313,11 +314,21 @@ final class StatsController: ObservableObject {
         return shown.map(segment)
     }
 
+    /// The looks a stat can have now: AI usage's pills fill to a limit, so
+    /// they're offered only with a tool on that has limits.
+    func looks(_ kind: StatKind) -> [StatLook] {
+        guard kind == .ai, !ai.config.providers.contains(where: \.hasLimits) else { return kind.looks }
+        return [.number]
+    }
+
     private func segment(_ kind: StatKind) -> MenuBarSegment {
-        let look = config.setting(kind).look
+        var look = config.setting(kind).look
+        // A pill fills to a share: AI usage has one only with a limit read,
+        // and a window that's ended or a figure an hour old shows a number until the next.
+        if kind == .ai, share(kind) == nil { look = .number }
         let label = kind.title + ", " + spoken(kind)
         let tint = self.tint(kind)
-        switch (kind, kind.looks.contains(look) ? look : .number) {
+        switch (kind, looks(kind).contains(look) ? look : .number) {
         case (.network, .chart):
             return MenuBarSegment(kind: .stat(kind), glyph: MenuBarArt.sparkline(Array((history[.down] ?? []).suffix(chartReadings)), symbol: kind.symbol,
                                                                                          second: Array((history[.up] ?? []).suffix(chartReadings)), count: chartReadings),

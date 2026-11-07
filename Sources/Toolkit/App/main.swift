@@ -61,7 +61,8 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     }
     if rest.contains("stats-panel") {
         let kinds = rest.compactMap(StatKind.init)
-        Snapshot.writeStatsPanel(to: rest[0], light: rest.contains("light"), kinds: kinds.isEmpty ? StatKind.allCases : kinds)
+        Snapshot.writeStatsPanel(to: rest[0], light: rest.contains("light"), kinds: kinds.isEmpty ? StatKind.allCases : kinds,
+                                 claudeOnly: rest.contains("claude"))
         exit(0)
     }
     if rest.contains("mouse-panel") {

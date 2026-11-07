@@ -21,6 +21,7 @@ enum AIUsageSelfTest {
         codex(in: folder.appendingPathComponent("codex"))
         claude(in: folder.appendingPathComponent("claude"), cache: folder.appendingPathComponent("cache.plist"))
         scanner()
+        menuBar()
         print(failures == 0 ? "all ok" : "\(failures) failed")
         exit(failures == 0 ? 0 : 1)
     }
@@ -314,6 +315,28 @@ enum AIUsageSelfTest {
         check(read(running).state == .unreadable, "claude: a format that changes while it runs says so")
         write(usageLine(id: "c2", output: 5, input: 0, at: now), to: changing.appendingPathComponent("c.jsonl"))
         check(read(running).state == .read, "claude: back to read with a line it can read")
+    }
+
+    /// The stat in the menu bar: nothing without a figure, a pill only for a
+    /// limit, Claude Code's tokens alone as a number.
+    private static func menuBar() {
+        let stats = StatsController.preview(looks: [.ai: .pill], shown: [.ai])
+        let usage = stats.ai.live.usage
+        let codex = usage.filter { $0.provider == .codex }, claude = usage.filter { $0.provider == .claude }
+        check(stats.segments().count == 1 && stats.segments().first?.text == nil, "menu bar: a limit read, a pill")
+        stats.ai.live.usage = claude
+        check(stats.segments().count == 1 && stats.segments().first?.text != nil, "menu bar: Claude Code's tokens alone, a number rather than a pill")
+        stats.ai.live.usage = []
+        check(stats.segments().isEmpty, "menu bar: nothing to show, no part")
+        check(!stats.ai.hasSomething, "panel: nothing on, no section")
+        stats.ai.live.usage = [ProviderUsage(provider: .codex, state: .notFound)]
+        check(stats.segments().isEmpty && !stats.ai.hasSomething, "a tool turned on that isn't on this Mac: nothing")
+        stats.ai.live.usage = codex
+        check(stats.ai.hasSomething, "panel: a tool read, its section")
+        check(AIUsageConfig().providers.isEmpty, "nothing read until it's turned on")
+        check(stats.looks(.ai).contains(.pill), "looks: pills with Codex on, which has limits")
+        stats.ai.config.codex = false
+        check(stats.looks(.ai) == [.number], "looks: Claude Code alone has no limits to fill a pill, so only a number")
     }
 
     /// The transcript scanner against Foundation's decoder, on lines shaped

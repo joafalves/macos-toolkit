@@ -14,6 +14,10 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Whether it tells of its limits, which a pill fills to: Claude Code
+    /// only has tokens.
+    var hasLimits: Bool { self == .codex }
+
     /// Its own pill's symbol, so two side by side can be told apart. Plain
     /// shapes, not either product's mark.
     var symbol: String {

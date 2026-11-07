@@ -400,7 +400,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png switcher-grid [light] [colors] [many|crowded] [medium|large] [row]   # the grid, with medium or large app icons rather than small, or in one row some way along; crowded: 70 windows, scrolled some way down
 .build/debug/Toolkit --snapshot out.png menu-bar [light]        # the menu bar item in a few states, on a drawn strip
 .build/debug/Toolkit --snapshot out.png stats-bar [light]       # System Stats in each look and layout, from made-up readings
-.build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power|ai ...] [light]
+.build/debug/Toolkit --snapshot out.png stats-panel [cpu|memory|network|disk|gpu|power|ai ...] [claude] [light]   # claude: AI usage with Claude Code alone, on its chart
 .build/debug/Toolkit --snapshot out.png toolkit-panel [light]   # the panel the toolkit's mark opens, from the tools' previews
 .build/debug/Toolkit --snapshot out.png permissions [light]     # the Permissions page, every one granted
 .build/debug/Toolkit --snapshot out.png switcher no-access [light]   # any page as without Accessibility: locked settings, sidebar warnings

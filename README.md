@@ -897,12 +897,12 @@ for each. It uses no network and no credentials, and nothing leaves the Mac. Onl
 down itself is read: the other AI tools only give their limits to a program signed in as you, so
 they aren't here. It's read on its own, when the files change, not every couple of seconds.
 
-- **Codex** has its limits in its session files, `~/.codex/sessions`, as Codex itself is told of them,
+- **Codex**, off to start with, has its limits in its session files, `~/.codex/sessions`, as Codex itself is told of them,
   from the app and the command line alike: what's left of its 5-hour and weekly windows, when each
   resets, and the plan. New figures only come while Codex runs, so an older one says when it was read.
 - **Claude Code**, off to start with, has its tokens by hour and model in its transcripts,
-  `~/.claude/projects`: the last 5 hours and 7 days, and on System Stats' page a chart and split for today,
-  yesterday or 30 days, without what's read back from the cache. Only the figures are picked out of
+  `~/.claude/projects`: the last 5 hours and 7 days, and a chart and split by model for the last 24 hours, 7 days or
+  30 days, without what's read back from the cache. Only the figures are picked out of
   each line, never what was said, and only what's new is read. What's been added up is kept in a
   small file, so a restart doesn't read it all again, and it's deleted when Claude Code is turned off
   here. The first read of a long history takes some seconds in the background. Claude Code doesn't
@@ -910,8 +910,10 @@ they aren't here. It's read on its own, when the files change, not every couple 
 - Each limit is a bar of what's left, with a mark where an even pace would put you, red when this pace
   runs out before the reset. Once a window has ended, what's left isn't known until the next report, so
   it says that rather than showing a figure.
-- With no limit read in the last hour, its figure is Claude Code's tokens in the last 5 hours, and
-  it's red when a limit runs out before its reset at this pace.
+- A pill fills to what's left of a limit, so the pill looks are offered only with Codex on. With
+  no limit read in the last hour, the figure is Claude Code's tokens in the last 5 hours, as a number. It's red when a
+  limit runs out before its reset at this pace. With nothing to show, neither tool turned on or
+  nothing read yet, it isn't in the menu bar or the panel at all.
 - **Warn when a limit runs short**, off to start with, sends a notification at 80% used, once for each window.
 - Files are read when something in their folders changes, at most every ten seconds, and only what's new.
 

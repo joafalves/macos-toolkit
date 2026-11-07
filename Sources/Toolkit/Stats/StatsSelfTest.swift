@@ -101,7 +101,8 @@ extension StatsController {
         }
         let top = stats.apps.sorted { $0.memory > $1.memory }.prefix(3).map { "\($0.name) \(StatsController.memory($0.memory))" }
         check(!stats.apps.isEmpty, "top apps by memory: \(top.joined(separator: ", "))")
-        check(stats.segments().count == StatKind.allCases.count, "a menu bar part for each stat shown")
+        // But AI usage, which has nothing to show: a test's controller doesn't read this Mac's files.
+        check(stats.segments().count == StatKind.allCases.count - 1, "a menu bar part for each stat shown")
 
         // A change of look keeps the timer and reads nothing early; a stat
         // turned on is read at once, the others aren't.

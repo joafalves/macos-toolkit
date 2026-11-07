@@ -41,7 +41,7 @@ struct StatsSettingsView: View {
                 Card(title: "Stats", footnote: "The panel shows the stat you click, then those only in the panel. Those are read only while the panel is open, so their charts start when it opens; AI usage is read from its files whenever it isn't off.") {
                     ForEach(Array(StatKind.allCases.enumerated()), id: \.element) { index, kind in
                         if index > 0 { RowDivider() }
-                        StatRow(kind: kind, stats: stats)
+                        StatRow(kind: kind, stats: stats, ai: stats.ai)
                     }
                 }
 
@@ -56,15 +56,18 @@ struct StatsSettingsView: View {
 private struct StatRow: View {
     let kind: StatKind
     @ObservedObject var stats: StatsController
+    /// For AI usage's looks, which follow its tools.
+    @ObservedObject var ai: AIUsageController
 
     private var setting: StatSetting { stats.config.setting(kind) }
 
     var body: some View {
         SettingRow(title: .verbatim(kind.title), caption: .verbatim(kind.caption)) {
             HStack(spacing: 12) {
-                if setting.shown, stats.config.layout == .separate, kind.looks.count > 1 {
+                let looks = stats.looks(kind)
+                if setting.shown, stats.config.layout == .separate, looks.count > 1 {
                     Picker("Look", selection: Binding(get: { setting.look }, set: { look in stats.config.set(kind) { $0.look = look } })) {
-                        ForEach(kind.looks, id: \.self) { Text($0.title).tag($0) }
+                        ForEach(looks, id: \.self) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
