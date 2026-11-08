@@ -72,7 +72,8 @@ tool; keep it in step with the code.
   Back, Forward and Autoscroll are actions like the rest (Navigate and Autoscroll were switches before 0.28.0,
   migrated in `Profile.init(from:)`). Fixed and Curve give a notch a distance in points, not lines: the wheel
   tap makes the event continuous, as a trackpad's, with whole points and the lines carried
-  (`WheelEngine.setDistance`). Apps size a line their own way (10 px in one, 40 or 50 in others, and some
+  (`WheelEngine.setDistance`). Smooth scrolling (`Mouse/Glide.swift`) steps once per frame of the display
+  under the pointer, from its display link (paused between glides), never a timer, which beat against the frames. Apps size a line their own way (10 px in one, 40 or 50 in others, and some
   read only that the wheel moved), but most scroll a distance as given; don't go back to lines.
   `AIUsage` is System Stats' AI usage stat (`StatKind.ai`), owned by `StatsController` (`ai`), which sets it `active`
   while the stat isn't off; its card goes on System Stats' page. It reads only what a tool writes down itself, on a
@@ -451,6 +452,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-disk-history    # the settings window's back and forward through the made-up disk map, by ⌘[ and ⌘], in a window never shown
 .build/debug/Toolkit --test-disk-space      # the disk map of a made-up folder against what went in, then this Mac's disk scanned for real (changes nothing): time, items kept, memory, a cancel
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of; the page's tabs read their stat, and nothing once the window closes
+.build/debug/Toolkit --test-glide            # smooth scrolling against the main display's real frames: a 120 Hz timer's ticks per frame, then a notch and a spin by the old glide and the new, frame by frame (posts nothing)
 .build/debug/Toolkit --test-navigation       # what Back and Forward do with each button in each kind of app, posting nothing; settings from before 0.28.0 read into button actions and points; a notch's distance and lines as apps get them; with Accessibility (open -n the dev bundle), Finder's Back and Forward found
 .build/debug/Toolkit --test-tweaks           # every tweak read from this Mac (changes nothing of macOS's), and the preference round trip on a scratch domain
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)

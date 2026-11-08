@@ -18,24 +18,27 @@ final class WheelEngine {
     /// Everything below, the smoothing included, lives on the tap's thread.
     private var tap: EventTap?
 
-    // Smooth scrolling: distance still to be delivered, in pixels.
-    private var remainingX = 0.0
-    private var remainingY = 0.0
-    private var carryX = 0.0
-    private var carryY = 0.0
+    /// Smooth scrolling, a frame at a time of the display under the pointer.
+    /// Made with the engine, not lazily: the tap's thread and the main one both reach it.
+    private var glide: Glide!
+    /// What the display links call, holding the glide weakly; and the
+    /// watch for displays coming and going, which gives them new links.
+    private let linkTarget = Glide.LinkTarget()
+    private var screens: NSObjectProtocol?
     /// What a distance in points has left over, and the points not yet
     /// counted as a line, each way: see `setDistance`.
     private var pointsLeft = (x: 0.0, y: 0.0)
     private var linesLeft = (x: 0.0, y: 0.0)
     private var flags: CGEventFlags = []
-    private var timer: Timer?
-    private var lastTick = 0.0
-    /// The glide's time constant, from the last notch's profile.
-    private var glide = GlideSpeed.normal.timeConstant
     /// The first few events are logged to help diagnose devices that scroll oddly.
     private var loggedEvents = 0
 
     var isRunning: Bool { tap != nil }
+
+    init() {
+        glide = Glide { [weak self] x, y in self?.postGlide(x: x, y: y) }
+        linkTarget.glide = glide
+    }
 
     /// While a mouse's buttons are shown for pressing: presses over the
     /// toolkit's own windows go to them as they are, so a button with an
@@ -52,7 +55,19 @@ final class WheelEngine {
             guard let self else { return Unmanaged.passUnretained(event) }
             return self.handle(type: type, event: event)
         }
-        return tap != nil
+        guard tap != nil else { return false }
+        installLinks()
+        screens = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil,
+                                                         queue: .main) { [weak self] _ in self?.installLinks() }
+        return true
+    }
+
+    /// On the main thread, where they're made: a display link for each
+    /// display, run on the tap's thread with the rest of the glide.
+    private func installLinks() {
+        guard let tap else { return }
+        let links = Glide.makeLinks(target: linkTarget)
+        tap.perform { [glide] in glide.install(links) }
     }
 
     /// Takes the tap out, while the mouse tool is off: left in, it kept every
@@ -60,14 +75,13 @@ final class WheelEngine {
     func stop() {
         guard let tap else { return }
         self.tap = nil
+        if let screens { NotificationCenter.default.removeObserver(screens) }
+        screens = nil
         // Wound down on the tap's own thread, where the smoothing and autoscroll live.
         tap.perform { [self] in
             releaseHeld()
             autoscroller.cancel()
-            timer?.invalidate()
-            timer = nil
-            remainingX = 0
-            remainingY = 0
+            glide.install([])
             tap.stop()
         }
     }
@@ -134,14 +148,8 @@ final class WheelEngine {
         }
 
         if profile.smoothScrolling {
-            // A reversal should take effect immediately rather than fight the tail.
-            if remainingY * pointY < 0 { remainingY = 0; carryY = 0 }
-            if remainingX * pointX < 0 { remainingX = 0; carryX = 0 }
-            remainingY += pointY
-            remainingX += pointX
             flags = event.flags
-            glide = profile.glide.timeConstant
-            startAnimating()
+            glide.add(x: pointX, y: pointY, length: profile.glide.duration, at: event.location)
             return nil
         }
 
@@ -300,55 +308,15 @@ final class WheelEngine {
 
     // MARK: - Smooth scrolling
 
-    private func startAnimating() {
-        guard timer == nil else { return }
-        lastTick = CACurrentMediaTime()
-        let timer = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] _ in self?.tick() }
-        // On the tap's thread, with the rest of the smoothing.
-        RunLoop.current.add(timer, forMode: .common)
-        self.timer = timer
-    }
-
-    private func tick() {
-        let now = CACurrentMediaTime()
-        let dt = min(now - lastTick, 0.05)
-        lastTick = now
-
-        // Exponential ease-out: each frame delivers a fixed share of what is left.
-        let share = 1 - exp(-dt / glide)
-        let stepY = Self.take(&remainingY, &carryY, share)
-        let stepX = Self.take(&remainingX, &carryX, share)
-
-        if stepX != 0 || stepY != 0,
-           let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: stepY, wheel2: stepX, wheel3: 0) {
-            // Made again with the lines carried from one frame to the next:
-            // as macOS makes it, each frame says a line, and an app that
-            // counts lines went one a frame.
-            setDistance(event, x: Double(stepX), y: Double(stepY))
-            event.setIntegerValueField(.eventSourceUserData, value: Self.marker)
-            event.flags = flags
-            event.post(tap: .cgSessionEventTap)
-        }
-        if remainingX == 0, remainingY == 0 {
-            timer?.invalidate()
-            timer = nil
-        }
-    }
-
-    /// Removes this frame's whole-pixel step from `remaining`, keeping the
-    /// fractional part in `carry` so no distance is lost to rounding.
-    private static func take(_ remaining: inout Double, _ carry: inout Double, _ share: Double) -> Int32 {
-        guard remaining != 0 else { return 0 }
-        var move = remaining * share
-        if abs(remaining) < 0.5 { move = remaining }
-        remaining -= move
-        carry += move
-        let whole = carry.rounded(.towardZero)
-        carry -= whole
-        if abs(remaining) < 0.01 {
-            remaining = 0
-            carry = 0
-        }
-        return Int32(whole)
+    /// A frame's step of the glide, as a distance in points like a notch's.
+    private func postGlide(x: Int32, y: Int32) {
+        guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: y, wheel2: x, wheel3: 0) else { return }
+        // Made again with the lines carried from one frame to the next: as
+        // macOS makes it, each frame says a line, and an app that counts
+        // lines went one a frame.
+        setDistance(event, x: Double(x), y: Double(y))
+        event.setIntegerValueField(.eventSourceUserData, value: Self.marker)
+        event.flags = flags
+        event.post(tap: .cgSessionEventTap)
     }
 }

@@ -49,9 +49,9 @@ enum ScrollMode: String, Codable, CaseIterable {
 enum GlideSpeed: String, Codable, CaseIterable {
     case normal, fast
 
-    /// The glide's time constant, in seconds: each frame takes the share of
-    /// what's left that this gives (`WheelEngine.tick`).
-    var timeConstant: Double { self == .fast ? 0.035 : 0.07 }
+    /// How long a notch's glide lasts, in seconds (`Glide`). Fast is half as
+    /// quick again: twice was too quick.
+    var duration: Double { self == .fast ? 0.22 / 1.5 : 0.22 }
 }
 
 /// The graph's shape, for `ScrollMode.curve`.

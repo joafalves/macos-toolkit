@@ -892,9 +892,6 @@
 /* Sources/Toolkit/Mouse/MouseSettingsView.swift:569 */
 "Each notch glides instead of jumping, as far as it would jump." = "Cada passo desliza em vez de saltar, tão longe quanto saltaria.";
 
-/* Sources/Toolkit/App/SettingsIndex.swift:46 */
-"Each notch glides instead of jumping." = "Cada passo desliza em vez de saltar.";
-
 /* Sources/Toolkit/App/SettingsIndex.swift:99 */
 "Each output keeps its own equalizer, so headphones and speakers can sound different. Off, one equalizer for all of them." = "Cada saída guarda o seu equalizador, para que os auscultadores e as colunas possam soar de forma diferente. Desativado, há um equalizador para todas.";
 

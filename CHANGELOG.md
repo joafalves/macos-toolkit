@@ -9,7 +9,7 @@ worked on; it gets its date when it's released.
 
 - **Mouse:** a mouse's page is in three tabs, Pointer, Scrolling and Buttons, with Rename, Copy, Reset and
   Forget in its **…** menu.
-- **Mouse:** Smooth scrolling has a Glide speed, Normal or Fast, which stops in half the time.
+- **Mouse:** Smooth scrolling has a Glide speed, Normal or Fast, half as quick again.
 - **Mouse:** Buttons lists every button of the mouse with its action, Default until you pick one. Press a
   button while the tab is open to light up its row; one that isn't listed is added.
 
@@ -27,6 +27,9 @@ worked on; it gets its date when it's released.
 ### Fixed
 
 - **Mouse:** with Smooth scrolling, apps that count lines no longer scroll one for every step of the glide.
+- **Mouse:** Smooth scrolling glides in step with the display, a step each frame, where a timer of its own
+  left some frames with two steps and some with none; each glide ends cleanly rather than creeping a point
+  at a time, and a notch during a glide carries on at its speed.
 
 ## 0.27.0 (2026-11-08)
 

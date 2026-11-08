@@ -608,7 +608,7 @@ soon as the mouse is connected again.
 | Pointer speed | macOS / a multiplier (Use macOS's puts it back) | `HIDPointerResolution` on the device's HID service |
 | Pointer acceleration | macOS / off / custom (0–3) | `HIDMouseAcceleration` on the device's HID service |
 | Scroll distance | macOS (its own, scaled) / fixed (points a notch) / curve (a notch one distance, fast spins further, along a graph you drag) | scroll event tap; fixed and curve also switch `HIDMouseScrollAcceleration` off on the device, so a slow notch isn't shrunk to a point |
-| Smooth scrolling | on / off, with a glide that's normal or fast (stops in half the time) | scroll event tap |
+| Smooth scrolling | on / off, with a glide that's normal or fast (half as quick again) | scroll event tap |
 | Reverse vertical or horizontal scrolling | on / off | scroll event tap |
 | A button's action | Default, nothing, back, forward, autoscroll (the wheel button), Floating Dock, Mission Control, Show Desktop, a keyboard shortcut, open an app | event tap; for the buttons a mouse keeps to itself, its HID++ channel |
 
