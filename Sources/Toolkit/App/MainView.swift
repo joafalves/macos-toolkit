@@ -126,10 +126,16 @@ struct MainView: View {
     /// For `--snapshot … search=<words>`: the window as that search shows it.
     static var previewSearch = ""
 
-    /// What's shown: the section, and on Mouse the mouse whose page is open.
-    private var place: Place {
+    /// What's shown: the section, on Mouse the mouse whose page is open, and
+    /// the disk map's folder.
+    private var place: Place { place(disk: stats.space.current) }
+
+    /// With the map at `folder`: told it as it changes, before it's stored.
+    private func place(disk folder: SpaceItem?) -> Place {
         let section = model.section ?? .welcome
-        return Place(section: section, mouse: section == .mouse ? mouse.openID : nil)
+        let inMap = section == .stats && stats.tab == .stat(.disk) && folder?.parent != nil
+        return Place(section: section, mouse: section == .mouse ? mouse.openID : nil,
+                     disk: inMap ? folder.map(DiskSpace.names) : nil)
     }
 
     /// The section's name, beside back and forward; on a mouse's page, what
@@ -162,6 +168,11 @@ struct MainView: View {
             swipes.start(back: goBack, forward: goForward)
         }
         .onDisappear { swipes.stop() }
+        // The map's folders are steps too. The page isn't drawn again when
+        // one opens, so it's heard from the map itself.
+        .onReceive(stats.space.$current.dropFirst()) { folder in
+            navigator.moved(to: place(disk: folder))
+        }
         .onChange(of: place) { _, place in
             navigator.moved(to: place)
             // Each page shows them as they are now: macOS says nothing when
@@ -397,6 +408,15 @@ struct MainView: View {
     /// The mouse first: the Mouse page shows whichever is open as it appears.
     private func go(to place: Place) {
         mouse.openID = place.mouse
+        // The tab first, so the folder opens as a step that's already there.
+        if place.section == .stats {
+            if let disk = place.disk {
+                stats.tab = .stat(.disk)
+                stats.space.open(disk)
+            } else if stats.tab == .stat(.disk) {
+                stats.space.open([])
+            }
+        }
         model.section = place.section
     }
 }

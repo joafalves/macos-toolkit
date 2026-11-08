@@ -878,7 +878,17 @@ stat, even one that's off, and reads it only while the tab is open.
   seconds: per core, as Activity Monitor counts them (100% is one core), or, with **Top apps' CPU of
   the whole CPU**, as a share of every core.
 - **Network** shows upload and download speed on the connection in use, **disk** the free space
-  and how fast it's read and written, and **GPU** how busy it is.
+  and how fast it's read and written, and **GPU** how busy it is. Disk's panel also shows how much
+  of the free space is purgeable (caches and local snapshots macOS clears by itself when it needs
+  room), the other disks connected, each with its free space, and the apps reading and writing the most.
+- **What Takes Space**, on the Disk tab in the settings, shows the startup disk's folders as blocks
+  sized by the space they take, with the largest listed below; click one to go into it (back and
+  forward in the toolbar retrace the way), and right-click for Show in Finder. It's only made when you press **Scan**, in the background (about
+  half a minute for two million files), changes nothing, and keeps only what's large enough to
+  show: the rest of each folder is one Smaller items block. What it couldn't count, macOS itself, local
+  snapshots and folders it isn't allowed to read, is System and other. Without Full Disk Access some
+  folders, such as Mail's and Messages', can't be read; it says how many, with a link to allow it.
+  Files kept in iCloud and not downloaded take no space here and aren't downloaded by the scan.
 - **Power** shows what the Mac draws, from the battery's own readings, and in its panel the GPU's
   share, the charger, and the battery's charge, health and cycles. Some Macs only tell an admin
   what the CPU draws; there that line is left out. Desktops have no battery readings and show what

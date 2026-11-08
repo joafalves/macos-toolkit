@@ -203,6 +203,21 @@ struct StatSection: View {
             ShareBar(share: disk.usedShare, color: .purple)
                 .padding(.top, 4)
             Row("Used", String(localized: "\(StatsController.bytes(disk.total - disk.free)) of \(StatsController.bytes(disk.total))"))
+            if disk.purgeable > 0 { Row("Purgeable", StatsController.bytes(disk.purgeable)) }
+            ForEach(disk.volumes) { volume in
+                VStack(alignment: .leading, spacing: 4) {
+                    Row(.verbatim(volume.name), String(localized: "\(StatsController.bytes(volume.free)) free of \(StatsController.bytes(volume.total))"))
+                    ShareBar(share: volume.usedShare, color: .purple.opacity(0.6))
+                }
+                .padding(.top, 4)
+            }
+            // The apps reading and writing, read and written together.
+            if live.cpuOfAppsKnown {
+                TopList(apps: stats.apps.filter { $0.disk > 0 }.sorted { $0.disk > $1.disk }.prefix(topApps).map { ($0, StatsController.speed($0.disk)) },
+                        scale: String(localized: "Read and written"), count: topApps)
+            } else {
+                TopList(apps: [], measuring: true, scale: String(localized: "Read and written"), count: topApps)
+            }
         }
     }
 

@@ -84,9 +84,12 @@ private struct StatTab: View {
     @StateObject private var watch = PageWatch()
 
     var body: some View {
-        Card(footnote: footnote) {
-            StatSection(stats: stats, kind: kind, wide: true)
-                .padding(14)
+        VStack(alignment: .leading, spacing: 22) {
+            Card(footnote: footnote) {
+                StatSection(stats: stats, kind: kind, wide: true)
+                    .padding(14)
+            }
+            if kind == .disk { DiskMapCard(space: stats.space) }
         }
         .onAppear { watch.start(stats, kind) }
         .onDisappear { watch.end() }

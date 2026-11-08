@@ -1,11 +1,14 @@
 import AppKit
 import SwiftUI
 
-/// Where the settings window is: a section, and on Mouse, the mouse whose
-/// page is open.
+/// Where the settings window is: a section, on Mouse the mouse whose page
+/// is open, and on System Stats' Disk tab the folder its map is open at.
 struct Place: Equatable {
     var section: AppSection
     var mouse: String?
+    /// The map's folder by its names from the disk down, so a step still
+    /// leads there after the disk is scanned again; nil at the disk itself.
+    var disk: [String]?
 }
 
 /// The window's history, as System Settings keeps it: every place shown,

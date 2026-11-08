@@ -62,10 +62,26 @@ struct NetworkReading: Equatable {
 
 struct DiskReading: Equatable {
     var total: Int64
+    /// As Finder counts it: with what macOS can clear by itself.
     var free: Int64
+    /// Of `free`, what macOS clears by itself when it needs room: caches,
+    /// local Time Machine snapshots.
+    var purgeable: Int64 = 0
     /// Bytes a second, across disks; nil until there's a previous read.
     var read: Double?
     var write: Double?
+    /// The other disks mounted: external drives, a second internal one.
+    var volumes: [VolumeSpace] = []
+
+    var usedShare: Double { total > 0 ? Double(total - free) / Double(total) : 0 }
+}
+
+struct VolumeSpace: Equatable, Identifiable {
+    /// Where it's mounted.
+    var id: String
+    var name: String
+    var total: Int64
+    var free: Int64
 
     var usedShare: Double { total > 0 ? Double(total - free) / Double(total) : 0 }
 }
@@ -270,7 +286,7 @@ enum StatsReadings {
 
     final class Disk {
         private var last: (read: UInt64, write: UInt64, disks: Int, time: TimeInterval)?
-        private var space: (total: Int64, free: Int64, time: TimeInterval)?
+        private var space: (total: Int64, free: Int64, purgeable: Int64, volumes: [VolumeSpace], time: TimeInterval)?
 
         func read() -> DiskReading? {
             let now = ProcessInfo.processInfo.systemUptime
@@ -278,13 +294,16 @@ enum StatsReadings {
             // to work out, and slow to change, so every half minute.
             if space.map({ now - $0.time > 30 }) ?? true {
                 let root = URL(fileURLWithPath: "/")
-                if let values = try? root.resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]),
+                if let values = try? root.resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey,
+                                                                   .volumeAvailableCapacityKey]),
                    let total = values.volumeTotalCapacity, let free = values.volumeAvailableCapacityForImportantUsage {
-                    space = (Int64(total), free, now)
+                    // What's free now, without clearing anything, is the rest.
+                    let purgeable = values.volumeAvailableCapacity.map { max(0, free - Int64($0)) } ?? 0
+                    space = (Int64(total), free, purgeable, Self.volumes(), now)
                 }
             }
             guard let space else { return nil }
-            var reading = DiskReading(total: space.total, free: space.free)
+            var reading = DiskReading(total: space.total, free: space.free, purgeable: space.purgeable, volumes: space.volumes)
             if let bytes = Self.transferred() {
                 // The same disks, and counters that only went up: a disk that
                 // comes or goes changes the sums by all it has ever moved,
@@ -296,6 +315,32 @@ enum StatsReadings {
                 last = (bytes.read, bytes.write, bytes.disks, now)
             }
             return reading
+        }
+
+        /// The disks mounted in /Volumes that can be written to, as Finder
+        /// shows them: not a disk image or an installer, which are read-only,
+        /// and not a network one, whose server might not answer.
+        static func volumes() -> [VolumeSpace] {
+            let room = Int(getfsstat(nil, 0, MNT_NOWAIT)) + 4
+            guard room > 4 else { return [] }
+            // From what's known already: asking each disk afresh could wait on one.
+            let mounts = Array<statfs>(unsafeUninitializedCapacity: room) { buffer, filled in
+                filled = Int(max(0, getfsstat(buffer.baseAddress, Int32(room * MemoryLayout<statfs>.stride), MNT_NOWAIT)))
+            }
+            return mounts.compactMap { mount -> VolumeSpace? in
+                var mount = mount
+                let flags = Int32(bitPattern: mount.f_flags)
+                guard flags & MNT_LOCAL != 0, flags & MNT_RDONLY == 0, flags & MNT_DONTBROWSE == 0 else { return nil }
+                let path = withUnsafePointer(to: &mount.f_mntonname) { $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) } }
+                guard path.hasPrefix("/Volumes/") else { return nil }
+                let url = URL(fileURLWithPath: path)
+                let values = try? url.resourceValues(forKeys: [.volumeLocalizedNameKey, .volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey])
+                let block = Int64(mount.f_bsize)
+                let total = values?.volumeTotalCapacity.map(Int64.init) ?? Int64(mount.f_blocks) * block
+                let free = values?.volumeAvailableCapacityForImportantUsage ?? Int64(mount.f_bavail) * block
+                return VolumeSpace(id: path, name: values?.volumeLocalizedName ?? url.lastPathComponent, total: total, free: free)
+            }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
 
         /// Bytes read and written since startup, across every disk's driver,

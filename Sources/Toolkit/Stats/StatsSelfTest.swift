@@ -76,6 +76,9 @@ extension StatsController {
         } else { print("      network: nothing read (no primary interface?)") }
         if let disk = stats.disk {
             check(disk.free > 0 && disk.free < disk.total && disk.read != nil, "disk: \(bytes(disk.free)) free of \(bytes(disk.total)), read \(disk.read.map(speed) ?? "?"), write \(disk.write.map(speed) ?? "?")")
+            check(disk.purgeable >= 0 && disk.purgeable <= disk.free, "disk: \(bytes(disk.purgeable)) of the free space purgeable")
+            // How many, not their names: those are this Mac's.
+            check(disk.volumes.allSatisfy { $0.total > 0 && $0.free <= $0.total }, "disk: \(disk.volumes.count) other volumes")
         } else { check(false, "disk read") }
         if let gpu = stats.gpu { check((0...1).contains(gpu), String(format: "gpu %.0f%%", gpu * 100)) } else { print("      gpu: not reported") }
         if let power = stats.power {

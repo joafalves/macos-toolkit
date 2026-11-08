@@ -136,6 +136,7 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
     // `stats cpu`, `stats memory`, …: that stat's tab of the System Stats page.
     StatsController.previewTab = rest.compactMap(StatKind.init).first
+    DiskSpace.previewInside = rest.contains("inside")
     Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"),
                    noAccess: rest.contains("no-access"), tall: rest.contains("tall"))
     exit(0)
@@ -496,6 +497,16 @@ if let flag = CommandLine.arguments.firstIndex(of: "--measure-ai-usage") {
 }
 if CommandLine.arguments.contains("--list-ai-usage") {
     AIUsageSelfTest.list()
+}
+// Development aid: back and forward through the disk map, in a window never shown.
+if CommandLine.arguments.contains("--test-disk-history") {
+    DiskSpace.historyTest()
+    exit(0)
+}
+// Development aid: the disk map of a made-up folder, then this Mac's disk read for real.
+if CommandLine.arguments.contains("--test-disk-space") {
+    DiskSpace.selfTest()
+    exit(0)
 }
 if CommandLine.arguments.contains("--test-stats-panels") {
     StatsController.panelTest()

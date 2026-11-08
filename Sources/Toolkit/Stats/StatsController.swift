@@ -24,6 +24,9 @@ final class StatsController: ObservableObject {
     /// this timer, and only while the stat is in the menu bar or the panel.
     private(set) var ai = AIUsageController()
 
+    /// What takes space on the startup disk, scanned only when asked for on the Disk tab.
+    private(set) var space = DiskSpace()
+
     var cpu: CPUReading? { live.cpu }
     var memory: MemoryReading? { live.memory }
     var network: NetworkReading? { live.network }
@@ -109,6 +112,7 @@ final class StatsController: ObservableObject {
         if shown == nil { config.set(.ai) { $0.place = .panel } }
         stats.config = config
         stats.ai = AIUsageController.preview()
+        stats.space = DiskSpace.preview()
         let gb: UInt64 = 1 << 30
         stats.live.cpu = CPUReading(total: 0.23, user: 0.15, system: 0.08,
                                cores: [0.42, 0.31, 0.18, 0.12, 0.08, 0.05, 0.36, 0.22, 0.14, 0.09],
@@ -116,7 +120,9 @@ final class StatsController: ObservableObject {
         stats.live.memory = MemoryReading(total: 16 * gb, app: 6 * gb, wired: 2 * gb, compressed: gb + gb / 2, cached: 4 * gb, free: 2 * gb + gb / 2,
                                      swapUsed: gb / 4, pressure: .normal)
         stats.live.network = NetworkReading(up: 48_000, down: 1_240_000, interface: "en0", address: "192.168.1.20")
-        stats.live.disk = DiskReading(total: 994_000_000_000, free: 312_000_000_000, read: 2_400_000, write: 860_000)
+        stats.live.disk = DiskReading(total: 994_000_000_000, free: 312_000_000_000, purgeable: 18_400_000_000, read: 2_400_000, write: 860_000,
+                                      volumes: [VolumeSpace(id: "/Volumes/Backup", name: "Backup", total: 2_000_000_000_000, free: 640_000_000_000),
+                                                VolumeSpace(id: "/Volumes/USB Drive", name: "USB Drive", total: 64_000_000_000, free: 51_000_000_000)])
         stats.live.gpu = 0.18
         stats.live.power = PowerReading(system: 7.4, cpu: 2.1, gpu: 0.9, charger: nil, charging: false, battery: 82, health: 96, cycles: 143)
         func wave(_ count: Int, _ base: Double, _ swing: Double, _ seed: Double) -> [Double] {
@@ -135,12 +141,12 @@ final class StatsController: ObservableObject {
         }
         stats.live.cpuOfAppsKnown = true
         stats.live.apps = [
-            AppUsage(id: 1, name: "Safari", icon: icon("Safari"), cpu: 0.31, memory: 2 * gb),
-            AppUsage(id: 2, name: "Mail", icon: icon("mail"), cpu: 0.06, memory: gb / 2),
-            AppUsage(id: 3, name: "Music", icon: icon("Music"), cpu: 0.12, memory: gb / 3),
-            AppUsage(id: 4, name: "Notes", icon: icon("Notes"), cpu: 0.02, memory: gb / 5),
+            AppUsage(id: 1, name: "Safari", icon: icon("Safari"), cpu: 0.31, memory: 2 * gb, diskRead: 420_000, diskWrite: 180_000),
+            AppUsage(id: 2, name: "Mail", icon: icon("mail"), cpu: 0.06, memory: gb / 2, diskRead: 96_000, diskWrite: 310_000),
+            AppUsage(id: 3, name: "Music", icon: icon("Music"), cpu: 0.12, memory: gb / 3, diskRead: 1_100_000, diskWrite: 0),
+            AppUsage(id: 4, name: "Notes", icon: icon("Notes"), cpu: 0.02, memory: gb / 5, diskRead: 0, diskWrite: 12_000),
             AppUsage(id: 5, name: "Calendar", icon: icon("iCal"), cpu: 0.01, memory: gb / 6),
-            AppUsage(id: 6, name: "Photos", icon: icon("Photos"), cpu: 0.08, memory: gb),
+            AppUsage(id: 6, name: "Photos", icon: icon("Photos"), cpu: 0.08, memory: gb, diskRead: 640_000, diskWrite: 210_000),
         ]
         return stats
     }
@@ -150,6 +156,7 @@ final class StatsController: ObservableObject {
         timer = nil
         wasReading = []
         ai.stop()
+        space.cancel()
     }
 
     /// What's being read now.
@@ -166,6 +173,7 @@ final class StatsController: ObservableObject {
     func apply() {
         guard !isPreview else { return }
         ai.active = aiActive
+        if !config.enabled, space.current != nil || space.isScanning { space.clear() }
         // Read by its own reader: nothing for the timer to do.
         let reading = self.reading.subtracting([.ai])
         if !reading.contains(.cpu) { cpuReader = nil; live.cpu = nil }
@@ -197,7 +205,7 @@ final class StatsController: ObservableObject {
             energy = nil
         }
         var newApps = false
-        if config.enabled, open.contains(.cpu) || open.contains(.memory) {
+        if config.enabled, !open.isDisjoint(with: [.cpu, .memory, .disk]) {
             newApps = topApps == nil
             topApps = topApps ?? TopApps()
         } else {

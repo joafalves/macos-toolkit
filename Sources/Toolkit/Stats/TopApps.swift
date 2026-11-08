@@ -9,9 +9,14 @@ struct AppUsage: Identifiable, Equatable {
     /// Of one core, as Activity Monitor counts it: 2 is two cores' worth.
     var cpu: Double
     var memory: UInt64
+    /// Bytes a second read from and written to disk, over the same seconds as the CPU.
+    var diskRead: Double = 0
+    var diskWrite: Double = 0
+
+    var disk: Double { diskRead + diskWrite }
 
     static func == (a: AppUsage, b: AppUsage) -> Bool {
-        a.id == b.id && a.name == b.name && a.cpu == b.cpu && a.memory == b.memory
+        a.id == b.id && a.name == b.name && a.cpu == b.cpu && a.memory == b.memory && a.diskRead == b.diskRead && a.diskWrite == b.diskWrite
     }
 }
 
@@ -20,10 +25,22 @@ struct AppUsage: Identifiable, Equatable {
 /// does, so a browser's helpers add up to the browser. Other users' processes
 /// (macOS's own daemons) can't be read without root and aren't listed.
 final class TopApps {
-    /// Each process's CPU time at each read of the last few seconds: CPU is
-    /// told from the oldest, an average like Activity Monitor's, so one
-    /// spike doesn't put an app on top for a reading.
-    private var snapshots: [(at: TimeInterval, times: [pid_t: UInt64])] = []
+    /// Each process's CPU time and bytes moved at each read of the last few
+    /// seconds: both are told from the oldest, an average like Activity
+    /// Monitor's, so one spike doesn't put an app on top for a reading.
+    private var snapshots: [(at: TimeInterval, times: [pid_t: Counters])] = []
+
+    private struct Counters {
+        var time: UInt64
+        var read: UInt64
+        var written: UInt64
+
+        init(_ usage: rusage_info_v2) {
+            time = usage.ri_user_time + usage.ri_system_time
+            read = usage.ri_diskio_bytesread
+            written = usage.ri_diskio_byteswritten
+        }
+    }
     private static let window: TimeInterval = 5
     /// Less than this behind it and there's no CPU to tell yet: over a
     /// moment, any spike reads as a lot.
@@ -50,9 +67,9 @@ final class TopApps {
 
     /// Starts counting afresh from now, as the panel opens.
     func restart() {
-        var times: [pid_t: UInt64] = [:]
+        var times: [pid_t: Counters] = [:]
         for pid in Self.pids() {
-            if let usage = Self.usage(pid) { times[pid] = usage.ri_user_time + usage.ri_system_time }
+            if let usage = Self.usage(pid) { times[pid] = Counters(usage) }
         }
         let now = ProcessInfo.processInfo.systemUptime
         snapshots = [(now, times)]
@@ -72,16 +89,20 @@ final class TopApps {
         // The toolkit's own, from the first reading after the panel settled; none till then.
         let ownAnchor = snapshots.first { $0.at >= settledAt }
         let ownSeconds = ownAnchor.map { now - $0.at } ?? 0
-        var times: [pid_t: UInt64] = [:]
+        var times: [pid_t: Counters] = [:]
         var byOwner: [pid_t: AppUsage] = [:]
         for pid in Self.pids() {
             guard let usage = Self.usage(pid) else { continue }
-            let time = usage.ri_user_time + usage.ri_system_time
-            times[pid] = time
-            // Less than before: the number went to a new process since.
+            let counters = Counters(usage)
+            times[pid] = counters
             let (from, span) = pid == Self.own ? (ownAnchor, ownSeconds) : (anchor, seconds)
-            let cpu = cpuKnown && span >= Self.shortest
-                ? from?.times[pid].map { time >= $0 ? Double(time - $0) * Self.timebase / 1e9 / span : 0 } ?? 0 : 0
+            let before = cpuKnown && span >= Self.shortest ? from?.times[pid] : nil
+            // Less than before: the number went to a new process since.
+            func rate(_ value: KeyPath<Counters, UInt64>, _ scale: Double) -> Double {
+                guard let before, counters[keyPath: value] >= before[keyPath: value] else { return 0 }
+                return Double(counters[keyPath: value] - before[keyPath: value]) * scale / span
+            }
+            let cpu = rate(\.time, Self.timebase / 1e9)
             let owner = AudioProcesses.responsiblePID(of: pid) ?? pid
             var entry = byOwner[owner] ?? described[owner] ?? {
                 let entry = Self.describe(owner)
@@ -90,6 +111,8 @@ final class TopApps {
             }()
             entry.cpu += max(0, cpu)
             entry.memory += usage.ri_phys_footprint
+            entry.diskRead += rate(\.read, 1)
+            entry.diskWrite += rate(\.written, 1)
             byOwner[owner] = entry
         }
         if counting { snapshots.append((now, times)) }

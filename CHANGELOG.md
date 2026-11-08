@@ -10,6 +10,10 @@ worked on; it gets its date when it's released.
 - **System Stats:** a tab for each stat on its page in the settings, beside the settings: the panel's chart
   and details, with more room and the top ten apps. It works for a stat that isn't in the menu bar, or is
   off, which is read only while its tab is open.
+- **System Stats:** What Takes Space, on the Disk tab: the startup disk's folders as blocks by size, to go
+  into one by one (back and forward retrace them), made only when you press Scan.
+- **System Stats:** the disk panel shows purgeable space, the other disks connected, and the apps reading
+  and writing the most.
 - **Floating Dock:** a new tool: your apps in a ring that opens at the pointer, beside the macOS Dock and
   without touching it. Its key is the right ⌘, a shortcut or a mouse button given it on the Mouse page,
   and it opens one of two ways: Toggle, as the key goes up, staying open for a click, an app's letter or
