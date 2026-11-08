@@ -8,10 +8,12 @@ worked on; it gets its date when it's released.
 ### Added
 
 - **Floating Dock:** a new tool: your apps in a ring that opens at the pointer, beside the macOS Dock and
-  without touching it. Hold the right ⌘ (or a shortcut, or a mouse button given it on the Mouse page),
-  point at an app and let go to bring it forward; carry on past the ring for one of its windows, which
-  follow the ring beyond the app, or hold ⌥ as you let go (or right-click it) for a new one. The right ⌘
-  and an app's letter bring it forward at once, without the ring. A tap leaves it open for a click, an app's letter or Tab to search every app.
+  without touching it. Its key is the right ⌘, a shortcut or a mouse button given it on the Mouse page,
+  and it opens one of two ways: Toggle, as the key goes up, staying open for a click, an app's letter or
+  Tab to search every app; or Press, the moment the key goes down, for as long as it's held, to point at an
+  app and let go. Carry on past the ring for one of its windows, which follow the ring beyond the app, or
+  hold ⌥ as you pick (or right-click it) for a new one. With Toggle, the right ⌘ and an app's letter bring
+  it forward at once, without the ring.
 - **Floating Dock:** apps from the Dock, in its order with Finder first, or a list of your own with folders, which open as
   a ring of their own. Ten places by default, six to twelve; what doesn't fit goes in the last place, as a
   folder, or on a layer of its own. The scroll wheel switches to the apps that are open but not on the ring.

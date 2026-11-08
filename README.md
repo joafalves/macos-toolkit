@@ -766,20 +766,25 @@ quits or the tool is turned off.
 </p>
 
 Your apps in a ring that opens where the pointer is, alongside the macOS Dock, which it leaves alone and
-reserves no room for. Hold the **right ⌘** on its own (or a shortcut set on the page, or a mouse button
-given the Floating Dock on the Mouse page), point at an app and let go to bring it forward. The pick goes
-by direction: a short flick is enough, and a quick one never even shows the ring.
+reserves no room for. Its key is the **right ⌘** on its own or a shortcut set on the page, or a mouse
+button given the Floating Dock on the Mouse page, and how it opens is chosen on the page:
+
+- **Toggle**, to start with: the ring opens as you let go of the key, with each app's letter on its icon,
+  and stays open for a click, a letter or ⇥. The key again closes it.
+- **Press**: the ring opens the moment the key goes down, with nothing to wait for, and stays while you
+  hold it. Point at an app and let go to bring it forward; the pick goes by direction, so a short flick
+  is enough.
 
 Carry on past the ring and the app's windows follow the ring just beyond it, the most recent in the
-app's direction and the others either side; let go on one to bring it forward. With more than three
+app's direction and the others either side; let go on one, or click it, to bring it forward. With more than three
 windows, a card at the start shows them all, as App Exposé does. For a new window, hold **⌥** as you let
-go on the app, or right-click it, as the Dock's own menu offers: the app comes forward and is asked for
+go on the app or click it, or right-click it, as the Dock's own menu offers: the app comes forward and is asked for
 another, through its own menu item with ⌘N. Window pictures need **Screen Recording**, as in the Window Switcher; without it
 the cards show the app's icon and the window's title. Back in the centre, letting go cancels.
 
 | While it's open | |
 | --- | --- |
-| point, let go | Bring the app forward, or its most recent window |
+| point, let go (or click) | Bring the app forward, or its most recent window |
 | further out | One of its windows; into a folder, which opens as a ring of its own |
 | ⌥ as you let go, or right-click | A new window of the app (⌥ and a letter: of the app with that letter) |
 | the centre | Back out of a folder; let go there to cancel |
@@ -788,10 +793,10 @@ the cards show the app's icon and the window's title. Back in the centre, lettin
 | ⇥ | Search every app on the Mac by name; ↩ opens the one selected |
 | esc | Close |
 
-A tap of the trigger, without moving, leaves the ring open for a click, a letter or ⇥, and only then
-are the letters shown on the icons. With the right ⌘ as the trigger, the right ⌘ and an app's letter
-bring that app forward at once, without the ring (with ⌥ too, a new window of it); any other key with
-the right ⌘ is a ⌘ shortcut as ever. It can be turned off on the page. The apps come from the Dock, in its order (read each time it
+With the right ⌘ and Toggle, the right ⌘ and an app's letter bring that app forward at once, without the
+ring (with ⌥ too, a new window of it); any other key with the right ⌘ is a ⌘ shortcut as ever. It can be
+turned off on the page. With Press the ring is already open, and the letter picks from it the same way;
+any other key closes it and goes to the app as a ⌘ shortcut. The apps come from the Dock, in its order (read each time it
 opens), or from **My own list**, which can have folders and starts from the Dock with **Copy from the
 Dock**. The ring has ten places by default, six to twelve; what doesn't fit goes in the last place, as
 a folder, or on a layer of its own.
@@ -800,8 +805,8 @@ While the ring is open your pointer stays where it was, hidden and held still, a
 pointer of its own, moved by the mouse, that starts at its centre. Near an edge or a corner the ring
 moves in to fit and the gesture is still the same; its pointer never stops at the edge of the screen;
 the apps below see no movement, so nothing there lights up or changes the pointer; and when it closes
-your pointer is where you left it. It needs **Accessibility** for its key and to follow the mouse. The
-right ⌘ with another key, a click or the wheel is still a ⌘ shortcut, as ever.
+your pointer is where you left it. It needs **Accessibility** for its key and to follow the mouse. With
+Toggle, the right ⌘ with another key, a click or the wheel is still a ⌘ shortcut, as ever.
 
 ## Keep Awake
 

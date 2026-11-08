@@ -79,8 +79,10 @@ tool; keep it in step with the code.
   reading (`ClaudeTranscripts`) picks the figures out of each line's bytes (`TranscriptLine`) into a buffer from
   `ReadPages`: decoding lines whole took 280 MB on a first read, and malloc kept the large blocks it freed. A
   response's lines are counted once, at its last figure.
-- The Floating Dock (`Sources/Toolkit/Dock`): a ring of apps at the pointer, held open by the right ⌘, a
-  shortcut or a mouse button with its action, and picked by direction. One event tap for its keys, clicks,
+- The Floating Dock (`Sources/Toolkit/Dock`): a ring of apps at the pointer, opened by the right ⌘, a
+  shortcut or a mouse button with its action, and picked by direction. `DockOpening`: `.toggle` opens as
+  the key goes up (the right ⌘ held waits for a letter or a ⌘ shortcut, never shows the ring), `.press`
+  the moment it goes down, held open until it's let go. One event tap for its keys, clicks,
   wheel and moves. While it's open the real pointer is held still and hidden (`CGAssociateMouseAndMouseCursorPosition(0)`,
   `CGDisplayHideCursor` with `SetsCursorInBackground`) and the ring draws its own, moved by each event's deltas,
   which the tap then swallows, so apps below see no hover. Both are undone on close and belong to the process's

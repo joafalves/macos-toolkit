@@ -45,7 +45,7 @@ final class FloatingDockController: ObservableObject {
         var searching = false
         var trigger = DockTrigger.rightCommand
         var shortcut = Shortcut.none
-        /// The right ⌘ went down alone and no key has followed yet.
+        /// The right ⌘ went down alone and nothing has followed yet: let go, it's a tap.
         var commandPending: UInt64?
         /// The key that holds it open, while it does.
         var heldBy: Held = .none
@@ -58,6 +58,15 @@ final class FloatingDockController: ObservableObject {
         var quickLetters: Set<String> = []
         /// A letter taken with the right ⌘: its key going up is ours too.
         var swallowUp: Int?
+        /// The right ⌘ was down at the last change of modifiers. Only its going down
+        /// counts: macOS sends a change with the same keys to an app that comes forward,
+        /// which the ⌘ still held from a quick switch would take for a press.
+        var rightDown = false
+        var opening = DockOpening.toggle
+        /// Every app's letter on the ring, for keys typed with the right ⌘ held in `.press`.
+        var ringLetters: Set<String> = []
+        /// The shortcut is down, to toggle the ring as it goes up.
+        var shortcutDown: Int?
     }
     enum Held { case none, rightCommand, shortcut, mouse }
     private let state = Locked(TapState())
@@ -73,7 +82,6 @@ final class FloatingDockController: ObservableObject {
     private var center = CGPoint.zero
     /// The pointer left the centre once since this ring showed: coming back is "back".
     private var leftHub = false
-    private var revealWork: DispatchWorkItem?
     private var layers: [DockRing] = []
     private var folders: [DockRing] = []
     private var letters: [String: DockApp] = [:]
@@ -130,6 +138,7 @@ final class FloatingDockController: ObservableObject {
         state.update {
             $0.trigger = config.trigger
             $0.shortcut = config.shortcut
+            $0.opening = config.opening
         }
         guard config.enabled else { return stop() }
         WindowCatalog.shared.use(self, true)
@@ -144,16 +153,20 @@ final class FloatingDockController: ObservableObject {
         let chosen = DockRings.letters(for: pinnedApps, chosen: config.letters)
         letters = Dictionary(pinnedApps.compactMap { app in chosen[app.path].map { ($0, app) } }, uniquingKeysWith: { first, _ in first })
         let keys = config.quickLetters && config.trigger == .rightCommand ? Set(letters.keys) : []
-        state.update { $0.quickLetters = keys }
+        let all = Set(letters.keys)
+        state.update { $0.quickLetters = keys; $0.ringLetters = all }
     }
 
     /// The right ⌘ with an app's letter, the ring never shown: the app forward, or with ⌥ a new window of it.
     private func quickSwitch(_ letter: String, newWindow: Bool) {
         guard let app = letters[letter] else { return }
-        if newWindow {
-            Self.newWindow(of: RingSlot(id: app.path, kind: .app(app), name: app.name, icon: nil))
-        } else {
-            Self.bringForward(app, windows: DockRings.windows(of: app, in: WindowCatalog.shared.snapshot().items))
+        // The ring may have been taken just as the letter came: it goes with the switch.
+        close {
+            if newWindow {
+                Self.newWindow(of: RingSlot(id: app.path, kind: .app(app), name: app.name, icon: nil))
+            } else {
+                Self.bringForward(app, windows: DockRings.windows(of: app, in: WindowCatalog.shared.snapshot().items))
+            }
         }
     }
 
@@ -186,9 +199,6 @@ final class FloatingDockController: ObservableObject {
     /// The right ⌘ key, apart from the left one.
     private static let rightCommandBit: UInt64 = 0x10
     private static let leftCommandBit: UInt64 = 0x08
-    /// How long the right ⌘ waits for a key before it's taken as the dock's: a
-    /// ⌘ shortcut typed with it is a key within this.
-    private static let commandWait = 0.12
 
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
@@ -196,7 +206,8 @@ final class FloatingDockController: ObservableObject {
             DispatchQueue.main.async { [weak self] in if let self { work(self) } }
         }
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            state.update { $0.commandPending = nil }
+            // It may have missed the right ⌘ going up, which would leave its next press unseen.
+            state.update { $0.commandPending = nil; $0.rightDown = false }
             return pass
         }
         if event.getIntegerValueField(.eventSourceUserData) == ButtonActions.marker { return pass }
@@ -215,18 +226,23 @@ final class FloatingDockController: ObservableObject {
             let raw = event.flags.rawValue
             let right = raw & Self.rightCommandBit != 0
             let others = event.flags.intersection([.maskShift, .maskControl, .maskAlternate]) != [] || raw & Self.leftCommandBit != 0
-            if right, !others, current.heldBy == .none, current.commandPending == nil {
-                let stamp = event.timestamp
-                state.update { $0.commandPending = stamp }
-                DispatchQueue.main.asyncAfter(deadline: .now() + Self.commandWait) { [weak self] in
-                    guard let self else { return }
-                    var take = false
-                    self.state.update { if $0.commandPending == stamp { $0.commandPending = nil; $0.heldBy = .rightCommand; take = true } }
-                    if take { self.open(mode: .hold, held: .rightCommand) }
+            let pressed = right && !current.rightDown
+            if current.rightDown != right { state.update { $0.rightDown = right } }
+            if pressed, !others, current.heldBy == .none, current.commandPending == nil {
+                if current.opening == .press, !current.open {
+                    // Shown at once, for as long as it's held. Marked open here, so a key
+                    // typed while the ring is being built is already the ring's.
+                    state.update { $0.heldBy = .rightCommand; $0.open = true }
+                    main { $0.open(mode: .hold, held: .rightCommand) }
+                } else {
+                    // Toggled as it goes up, never while it's held: held, it's waiting for
+                    // a letter or a ⌘ shortcut, and the ring would only be in the way.
+                    let stamp = event.timestamp
+                    state.update { $0.commandPending = stamp }
                 }
             } else if !right {
                 if current.commandPending != nil {
-                    // Let go alone before it was taken: a tap, which opens it to stay.
+                    // Let go alone, with no key, click or scroll in between: open it to stay, or close it.
                     state.update { $0.commandPending = nil }
                     if !others { main { $0.tapped(from: .keyboard) } }
                 } else if current.heldBy == .rightCommand {
@@ -241,11 +257,30 @@ final class FloatingDockController: ObservableObject {
         case .keyDown, .keyUp:
             let code = Int(event.getIntegerValueField(.keyboardEventKeycode))
             let repeating = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-            if !current.open {
-                if type == .keyUp, current.swallowUp == code {
-                    state.update { $0.swallowUp = nil }
+            // A key with the right ⌘ down: a ⌘ shortcut, or a letter for the ring, so letting
+            // go of it is no tap (which would open the ring after the switch).
+            if type == .keyDown, current.commandPending != nil { state.update { $0.commandPending = nil } }
+            // A key the dock took going down: going up is the dock's too, even once it's closed.
+            if type == .keyUp, current.swallowUp == code {
+                state.update { $0.swallowUp = nil }
+                return nil
+            }
+            // The shortcut, to toggle (and, held for the ring in `.press`, to close one left open):
+            // the ring opens or closes as it goes up.
+            if current.trigger == .shortcut, !current.shortcut.isNone, code == current.shortcut.keyCode, current.heldBy != .shortcut {
+                if type == .keyUp, current.shortcutDown == code {
+                    state.update { $0.shortcutDown = nil }
+                    main { $0.tapped(from: .keyboard) }
                     return nil
                 }
+                if type == .keyDown, current.shortcutDown == code { return nil }
+                if type == .keyDown, !repeating, current.opening == .toggle || current.open,
+                   event.flags.intersection([.maskCommand, .maskShift, .maskControl, .maskAlternate]) == current.shortcut.cgFlags {
+                    state.update { $0.shortcutDown = code }
+                    return nil
+                }
+            }
+            if !current.open {
                 // The right ⌘ (alone, or with ⌥ for a new window) and an app's letter: that app,
                 // at once, the ring never shown. Any other key with it is a ⌘ shortcut, the app's.
                 let raw = event.flags.rawValue
@@ -256,14 +291,12 @@ final class FloatingDockController: ObservableObject {
                     let letter = Self.text(of: plain ?? event).lowercased()
                     if current.quickLetters.contains(letter) {
                         let alt = event.flags.contains(.maskAlternate)
-                        state.update { $0.commandPending = nil; $0.swallowUp = code }
+                        state.update { $0.swallowUp = code }
                         main { $0.quickSwitch(letter, newWindow: alt) }
                         return nil
                     }
                 }
-                // A key with the right ⌘ before the dock took it: a ⌘ shortcut, the app's.
-                if current.commandPending != nil { state.update { $0.commandPending = nil } }
-                guard current.trigger == .shortcut, !current.shortcut.isNone, type == .keyDown, !repeating,
+                guard current.trigger == .shortcut, current.opening == .press, !current.shortcut.isNone, type == .keyDown, !repeating,
                       code == current.shortcut.keyCode,
                       event.flags.intersection([.maskCommand, .maskShift, .maskControl, .maskAlternate]) == current.shortcut.cgFlags
                 else { return pass }
@@ -278,7 +311,7 @@ final class FloatingDockController: ObservableObject {
                 }
                 return nil
             }
-            // ⌘Tab with the right ⌘ held: the switcher's, or macOS's. The ring gives way.
+            // ⌘Tab while it's open: the switcher's, or macOS's. The ring gives way.
             if type == .keyDown, code == kVK_Tab, event.flags.contains(.maskCommand) {
                 state.update { $0.open = false; $0.searching = false; $0.heldBy = .none }
                 main { $0.close(pick: nil) }
@@ -291,6 +324,15 @@ final class FloatingDockController: ObservableObject {
                 let plain = event.copy()
                 plain?.flags = []
                 let text = Self.text(of: plain ?? event)
+                // Held open by the right ⌘, a key that isn't an app's letter (or esc, ↩) is a
+                // ⌘ shortcut: the ring gives way and the app gets it, as without the dock.
+                if current.heldBy == .rightCommand, ![kVK_Escape, kVK_Return, kVK_ANSI_KeypadEnter].contains(code),
+                   !current.ringLetters.contains(text.lowercased()) {
+                    state.update { $0.open = false; $0.searching = false; $0.heldBy = .none }
+                    main { $0.close(pick: nil) }
+                    return pass
+                }
+                state.update { $0.swallowUp = code }
                 main { $0.key(code, text: text, alt: alt) }
             }
             return nil
@@ -351,6 +393,10 @@ final class FloatingDockController: ObservableObject {
     /// From the Mouse tool: a button held, or let go.
     func trigger(down: Bool, source: Source) {
         guard config.enabled, !isPreview else { return }
+        if config.opening == .toggle {
+            if !down { tapped(from: source) }
+            return
+        }
         if down {
             if state.value.open { return close(pick: nil) }
             state.update { $0.heldBy = .mouse }
@@ -371,7 +417,13 @@ final class FloatingDockController: ObservableObject {
             state.update { $0.open = false; $0.heldBy = .none }
             return
         }
-        guard !panel.isVisible else { return }
+        // Already showing: the tap may have marked it open for this one, which isn't
+        // coming, so it's marked as the ring that is, or every move would be swallowed.
+        guard !panel.isVisible else {
+            let current = self.held
+            state.update { $0.open = true; $0.heldBy = current }
+            return
+        }
         let pointer = CGEvent(source: nil)?.location ?? .zero
         items = WindowCatalog.shared.snapshot().items
         buildLayers()
@@ -385,7 +437,7 @@ final class FloatingDockController: ObservableObject {
         folders = []
         model.layer = 0
         model.searching = false
-        model.letters = mode == .click
+        model.letters = true
         optionFromTrigger = NSEvent.modifierFlags.contains(.option)
         model.newWindow = false
         showRing(layers[0], layerCount: layers.count)
@@ -397,12 +449,8 @@ final class FloatingDockController: ObservableObject {
         state.update { $0.open = true; $0.searching = false }
         takePreviews()
         DockBadges.shared.read { [weak self] badges in self?.applyBadges(badges) }
-        // Shown once the trigger has been held a moment, so a quick flick never
-        // flashes it; at once when it's to stay open.
-        let reveal = DispatchWorkItem { [weak self] in self?.reveal() }
-        revealWork = reveal
-        DispatchQueue.main.asyncAfter(deadline: .now() + (mode == .hold ? 0.09 : 0), execute: reveal)
         track()
+        reveal()
     }
 
     private func reveal() {
@@ -411,15 +459,10 @@ final class FloatingDockController: ObservableObject {
         panel.movePointer(to: pointer)
     }
 
-    /// Lets go of the trigger: a pick if it moved to one, else it stays open.
+    /// Lets go of the trigger held in `.press`: a pick if it moved to one, else it closes.
     private func released() {
         guard state.value.open else { return }
-        if !model.moved, mode == .hold {
-            mode = .click
-            model.letters = true
-            revealWork?.perform()
-            return
-        }
+        if !model.moved, mode == .hold { return close(pick: nil) }
         commit()
     }
 
@@ -443,8 +486,6 @@ final class FloatingDockController: ObservableObject {
     }
 
     func close(pick: (() -> Void)?) {
-        revealWork?.cancel()
-        revealWork = nil
         // Whatever closed it, even ⌘Tab marking it shut before the ring showed: the
         // pointer is always let go of, or it stays stopped and hidden.
         guard state.value.open || panel.isVisible || pointerHeld else { pick?(); return }
@@ -474,7 +515,8 @@ final class FloatingDockController: ObservableObject {
         let chosen = DockRings.letters(for: pinnedApps, chosen: config.letters)
         letters = Dictionary(pinnedApps.compactMap { app in chosen[app.path].map { ($0, app) } }, uniquingKeysWith: { first, _ in first })
         let keys = config.quickLetters && config.trigger == .rightCommand ? Set(letters.keys) : []
-        state.update { $0.quickLetters = keys }
+        let all = Set(letters.keys)
+        state.update { $0.quickLetters = keys; $0.ringLetters = all }
         let badges = DockBadges.shared.last
         func ring(_ title: String, _ list: [DockEntry]) -> DockRing {
             DockRing(title: title, slots: DockRings.slots(list, letters: chosen, badges: badges, items: items, running: running))
@@ -943,16 +985,24 @@ final class FloatingDockController: ObservableObject {
             state.update { $0.follow = false }
             return
         }
-        // Put there before it's let go: let go first, it would follow the moves
-        // made meanwhile and then be put back. A warp then letting go skips the
-        // pause a warp brings.
-        if Self.onScreen(point), hypot(point.x - heldFrom.x, point.y - heldFrom.y) >= 1 {
-            CGWarpMouseCursorPosition(point)
-            let warp = CGVector(dx: point.x - heldFrom.x, dy: point.y - heldFrom.y)
-            state.update { $0.warped = warp }
-        }
         CGAssociateMouseAndMouseCursorPosition(1)
+        if Self.onScreen(point), hypot(point.x - heldFrom.x, point.y - heldFrom.y) >= 1 { Self.place(point) }
         CGDisplayShowCursor(CGMainDisplayID())
+    }
+
+    /// Puts the real pointer at `p` with a move of the mouse, not a warp: a warp holds
+    /// back the mouse's own moves for a moment after, and with the hand still moving
+    /// as the ring closes that left the pointer stopped dead. The move also lets the
+    /// app below see where it now is.
+    private static func place(_ p: CGPoint) {
+        guard let source = CGEventSource(stateID: .privateState),
+              let move = CGEvent(mouseEventSource: source, mouseType: .mouseMoved, mouseCursorPosition: p, mouseButton: .left)
+        else { CGWarpMouseCursorPosition(p); return }
+        source.localEventsSuppressionInterval = 0
+        source.setLocalEventsFilterDuringSuppressionState([.permitLocalMouseEvents, .permitLocalKeyboardEvents, .permitSystemDefinedEvents],
+                                                          state: .eventSuppressionStateSuppressionInterval)
+        move.setIntegerValueField(.eventSourceUserData, value: ButtonActions.marker)
+        move.post(tap: .cghidEventTap)
     }
 
     /// The real pointer put where the ring's is, when it's the ring's.

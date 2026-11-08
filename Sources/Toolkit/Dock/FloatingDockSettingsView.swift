@@ -36,14 +36,21 @@ struct FloatingDockSettingsView: View {
             }
 
             WhenEnabled(enabled: dock.config.enabled && permissions.ready(dock.permissionNeeds)) {
-                Card(title: "Opening", footnote: "Hold it, point and let go. A tap leaves the ring open, for a click, an app's letter or Tab. Wherever the ring opens, its pointer starts at the centre, and yours is back where it was when it closes.") {
-                    OptionRow(title: "Key", caption: "The right ⌘ on its own.",
-                              selection: $dock.config.trigger, options: [(.rightCommand, "Right ⌘ held"), (.shortcut, "A shortcut")])
+                Card(title: "Opening", footnote: dock.config.opening == .press
+                     ? "Point and let go to pick; let go in the centre to cancel. Wherever the ring opens, its pointer starts at the centre, and yours is back where it was when it closes."
+                     : "The ring stays open for a click, an app's letter or Tab. Wherever the ring opens, its pointer starts at the centre, and yours is back where it was when it closes.") {
+                    OptionRow(title: "Key", caption: "The right ⌘ on its own, or a shortcut.",
+                              selection: $dock.config.trigger, options: [(.rightCommand, "Right ⌘"), (.shortcut, "A shortcut")])
+                    RowDivider()
+                    OptionRow(title: "Opens", caption: dock.config.opening == .press
+                              ? "As the key or button goes down, for as long as it's held."
+                              : "As the key or button goes up, until a pick or a second press.",
+                              selection: $dock.config.opening, options: [(.press, "Press"), (.toggle, "Toggle")])
                     if dock.config.trigger == .shortcut {
                         RowDivider()
-                        ShortcutRow(title: "Shortcut", caption: "Held, like the right ⌘.", shortcut: $dock.config.shortcut,
+                        ShortcutRow(title: "Shortcut", shortcut: $dock.config.shortcut,
                                     defaultValue: FloatingDockConfig().shortcut, optional: false)
-                    } else {
+                    } else if dock.config.opening == .toggle {
                         RowDivider()
                         ToggleRow(title: "Right ⌘ and an app's letter",
                                   caption: "Brings that app forward at once, without the ring; with ⌥ too, a new window of it. Other keys with the right ⌘ are ⌘ shortcuts as ever.",

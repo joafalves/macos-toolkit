@@ -72,10 +72,17 @@ enum DockOverflow: String, Codable, CaseIterable {
 }
 
 enum DockTrigger: String, Codable, CaseIterable {
-    /// The right ⌘ key held on its own.
+    /// The right ⌘ key on its own.
     case rightCommand
-    /// A shortcut of two keys or more, held.
+    /// A shortcut of two keys or more.
     case shortcut
+}
+
+enum DockOpening: String, Codable, CaseIterable {
+    /// Shown the moment the trigger goes down, for as long as it's held; letting go picks.
+    case press
+    /// Shown as the trigger goes up, and kept open until a pick or the trigger again.
+    case toggle
 }
 
 struct FloatingDockConfig: Codable, Equatable {
@@ -88,6 +95,7 @@ struct FloatingDockConfig: Codable, Equatable {
     var overflow = DockOverflow.moreSlot
     var trigger = DockTrigger.rightCommand
     var shortcut = Shortcut(keyCode: kVK_Space, flags: [.option])
+    var opening = DockOpening.toggle
     /// Letters chosen by hand, by app path; the rest come from the names.
     var letters: [String: String] = [:]
     /// The right ⌘ with an app's letter brings it forward at once, without the ring.
@@ -105,6 +113,7 @@ struct FloatingDockConfig: Codable, Equatable {
         overflow = (try? c.decodeIfPresent(DockOverflow.self, forKey: .overflow)) ?? .moreSlot
         trigger = (try? c.decodeIfPresent(DockTrigger.self, forKey: .trigger)) ?? .rightCommand
         shortcut = (try? c.decodeIfPresent(Shortcut.self, forKey: .shortcut)) ?? Shortcut(keyCode: kVK_Space, flags: [.option])
+        opening = (try? c.decodeIfPresent(DockOpening.self, forKey: .opening)) ?? .toggle
         letters = (try? c.decodeIfPresent([String: String].self, forKey: .letters)) ?? [:]
         quickLetters = (try? c.decodeIfPresent(Bool.self, forKey: .quickLetters)) ?? true
     }
