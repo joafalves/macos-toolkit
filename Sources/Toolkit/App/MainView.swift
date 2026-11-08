@@ -380,6 +380,8 @@ struct MainView: View {
         }
         // The tab first, so the setting is on the page to go to.
         if let tab = entry?.tab.flatMap(LayoutPage.init(rawValue:)) { layout.page = tab }
+        // Every setting of System Stats is on its first tab.
+        if section == .stats, entry != nil { stats.tab = .settings }
         model.section = section
         model.goTo = entry?.anchor
     }

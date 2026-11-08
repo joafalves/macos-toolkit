@@ -390,6 +390,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
 .build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
 .build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
+.build/debug/Toolkit --snapshot out.png stats <cpu|memory|network|disk|gpu|power> [light]   # that stat's tab of the System Stats page
 .build/debug/Toolkit --snapshot out.png mixer driver=<installing|removing|starting|on|outdated|removed|removed-loaded|failed-install> [light]   # the mixer's page, tall enough for the driver's line in that state
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
 .build/debug/Toolkit --snapshot out.png switcher rows=6 [light]   # the Window Switcher's page with that many rows set, more than the made-up laptop has room for
@@ -440,7 +441,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-ai-usage         # the sources on made-up files: limits, a response counted once, half a line, a restart, a new format; the transcript scanner; warnings
 .build/debug/Toolkit --list-ai-usage         # what's read from this Mac's own files, as figures, and what the first read costs
 .build/debug/Toolkit --measure-ai-usage [s]  # the reader on this Mac's files: time to the first figures, its cost left alone, stopping, and a changed file read
-.build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of
+.build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of; the page's tabs read their stat, and nothing once the window closes
 .build/debug/Toolkit --test-navigation       # what Navigate does with each button in each kind of app, posting nothing; with Accessibility (open -n the dev bundle), Finder's Back and Forward found
 .build/debug/Toolkit --test-tweaks           # every tweak read from this Mac (changes nothing of macOS's), and the preference round trip on a scratch domain
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)

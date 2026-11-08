@@ -263,7 +263,54 @@ extension StatsController {
             RunLoop.main.run(until: Date().addingTimeInterval(1))
         }
         item.remove()
+        failures += pageTest()
         print(failures == 0 ? "all ok" : "\(failures) failed")
+    }
+
+    /// The settings page's tabs on a real controller, every stat off and
+    /// nothing saved: a stat's tab reads it, the settings tab and a closed
+    /// window read nothing.
+    private static func pageTest() -> Int {
+        let stats = StatsController()
+        stats.persists = false
+        var config = StatsConfig()
+        for kind in StatKind.allCases { config.set(kind) { $0.place = .off } }
+        stats.config = config
+        var failures = 0
+        func check(_ what: String, _ ok: Bool) {
+            print((ok ? "ok    " : "FAIL  ") + what)
+            if !ok { failures += 1 }
+        }
+        weak var heldWindow: NSWindow?
+        autoreleasepool {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: StatsSettingsView(stats: stats)))
+            window.isReleasedWhenClosed = false
+            heldWindow = window
+            window.setFrameOrigin(NSPoint(x: -3000, y: -3000))
+            window.orderFrontRegardless()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+            check("the settings tab reads nothing: \(stats.reading.map(\.rawValue).sorted())", stats.reading.isEmpty && stats.timer == nil)
+            stats.tab = .stat(.network)
+            // A speed takes two readings, the second at the timer's.
+            RunLoop.main.run(until: Date().addingTimeInterval(stats.config.interval + 0.5))
+            check("the network tab reads the network, which is off: \(stats.reading.map(\.rawValue).sorted())",
+                  stats.reading == [.network] && stats.timer != nil && stats.network != nil)
+            stats.tab = .stat(.cpu)
+            // A share of time takes two readings too.
+            RunLoop.main.run(until: Date().addingTimeInterval(stats.config.interval + 0.5))
+            check("the CPU tab reads the CPU and the top apps, and the network no more: \(stats.reading.map(\.rawValue).sorted()), \(stats.apps.count) apps",
+                  stats.reading == [.cpu] && stats.network == nil && stats.cpu != nil && !stats.apps.isEmpty)
+            stats.tab = .stat(.power)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+            check("the power tab reads power, with the CPU's and GPU's watts: \(stats.reading.map(\.rawValue).sorted())",
+                  stats.reading == [.power] && stats.energy != nil && stats.apps.isEmpty)
+            window.close()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        check("the window closed, nothing is read: \(stats.reading.map(\.rawValue).sorted()), window \(heldWindow == nil ? "let go of" : "kept")",
+              stats.reading.isEmpty && stats.timer == nil && stats.energy == nil)
+        return failures
     }
 }
 

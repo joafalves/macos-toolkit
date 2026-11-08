@@ -864,6 +864,10 @@ also be in the panel only, to keep the menu bar short: it shows under the one yo
 chart starting when the panel opens, and with every stat there, an icon in the menu bar opens the
 panel.
 
+System Stats' page in the settings has a tab for each stat, CPU to power, beside its settings: the
+same chart and details as its panel, with a taller chart and the top ten apps. A tab works for any
+stat, even one that's off, and reads it only while the tab is open.
+
 - **Memory** shows what apps need: their memory, the kernel's, and what's compressed. Most monitors
   count everything that isn't free, but macOS fills spare memory with cached files it drops as soon
   as an app needs room, so that figure always looks nearly full and says little. With **Color memory
@@ -882,9 +886,9 @@ panel.
 - Figures stop at 99%, so each part keeps the same width and the menu bar doesn't shift; a pill
   shows 100.
 - Every 2 seconds by default (1 or 5 in the settings). Only the stats in the menu bar, and those a
-  panel shows while it's open, are read; nothing at all while none are, or the tool is off. What
-  the CPU and GPU draw is read only while the power panel is open (on a desktop, whenever power is
-  read). A reading of all six costs under 2 ms.
+  panel or a tab of the settings shows while it's open, are read; nothing at all while none are, or the
+  tool is off. What the CPU and GPU draw is read only while the power panel or tab is open (on a
+  desktop, whenever power is read). A reading of all six costs under 2 ms.
 
 ### AI usage
 

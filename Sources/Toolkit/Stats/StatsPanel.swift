@@ -7,8 +7,6 @@ import SwiftUI
 /// after another, then those.
 struct StatsPanelView: View {
     let stats: StatsController
-    /// Watched for the readings, so the panel follows them.
-    @ObservedObject private var live: StatsLive
     let kinds: [StatKind]
     /// The display's room below the menu bar: the compact layout's panel,
     /// with every stat, is taller than some displays, and scrolls there.
@@ -18,7 +16,6 @@ struct StatsPanelView: View {
 
     init(stats: StatsController, kinds: [StatKind], maxHeight: CGFloat? = nil, close: @escaping () -> Void = {}, openSettings: @escaping () -> Void = {}) {
         self.stats = stats
-        live = stats.live
         self.kinds = kinds
         self.maxHeight = maxHeight
         self.close = close
@@ -62,26 +59,46 @@ struct StatsPanelView: View {
         if kind == .ai {
             AIUsageStatSection(usage: stats.ai)
         } else {
-            statSection(kind)
+            StatSection(stats: stats, kind: kind)
         }
     }
+}
 
-    private func statSection(_ kind: StatKind) -> some View {
+/// One stat's history and details, in a panel or, `wide`, on its tab of the
+/// settings page, where there's room for a taller chart and more apps.
+struct StatSection: View {
+    let stats: StatsController
+    /// Watched for the readings, so only the section is drawn again with each.
+    @ObservedObject private var live: StatsLive
+    let kind: StatKind
+    let wide: Bool
+
+    init(stats: StatsController, kind: StatKind, wide: Bool = false) {
+        self.stats = stats
+        live = stats.live
+        self.kind = kind
+        self.wide = wide
+    }
+
+    private var chartHeight: CGFloat { wide ? 140 : 64 }
+    private var topApps: Int { wide ? 10 : 5 }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Label(kind.title, systemImage: kind.symbol)
                     .font(.headline)
                 Spacer()
-                Text(headline(kind))
+                Text(headline)
                     .font(.title3.weight(.semibold).monospacedDigit())
                     .foregroundStyle(stats.tint(kind).map { Color(nsColor: $0) } ?? .primary)
             }
-            chart(kind)
-            details(kind)
+            chart
+            details
         }
     }
 
-    private func headline(_ kind: StatKind) -> String {
+    private var headline: String {
         switch kind {
         case .memory:
             guard let memory = stats.memory else { return "–" }
@@ -100,14 +117,14 @@ struct StatsPanelView: View {
     // MARK: - Charts
 
     @ViewBuilder
-    private func chart(_ kind: StatKind) -> some View {
+    private var chart: some View {
         switch kind {
-        case .cpu: HistoryChart(series: [(stats.history[.cpu] ?? [], .blue)], ceiling: 1)
-        case .memory: HistoryChart(series: [(stats.history[.memory] ?? [], pressureColor)], ceiling: 1)
-        case .gpu: HistoryChart(series: [(stats.history[.gpu] ?? [], .pink)], ceiling: 1)
-        case .power: HistoryChart(series: [(stats.history[.power] ?? [], .orange)], ceiling: nil)
-        case .network: HistoryChart(series: [(stats.history[.down] ?? [], .teal), (stats.history[.up] ?? [], .orange)], ceiling: nil)
-        case .disk: HistoryChart(series: [(stats.history[.read] ?? [], .purple), (stats.history[.write] ?? [], .orange)], ceiling: nil)
+        case .cpu: HistoryChart(series: [(stats.history[.cpu] ?? [], .blue)], ceiling: 1, height: chartHeight)
+        case .memory: HistoryChart(series: [(stats.history[.memory] ?? [], pressureColor)], ceiling: 1, height: chartHeight)
+        case .gpu: HistoryChart(series: [(stats.history[.gpu] ?? [], .pink)], ceiling: 1, height: chartHeight)
+        case .power: HistoryChart(series: [(stats.history[.power] ?? [], .orange)], ceiling: nil, height: chartHeight)
+        case .network: HistoryChart(series: [(stats.history[.down] ?? [], .teal), (stats.history[.up] ?? [], .orange)], ceiling: nil, height: chartHeight)
+        case .disk: HistoryChart(series: [(stats.history[.read] ?? [], .purple), (stats.history[.write] ?? [], .orange)], ceiling: nil, height: chartHeight)
         case .ai: EmptyView()
         }
     }
@@ -124,7 +141,7 @@ struct StatsPanelView: View {
     // MARK: - Details
 
     @ViewBuilder
-    private func details(_ kind: StatKind) -> some View {
+    private var details: some View {
         switch kind {
         case .cpu: cpuDetails
         case .memory: memoryDetails
@@ -140,18 +157,18 @@ struct StatsPanelView: View {
         if let cpu = stats.cpu {
             Row("User", StatsController.percent(cpu.user))
             Row("System", StatsController.percent(cpu.system))
-            CoreCharts(cpu: cpu, history: { stats.history[.core($0)] ?? [] }, slots: stats.chartReadings)
+            CoreCharts(cpu: cpu, history: { stats.history[.core($0)] ?? [] }, slots: stats.chartReadings, height: wide ? 44 : 34)
                 .padding(.top, 2)
             // A few seconds pass before there's CPU to tell: the list says so
-            // rather than showing zeros, at its full height so the panel
+            // rather than showing zeros, at its full height so the section
             // doesn't grow when the apps come in.
             let ofWhole = stats.config.topAppsOfWholeCPU
             let scale = StatsController.appCPUScale(ofWhole: ofWhole, cores: cpu.cores.count)
             if live.cpuOfAppsKnown {
-                TopList(apps: stats.apps.sorted { $0.cpu > $1.cpu }.prefix(5).map { ($0, StatsController.appCPU($0.cpu, ofWhole: ofWhole, cores: cpu.cores.count)) },
-                        scale: scale)
+                TopList(apps: stats.apps.sorted { $0.cpu > $1.cpu }.prefix(topApps).map { ($0, StatsController.appCPU($0.cpu, ofWhole: ofWhole, cores: cpu.cores.count)) },
+                        scale: scale, count: topApps)
             } else {
-                TopList(apps: [], measuring: true, scale: scale)
+                TopList(apps: [], measuring: true, scale: scale, count: topApps)
             }
         }
     }
@@ -162,7 +179,7 @@ struct StatsPanelView: View {
             MemoryBar(memory: memory)
             Row("Pressure", memory.pressure == .normal ? String(localized: "Normal") : memory.pressure == .warning ? String(localized: "Warning") : String(localized: "Critical"))
             Row("Swap used", StatsController.memory(memory.swapUsed))
-            TopList(apps: stats.apps.sorted { $0.memory > $1.memory }.prefix(5).map { ($0, StatsController.memory($0.memory)) })
+            TopList(apps: stats.apps.sorted { $0.memory > $1.memory }.prefix(topApps).map { ($0, StatsController.memory($0.memory)) }, count: topApps)
         }
     }
 
@@ -192,9 +209,9 @@ struct StatsPanelView: View {
     @ViewBuilder
     private var powerDetails: some View {
         if let power = stats.power {
-            // IOReport's watts arrive a moment after the panel opens: with it
-            // subscribed the rows are there from the start, so the panel
-            // doesn't grow when the figures come in.
+            // IOReport's watts arrive a moment after the section shows: with it
+            // subscribed the rows are there from the start, so it doesn't grow
+            // when the figures come in.
             let watching = stats.energy != nil
             if watching || power.cpu != nil { Row("CPU", power.cpu.map(StatsController.watts) ?? "–") }
             if watching || power.gpu != nil { Row("GPU", power.gpu.map(StatsController.watts) ?? "–") }
@@ -334,6 +351,7 @@ private struct CoreCharts: View {
     let cpu: CPUReading
     let history: (Int) -> [Double]
     let slots: Int
+    var height: CGFloat = 34
 
     /// Three or four across, whichever fills the rows evenly: six cores as
     /// two rows of three rather than four and two.
@@ -359,7 +377,7 @@ private struct CoreCharts: View {
                     .foregroundStyle(.secondary)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: Self.columns(cores.count)), spacing: 6) {
                         ForEach(cores, id: \.self) { core in
-                            HistoryChart(series: [(history(core), color)], ceiling: 1, height: 34, slots: slots)
+                            HistoryChart(series: [(history(core), color)], ceiling: 1, height: height, slots: slots)
                                 .overlay(alignment: .topTrailing) {
                                     Text(StatsController.percent(cpu.cores[core]))
                                         .font(.system(size: 9, weight: .semibold).monospacedDigit())
@@ -449,6 +467,8 @@ private struct TopList: View {
     var measuring = false
     /// What the figures are out of, for perspective: per core they pass 100%.
     var scale: String?
+    /// How many it lists, so the outline is as tall as the list will be.
+    var count = 5
 
     /// Short enough to end before "Measuring…" in the middle.
     private static let placeholderWidths: [CGFloat] = [84, 62, 76, 52, 70]
@@ -466,7 +486,7 @@ private struct TopList: View {
                 if measuring {
                     ZStack {
                         VStack(alignment: .leading, spacing: 5) {
-                            ForEach(Self.placeholderWidths, id: \.self) { PlaceholderRow(width: $0) }
+                            ForEach(0..<count, id: \.self) { PlaceholderRow(width: Self.placeholderWidths[$0 % Self.placeholderWidths.count]) }
                         }
                         Text("Measuring…")
                             .font(.callout)

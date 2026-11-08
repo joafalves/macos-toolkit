@@ -1,11 +1,12 @@
 import AppKit
 import Combine
 
-/// System Stats: reads what's shown in the menu bar and everything a panel
+/// System Stats: reads what's shown in the menu bar, everything a panel
 /// shows while it's open (the stats only in the panel included, so their
-/// charts start empty when it opens), on one timer. Nothing else: with the
-/// tool off, or no stat in the menu bar and no panel open, there's no timer,
-/// no reader, no history and no IOReport subscription.
+/// charts start empty when it opens) and the stat whose tab the settings page
+/// shows, on one timer. Nothing else: with the tool off, or no stat in the
+/// menu bar, no panel open and no stat's tab on screen, there's no timer, no
+/// reader, no history and no IOReport subscription.
 final class StatsController: ObservableObject {
     @Published var config: StatsConfig {
         didSet {
@@ -39,6 +40,24 @@ final class StatsController: ObservableObject {
             apply()
         }
     }
+
+    /// The stat whose tab is on screen on the settings page, set as the tab
+    /// appears and cleared as it goes, the window closing included.
+    var page: StatKind? {
+        didSet {
+            guard page != oldValue else { return }
+            apply()
+        }
+    }
+
+    /// The settings page's tab: kept here so a search can open the settings
+    /// on it, and the page opens again on the tab it was left at.
+    @Published var tab = StatsTab.settings
+    /// For `--snapshot … stats <kind>`: the tab to show.
+    static var previewTab: StatKind?
+
+    /// What a panel or the settings page shows now.
+    private var open: Set<StatKind> { Set(panel).union(page.map { [$0] } ?? []) }
 
     enum Series: Hashable {
         case cpu, memory, up, down, read, write, gpu, power
@@ -136,8 +155,8 @@ final class StatsController: ObservableObject {
     /// What's being read now.
     var reading: Set<StatKind> {
         guard config.enabled else { return [] }
-        // A stat only in the panel is read while a panel is open, which has it in `panel`.
-        return Set(config.shown).union(panel)
+        // A stat only in the panel, or off, is read while a panel or its tab shows it.
+        return Set(config.shown).union(open)
     }
 
     /// Readers for what's read, none for the rest; a timer only if anything
@@ -159,9 +178,9 @@ final class StatsController: ObservableObject {
         if reading.contains(.network) { networkReader = networkReader ?? StatsReadings.Network() }
         if reading.contains(.disk) { diskReader = diskReader ?? StatsReadings.Disk() }
         // IOReport only for what the battery doesn't say: the CPU and GPU in
-        // the power panel, or the whole draw on a desktop, which has no
+        // the power panel or tab, or the whole draw on a desktop, which has no
         // battery. Kept, it costs ~5 ms a reading; started, ~50 ms once.
-        if reading.contains(.power), panel.contains(.power) || StatsReadings.power()?.system == nil {
+        if reading.contains(.power), open.contains(.power) || StatsReadings.power()?.system == nil {
             if energy == nil, let report = EnergyReport() {
                 energy = report
                 // Watts come from two samples: the first now, and the figures
@@ -178,7 +197,7 @@ final class StatsController: ObservableObject {
             energy = nil
         }
         var newApps = false
-        if config.enabled, panel.contains(.cpu) || panel.contains(.memory) {
+        if config.enabled, open.contains(.cpu) || open.contains(.memory) {
             newApps = topApps == nil
             topApps = topApps ?? TopApps()
         } else {

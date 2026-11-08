@@ -65,6 +65,24 @@ enum StatKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// A tab of System Stats' settings page: its settings, or a stat's history
+/// and details, read while it's on screen whatever the stat's place.
+enum StatsTab: Hashable {
+    case settings
+    case stat(StatKind)
+
+    /// Every stat but AI usage, whose card is on the settings tab, and whose
+    /// tools are read only once turned on.
+    static let all: [StatsTab] = [.settings] + StatKind.allCases.filter { $0 != .ai }.map { .stat($0) }
+
+    var title: String {
+        switch self {
+        case .settings: return String(localized: "Settings")
+        case .stat(let kind): return kind.title
+        }
+    }
+}
+
 /// How a stat shows in the menu bar.
 enum StatLook: String, Codable, CaseIterable {
     /// Its icon and the number.

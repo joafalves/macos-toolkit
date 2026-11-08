@@ -134,6 +134,8 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
     MouseController.previewOpen = rest.contains("device")
     MainView.previewSearch = rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) } ?? ""
     LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
+    // `stats cpu`, `stats memory`, …: that stat's tab of the System Stats page.
+    StatsController.previewTab = rest.compactMap(StatKind.init).first
     Snapshot.write(to: rest[0], section: rest.dropFirst().compactMap(AppSection.init).first ?? .mouse, light: rest.contains("light"),
                    noAccess: rest.contains("no-access"), tall: rest.contains("tall"))
     exit(0)
