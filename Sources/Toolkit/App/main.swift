@@ -59,6 +59,11 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         Snapshot.writeStatsBar(to: rest[0], light: rest.contains("light"))
         exit(0)
     }
+    if rest.contains("disk-map") {
+        DiskSpace.previewInside = rest.contains("inside")
+        Snapshot.writeDiskMap(to: rest[0], light: rest.contains("light"))
+        exit(0)
+    }
     if rest.contains("stats-panel") {
         let kinds = rest.compactMap(StatKind.init)
         Snapshot.writeStatsPanel(to: rest[0], light: rest.contains("light"), kinds: kinds.isEmpty ? StatKind.allCases : kinds,

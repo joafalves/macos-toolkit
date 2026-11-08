@@ -126,7 +126,7 @@ section in the sidebar and (where it makes sense) an entry in the menu bar.
 | 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse, autoscroll on the wheel button, an action for any other button (even one the mouse keeps to itself), plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings, with window backdrops and small H.264 files, and ⇧⌘2 to copy the text on screen. |
-| 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU, power and AI usage in the menu bar, with a memory figure that leaves out what macOS only caches. |
+| 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU, power and AI usage in the menu bar, with a memory figure that leaves out what macOS only caches, and a map of what takes space on the disk. |
 | ☕ **[Keep Awake](#keep-awake)** | Keeps the Mac awake for a while or until you turn it off. |
 | ⭕ **[Floating Dock](#floating-dock)** | Your apps in a ring at the pointer: point and let go to switch, further out for one of their windows. |
 
@@ -899,6 +899,13 @@ stat, even one that's off, and reads it only while the tab is open.
   panel or a tab of the settings shows while it's open, are read; nothing at all while none are, or the
   tool is off. What the CPU and GPU draw is read only while the power panel or tab is open (on a
   desktop, whenever power is read). A reading of all six costs under 2 ms.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/stats-disk-map-dark.png">
+    <img src="docs/images/stats-disk-map-light.png" width="420" alt="What Takes Space, opened at a home folder: its folders as coloured blocks by size, Movies, Library and Pictures the largest, each with its own largest items outlined inside, and the same folders listed below with their sizes">
+  </picture>
+</p>
 
 ### AI usage
 

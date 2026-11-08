@@ -392,6 +392,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
 .build/debug/Toolkit --snapshot out.png stats <cpu|memory|network|disk|gpu|power> [light]   # that stat's tab of the System Stats page
 .build/debug/Toolkit --snapshot out.png stats disk tall [inside] [light]   # the Disk tab with a made-up disk's map; inside, opened at its home folder
+.build/debug/Toolkit --snapshot out.png disk-map [inside] [light]   # What Takes Space alone, from the made-up disk, for the README
 .build/debug/Toolkit --snapshot out.png mixer driver=<installing|removing|starting|on|outdated|removed|removed-loaded|failed-install> [light]   # the mixer's page, tall enough for the driver's line in that state
 .build/debug/Toolkit --snapshot out.png capture text [light]   # Screen Capture's page with Copy text from the screen on
 .build/debug/Toolkit --snapshot out.png switcher rows=6 [light]   # the Window Switcher's page with that many rows set, more than the made-up laptop has room for

@@ -552,6 +552,24 @@ enum Snapshot {
 
     /// A System Stats panel, from made-up readings.
     /// `claudeOnly`: AI usage with Claude Code alone, which opens on its tokens' chart.
+    /// What Takes Space as the Disk tab shows it, from the made-up disk, at the page's width.
+    static func writeDiskMap(to path: String, light: Bool) {
+        _ = NSApplication.shared
+        let card = DiskMapCard(space: DiskSpace.preview())
+            .frame(width: 564)
+            .padding(16)
+            .background(Color(nsColor: .windowBackgroundColor))
+        let host = NSHostingController(rootView: card)
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.borderless]
+        window.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        window.setContentSize(host.view.fittingSize)
+        onRetina(window)
+        window.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        if let view = window.contentView { save(view, to: path) }
+    }
+
     static func writeStatsPanel(to path: String, light: Bool, kinds: [StatKind], claudeOnly: Bool = false) {
         _ = NSApplication.shared
         let stats = StatsController.preview()
