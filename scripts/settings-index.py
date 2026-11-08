@@ -36,6 +36,11 @@ PAGES = {
 PER_MOUSE = ("struct ProfileEditor", "struct AutoscrollExceptions")
 # Window Layout's tabs, by the view each is built in, and LayoutPage's names.
 TABS = {"var snapping": "snapping", "var keyboard": "keyboard", "var tabsPage": "tabs"}
+# A mouse's tabs, the same way, and MouseTab's names; the autoscroll rows are
+# on its Buttons tab.
+MOUSE_TABS = {"var pointerTab": "pointer", "var scrollingTab": "scrolling", "var buttonsTab": "buttons"}
+# Each of a mouse's tabs is found by its own title too, as its cards have none.
+MOUSE_TAB_TITLES = [("Pointer", "pointer"), ("Scrolling", "scrolling"), ("Buttons", "buttons")]
 
 ROW = re.compile(r'\b(?:SettingRow|ToggleRow|OptionRow|ShortcutRow|FolderRow|TweakRow|Card)\(\s*title:\s*"((?:[^"\\]|\\.)*)"')
 # A row's caption, or a card's footnote, when it's written out.
@@ -60,10 +65,21 @@ def rows():
             owner = max((s for s in starts if s[0] < match.start()), default=(0, ""))[1]
             per_mouse = section == "mouse" and owner.startswith(PER_MOUSE)
             view = max((s for s in tab_starts if s[0] < match.start()), default=(0, ""))[1]
-            tab = TABS.get(view.split(":")[0]) if section == "layout" else None
+            if section == "layout":
+                tab = TABS.get(view.split(":")[0])
+            elif per_mouse:
+                tab = "buttons" if owner.startswith("struct AutoscrollExceptions") else MOUSE_TABS.get(view.split(":")[0])
+            else:
+                tab = None
             entry = (section, title, caption, per_mouse, tab)
             if not any(e[0] == section and e[1] == title for e in found):
                 found.append(entry)
+    # Listed with the Mouse page's own rows, after them.
+    at = max((i for i, e in enumerate(found) if e[0] == "mouse"), default=len(found) - 1) + 1
+    for title, tab in MOUSE_TAB_TITLES:
+        if not any(e[0] == "mouse" and e[1] == title for e in found):
+            found.insert(at, ("mouse", title, None, True, tab))
+            at += 1
     return found
 
 

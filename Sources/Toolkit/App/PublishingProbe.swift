@@ -29,26 +29,49 @@ enum PublishingProbe {
 
         let start = Date()
         var failed = 0
-        for (index, control) in controls(in: window.contentView!).enumerated() {
-            let before = issues(since: start)
-            let config = mouse.config
-            let what: String
-            if let segments = control as? NSSegmentedControl {
-                what = "segments \(index) (\((0..<segments.segmentCount).compactMap { segments.label(forSegment: $0) }.joined(separator: "/")))"
-                segments.selectedSegment = (segments.selectedSegment + 1) % segments.segmentCount
-            } else if let toggle = control as? NSSwitch {
-                what = "switch \(index)"
-                toggle.state = toggle.state == .on ? .off : .on
-            } else {
-                continue
+        // Each of the mouse's tabs in turn; the tabs' own picker changes no setting.
+        let tabTitles = Set(MouseTab.allCases.map(\.title))
+        for tab in MouseTab.allCases {
+            mouse.tab = tab
+            settle()
+            print("mouse: \(tab.rawValue)")
+            for (index, control) in controls(in: window.contentView!).enumerated() {
+                let before = issues(since: start)
+                let config = mouse.config
+                let what: String
+                if let segments = control as? NSSegmentedControl {
+                    let labels = (0..<segments.segmentCount).compactMap { segments.label(forSegment: $0) }
+                    if Set(labels) == tabTitles { continue }
+                    what = "segments \(index) (\(labels.joined(separator: "/")))"
+                    segments.selectedSegment = (segments.selectedSegment + 1) % segments.segmentCount
+                } else if let toggle = control as? NSSwitch {
+                    what = "switch \(index)"
+                    toggle.state = toggle.state == .on ? .off : .on
+                } else {
+                    continue
+                }
+                // An earlier change can take a control away (Smooth off, its glide).
+                guard control.window != nil else { print("\(what): gone with an earlier change"); continue }
+                _ = control.sendAction(control.action, to: control.target)
+                settle()
+                let found = issues(since: start) - before
+                // The change still has to reach the settings.
+                let changed = mouse.config != config
+                if found > 0 || !changed { failed += 1 }
+                print("\(what): \(found == 0 ? "ok" : "\(found) issue(s)")\(changed ? "" : ", but the setting didn't change")")
             }
-            _ = control.sendAction(control.action, to: control.target)
+        }
+        // The tabs' picker itself, as a click would.
+        if let picker = controls(in: window.contentView!).compactMap({ $0 as? NSSegmentedControl })
+            .first(where: { s in Set((0..<s.segmentCount).compactMap { s.label(forSegment: $0) }) == tabTitles }) {
+            let before = issues(since: start)
+            let tab = mouse.tab
+            picker.selectedSegment = (picker.selectedSegment + 1) % picker.segmentCount
+            _ = picker.sendAction(picker.action, to: picker.target)
             settle()
             let found = issues(since: start) - before
-            // The change still has to reach the settings.
-            let changed = mouse.config != config
-            if found > 0 || !changed { failed += 1 }
-            print("\(what): \(found == 0 ? "ok" : "\(found) issue(s)")\(changed ? "" : ", but the setting didn't change")")
+            if found > 0 || mouse.tab == tab { failed += 1 }
+            print("mouse tabs: \(found == 0 ? "ok" : "\(found) issue(s)")\(mouse.tab != tab ? "" : ", but the tab didn't change")")
         }
 
         // The other pages, made up too: segmented controls, and any menu that's an

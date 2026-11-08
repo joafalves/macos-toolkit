@@ -2,8 +2,9 @@
 import AppKit
 
 extension WheelEngine {
-    /// `--test-navigation`: what Navigate does with each button in each kind
-    /// of app, decided without posting anything; the buttons as saved; and,
+    /// `--test-navigation`: what Back and Forward do with each button in each
+    /// kind of app, decided without posting anything; settings from before
+    /// 0.28.0 read into the new ones; a notch's distance as apps get it; and,
     /// with Accessibility, Finder's Back and Forward menu items found, not pressed.
     static func navigationSelfTest() {
         var failures = 0
@@ -11,47 +12,83 @@ extension WheelEngine {
             if !ok { failures += 1 }
             print((ok ? "ok    " : "FAIL  ") + what)
         }
-        func decide(_ button: Int64, _ app: String?, _ profile: Profile) -> String {
-            guard let decision = navigation(button: button, profile: profile, frontApp: app) else { return "unchanged" }
-            return (decision.back ? "back" : "forward") + " by " + (decision.method == .swipe ? "swipe" : "menu")
+        func passes(_ action: ButtonAction, _ button: Int64, _ app: String?) -> Bool {
+            ButtonActions.passesThrough(action, button: button, frontApp: app)
         }
 
-        var profile = Profile(name: "Test")
-        check(profile.backButton == 3 && profile.forwardButton == 4, "buttons 4 and 5 (3 and 4 to macOS) by default")
-        check(decide(3, "com.apple.finder", profile) == "back by swipe", "back in Finder by swipe")
-        check(decide(4, "com.apple.Safari", profile) == "forward by swipe", "forward in Safari by swipe")
-        check(decide(3, "com.apple.systempreferences", profile) == "back by menu", "back in System Settings by its menu")
-        check(decide(3, "com.google.Chrome", profile) == "unchanged", "another developer's app gets the button")
-        check(decide(3, "dev.jalves.macos-toolkit", profile) == "unchanged", "the toolkit's own window gets the button, and goes back itself")
-        check(decide(5, "com.apple.finder", profile) == "unchanged", "another button is left alone")
-        check(decide(3, nil, profile) == "unchanged", "no front app: unchanged")
-        profile.backButton = 5
-        profile.forwardButton = 6
-        check(decide(5, "com.apple.finder", profile) == "back by swipe" && decide(6, "com.apple.finder", profile) == "forward by swipe"
-              && decide(3, "com.apple.finder", profile) == "unchanged", "buttons chosen as 6 and 7 replace 4 and 5")
+        check(!passes(.back, 3, "com.apple.finder") && !passes(.forward, 4, "com.apple.Safari"), "Apple's apps ignore the buttons: Back and Forward are taken")
+        check(passes(.back, 3, "com.example.browser") && passes(.forward, 4, "com.example.editor"), "another developer's app gets the button it already knows")
+        check(passes(.back, 3, "dev.jalves.macos-toolkit"), "the toolkit's own window gets the button, and goes back itself")
+        check(!passes(.back, 5, "com.example.browser") && !passes(.forward, 3, "com.example.browser"), "Back on another button, or Forward on the back button, is taken")
+        check(!passes(.missionControl, 3, "com.example.browser"), "another action on the back button is taken")
+        check(passes(.back, 3, nil), "no front app: the button goes through")
+        check(ButtonAction.offered(for: .number(2)).contains(.autoscroll) && !ButtonAction.offered(for: .number(3)).contains(.autoscroll)
+              && !ButtonAction.offered(for: .control(0x00FD)).contains(.autoscroll), "only the wheel button offers Autoscroll")
 
         func decoded(_ json: String) -> Profile? { try? JSONDecoder().decode(Profile.self, from: Data(json.utf8)) }
-        let kept = decoded(#"{"name":"A","backButton":5,"forwardButton":6}"#)
-        check(kept?.backButton == 5 && kept?.forwardButton == 6, "chosen buttons are read back")
-        check(decoded(#"{"name":"A"}"#).map { $0.backButton == 3 && $0.forwardButton == 4 } == true, "a profile from before has the defaults")
-        for (json, what) in [(#"{"name":"A","backButton":1,"forwardButton":4}"#, "the right button"),
-                             (#"{"name":"A","backButton":2,"forwardButton":4}"#, "the wheel button"),
-                             (#"{"name":"A","backButton":5,"forwardButton":5}"#, "one button for both")] {
-            let profile = decoded(json)
-            check(profile?.backButton == 3 && profile?.forwardButton == 4, "\(what) in a file falls back to the defaults")
+        func actions(_ profile: Profile?) -> [String] {
+            (profile?.buttonActions ?? []).map { a in
+                if case .number(let n) = a.button { return "\(n):\(a.action.rawValue)" }
+                return a.action.rawValue
+            }
+        }
+        // Navigate and Autoscroll before 0.28.0, now the buttons' actions.
+        check(actions(decoded(#"{"name":"A","navigationButtons":true}"#)) == ["3:back", "4:forward"], "Navigate becomes Back and Forward on buttons 4 and 5")
+        check(actions(decoded(#"{"name":"A","navigationButtons":true,"backButton":5,"forwardButton":6}"#)) == ["5:back", "6:forward"], "Navigate on chosen buttons keeps them")
+        check(actions(decoded(#"{"name":"A","navigationButtons":true,"backButton":2,"forwardButton":4}"#)) == ["3:back", "4:forward"], "Navigate on the wheel button falls back to 4 and 5")
+        check(actions(decoded(#"{"name":"A","navigationButtons":false,"backButton":5}"#)).isEmpty, "Navigate off adds nothing")
+        check(actions(decoded(#"{"name":"A","autoscroll":true}"#)) == ["2:autoscroll"], "Autoscroll becomes the wheel button's action")
+        check(actions(decoded(#"{"name":"A","navigationButtons":true,"buttonActions":[{"button":"button:3","action":"missionControl"}]}"#)) == ["3:missionControl", "4:forward"],
+              "a button's own action still wins over Navigate")
+        let migrated = decoded(#"{"name":"A","navigationButtons":true,"autoscroll":true}"#)
+        check(migrated?.needsEventTap == true, "migrated buttons need the event tap")
+        if let migrated, let data = try? JSONEncoder().encode(migrated) {
+            let text = String(decoding: data, as: UTF8.self)
+            check(!text.contains("navigationButtons") && !text.contains("\"autoscroll\":"), "the old switches aren't written again")
+            check(actions(try? JSONDecoder().decode(Profile.self, from: data)) == actions(migrated), "migrated actions are read back the same")
         }
 
-        // Buttons with an action: read back, a later version's action kept as Nothing, an unreadable button and a second row for one left out.
-        let assigned = decoded(#"{"name":"A","buttonActions":[{"button":"control:00FD","action":"floatingDock"},{"button":"button:5","action":"later"},{"button":"left","action":"back"},{"button":"button:5","action":"back"}]}"#)
-        check(assigned?.buttonActions.count == 2, "button actions: the unreadable row and the second row for a button left out")
-        check(assigned?.assignment(for: .control(0x00FD))?.action == .floatingDock, "button actions: a control the mouse keeps to itself is read back")
-        check(assigned?.assignment(for: .number(5))?.action == .nothing, "button actions: an action from a later version does nothing")
-        check(assigned?.divertedControls == [0x00FD], "button actions: only the control is diverted")
-        check(assigned?.needsEventTap == true, "button actions: a numbered button needs the event tap")
-        check(decoded(#"{"name":"A","buttonActions":[{"button":"control:00FD","action":"back"}]}"#)?.needsEventTap == false,
-              "button actions: a diverted control alone needs no event tap")
-        if let assigned, let data = try? JSONEncoder().encode(assigned), let back = try? JSONDecoder().decode(Profile.self, from: data) {
-            check(back.buttonActions == assigned.buttonActions, "button actions: written and read back the same")
+        // Distances: lines before 0.28.0, now points.
+        let fixed = decoded(#"{"name":"A","scrollMode":"fixed","scrollLines":3}"#)
+        check(fixed?.scrollDistance == 90, "3 lines, the old default, become 90 points, the new one")
+        let curve = decoded(#"{"name":"A","scrollMode":"curve","scrollCurveStart":3.2,"scrollCurveEnd":4.7}"#)
+        check(curve?.scrollCurveFrom == 95 && curve?.scrollCurveTo == 140, "a curve in lines becomes points in proportion, in fives")
+        check(decoded(#"{"name":"A","scrollMode":"fixed","scrollDistance":80,"scrollLines":3}"#)?.scrollDistance == 80, "points, once saved, win over lines")
+        check(decoded(#"{"name":"A","scrollMode":"fixed","scrollDistance":5000}"#)?.scrollDistance == 300, "a distance past the slider is kept to it")
+        check(decoded(#"{"name":"A","scrollAccelMode":"off","scrollSpeedMode":"custom","scrollSpeed":2}"#).map { $0.scrollMode == .fixed && $0.scrollDistance == 180 } == true,
+              "the oldest settings: macOS's curve off at twice the speed becomes 180 points")
+        if let fixed, let data = try? JSONEncoder().encode(fixed) {
+            check(!String(decoding: data, as: UTF8.self).contains("scrollLines"), "lines aren't written again")
+        }
+
+        // Picking a distance of the toolkit's turns smoothing on; a glide speed is read back.
+        var picked = Profile(name: "A")
+        picked.setScrollMode(.fixed)
+        check(picked.smoothScrolling && picked.scrollDistance == 90, "picking Fixed starts at 90 points, smooth")
+        picked.smoothScrolling = false
+        picked.setScrollMode(.curve)
+        check(!picked.smoothScrolling, "going from Fixed to Curve keeps smoothing as it was")
+        check(decoded(#"{"name":"A","glide":"fast"}"#)?.glide == .fast && decoded(#"{"name":"A","glide":"later"}"#)?.glide == .normal,
+              "a glide speed is read back, and one from a later version is Normal")
+
+        // A notch as apps get it: a distance in points, the lines only as many as it's gone.
+        let engine = WheelEngine()
+        var got: [(lines: Int64, fixed: Double, points: Int64)] = []
+        for points in [25.0, 25, 2.5, 2.5, 2.5, 2.5, -60] {
+            guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 2, wheel1: 1, wheel2: 0, wheel3: 0) else { continue }
+            engine.setDistance(event, x: 0, y: points)
+            let continuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) == 1
+            if !continuous { check(false, "a notch made a distance is continuous") }
+            got.append((event.getIntegerValueField(.scrollWheelEventDeltaAxis1), event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1),
+                        event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)))
+        }
+        check(got.map(\.points) == [25, 25, 2, 3, 2, 3, -60], "points are whole, and what's left over goes with the next")
+        check(got.map(\.lines) == [2, 3, 0, 0, 0, 1, -6], "lines are counted only as the distance goes, and a turn back starts afresh")
+        check(got.first.map { abs($0.fixed - 2.5) < 0.001 } == true, "the share of lines is the points over ten, as macOS writes it")
+        if let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 3, wheel2: 0, wheel3: 0) {
+            let made = event.getIntegerValueField(.scrollWheelEventDeltaAxis1)
+            engine.setDistance(event, x: 0, y: 3)
+            print("      macOS's own 3 px event says \(made) line; ours says \(event.getIntegerValueField(.scrollWheelEventDeltaAxis1))")
         }
 
         if AXIsProcessTrusted(), let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first {

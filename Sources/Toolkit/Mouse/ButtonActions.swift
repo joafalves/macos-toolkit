@@ -16,16 +16,53 @@ enum ButtonActions {
         }
         guard down else { return }
         switch assignment.action {
-        case .nothing, .floatingDock: break
-        case .back, .forward:
-            guard let pid = FrontApp.pid else { return }
-            AppNavigation.go(back: assignment.action == .back, method: AppNavigation.method(for: FrontApp.bundleID ?? ""), pid: pid)
+        // Autoscroll is the wheel tap's, on its own thread.
+        case .nothing, .floatingDock, .autoscroll: break
+        case .back, .forward: navigate(back: assignment.action == .back)
         case .missionControl: ShowDesktop.missionControl()
         case .showDesktop: ShowDesktop.toggle()
         case .shortcut: press(assignment.shortcut)
         case .openApp:
             guard let path = assignment.appPath else { return }
             NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: path), configuration: NSWorkspace.OpenConfiguration())
+        }
+    }
+
+    /// The buttons apps take for back and forward, as macOS numbers them: the
+    /// fourth and fifth.
+    static let backButton: Int64 = 3
+    static let forwardButton: Int64 = 4
+
+    /// Whether a press of `button` is let through to the app as it is: Back
+    /// on the button apps already take for back, and Forward on theirs, unless
+    /// the app is one of Apple's, which ignore the buttons. On the tap's thread.
+    static func passesThrough(_ action: ButtonAction, button: Int64, frontApp: String?) -> Bool {
+        guard (action == .back && button == backButton) || (action == .forward && button == forwardButton) else { return false }
+        return !isApple(frontApp)
+    }
+
+    private static func isApple(_ bundleID: String?) -> Bool {
+        bundleID?.hasPrefix("com.apple.") == true
+    }
+
+    /// Back or forward in the front app: as `AppNavigation` says in Apple's
+    /// apps, which ignore the mouse's buttons; elsewhere a click of the button
+    /// apps take for it, which browsers and editors already handle.
+    private static func navigate(back: Bool) {
+        guard let pid = FrontApp.pid else { return }
+        let app = FrontApp.bundleID
+        if isApple(app) {
+            AppNavigation.go(back: back, method: AppNavigation.method(for: app ?? ""), pid: pid)
+            return
+        }
+        let location = CGEvent(source: nil)?.location ?? .zero
+        for type in [CGEventType.otherMouseDown, .otherMouseUp] {
+            guard let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: location, mouseButton: .center) else { continue }
+            event.setIntegerValueField(.mouseEventButtonNumber, value: back ? backButton : forwardButton)
+            // Through the wheel tap untouched, as autoscroll's clicks are.
+            event.setIntegerValueField(.eventSourceUserData, value: WheelEngine.marker)
+            event.setIntegerValueField(.mouseEventClickState, value: 1)
+            event.post(tap: .cgSessionEventTap)
         }
     }
 

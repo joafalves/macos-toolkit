@@ -15,11 +15,11 @@ struct MouseSettingsView: View {
                 }
             } else {
                 Page {
-                    ToolHeader(section: .mouse, subtitle: "Cursor and wheel settings for each mouse.", enabled: $mouse.config.enabled,
+                    ToolHeader(section: .mouse, subtitle: "Pointer, scrolling and buttons for each mouse.", enabled: $mouse.config.enabled,
                                menuBar: MenuBarSwitch(isOn: $mouse.config.menuBarIcon, caption: "A click shows each mouse and its charge."))
 
                     if mouse.config.enabled, !permissions.isGranted(.accessibility) {
-                        Banner(text: "Wheel and button settings are not active yet. They need the Accessibility permission.",
+                        Banner(text: "Scrolling and button settings are not active yet. They need the Accessibility permission.",
                                button: "Grant Access…") { mouse.requestAccessibility() }
                     }
 
@@ -28,7 +28,7 @@ struct MouseSettingsView: View {
 
                         Card(title: "All Mice") {
                             ToggleRow(title: "Restore macOS behavior on quit",
-                                      caption: "When off, cursor settings stay applied after the app quits, until the mouse reconnects.",
+                                      caption: "When off, pointer settings stay applied after the app quits, until the mouse reconnects.",
                                       isOn: $mouse.config.restoreOnQuit)
                             RowDivider()
                             ToggleRow(title: "Show all pointing devices",
@@ -234,10 +234,24 @@ private struct MouseRow: View {
     }
 }
 
-/// One mouse's page: back to the list, its name, its settings, and what
-/// can be done with it.
+/// The tabs of a mouse's page. The raw values name them in the search's index.
+enum MouseTab: String, CaseIterable {
+    case pointer, scrolling, buttons
+
+    var title: String {
+        switch self {
+        case .pointer: return String(localized: "Pointer")
+        case .scrolling: return String(localized: "Scrolling")
+        case .buttons: return String(localized: "Buttons")
+        }
+    }
+}
+
+/// One mouse's page: what it is and how it's doing, what can be done with it,
+/// and its settings, a tab for each part of the mouse.
 private struct MousePage: View {
     @ObservedObject var mouse: MouseController
+    @ObservedObject private var permissions = Permissions.shared
     let device: MouseDevice
     @StateObject private var renaming = ViewState(false)
     @StateObject private var newName = ViewState("")
@@ -245,8 +259,49 @@ private struct MousePage: View {
     @StateObject private var copying = ViewState(false)
 
     var body: some View {
-        // As System Settings heads a device's page: the toolbar has its name,
-        // and the card on top says what it is and how it's doing.
+        header
+            .alert("Rename Mouse", isPresented: $renaming.value) {
+                TextField("Name", text: $newName.value)
+                Button("Rename") { mouse.rename(device, to: newName.value) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Leave it empty for the name macOS gives it, \(mouse.systemName(of: device)).")
+            }
+            .sheet(isPresented: $copying.value) {
+                CopySettingsSheet(mouse: mouse, device: device) { copying.value = false }
+            }
+            .confirmationDialog(Text("Forget \(mouse.label(for: device))?"), isPresented: $forgetting.value) {
+                Button("Forget", role: .destructive) {
+                    mouse.openID = nil
+                    mouse.forget(device)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(device.connected ? "Its settings go back to macOS's." : "Its settings go back to macOS's, and it leaves this list.")
+            }
+
+        // The pointer works without it; scrolling and buttons wait for it.
+        if !permissions.isGranted(.accessibility) {
+            Banner(text: "Scrolling and button settings are not active yet. They need the Accessibility permission.",
+                   button: "Grant Access…") { mouse.requestAccessibility() }
+        } else if mouse.profile(for: device).needsEventTap, mouse.wheelTapFailed {
+            Banner(text: "Accessibility is granted, but the app has to restart before scrolling and button settings take effect.",
+                   button: "Restart") { Relaunch.now() }
+        }
+
+        Picker("Page", selection: $mouse.tab.afterUpdate) {
+            ForEach(MouseTab.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: .infinity)
+
+        ProfileEditor(mouse: mouse, device: device, tab: mouse.tab)
+    }
+
+    /// As System Settings heads a device's page: the toolbar has its name, the
+    /// card says what it is and how it's doing, and its menu what can be done.
+    private var header: some View {
         HStack(spacing: 12) {
             IconTile(symbol: AppSection.mouse.symbol, color: device.connected ? AppSection.mouse.color : .gray, size: 40)
                 .opacity(device.connected ? 1 : 0.6)
@@ -261,46 +316,31 @@ private struct MousePage: View {
             if let level = mouse.battery(for: device) {
                 MouseBattery(level: level)
             }
+            Menu {
+                Button("Rename…") {
+                    newName.value = device.name
+                    renaming.value = true
+                }
+                Button("Copy Settings to Another Mouse…") { copying.value = true }
+                    .disabled(!mouse.devices.contains { $0.id != device.id })
+                Button("Reset to macOS") { mouse.reset(device) }
+                    .disabled(mouse.profile(for: device).isAllMacOS)
+                Divider()
+                Button("Forget This Mouse…", role: .destructive) { forgetting.value = true }
+                    .disabled(mouse.config.profiles[device.id] == nil)
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Rename, copy, reset or forget this mouse")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
-
-        ProfileEditor(mouse: mouse, device: device)
-
-        HStack(spacing: 10) {
-            Button("Reset to macOS") { mouse.reset(device) }
-                .disabled(mouse.profile(for: device).isAllMacOS)
-            Button("Rename…") {
-                newName.value = device.name
-                renaming.value = true
-            }
-            Button("Copy to Another Mouse…") { copying.value = true }
-                .disabled(!mouse.devices.contains { $0.id != device.id })
-            Spacer()
-            Button("Forget This Mouse…", role: .destructive) { forgetting.value = true }
-                .disabled(mouse.config.profiles[device.id] == nil)
-        }
-        .alert("Rename Mouse", isPresented: $renaming.value) {
-            TextField("Name", text: $newName.value)
-            Button("Rename") { mouse.rename(device, to: newName.value) }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Leave it empty for the name macOS gives it, \(mouse.systemName(of: device)).")
-        }
-        .sheet(isPresented: $copying.value) {
-            CopySettingsSheet(mouse: mouse, device: device) { copying.value = false }
-        }
-        .confirmationDialog(Text("Forget \(mouse.label(for: device))?"), isPresented: $forgetting.value) {
-            Button("Forget", role: .destructive) {
-                mouse.openID = nil
-                mouse.forget(device)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(device.connected ? "Its settings go back to macOS's." : "Its settings go back to macOS's, and it leaves this list.")
-        }
     }
 }
 
@@ -389,186 +429,16 @@ struct CopySettingsSheet: View {
     }
 }
 
-/// Cursor and wheel settings for one mouse.
-/// Which buttons go back and forward, as one line, and Change… to press
-/// them: most mice use the fourth and fifth, which is where it starts.
-private struct NavigationButtons: View {
-    @Binding var profile: Profile
-    /// 0 when not choosing; 1 waiting for back, 2 for forward.
-    @StateObject private var step = ViewState(0)
-    @StateObject private var back = ViewState(3)
-    @StateObject private var listener = ButtonListener()
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Group {
-                switch step.value {
-                case 1: Text("Press the back button on the mouse.")
-                case 2: Text("Press the forward button on the mouse.")
-                default: Text("Buttons \(profile.backButton + 1) and \(profile.forwardButton + 1)")
-                }
-            }
-            .foregroundStyle(.secondary)
-            Button(step.value == 0 ? "Change…" : "Cancel") { step.value == 0 ? start() : stop() }
-                .buttonStyle(.link)
-        }
-        .font(.subheadline)
-        .onDisappear { stop() }
-    }
-
-    private func start() {
-        step.value = 1
-        listener.start { button in
-            guard Profile.sideButtons.contains(button) else { return }
-            if step.value == 1 {
-                back.value = button
-                step.value = 2
-            } else if button != back.value {
-                profile.backButton = back.value
-                profile.forwardButton = button
-                stop()
-            }
-        }
-    }
-
-    private func stop() {
-        listener.stop()
-        step.value = 0
-    }
-}
-
-/// The buttons given an action of their own, and adding one: by pressing it,
-/// or from the buttons the mouse keeps to itself, which only it can report.
-private struct ButtonAssignments: View {
-    @Binding var profile: Profile
-    let controls: [HIDPPChannel.Control]
-    /// Starts (with what to do with a press) or stops listening to the buttons
-    /// the mouse keeps to itself, which only its own channel reports.
-    let learnControls: (((UInt16) -> Void)?) -> Void
-    @StateObject private var learning = ViewState(false)
-    @StateObject private var listener = ButtonListener()
-
-    var body: some View {
-        ForEach(profile.buttonActions) { assignment in
-            RowDivider()
-            AssignmentRow(assignment: binding(assignment.button)) {
-                profile.buttonActions.removeAll { $0.button == assignment.button }
-            }
-        }
-        RowDivider()
-        HStack(spacing: 10) {
-            if learning.value {
-                Text("Press the button on the mouse.")
-                    .foregroundStyle(.secondary)
-                Button("Cancel") { stopLearning() }
-                    .buttonStyle(.link)
-            } else {
-                let offered = controls.filter { profile.assignment(for: .control($0.cid)) == nil }
-                Menu("Give a button an action") {
-                    Button("Press It on the Mouse…") { startLearning() }
-                    if !offered.isEmpty {
-                        Section("Buttons the mouse keeps to itself") {
-                            ForEach(offered, id: \.cid) { control in
-                                Button(String(localized: ButtonNames.title(.control(control.cid)))) { add(.control(control.cid)) }
-                            }
-                        }
-                    }
-                }
-                .fixedSize()
-            }
-            Spacer(minLength: 0)
-        }
-        .font(.subheadline)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .settingAnchor("Give a button an action")
-        .onDisappear { stopLearning() }
-    }
-
-    private func binding(_ button: MouseButtonID) -> Binding<ButtonAssignment> {
-        Binding(get: { profile.assignment(for: button) ?? ButtonAssignment(button: button, action: .nothing) },
-                set: { new in
-                    if let i = profile.buttonActions.firstIndex(where: { $0.button == button }) { profile.buttonActions[i] = new }
-                })
-    }
-
-    private func add(_ button: MouseButtonID) {
-        stopLearning()
-        guard profile.assignment(for: button) == nil else { return }
-        profile.buttonActions.append(ButtonAssignment(button: button, action: .floatingDock))
-    }
-
-    private func startLearning() {
-        learning.value = true
-        // The left and right buttons are never offered: losing them would leave no way to click.
-        listener.start { button in
-            guard button >= 2 else { return }
-            add(.number(button))
-        }
-        learnControls { cid in add(.control(cid)) }
-    }
-
-    private func stopLearning() {
-        listener.stop()
-        if learning.value { learnControls(nil) }
-        learning.value = false
-    }
-}
-
-private struct AssignmentRow: View {
-    @Binding var assignment: ButtonAssignment
-    let remove: () -> Void
-
-    var body: some View {
-        SettingRow(title: ButtonNames.title(assignment.button)) {
-            HStack(spacing: 8) {
-                Picker("Action", selection: $assignment.action) {
-                    ForEach(ButtonAction.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .fixedSize()
-                Button(action: remove) { Image(systemName: "minus.circle") }
-                    .buttonStyle(.borderless)
-                    .help("Back to what the mouse does on its own")
-            }
-        } extra: {
-            switch assignment.action {
-            case .shortcut:
-                HStack {
-                    Text("Keys it presses").foregroundStyle(.secondary)
-                    Spacer()
-                    ShortcutRecorder(shortcut: $assignment.shortcut, defaultValue: .none)
-                }
-                .font(.subheadline)
-            case .openApp:
-                HStack {
-                    Text(verbatim: assignment.appName ?? String(localized: "No app chosen")).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Choose…") { choose() }
-                }
-                .font(.subheadline)
-            default:
-                EmptyView()
-            }
-        }
-    }
-
-    private func choose() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.application]
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        assignment.appPath = url.path
-        assignment.appName = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
-    }
-}
-
 /// What the page calls each button.
 enum ButtonNames {
+    /// The buttons a mouse keeps to itself that have a name here.
+    static let named: Set<UInt16> = [0x00FD, 0x00C3, 0x00C4]
+
     static func title(_ button: MouseButtonID) -> LocalizedStringResource {
         switch button {
         case .number(2): return "Wheel button"
+        case .number(3): return "Back button"
+        case .number(4): return "Forward button"
         case .number(let n): return "Button \(n + 1)"
         case .control(0x00FD): return "DPI button"
         case .control(0x00C3): return "Gesture button"
@@ -585,6 +455,7 @@ extension ButtonAction {
     var title: String {
         switch self {
         case .nothing: return String(localized: "Nothing")
+        case .autoscroll: return String(localized: "Autoscroll")
         case .floatingDock: return String(localized: "Floating Dock")
         case .back: return String(localized: "Back")
         case .forward: return String(localized: "Forward")
@@ -596,136 +467,368 @@ extension ButtonAction {
     }
 }
 
-/// A mouse's extra buttons pressed over the app's windows, taken from them
-/// while a button is being chosen, so the settings window doesn't go back.
-private final class ButtonListener: ObservableObject {
-    private var monitor: Any?
-
-    func start(_ pressed: @escaping (Int) -> Void) {
-        stop()
-        SwipeNavigation.paused = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { event in
-            pressed(event.buttonNumber)
-            return nil
-        }
-    }
-
-    func stop() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
-        SwipeNavigation.paused = false
-    }
-
-    deinit { stop() }
-}
-
+/// A mouse's settings, one tab at a time.
 private struct ProfileEditor: View {
     @ObservedObject var mouse: MouseController
     @ObservedObject private var permissions = Permissions.shared
     let device: MouseDevice
+    let tab: MouseTab
 
     private var profile: Binding<Profile> {
         Binding(get: { mouse.profile(for: device) }, set: { mouse.setProfile($0, for: device) })
     }
 
-    private static func distanceCaption(_ mode: ScrollMode) -> LocalizedStringKey {
-        switch mode {
-        case .macOS: return "macOS's own: a slow notch barely moves, fast spins go further. The slider scales it."
-        case .fixed: return "Every notch the same distance, however fast the wheel turns."
-        case .curve: return "A single notch goes one distance and fast spins further, along the graph."
+    var body: some View {
+        switch tab {
+        case .pointer: pointerTab
+        // Scrolling and buttons go through the event tap, which needs
+        // Accessibility: locked, as when the tool is off, until then.
+        case .scrolling: WhenEnabled(enabled: permissions.isGranted(.accessibility)) { scrollingTab }
+        case .buttons: WhenEnabled(enabled: permissions.isGranted(.accessibility)) { buttonsTab }
         }
     }
 
-    var body: some View {
+    // MARK: Pointer
+
+    @ViewBuilder
+    private var pointerTab: some View {
         let p = profile
-
-        // Locked below until granted; cursor settings work without it.
-        if !permissions.isGranted(.accessibility) {
-            Banner(text: "Wheel and button settings are not active yet. They need the Accessibility permission.",
-                   button: "Grant Access…") { mouse.requestAccessibility() }
-        } else if p.wrappedValue.needsEventTap, mouse.wheelTapFailed {
-            Banner(text: "Accessibility is granted, but the app has to restart before wheel and button settings take effect.",
-                   button: "Restart") { Relaunch.now() }
-        }
-
-        Card(title: "Cursor") {
-            OptionRow(title: "Speed", caption: "How far the cursor travels for a given hand movement.",
-                      selection: p.cursorSpeedMode, options: [(.macOS, "macOS"), (.custom, "Custom")]) {
-                if p.wrappedValue.cursorSpeedMode == .custom {
-                    ValueSlider(value: p.cursorSpeed, range: 0.2...3, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", locale: .current, $0) }
+        Card {
+            SettingRow(title: "Speed", caption: "How far the pointer travels for a given hand movement.") {
+                UseMacOSButton(shown: p.wrappedValue.cursorSpeedMode == .custom) { p.wrappedValue.cursorSpeedMode = .macOS }
+            } extra: {
+                ValueSlider(value: speed, range: 0.2...3, step: 0.05, low: "Slow", high: "Fast") { value in
+                    p.wrappedValue.cursorSpeedMode == .macOS ? String(localized: "macOS") : String(format: "%.2f×", locale: .current, value)
                 }
             }
             RowDivider()
-            OptionRow(title: "Acceleration", caption: "How much further the cursor goes when you move quickly. Off is 1:1.",
+            OptionRow(title: "Acceleration", caption: "How much further the pointer goes when you move quickly. Off is 1:1.",
                       selection: p.accelMode, options: [(.macOS, "macOS"), (.off, "Off"), (.custom, "Custom")]) {
                 if p.wrappedValue.accelMode == .custom {
                     ValueSlider(value: p.accel, range: 0...3, step: 0.005, low: "Less", high: "More") { String(format: "%.2f", locale: .current, $0) }
                 }
             }
         }
+    }
 
-        // Every wheel and button setting goes through the event tap, which
-        // needs Accessibility: locked, as when the tool is off, until then.
-        WhenEnabled(enabled: permissions.isGranted(.accessibility)) {
-            Card(title: "Wheel", footnote: "Trackpad scrolling is never changed. Fixed and Curve set how far the wheel scrolls up and down; sideways, a tilt scrolls a line at a time.") {
-                OptionRow(title: "Vertical direction", selection: p.verticalInverted, options: [(false, "macOS"), (true, "Inverted")])
-                RowDivider()
-                OptionRow(title: "Horizontal direction", caption: "Tilt wheel or side scrolling.",
-                          selection: p.horizontalInverted, options: [(false, "macOS"), (true, "Inverted")])
-                RowDivider()
-                OptionRow(title: "Distance", caption: Self.distanceCaption(p.wrappedValue.scrollMode),
-                          selection: p.scrollMode, options: [(.macOS, "macOS"), (.fixed, "Fixed"), (.curve, "Curve")]) {
-                    switch p.wrappedValue.scrollMode {
-                    case .macOS:
-                        ValueSlider(value: p.scrollSpeed, range: 0.25...5, step: 0.05, low: "Short", high: "Long") { String(format: "%.2f×", locale: .current, $0) }
-                    case .fixed:
-                        ValueSlider(value: p.scrollLines, range: Profile.scrollLinesRange, step: 1, low: "Short", high: "Long") {
-                            $0 == 1 ? String(localized: "1 line") : String(localized: "\(Int($0)) lines")
+    /// The speed as the slider shows it: macOS's own is 1×, the resolution
+    /// macOS assumes for a mouse, and moving it there hands the speed back.
+    private var speed: Binding<Double> {
+        let p = profile
+        return Binding(get: { p.wrappedValue.cursorSpeedMode == .custom ? p.wrappedValue.cursorSpeed : 1 },
+                       set: { value in
+                           if abs(value - 1) < 0.001 {
+                               p.wrappedValue.cursorSpeedMode = .macOS
+                           } else {
+                               p.wrappedValue.cursorSpeedMode = .custom
+                               p.wrappedValue.cursorSpeed = value
+                           }
+                       })
+    }
+
+    // MARK: Scrolling
+
+    private static func distanceCaption(_ mode: ScrollMode) -> LocalizedStringKey {
+        switch mode {
+        case .macOS: return "macOS's own: a slow notch barely moves, fast spins go further. The slider scales it."
+        case .fixed: return "Every notch scrolls this far on screen, however fast the wheel turns, so most apps scroll alike."
+        case .curve: return "A single notch scrolls one distance on screen and fast spins further, along the graph."
+        }
+    }
+
+    @ViewBuilder
+    private var scrollingTab: some View {
+        let p = profile
+        Card(footnote: "Trackpad scrolling is never changed.") {
+            OptionRow(title: "Distance", caption: Self.distanceCaption(p.wrappedValue.scrollMode),
+                      selection: Binding(get: { p.wrappedValue.scrollMode }, set: { p.wrappedValue.setScrollMode($0) }),
+                      options: [(.macOS, "macOS"), (.fixed, "Fixed"), (.curve, "Curve")]) {
+                switch p.wrappedValue.scrollMode {
+                case .macOS:
+                    ValueSlider(value: p.scrollSpeed, range: 0.25...5, step: 0.05, low: "Short", high: "Long") { String(format: "%.2f×", locale: .current, $0) }
+                case .fixed:
+                    ValueSlider(value: p.scrollDistance, range: Profile.scrollDistanceRange, step: 5, low: "Short", high: "Long") { WheelCurveEditor.points($0) }
+                case .curve:
+                    HStack {
+                        Text("Shape")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Picker("Shape", selection: p.scrollCurve.afterUpdate) {
+                            Text("Linear").tag(ScrollCurve.linear)
+                            Text("Curve").tag(ScrollCurve.curve)
                         }
-                    case .curve:
-                        HStack {
-                            Text("Shape")
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Picker("Shape", selection: p.scrollCurve.afterUpdate) {
-                                Text("Linear").tag(ScrollCurve.linear)
-                                Text("Curve").tag(ScrollCurve.curve)
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
-                            .fixedSize()
-                        }
-                        WheelCurveEditor(start: p.scrollCurveStart, end: p.scrollCurveEnd, bend: p.scrollCurveBend,
-                                         curved: p.wrappedValue.scrollCurve == .curve)
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
                     }
+                    WheelCurveEditor(start: p.scrollCurveFrom, end: p.scrollCurveTo, bend: p.scrollCurveBend,
+                                     curved: p.wrappedValue.scrollCurve == .curve)
                 }
-                RowDivider()
-                OptionRow(title: "Smoothing", caption: "Glide each notch instead of jumping.",
-                          selection: p.smoothScrolling, options: [(false, "macOS"), (true, "Smooth")])
             }
-
-            Card(title: "Buttons", footnote: "Other apps receive the back and forward buttons unchanged; most browsers and editors already handle them. A wheel click without moving stays a normal middle click. A button given its own action does only that, in every app.") {
-                OptionRow(title: "Back and forward buttons", caption: "Go back and forward in Finder, Safari and other Apple apps.",
-                          selection: p.navigationButtons, options: [(false, "macOS"), (true, "Navigate")]) {
-                    if p.wrappedValue.navigationButtons {
-                        NavigationButtons(profile: p)
+            RowDivider()
+            SettingRow(title: "Smooth scrolling", caption: "Each notch glides instead of jumping, as far as it would jump.") {
+                Toggle("Smooth scrolling", isOn: p.smoothScrolling)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+            } extra: {
+                if p.wrappedValue.smoothScrolling {
+                    HStack {
+                        Text("Glide")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Picker("Glide", selection: p.glide.afterUpdate) {
+                            Text("Normal").tag(GlideSpeed.normal)
+                            Text("Fast").tag(GlideSpeed.fast)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
                     }
-                }
-                RowDivider()
-                OptionRow(title: "Wheel button", caption: "Hold it and move the mouse to scroll, faster the farther you move, in any app.",
-                          selection: p.autoscroll, options: [(false, "macOS"), (true, "Autoscroll")]) {
-                    if p.wrappedValue.autoscroll {
-                        ValueSlider(value: p.autoscrollPace, range: Profile.autoscrollPaceRange, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", locale: .current, $0) }
-                    }
-                }
-                if p.wrappedValue.autoscroll {
-                    RowDivider()
-                    AutoscrollExceptions(mouse: mouse)
-                }
-                ButtonAssignments(profile: p, controls: mouse.hidppControls[device.id] ?? []) { handler in
-                    mouse.learnControls(handler.map { add in { key, cid in if key == device.id { add(cid) } } })
                 }
             }
         }
+
+        Card(title: "Direction") {
+            ToggleRow(title: "Reverse vertical scrolling", caption: "The opposite of macOS's Natural scrolling, for this mouse only.",
+                      isOn: p.verticalInverted)
+            RowDivider()
+            ToggleRow(title: "Reverse horizontal scrolling", caption: "Tilt wheel or side scrolling.", isOn: p.horizontalInverted)
+        }
     }
+
+    // MARK: Buttons
+
+    @ViewBuilder
+    private var buttonsTab: some View {
+        Card(footnote: "Press a button on the mouse to find it here; one that isn't listed is added. The left and right buttons always click.") {
+            ButtonList(mouse: mouse, device: device, profile: profile)
+        }
+    }
+}
+
+/// Hands a setting back to macOS: there only while it isn't macOS's.
+private struct UseMacOSButton: View {
+    let shown: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Use macOS's", systemImage: "arrow.uturn.backward")
+        }
+        .controlSize(.small)
+        // Kept in place while hidden, so the row doesn't change height.
+        .opacity(shown ? 1 : 0)
+        .disabled(!shown)
+        .accessibilityHidden(!shown)
+    }
+}
+
+/// Every button of the mouse worth a row: the wheel, back and forward
+/// buttons most mice have, those it keeps to itself, and any other that has
+/// an action or was pressed. Each does what macOS does until given one.
+private struct ButtonList: View {
+    @ObservedObject var mouse: MouseController
+    let device: MouseDevice
+    @Binding var profile: Profile
+    @StateObject private var finder = ButtonFinder()
+
+    private var buttons: [MouseButtonID] {
+        var numbered: Set<Int> = [2, 3, 4]
+        // Those it keeps to itself by name: a keyboard can report twenty, its
+        // function keys among them, which show once pressed or given an action.
+        var controls: [UInt16] = (mouse.hidppControls[device.id] ?? []).map(\.cid).filter(ButtonNames.named.contains)
+        for button in profile.buttonActions.map(\.button) + finder.found {
+            switch button {
+            case .number(let n): numbered.insert(n)
+            case .control(let cid): if !controls.contains(cid) { controls.append(cid) }
+            }
+        }
+        return numbered.sorted().map { .number($0) } + controls.map { .control($0) }
+    }
+
+    var body: some View {
+        // One view: on a ForEach, these would be each row's, and a row going
+        // (a button set back to Default) would stop the finder.
+        VStack(spacing: 0) {
+            ForEach(Array(buttons.enumerated()), id: \.element) { index, button in
+                if index > 0 { RowDivider() }
+                ButtonRow(button: button, assignment: assignment(button), pace: $profile.autoscrollPace, lit: finder.lit == button)
+                if button == .number(2), profile.assignment(for: button)?.action == .autoscroll {
+                    RowDivider()
+                    AutoscrollExceptions(mouse: mouse)
+                }
+            }
+        }
+        .onAppear { finder.start(mouse: mouse, deviceID: device.id) }
+        .onDisappear { finder.stop() }
+    }
+
+    /// Nil while the button does what macOS does.
+    private func assignment(_ button: MouseButtonID) -> Binding<ButtonAssignment?> {
+        Binding(get: { profile.assignment(for: button) },
+                set: { new in
+                    if let new {
+                        if let i = profile.buttonActions.firstIndex(where: { $0.button == button }) {
+                            profile.buttonActions[i] = new
+                        } else {
+                            profile.buttonActions.append(new)
+                        }
+                    } else {
+                        profile.buttonActions.removeAll { $0.button == button }
+                    }
+                })
+    }
+}
+
+/// One button: its action, what that does, and what the action needs.
+private struct ButtonRow: View {
+    let button: MouseButtonID
+    @Binding var assignment: ButtonAssignment?
+    @Binding var pace: Double
+    /// Lit for a moment as the button is pressed.
+    let lit: Bool
+
+    private var action: Binding<ButtonAction?> {
+        Binding(get: { assignment?.action },
+                set: { action in
+                    guard let action else { assignment = nil; return }
+                    var new = assignment ?? ButtonAssignment(button: button, action: action)
+                    new.action = action
+                    assignment = new
+                })
+    }
+
+    var body: some View {
+        SettingRow(title: ButtonNames.title(button), caption: caption) {
+            Picker("Action", selection: action) {
+                Text("Default").tag(ButtonAction?.none)
+                Divider()
+                ForEach(ButtonAction.offered(for: button), id: \.self) { Text(verbatim: $0.title).tag(ButtonAction?.some($0)) }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .fixedSize()
+        } extra: {
+            extra
+        }
+        .background(Color.accentColor.opacity(lit ? 0.16 : 0))
+        .animation(.easeOut(duration: lit ? 0.1 : 0.8), value: lit)
+    }
+
+    @ViewBuilder
+    private var extra: some View {
+        switch assignment?.action {
+        case .shortcut:
+            HStack {
+                Text("Keys it presses").foregroundStyle(.secondary)
+                Spacer()
+                ShortcutRecorder(shortcut: Binding(get: { assignment?.shortcut ?? .none }, set: { assignment?.shortcut = $0 }), defaultValue: .none)
+            }
+            .font(.subheadline)
+        case .openApp:
+            HStack {
+                Text(verbatim: assignment?.appName ?? String(localized: "No app chosen")).foregroundStyle(.secondary)
+                Spacer()
+                Button("Choose…") { choose() }
+            }
+            .font(.subheadline)
+        case .autoscroll:
+            ValueSlider(value: $pace, range: Profile.autoscrollPaceRange, step: 0.05, low: "Slow", high: "Fast") { String(format: "%.2f×", locale: .current, $0) }
+        default:
+            EmptyView()
+        }
+    }
+
+    /// What the button does: macOS's own until it has an action, then that.
+    private var caption: LocalizedStringKey? {
+        switch assignment?.action {
+        case nil:
+            switch button {
+            case .number(2): return "A middle click, which opens a link in a new tab."
+            case .number(3): return "Browsers and editors go back with it; Apple's apps ignore it."
+            case .number(4): return "Browsers and editors go forward with it; Apple's apps ignore it."
+            case .number: return "Sent to the app, which most ignore."
+            case .control: return "What the mouse does with it on its own."
+            }
+        case .nothing: return "Does nothing, in every app."
+        case .back: return "Goes back in every app, Apple's included."
+        case .forward: return "Goes forward in every app, Apple's included."
+        case .autoscroll: return "Hold it and move the mouse to scroll, faster the farther you move. A click without moving stays a middle click."
+        case .floatingDock: return "Opens the Floating Dock at the pointer."
+        case .missionControl, .showDesktop, .shortcut, .openApp: return nil
+        }
+    }
+
+    private func choose() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        assignment?.appPath = url.path
+        assignment?.appName = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+    }
+}
+
+/// Lights a button's row as it's pressed, while the buttons are shown and the
+/// toolkit is in front: a press over its windows reaches them rather than
+/// doing what it's set to, and one the mouse keeps to itself reports here.
+/// Off while another app is in front, so the buttons work there as set.
+private final class ButtonFinder: ObservableObject {
+    @Published private(set) var lit: MouseButtonID?
+    /// Buttons pressed that have no row of their own yet.
+    @Published private(set) var found: [MouseButtonID] = []
+    private weak var mouse: MouseController?
+    private var deviceID = ""
+    private var monitor: Any?
+    private var observers: [NSObjectProtocol] = []
+    private var dim: DispatchWorkItem?
+
+    func start(mouse: MouseController, deviceID: String) {
+        guard !mouse.isPreview, observers.isEmpty else { return }
+        self.mouse = mouse
+        self.deviceID = deviceID
+        let center = NotificationCenter.default
+        observers = [
+            center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.listen(true) },
+            center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.listen(false) },
+        ]
+        listen(NSApp.isActive)
+    }
+
+    func stop() {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+        listen(false)
+    }
+
+    private func listen(_ on: Bool) {
+        if on, monitor == nil {
+            // Not back and forward through the settings window's history.
+            SwipeNavigation.paused = true
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { [weak self] event in
+                self?.pressed(.number(event.buttonNumber))
+                return nil
+            }
+            mouse?.identifyButtons(of: deviceID) { [weak self] key, cid in
+                guard let self, key == deviceID else { return }
+                pressed(.control(cid))
+            }
+        } else if !on, let monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+            SwipeNavigation.paused = false
+            mouse?.identifyButtons(of: deviceID, nil)
+        }
+    }
+
+    private func pressed(_ button: MouseButtonID) {
+        if !found.contains(button) { found.append(button) }
+        lit = button
+        dim?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.lit = nil }
+        dim = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
+    }
+
+    deinit { stop() }
 }

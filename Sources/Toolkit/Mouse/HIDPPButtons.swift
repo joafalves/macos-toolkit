@@ -38,7 +38,8 @@ final class HIDPPButtons {
     private var desired: [String: Set<UInt16>] = [:]
     /// While a button is being chosen on the page: every control offered is
     /// asked for, so a press of one says which it is.
-    private var learning = false
+    /// The mouse, by key, whose every control reports while its buttons are shown.
+    private var learning: String?
 
     var isRunning: Bool { thread != nil }
 
@@ -94,11 +95,12 @@ final class HIDPPButtons {
         runLoop = nil
     }
 
-    /// While on, every button the mice keep to themselves reports to us, so
-    /// pressing one can name it; off, back to only those with an action.
-    func learn(_ on: Bool) {
+    /// While set, every button that mouse keeps to itself reports to us, so
+    /// pressing one can name it; nil, back to only those with an action.
+    /// Only that mouse: another device's (a keyboard's keys) would go dead.
+    func learn(_ key: String?) {
         perform { [self] in
-            learning = on
+            learning = key
             for mouse in mice.values { apply(mouse) }
         }
     }
@@ -166,7 +168,7 @@ final class HIDPPButtons {
 
     private func apply(_ mouse: Mouse) {
         let all = Set(mouse.controls.map(\.cid))
-        let wanted = learning ? all : (desired[mouse.key] ?? []).intersection(all)
+        let wanted = learning == mouse.key ? all : (desired[mouse.key] ?? []).intersection(all)
         for cid in wanted.subtracting(mouse.diverted) where mouse.channel.setDiverted(cid, true, feature: mouse.feature) {
             mouse.diverted.insert(cid)
             Log.mouse.notice("hid++ control diverted: \(String(format: "%04X", cid), privacy: .public)")

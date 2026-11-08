@@ -26,6 +26,8 @@ final class Autoscroller {
     private static let pace = 0.25
 
     private var state = State.idle
+    /// A press of the wheel button is held, or scrolling: its release is ours.
+    var isActive: Bool { state != .idle }
     private var anchor = CGPoint.zero
     private var pointer = CGPoint.zero
     private var speed = 1.0
@@ -38,14 +40,15 @@ final class Autoscroller {
     private var indicator: NSPanel?
 
     /// Handles the wheel button (button 2). Returns true when the event was
-    /// consumed; a drag passes on as a plain move. `profile` is the scrolling
-    /// mouse's, read on the press only.
-    func handle(type: CGEventType, event: CGEvent, profile: () -> Profile?) -> Bool {
+    /// consumed, false when it goes to the app as it is, and nil when it isn't
+    /// autoscroll's: the button has another action, or none. A drag passes on
+    /// as a plain move. `pace` is the scrolling mouse's, nil when its wheel
+    /// button doesn't autoscroll, read on the press only.
+    func handle(type: CGEventType, event: CGEvent, pace: () -> Double?) -> Bool? {
         switch type {
         case .otherMouseDown:
-            guard state == .idle, let profile = profile(), profile.autoscroll,
-                  !event.flags.contains(bypassKey())
-            else { return false }
+            guard state == .idle, let pace = pace() else { return nil }
+            guard !event.flags.contains(bypassKey()) else { return false }
             let excluded = excludedApps()
             if !excluded.isEmpty, let id = NSRunningApplication.owningWindow(at: event.location)?.bundleIdentifier,
                excluded.contains(id) {
@@ -55,11 +58,11 @@ final class Autoscroller {
             state = .pending
             anchor = event.location
             pointer = anchor
-            speed = profile.autoscrollPace * Self.pace
+            speed = pace * Self.pace
             flags = event.flags
             return true
         case .otherMouseDragged:
-            guard state != .idle else { return false }
+            guard state != .idle else { return nil }
             pointer = event.location
             if state == .pending, hypot(pointer.x - anchor.x, pointer.y - anchor.y) >= Self.startDistance {
                 start()
@@ -70,7 +73,7 @@ final class Autoscroller {
             return false
         case .otherMouseUp:
             switch state {
-            case .idle: return false
+            case .idle: return nil
             case .pending:
                 state = .idle
                 Self.click(at: anchor, flags: flags)
@@ -79,7 +82,7 @@ final class Autoscroller {
             }
             return true
         default:
-            return false
+            return nil
         }
     }
 

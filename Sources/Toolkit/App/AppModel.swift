@@ -83,7 +83,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     var summary: String {
         switch self {
         case .welcome: return ""
-        case .mouse: return String(localized: "Cursor and wheel settings for each mouse.")
+        case .mouse: return String(localized: "Pointer, scrolling and buttons for each mouse.")
         case .switcher: return String(localized: "⌘Tab through windows instead of apps.")
         case .layout: return String(localized: "Snap windows to halves, quarters, thirds or a grid.")
         case .mixer: return String(localized: "A volume for each app, and an equalizer.")

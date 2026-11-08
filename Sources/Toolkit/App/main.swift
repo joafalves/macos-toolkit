@@ -132,11 +132,13 @@ if let flag = CommandLine.arguments.firstIndex(of: "--snapshot"), CommandLine.ar
         exit(0)
     }
     // `layout tabs` or `layout keyboard`: that tab of the Window Layout page;
-    // `mouse device`: the made-up mouse's own page.
+    // `mouse device`: the made-up mouse's own page; with `scrolling` or
+    // `buttons`, that tab of it.
     CaptureController.previewText = rest.contains("text")
     TweaksModel.previewStillRunning = rest.contains("running")
     MixerController.previewDriver = rest.first { $0.hasPrefix("driver=") }.map { String($0.dropFirst(7)) }
     MouseController.previewOpen = rest.contains("device")
+    MouseController.previewTab = rest.compactMap(MouseTab.init).first
     MainView.previewSearch = rest.first { $0.hasPrefix("search=") }.map { String($0.dropFirst(7)) } ?? ""
     LayoutController.previewPage = rest.contains("tabs") ? .tabs : rest.contains("keyboard") ? .keyboard : nil
     // `stats cpu`, `stats memory`, …: that stat's tab of the System Stats page.

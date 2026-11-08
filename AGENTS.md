@@ -34,7 +34,7 @@ tool; keep it in step with the code.
   bar item's segments, the mixer popover, the main window), `MenuBar` (the one menu bar item), `AppModel` (`AppSection`, the sidebar sections),
   `MainView`, `GeneralConfig` (the app's own settings, such as the menu bar spacing and order),
   `AppNavigation` (how each app is told to go back or forward: a navigation swipe, or its Back and
-  Forward menu items; Mouse's Navigate and the Finder tool's swipes share it),
+  Forward menu items; Mouse's Back and Forward actions and the Finder tool's swipes share it),
   `MenuBarOrderView` (the order list on the Settings page), `Permissions`/`PermissionsView`/`PermissionsSheet` (see Permissions below), `ToolkitPanel` (the panel the toolkit's mark opens: every tool with its switch),
   `SettingsTransfer` (export and import of all settings), `Snapshot`, `WindowUnderPointer`
   (which app owns the window under a point, for tools that act on it), `Navigator` (the settings
@@ -69,6 +69,11 @@ tool; keep it in step with the code.
   channel (`Mouse/HIDPP.swift`, `HIDPPButtons`: feature 0x1B04, on a thread of its own). A divert is gone
   when the mouse disconnects, so it's made again on each connection and undone on quit (`MouseController.stop`).
   Only mice connected directly: behind a receiver the channel is the receiver's.
+  Back, Forward and Autoscroll are actions like the rest (Navigate and Autoscroll were switches before 0.28.0,
+  migrated in `Profile.init(from:)`). Fixed and Curve give a notch a distance in points, not lines: the wheel
+  tap makes the event continuous, as a trackpad's, with whole points and the lines carried
+  (`WheelEngine.setDistance`). Apps size a line their own way (10 px in one, 40 or 50 in others, and some
+  read only that the wheel moved), but most scroll a distance as given; don't go back to lines.
   `AIUsage` is System Stats' AI usage stat (`StatKind.ai`), owned by `StatsController` (`ai`), which sets it `active`
   while the stat isn't off; its card goes on System Stats' page. It reads only what a tool writes down itself, on a
   queue of its own (`AIUsageReader`: FSEvents and a slow timer, not System Stats' tick): no credentials, no network,
@@ -387,7 +392,7 @@ swift build                                  # compile check
 ./scripts/build.sh --install                 # also copy to /Applications and relaunch (and Finder, if the extension is on)
 ./scripts/build.sh --dev [--install]         # with the development flags, for the tests run through the app bundle
 .build/debug/Toolkit --snapshot out.png [mouse|switcher|layout|mixer|finder|capture|stats|general|tweaks] [light]   # tweaks: macOS's defaults with two changed, not this Mac's (with `running`, Tips off and still running)
-.build/debug/Toolkit --snapshot out.png mouse device [light]   # the made-up mouse's own page, not the list
+.build/debug/Toolkit --snapshot out.png mouse device [scrolling|buttons] [light]   # the made-up mouse's own page, not the list, on that tab (Pointer otherwise)
 .build/debug/Toolkit --snapshot out.png general search=battery  # the sidebar with that search's results
 .build/debug/Toolkit --snapshot out.png mixer tall [light]      # any page, twice as tall, for the whole of a long one
 .build/debug/Toolkit --snapshot out.png stats <cpu|memory|network|disk|gpu|power> [light]   # that stat's tab of the System Stats page
@@ -446,7 +451,7 @@ swift build                                  # compile check
 .build/debug/Toolkit --test-disk-history    # the settings window's back and forward through the made-up disk map, by ⌘[ and ⌘], in a window never shown
 .build/debug/Toolkit --test-disk-space      # the disk map of a made-up folder against what went in, then this Mac's disk scanned for real (changes nothing): time, items kept, memory, a cancel
 .build/debug/Toolkit --test-stats-panels     # each stats panel costs nothing left alone, and one closed from a real menu bar item is let go of; the page's tabs read their stat, and nothing once the window closes
-.build/debug/Toolkit --test-navigation       # what Navigate does with each button in each kind of app, posting nothing; with Accessibility (open -n the dev bundle), Finder's Back and Forward found
+.build/debug/Toolkit --test-navigation       # what Back and Forward do with each button in each kind of app, posting nothing; settings from before 0.28.0 read into button actions and points; a notch's distance and lines as apps get them; with Accessibility (open -n the dev bundle), Finder's Back and Forward found
 .build/debug/Toolkit --test-tweaks           # every tweak read from this Mac (changes nothing of macOS's), and the preference round trip on a scratch domain
 .build/debug/Toolkit --test-taps [report]    # a tap keeps up while the main thread is stuck (run with open -n)
 .build/debug/Toolkit --test-awake <report>   # Keep Awake's assertion, times and one mouse drift (open -n)

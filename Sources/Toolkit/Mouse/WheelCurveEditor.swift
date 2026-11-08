@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// How far a notch scrolls, as the graph the wheel tap follows: across, how
-/// fast the wheel spins; up, the lines a notch goes. The left end is a single
+/// fast the wheel spins; up, the points a notch goes. The left end is a single
 /// notch, the right end a fast spin; with a curve, a handle in the middle
 /// bends it. Drawn with shapes: a redrawing
 /// Canvas keeps graphics memory (see System Stats).
@@ -11,7 +11,7 @@ struct WheelCurveEditor: View {
     @Binding var bend: Double
     let curved: Bool
 
-    private static let range = Profile.scrollCurveRange
+    private static let range = Profile.scrollDistanceRange
     private static let bends: ClosedRange<Double> = 1...4
     private static let height: CGFloat = 120
     private static let space = "wheel-curve"
@@ -19,7 +19,7 @@ struct WheelCurveEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text("A notch scrolls \(Self.lines(start)), a fast spin \(Self.lines(end))")
+                Text("A notch scrolls \(Self.points(start)), a fast spin \(Self.points(end))")
                     .font(.callout)
                 Spacer()
                 Text(curved ? "Drag the ends and the middle" : "Drag the ends")
@@ -36,12 +36,12 @@ struct WheelCurveEditor: View {
                     Line(points: (0...40).map { Double($0) / 40 }.map { point($0, further(at: $0), in: plot) })
                         .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     handle(at: point(0, start, in: plot))
-                        .gesture(drag(in: plot) { lines in start = min(lines, end) })
+                        .gesture(drag(in: plot) { points in start = min(points, end) })
                     handle(at: point(1, end, in: plot))
-                        .gesture(drag(in: plot) { lines in end = max(lines, start) })
+                        .gesture(drag(in: plot) { points in end = max(points, start) })
                     if curved {
                         handle(at: point(0.5, further(at: 0.5), in: plot))
-                            .gesture(drag(in: plot) { lines in bend = bend(for: lines) })
+                            .gesture(drag(in: plot) { points in bend = bend(for: points) })
                     }
                 }
                 .coordinateSpace(name: Self.space)
@@ -62,8 +62,8 @@ struct WheelCurveEditor: View {
         WheelEngine.further(start: start, end: end, bend: bend, curved: curved, at: pace)
     }
 
-    private func point(_ pace: Double, _ lines: Double, in plot: CGRect) -> CGPoint {
-        let share = (lines - Self.range.lowerBound) / (Self.range.upperBound - Self.range.lowerBound)
+    private func point(_ pace: Double, _ points: Double, in plot: CGRect) -> CGPoint {
+        let share = (points - Self.range.lowerBound) / (Self.range.upperBound - Self.range.lowerBound)
         return CGPoint(x: plot.minX + pace * plot.width, y: plot.maxY - share * plot.height)
     }
 
@@ -78,34 +78,33 @@ struct WheelCurveEditor: View {
             .position(point)
     }
 
-    /// Where the pointer is, in lines, in tenths.
+    /// Where the pointer is, in points, in fives.
     private func drag(in plot: CGRect, _ moved: @escaping (Double) -> Void) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.space)).onChanged { value in
             let share = (plot.maxY - value.location.y) / plot.height
-            let lines = Self.range.lowerBound + share * (Self.range.upperBound - Self.range.lowerBound)
-            moved((min(max(lines, Self.range.lowerBound), Self.range.upperBound) * 10).rounded() / 10)
+            let points = Self.range.lowerBound + share * (Self.range.upperBound - Self.range.lowerBound)
+            moved((min(max(points, Self.range.lowerBound), Self.range.upperBound) / 5).rounded() * 5)
         }
     }
 
-    /// The bend that puts the middle of the curve at `lines`.
-    private func bend(for lines: Double) -> Double {
+    /// The bend that puts the middle of the curve at `points`.
+    private func bend(for points: Double) -> Double {
         guard end - start > 0.01 else { return bend }
-        let share = min(max((lines - start) / (end - start), 0.0625), 0.5)
+        let share = min(max((points - start) / (end - start), 0.0625), 0.5)
         let value = log(share) / log(0.5)
         return (min(max(value, Self.bends.lowerBound), Self.bends.upperBound) * 20).rounded() / 20
     }
 
-    private static func lines(_ value: Double) -> String {
-        let number = value == value.rounded() ? "\(Int(value))" : String(format: "%.1f", locale: .current, value)
-        return value == 1 ? String(localized: "1 line") : String(localized: "\(number) lines")
+    static func points(_ value: Double) -> String {
+        String(localized: "\(Int(value.rounded())) pt")
     }
 
-    /// Faint lines every three lines.
+    /// Faint lines every 50 points.
     private struct Grid: Shape {
         let range: ClosedRange<Double>
         func path(in rect: CGRect) -> Path {
             var path = Path()
-            for step in stride(from: 3.0, through: range.upperBound, by: 3) {
+            for step in stride(from: 50.0, through: range.upperBound, by: 50) {
                 let y = rect.maxY - (step - range.lowerBound) / (range.upperBound - range.lowerBound) * rect.height
                 path.move(to: CGPoint(x: rect.minX, y: y))
                 path.addLine(to: CGPoint(x: rect.maxX, y: y))

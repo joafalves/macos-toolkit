@@ -63,7 +63,7 @@ long as you need. CPU, memory and more in the menu bar, with memory that means s
       <a href="#mouse">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="docs/images/mouse-device-dark.png">
-          <img src="docs/images/mouse-device-light.png" width="380" alt="Mouse settings: cursor speed and acceleration, wheel direction, speed and smoothing">
+          <img src="docs/images/mouse-device-light.png" width="380" alt="A mouse's Scrolling tab: a fixed distance in points, smooth scrolling and direction">
         </picture><br>
         <b>Mouse</b>
       </a>
@@ -123,7 +123,7 @@ section in the sidebar and (where it makes sense) an entry in the menu bar.
 | 🎚️ **[Audio Mixer](#audio-mixer)** | A volume for each app, plus an equalizer and volume control for outputs that have none. |
 | 🪟 **[Window Switcher](#window-switcher)** | ⌘Tab lists *windows*, not apps, across all Spaces. |
 | 🔲 **[Window Layout](#window-layout)** | Shortcuts for halves, quarters and thirds, a grid you place windows on with two keys, a finer grid of dots to line any window up on, snapping by dragging, and stacks of windows sharing a slot (a preview). |
-| 🖱️ **[Mouse](#mouse)** | Cursor and wheel settings per mouse, autoscroll on the wheel button, an action for any other button (even one the mouse keeps to itself), plus battery level. |
+| 🖱️ **[Mouse](#mouse)** | Pointer, scrolling and buttons per mouse: a scroll distance that's the same in most apps, autoscroll on the wheel button, an action for any button (even one the mouse keeps to itself), plus battery level. |
 | 📁 **[Finder](#finder)** | ⌘X to cut files, two-finger swipes back and forward, and New Text File and Open in Terminal in the right-click menu. |
 | 📸 **[Screen Capture](#screen-capture)** | ⇧⌘3/4/5 screenshots and screen recordings, with window backdrops and small H.264 files, and ⇧⌘2 to copy the text on screen. |
 | 📊 **[System Stats](#system-stats)** | CPU, memory, network, disk, GPU, power and AI usage in the menu bar, with a memory figure that leaves out what macOS only caches, and a map of what takes space on the disk. |
@@ -589,14 +589,15 @@ two would fight over the same keys and drags.
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/mouse-device-dark.png">
-    <img src="docs/images/mouse-device-light.png" width="520" alt="One mouse's page: cursor speed and acceleration, wheel direction, distance and smoothing, and its buttons">
+    <img src="docs/images/mouse-device-light.png" width="520" alt="A mouse's Scrolling tab: a fixed distance in points, smooth scrolling and direction">
   </picture>
 </p>
 
-Every setting has a **macOS** choice, meaning the toolkit leaves that behaviour to System Settings.
-The page lists every mouse: those connected, with their charge, then those the toolkit keeps
-settings for while they're away. Click one for its own page, with its settings and buttons to reset,
-rename or forget it, or to copy its settings to the other mice you pick (their names stay). Back in the toolbar, ⌘[, a two-finger swipe to the right or the mouse's back button goes back to the
+A setting the toolkit doesn't change is left to System Settings: **macOS** in a choice, **Default** for a
+button. The page lists every mouse: those connected, with their charge, then those the toolkit keeps
+settings for while they're away. Click one for its own page, in three tabs: **Pointer**, **Scrolling** and
+**Buttons**. Its **…** menu renames, resets or forgets it, or copies its settings to the other mice you
+pick (their names stay). Back in the toolbar, ⌘[ or a two-finger swipe to the right goes back to the
 list. With **Show in the menu bar** on, its part of the menu bar
 opens a panel with each connected mouse and its charge; a mouse there opens its page. Settings are per mouse, by its Bluetooth address or serial number, so two of the same
 model each have their own, and an Apple mouse keeps its settings on its cable. They come back as
@@ -604,38 +605,47 @@ soon as the mouse is connected again.
 
 | Setting | Options | How |
 | --- | --- | --- |
-| Cursor speed | macOS / custom multiplier | `HIDPointerResolution` on the device's HID service |
-| Cursor acceleration | macOS / off / custom (0–3) | `HIDMouseAcceleration` on the device's HID service |
-| Wheel direction (vertical, horizontal) | macOS / inverted | scroll event tap |
-| Wheel distance | macOS (its own, scaled) / fixed (lines a notch) / curve (a notch one distance, fast spins further, along a graph you drag) | scroll event tap; fixed and curve also switch `HIDMouseScrollAcceleration` off on the device, so a slow notch isn't shrunk to a point |
-| Wheel smoothing | macOS / smooth | scroll event tap |
-| Back and forward buttons | macOS / navigate, with which buttons they are (4 and 5 unless changed) | event tap; in Apple's apps, which ignore the buttons, a navigation swipe, or a press of Back or Forward in their menus where they ignore that too (System Settings) |
-| Wheel button | macOS / autoscroll, with a speed | event tap; posts scroll events while the button is held |
-| Give a button an action | Floating Dock, back, forward, Mission Control, Show Desktop, a keyboard shortcut, open an app, or nothing | event tap; for the buttons a mouse keeps to itself, its HID++ channel |
+| Pointer speed | macOS / a multiplier (Use macOS's puts it back) | `HIDPointerResolution` on the device's HID service |
+| Pointer acceleration | macOS / off / custom (0–3) | `HIDMouseAcceleration` on the device's HID service |
+| Scroll distance | macOS (its own, scaled) / fixed (points a notch) / curve (a notch one distance, fast spins further, along a graph you drag) | scroll event tap; fixed and curve also switch `HIDMouseScrollAcceleration` off on the device, so a slow notch isn't shrunk to a point |
+| Smooth scrolling | on / off, with a glide that's normal or fast (stops in half the time) | scroll event tap |
+| Reverse vertical or horizontal scrolling | on / off | scroll event tap |
+| A button's action | Default, nothing, back, forward, autoscroll (the wheel button), Floating Dock, Mission Control, Show Desktop, a keyboard shortcut, open an app | event tap; for the buttons a mouse keeps to itself, its HID++ channel |
 
-Cursor settings need no permission. The wheel and button settings that go through the event tap need
-**Accessibility**. Trackpad scrolling is never modified. Fixed and curve set how far the wheel scrolls
-up and down; sideways, a tilt scrolls a line at a time. They count each wheel event as a notch, as an
-ordinary wheel sends them; a mouse whose own software makes its wheel
-send fractions of a notch is left to that software.
+The pointer settings need no permission. Scrolling and buttons go through the event tap and need
+**Accessibility**. Trackpad scrolling is never modified.
 
-**Autoscroll** works in every app: hold the wheel button and move the mouse,
+**Fixed** and **curve** give a notch a distance on screen, in points, as a trackpad reports its scrolling.
+A wheel normally tells apps how many lines to scroll, and each app makes a line its own size: one notch
+of "3 lines" was 30 pixels in one code editor and 120 in a browser. Most apps scroll a distance in points
+the same, so one setting fits them all. Picking fixed or curve starts at 90 points with **Smooth
+scrolling** on, which glides each notch as far as it would jump; a browser no longer glides a notch
+on its own. Sideways, a tilt scrolls 20 points at a time. They count each wheel event as a notch, as an
+ordinary wheel sends them; a mouse whose own software makes its wheel send fractions of a notch is left
+to that software.
+
+**Buttons** lists the wheel, back and forward buttons, the ones the mouse keeps to itself, and any other
+you've given an action. Press a button on the mouse while the tab is open to light up its row; one that
+isn't listed is added. Over the toolkit's window a press only finds its row, whatever it's set to; in
+other apps it does its action. **Back** and **Forward** work in every app: in Apple's, which ignore the
+mouse's buttons, through a navigation swipe or their Back and Forward menu items (System Settings); in
+the others, as the button they already know.
+
+**Autoscroll**, the wheel button's action, works in every app: hold the wheel button and move the mouse,
 and the window scrolls that way, faster the farther you move from where you pressed. A marker shows
 that spot, and letting go stops. A wheel click without moving is still a normal middle click, so
 links still open in new tabs. Hold **⌥** (or the key picked in the settings) while pressing the wheel
 to get the app's own behaviour for that press, such as its own autoscroll or panning, without giving
 up autoscroll in that app. Apps that should always get the button (design apps that pan with it,
 remote desktops, virtual machines) can be added to **Leave the wheel button to these apps**; the app
-under the cursor when you press decides. Both count for every mouse.
+under the pointer when you press decides. Both count for every mouse.
 
-**Give a button an action** gives any button past the left and right one of its own, in every app:
-press it on the mouse to add it. It wins over Navigate and Autoscroll for that button. Some mice keep
-buttons to themselves, such as a DPI button that changes the cursor speed inside the mouse, and never
-tell macOS about them. When a mouse connected directly reports them through its maker's HID++ channel,
-they're listed under **Buttons the mouse keeps to itself**: one given an action is asked for (diverted)
-while the toolkit runs, every time the mouse connects, and handed back when the action is removed, the
-tool is turned off or the toolkit quits. Taken that way, the button no longer does its own thing; another
-app that also takes the mouse's buttons should leave that one alone.
+Some mice keep buttons to themselves, such as a DPI button that changes the pointer speed inside the
+mouse, and never tell macOS about them. When a mouse connected directly reports them through its maker's
+HID++ channel, they're listed too: one given an action is asked for (diverted) while the toolkit runs,
+every time the mouse connects, and handed back when the action is removed, the tool is turned off or the
+toolkit quits. Taken that way, the button no longer does its own thing; another app that also takes the
+mouse's buttons should leave that one alone.
 
 ## Finder
 

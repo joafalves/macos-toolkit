@@ -3,6 +3,31 @@
 What each version adds, changes and fixes, newest first. The version at the top is the one being
 worked on; it gets its date when it's released.
 
+## 0.28.0 (unreleased)
+
+### Added
+
+- **Mouse:** a mouse's page is in three tabs, Pointer, Scrolling and Buttons, with Rename, Copy, Reset and
+  Forget in its **…** menu.
+- **Mouse:** Smooth scrolling has a Glide speed, Normal or Fast, which stops in half the time.
+- **Mouse:** Buttons lists every button of the mouse with its action, Default until you pick one. Press a
+  button while the tab is open to light up its row; one that isn't listed is added.
+
+### Changed
+
+- **Mouse:** Fixed and Curve set a distance on screen, in points, rather than lines. Apps made a line
+  their own size, so one notch went 30 pixels in one and 120 in another; now most scroll the same.
+  Picking Fixed starts at 90 points with Smooth scrolling on, and settings in lines become points in
+  proportion, 3 lines being 90. A browser no longer glides each notch itself: Smooth scrolling does, and it
+  now goes the same distance as a notch without it.
+- **Mouse:** the back and forward buttons' Navigate and the wheel button's Autoscroll are now actions in
+  the button list, and settings carry over. Back and Forward work in every app, on any button.
+- **Mouse:** Speed hands the pointer back to macOS with Use macOS's; direction and smoothing are switches.
+
+### Fixed
+
+- **Mouse:** with Smooth scrolling, apps that count lines no longer scroll one for every step of the glide.
+
 ## 0.27.0 (2026-11-08)
 
 ### Added

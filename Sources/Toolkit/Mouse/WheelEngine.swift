@@ -2,9 +2,9 @@ import AppKit
 import CoreGraphics
 import os
 
-/// Rewrites events from mice: wheel direction, distance and smoothing, the
-/// side buttons, and autoscroll on the wheel button. Trackpad and Magic Mouse
-/// scrolling (continuous events) is never touched.
+/// Rewrites events from mice: wheel direction, distance and smoothing, and
+/// the buttons given an action, autoscroll on the wheel button among them.
+/// Trackpad and Magic Mouse scrolling (continuous events) is never touched.
 final class WheelEngine {
     /// Stamped on events we post ourselves so the tap lets them through.
     static let marker: Int64 = 0x54494C4C
@@ -23,13 +23,25 @@ final class WheelEngine {
     private var remainingY = 0.0
     private var carryX = 0.0
     private var carryY = 0.0
+    /// What a distance in points has left over, and the points not yet
+    /// counted as a line, each way: see `setDistance`.
+    private var pointsLeft = (x: 0.0, y: 0.0)
+    private var linesLeft = (x: 0.0, y: 0.0)
     private var flags: CGEventFlags = []
     private var timer: Timer?
     private var lastTick = 0.0
+    /// The glide's time constant, from the last notch's profile.
+    private var glide = GlideSpeed.normal.timeConstant
     /// The first few events are logged to help diagnose devices that scroll oddly.
     private var loggedEvents = 0
 
     var isRunning: Bool { tap != nil }
+
+    /// While a mouse's buttons are shown for pressing: presses over the
+    /// toolkit's own windows go to them as they are, so a button with an
+    /// action can still be found by pressing it.
+    let identifying = Locked(false)
+    private static let ownPID = getpid()
 
     /// Installs the event tap. Fails (returns false) until Accessibility is granted.
     @discardableResult
@@ -65,22 +77,21 @@ final class WheelEngine {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             // The wheel button's release may have gone by unseen, and a side button's.
             autoscroller.cancel()
-            swallowedButtons.removeAll()
             releaseHeld()
             return pass
         }
-        if type == .otherMouseDown || type == .otherMouseUp || type == .otherMouseDragged,
-           event.getIntegerValueField(.eventSourceUserData) != Self.marker,
-           let taken = handleAssigned(type: type, event: event) {
-            return taken ? nil : pass
-        }
         if type == .otherMouseDown || type == .otherMouseUp || type == .otherMouseDragged {
-            if event.getIntegerValueField(.mouseEventButtonNumber) == 2,
-               event.getIntegerValueField(.eventSourceUserData) != Self.marker {
-                return autoscroller.handle(type: type, event: event, profile: profileProvider) ? nil : pass
+            // Our own clicks: autoscroll's middle click, Back's button.
+            guard event.getIntegerValueField(.eventSourceUserData) != Self.marker else { return pass }
+            if identifying.value, FrontApp.pid == Self.ownPID, held.isEmpty, !autoscroller.isActive { return pass }
+            if event.getIntegerValueField(.mouseEventButtonNumber) == 2 {
+                let taken = autoscroller.handle(type: type, event: event) { [profileProvider] in
+                    guard let profile = profileProvider(), profile.assignment(for: .number(2))?.action == .autoscroll else { return nil }
+                    return profile.autoscrollPace
+                }
+                if let taken { return taken ? nil : pass }
             }
-            if type == .otherMouseDragged { return pass }
-            return handleButton(type: type, event: event) ? nil : pass
+            return handleAssigned(type: type, event: event) ? nil : pass
         }
         if type == .scrollWheel, loggedEvents < 5 {
             loggedEvents += 1
@@ -97,10 +108,10 @@ final class WheelEngine {
         // A multiplier only on macOS's own distances; the others set their own.
         let speed = profile.scrollMode == .macOS ? profile.scrollSpeed : 1.0
 
-        var linesY = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)) * signY
-        var linesX = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis2)) * signX
-        var fixedY = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1) * signY * speed
-        var fixedX = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2) * signX * speed
+        let linesY = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)) * signY
+        let linesX = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis2)) * signX
+        let fixedY = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1) * signY * speed
+        let fixedX = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2) * signX * speed
         var pointY = Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)) * signY * speed
         var pointX = Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)) * signX * speed
 
@@ -108,20 +119,18 @@ final class WheelEngine {
             // With its curve off, macOS makes a slow notch a tenth of a line,
             // a single point (measured on an MX Anywhere 2S, which reports an
             // ordinary wheel): barely a move. Each notch, one event, goes a set
-            // distance instead, or one along the
-            // graph. Only up and down: a tilt sends events for as long as it's
-            // held, not notches, so sideways each is a line.
-            if fixedY != 0 {
-                let lines = profile.scrollMode == .fixed ? profile.scrollLines : acceleration(profile)
-                linesY = Self.notch(fixedY) * lines
-            } else {
-                linesY = 0
+            // distance instead, or one along the graph. Only up and down: a
+            // tilt sends events for as long as it's held, not notches, so
+            // sideways each is a step.
+            pointY = fixedY == 0 ? 0 : Self.notch(fixedY) * (profile.scrollMode == .fixed ? profile.scrollDistance : acceleration(profile))
+            pointX = Self.notch(fixedX) * Self.sidewaysPoints
+            if !profile.smoothScrolling {
+                // In points, as a trackpad reports, not lines: each app makes
+                // a line its own size, from 10 px to 50, and some read only
+                // that the wheel moved, but most scroll a distance as given.
+                setDistance(event, x: pointX, y: pointY)
+                return pass
             }
-            linesX = Self.notch(fixedX) * Self.sidewaysLines
-            fixedY = linesY
-            fixedX = linesX
-            pointY = fixedY * Self.pointsPerLine
-            pointX = fixedX * Self.pointsPerLine
         }
 
         if profile.smoothScrolling {
@@ -131,6 +140,7 @@ final class WheelEngine {
             remainingY += pointY
             remainingX += pointX
             flags = event.flags
+            glide = profile.glide.timeConstant
             startAnimating()
             return nil
         }
@@ -145,17 +155,49 @@ final class WheelEngine {
         return pass
     }
 
-    /// Sideways, with a set distance up and down: a line each event.
-    static let sidewaysLines = 1.0
-    /// What macOS makes of a line, in points (measured: 1.595 lines, 16 points).
+    /// Sideways, with a set distance up and down: about a line of text each event.
+    static let sidewaysPoints = 20.0
+    /// A line in a scroll event that gives a distance: what macOS puts in
+    /// one it makes itself, 3 for 30 points.
     static let pointsPerLine = 10.0
+
+    /// Makes `event` a distance on screen, in points, as a trackpad's events
+    /// are. The points are whole, as apps read them; what's left over goes
+    /// with the next. The lines are whole too, and only as many as the
+    /// distance has gone: macOS's own pixel events say a line for every one,
+    /// however small, and an app that counts lines scrolled one each.
+    func setDistance(_ event: CGEvent, x: Double, y: Double) {
+        func take(_ points: Double, _ left: inout Double, _ uncounted: inout Double) -> (lines: Int64, fixed: Double, points: Int64) {
+            // A turn the other way starts afresh.
+            if left * points < 0 { left = 0 }
+            if uncounted * points < 0 { uncounted = 0 }
+            let total = points + left
+            let whole = total.rounded(.towardZero)
+            left = total - whole
+            // Kept in whole points, so the count never drifts with rounding.
+            uncounted += whole
+            let lines = (uncounted / Self.pointsPerLine).rounded(.towardZero)
+            uncounted -= lines * Self.pointsPerLine
+            return (Int64(lines), whole / Self.pointsPerLine, Int64(whole))
+        }
+        let vertical = take(y, &pointsLeft.y, &linesLeft.y)
+        let sideways = take(x, &pointsLeft.x, &linesLeft.x)
+        event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        // The whole-line delta must be written first: setting it resets the others.
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: vertical.lines)
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: sideways.lines)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: vertical.fixed)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: sideways.fixed)
+        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: vertical.points)
+        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: sideways.points)
+    }
 
     /// Notches a second, smoothed, and when the last one came: the pace of a
     /// spin, on the tap's thread.
     private var pace = 0.0
     private var lastNotch = 0.0
 
-    /// The lines this notch goes, along the graph: its start at a gentle pace,
+    /// The points this notch goes, along the graph: its start at a gentle pace,
     /// so a single notch is always the same, up to its end for a fast spin.
     /// One event is one notch: the mouse reports up to 125 times a second
     /// (its 8 ms report interval), more than a ratchet wheel turns.
@@ -167,11 +209,11 @@ final class WheelEngine {
         pace = gap > 0.25 ? 0 : 0.6 * pace + 0.4 / max(gap, 0.004)
         // Six notches a second or fewer: none; forty or more: all of it.
         let fast = min(max((pace - 6) / 34, 0), 1)
-        return Self.further(start: profile.scrollCurveStart, end: profile.scrollCurveEnd, bend: profile.scrollCurveBend,
+        return Self.further(start: profile.scrollCurveFrom, end: profile.scrollCurveTo, bend: profile.scrollCurveBend,
                             curved: profile.scrollCurve == .curve, at: fast)
     }
 
-    /// The lines a notch goes at `pace` (0, gentle, to 1, a fast spin), from
+    /// The points a notch goes at `pace` (0, gentle, to 1, a fast spin), from
     /// `start` to `end`, as the settings' graph draws it.
     static func further(start: Double, end: Double, bend: Double, curved: Bool, at pace: Double) -> Double {
         start + (end - start) * (curved ? pow(pace, bend) : pace)
@@ -194,19 +236,31 @@ final class WheelEngine {
     /// Buttons held down whose press went to their action: the drags and the
     /// release go there too, never to the app under the pointer.
     private var held: [Int64: ButtonAssignment] = [:]
+    /// Buttons whose press was let through to the app, as Back and Forward
+    /// are where the app knows them: the release goes the same way.
+    private var passed: Set<Int64> = []
 
-    /// A button given an action of its own: true when taken, nil when it has none.
-    private func handleAssigned(type: CGEventType, event: CGEvent) -> Bool? {
+    /// A button given an action of its own: true when taken.
+    private func handleAssigned(type: CGEventType, event: CGEvent) -> Bool {
         let button = event.getIntegerValueField(.mouseEventButtonNumber)
         if type == .otherMouseDown {
             // A press, so a release still waited for went by unseen.
             if let stale = held.removeValue(forKey: button) { Self.main(stale, down: false) }
-            guard let assignment = profileProvider()?.assignment(for: .number(Int(button))) else { return nil }
+            passed.remove(button)
+            guard let assignment = profileProvider()?.assignment(for: .number(Int(button))) else { return false }
+            if ButtonActions.passesThrough(assignment.action, button: button, frontApp: FrontApp.bundleID) {
+                passed.insert(button)
+                return false
+            }
             held[button] = assignment
             Self.main(assignment, down: true)
             return true
         }
-        guard let assignment = held[button] else { return nil }
+        if passed.contains(button) {
+            if type == .otherMouseUp { passed.remove(button) }
+            return false
+        }
+        guard let assignment = held[button] else { return false }
         // The Floating Dock follows the mouse by its drags: let them on to its tap,
         // which keeps them from the apps.
         if type == .otherMouseDragged, assignment.action == .floatingDock { return false }
@@ -220,45 +274,11 @@ final class WheelEngine {
     private func releaseHeld() {
         for assignment in held.values { Self.main(assignment, down: false) }
         held.removeAll()
+        passed.removeAll()
     }
 
     private static func main(_ assignment: ButtonAssignment, down: Bool) {
         DispatchQueue.main.async { ButtonActions.perform(assignment, down: down) }
-    }
-
-    // MARK: - Side buttons
-
-    /// Side buttons whose press we swallowed, so the release goes the same way.
-    private var swallowedButtons: Set<Int64> = []
-
-    /// Turns the mouse's back and forward buttons (3 and 4 unless set) into
-    /// back and forward for the front app when it's one of Apple's, which
-    /// ignore the buttons themselves: as `AppNavigation` says each is told.
-    /// Other apps mostly handle the buttons natively, so they get them
-    /// unchanged. Returns true when the event was consumed.
-    private func handleButton(type: CGEventType, event: CGEvent) -> Bool {
-        let button = event.getIntegerValueField(.mouseEventButtonNumber)
-        if type == .otherMouseUp {
-            return swallowedButtons.remove(button) != nil
-        }
-        // A new press: a release still waited for from an earlier one went by unseen.
-        swallowedButtons.remove(button)
-        guard let profile = profileProvider(), profile.navigationButtons,
-              let decision = Self.navigation(button: button, profile: profile, frontApp: FrontApp.bundleID),
-              let pid = FrontApp.pid
-        else { return false }
-
-        swallowedButtons.insert(button)
-        AppNavigation.go(back: decision.back, method: decision.method, pid: pid)
-        return true
-    }
-
-    /// What a press of `button` does in the front app: nil leaves it as it is.
-    static func navigation(button: Int64, profile: Profile, frontApp: String?) -> (back: Bool, method: AppNavigation.Method)? {
-        guard button == Int64(profile.backButton) || button == Int64(profile.forwardButton),
-              let frontApp, frontApp.hasPrefix("com.apple.")
-        else { return nil }
-        return (button == Int64(profile.backButton), AppNavigation.method(for: frontApp))
     }
 
     /// Posts the same event a three-finger trackpad swipe produces. Apps read
@@ -295,12 +315,16 @@ final class WheelEngine {
         lastTick = now
 
         // Exponential ease-out: each frame delivers a fixed share of what is left.
-        let share = 1 - exp(-dt / 0.07)
+        let share = 1 - exp(-dt / glide)
         let stepY = Self.take(&remainingY, &carryY, share)
         let stepX = Self.take(&remainingX, &carryX, share)
 
         if stepX != 0 || stepY != 0,
            let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: stepY, wheel2: stepX, wheel3: 0) {
+            // Made again with the lines carried from one frame to the next:
+            // as macOS makes it, each frame says a line, and an app that
+            // counts lines went one a frame.
+            setDistance(event, x: Double(stepX), y: Double(stepY))
             event.setIntegerValueField(.eventSourceUserData, value: Self.marker)
             event.flags = flags
             event.post(tap: .cgSessionEventTap)

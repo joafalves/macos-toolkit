@@ -31,6 +31,11 @@ final class MouseController: ObservableObject {
     @Published private(set) var devices: [MouseDevice] = []
     /// The mouse whose page is open in the settings window; nil for the list.
     @Published var openID: String?
+    /// The tab a mouse's page is on: kept here so a search can open it, and
+    /// the next mouse opens on the same one.
+    @Published var tab = MouseTab.pointer
+    /// For `--snapshot mouse device scrolling`: the tab to show.
+    static var previewTab: MouseTab?
     /// Battery charge (0...100), for mice that report one: by the identifier
     /// the power-source registry gives (`MouseIdentity.batteryIDs`), and by
     /// "vendor:product" for mice that have none.
@@ -66,6 +71,8 @@ final class MouseController: ObservableObject {
         profile.cursorSpeed = 1.2
         profile.accelMode = .custom
         profile.accel = 0.5
+        profile.scrollMode = .fixed
+        profile.scrollDistance = 90
         profile.smoothScrolling = true
         var shortcut = ButtonAssignment(button: .number(5), action: .shortcut)
         shortcut.shortcut = Shortcut(keyCode: 13, flags: [.command], key: "W")
@@ -80,6 +87,7 @@ final class MouseController: ObservableObject {
             MouseDevice(id: "unit:00:00:00:00:00:03", name: "Travel Mouse", transport: "Bluetooth", connected: false, shortUnit: "00:03"),
         ]
         if previewOpen { mouse.openID = id }
+        if let previewTab { mouse.tab = previewTab }
         mouse.batteries = ["00:00:00:00:00:01": 80]
         mouse.hidppControls = [id: [HIDPPChannel.Control(cid: 0x00FD, task: 0, flags: 0x30, position: 0, group: 0),
                                     HIDPPChannel.Control(cid: 0x00C3, task: 0, flags: 0x30, position: 0, group: 0)]]
@@ -225,13 +233,18 @@ final class MouseController: ObservableObject {
         if !hidppControls.isEmpty { hidppControls = [:] }
     }
 
-    /// While a button is being chosen on a mouse's page: told of a press of one
-    /// the mouse keeps to itself, instead of its action.
+    /// While a mouse's buttons are shown and the settings window is in front:
+    /// told of a press of one the mouse keeps to itself, instead of its action.
     private var learner: ((String, UInt16) -> Void)?
 
-    func learnControls(_ handler: ((String, UInt16) -> Void)?) {
+    /// Lets a press of any button be named rather than do what it's set to:
+    /// those the mouse `key` keeps to itself all report to `handler`, and the
+    /// others reach the toolkit's own windows as they are, while it's the
+    /// front app. A nil handler ends it.
+    func identifyButtons(of key: String, _ handler: ((String, UInt16) -> Void)?) {
         learner = handler
-        hidpp.learn(handler != nil)
+        hidpp.learn(handler == nil ? nil : key)
+        wheel.identifying.value = handler != nil
     }
 
     private func controlPressed(key: String, cid: UInt16, down: Bool) {

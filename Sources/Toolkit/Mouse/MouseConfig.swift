@@ -45,6 +45,15 @@ enum ScrollMode: String, Codable, CaseIterable {
     case curve
 }
 
+/// How quickly a smoothed notch glides to a stop.
+enum GlideSpeed: String, Codable, CaseIterable {
+    case normal, fast
+
+    /// The glide's time constant, in seconds: each frame takes the share of
+    /// what's left that this gives (`WheelEngine.tick`).
+    var timeConstant: Double { self == .fast ? 0.035 : 0.07 }
+}
+
 /// The graph's shape, for `ScrollMode.curve`.
 enum ScrollCurve: String, Codable, CaseIterable {
     /// Evenly, from the first quick notches.
@@ -85,7 +94,13 @@ enum MouseButtonID: Hashable, Codable {
 
 /// What a button does instead of what macOS makes of it.
 enum ButtonAction: String, Codable, CaseIterable {
-    case nothing, floatingDock, back, forward, missionControl, showDesktop, shortcut, openApp
+    case nothing, back, forward, autoscroll, floatingDock, missionControl, showDesktop, shortcut, openApp
+
+    /// What the button can be given: autoscroll is the wheel button's alone,
+    /// as it falls back to the middle click a press without moving is.
+    static func offered(for button: MouseButtonID) -> [ButtonAction] {
+        allCases.filter { $0 != .autoscroll || button == .number(2) }
+    }
 }
 
 struct ButtonAssignment: Codable, Equatable, Identifiable {
@@ -138,36 +153,29 @@ struct Profile: Codable, Equatable {
     var scrollMode: ScrollMode = .macOS
     /// For macOS: a multiplier on what macOS gives (1 is macOS's own).
     var scrollSpeed: Double = 1.0
-    /// For Fixed: lines a notch, whole.
-    var scrollLines: Double = 3
-    static let scrollLinesRange: ClosedRange<Double> = 1...15
-    /// For Curve: lines a single notch scrolls, and a fast spin
-    /// (`WheelEngine.further`), each within `scrollCurveRange`.
-    var scrollCurveStart: Double = 3
-    var scrollCurveEnd: Double = 6
-    static let scrollCurveRange: ClosedRange<Double> = 0.5...12
+    /// For Fixed: points a notch. A distance on screen rather than lines,
+    /// which each app sizes its own way (a line is 10 px in one, 40 in another).
+    var scrollDistance: Double = 90
+    static let scrollDistanceRange: ClosedRange<Double> = 10...300
+    /// For Curve: points a single notch scrolls, and a fast spin
+    /// (`WheelEngine.further`), each within `scrollDistanceRange`.
+    var scrollCurveFrom: Double = 90
+    var scrollCurveTo: Double = 180
+    /// Settings before 0.28.0 were in lines: the old default of three is
+    /// the new one of 90 points, and the rest in proportion.
+    static let pointsPerOldLine = 30.0
     var scrollCurve: ScrollCurve = .linear
     /// For a curve, how late it rises: the power of the pace (1 is a line).
     var scrollCurveBend: Double = 2
     var smoothScrolling = false
+    var glide: GlideSpeed = .normal
 
     // Buttons
-    /// Turns the side buttons into back/forward navigation in Apple's apps.
-    var navigationButtons = false
-    /// Which buttons those are, as macOS numbers them from 0 (the left
-    /// button): 3 and 4 on most mice, the fourth and fifth buttons.
-    var backButton = 3
-    var forwardButton = 4
-    static let sideButtons: ClosedRange<Int> = 3...31
-    /// Holding the wheel button and moving the mouse scrolls, faster the
-    /// farther it moves.
-    var autoscroll = false
-    /// Multiplier on the autoscroll speed, 1 for a pace that can be read
-    /// as it goes (`Autoscroller.pace`).
+    /// For the wheel button's Autoscroll: a multiplier on its speed, 1 for a
+    /// pace that can be read as it goes (`Autoscroller.pace`).
     var autoscrollPace = 1.0
     static let autoscrollPaceRange: ClosedRange<Double> = 0.25...4
-    /// Buttons given an action of their own, which wins over Navigate and
-    /// Autoscroll for that button.
+    /// Buttons given an action of their own; the others do what macOS does.
     var buttonActions: [ButtonAssignment] = []
 
     func assignment(for button: MouseButtonID) -> ButtonAssignment? {
@@ -202,29 +210,39 @@ struct Profile: Codable, Equatable {
         verticalInverted = try c.decodeIfPresent(Bool.self, forKey: .verticalInverted) ?? false
         horizontalInverted = try c.decodeIfPresent(Bool.self, forKey: .horizontalInverted) ?? false
         scrollSpeed = within(try c.decodeIfPresent(Double.self, forKey: .scrollSpeed), 0.25...5, 1.0)
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+        // In lines before 0.28.0: read, then made points.
+        var lines: (fixed: Double, from: Double, to: Double)?
         if let mode = try? c.decodeIfPresent(ScrollMode.self, forKey: .scrollMode) {
             scrollMode = mode
-            scrollLines = within(try c.decodeIfPresent(Double.self, forKey: .scrollLines), Self.scrollLinesRange, 3).rounded()
-            scrollCurveStart = within(try c.decodeIfPresent(Double.self, forKey: .scrollCurveStart), Self.scrollCurveRange, 3)
-            scrollCurveEnd = within(try c.decodeIfPresent(Double.self, forKey: .scrollCurveEnd), Self.scrollCurveRange, 6)
+            if c.contains(.scrollDistance) || c.contains(.scrollCurveFrom) {
+                scrollDistance = within(try c.decodeIfPresent(Double.self, forKey: .scrollDistance), Self.scrollDistanceRange, 90)
+                scrollCurveFrom = within(try c.decodeIfPresent(Double.self, forKey: .scrollCurveFrom), Self.scrollDistanceRange, 90)
+                scrollCurveTo = within(try c.decodeIfPresent(Double.self, forKey: .scrollCurveTo), Self.scrollDistanceRange, 180)
+            } else {
+                lines = ((try legacy.decodeIfPresent(Double.self, forKey: .scrollLines)) ?? 3,
+                         (try legacy.decodeIfPresent(Double.self, forKey: .scrollCurveStart)) ?? 3,
+                         (try legacy.decodeIfPresent(Double.self, forKey: .scrollCurveEnd)) ?? 6)
+            }
         } else {
-            try migrate(from: decoder.container(keyedBy: LegacyKeys.self), within: within)
+            lines = try migrate(from: legacy)
         }
-        scrollCurveEnd = max(scrollCurveEnd, scrollCurveStart)
+        if let lines {
+            let points = { (value: Double, fallback: Double) in
+                within((value * Self.pointsPerOldLine / 5).rounded() * 5, Self.scrollDistanceRange, fallback)
+            }
+            scrollDistance = points(lines.fixed, 90)
+            scrollCurveFrom = points(lines.from, 90)
+            scrollCurveTo = points(lines.to, 180)
+        }
+        scrollCurveTo = max(scrollCurveTo, scrollCurveFrom)
         scrollCurve = (try? c.decodeIfPresent(ScrollCurve.self, forKey: .scrollCurve)) ?? .linear
         scrollCurveBend = within(try c.decodeIfPresent(Double.self, forKey: .scrollCurveBend), 1...4, 2)
         smoothScrolling = try c.decodeIfPresent(Bool.self, forKey: .smoothScrolling) ?? false
-        navigationButtons = try c.decodeIfPresent(Bool.self, forKey: .navigationButtons) ?? false
-        let back = try c.decodeIfPresent(Int.self, forKey: .backButton) ?? 3
-        let forward = try c.decodeIfPresent(Int.self, forKey: .forwardButton) ?? 4
-        // Two different buttons past the wheel button (2); else the defaults.
-        if Self.sideButtons.contains(back), Self.sideButtons.contains(forward), back != forward {
-            (backButton, forwardButton) = (back, forward)
-        }
-        autoscroll = try c.decodeIfPresent(Bool.self, forKey: .autoscroll) ?? false
+        glide = (try? c.decodeIfPresent(GlideSpeed.self, forKey: .glide)) ?? .normal
         if let pace = try c.decodeIfPresent(Double.self, forKey: .autoscrollPace) {
             autoscrollPace = within(pace, Self.autoscrollPaceRange, 1.0)
-        } else if let speed = try decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(Double.self, forKey: .autoscrollSpeed),
+        } else if let speed = try legacy.decodeIfPresent(Double.self, forKey: .autoscrollSpeed),
                   speed.isFinite, speed != 1 {
             // Before 0.18.3, 1 was four times as fast, too fast to read by: one
             // picked by hand stays as fast; the 1 nobody changed is the new 1.
@@ -234,6 +252,25 @@ struct Profile: Codable, Equatable {
         var seen = Set<MouseButtonID>()
         buttonActions = ((try? c.decodeIfPresent([LossyAssignment].self, forKey: .buttonActions)) ?? [])
             .compactMap(\.value).filter { seen.insert($0.button).inserted }
+        migrateButtons(from: legacy)
+    }
+
+    /// Before 0.28.0, Navigate and Autoscroll were switches of their own, and
+    /// a button's own action won over them: now they're its action, where it
+    /// has none.
+    private mutating func migrateButtons(from c: KeyedDecodingContainer<LegacyKeys>) {
+        func add(_ button: Int, _ action: ButtonAction) {
+            if assignment(for: .number(button)) == nil { buttonActions.append(ButtonAssignment(button: .number(button), action: action)) }
+        }
+        if (try? c.decodeIfPresent(Bool.self, forKey: .navigationButtons)) == true {
+            var back = ((try? c.decodeIfPresent(Int.self, forKey: .backButton)) ?? nil) ?? 3
+            var forward = ((try? c.decodeIfPresent(Int.self, forKey: .forwardButton)) ?? nil) ?? 4
+            // Two different buttons past the wheel button (2); else the usual ones.
+            if !(3...31).contains(back) || !(3...31).contains(forward) || back == forward { (back, forward) = (3, 4) }
+            add(back, .back)
+            add(forward, .forward)
+        }
+        if (try? c.decodeIfPresent(Bool.self, forKey: .autoscroll)) == true { add(2, .autoscroll) }
     }
 
     private struct LossyAssignment: Decodable {
@@ -242,18 +279,18 @@ struct Profile: Codable, Equatable {
     }
 
     /// Before one setting for the distance, a speed and an acceleration, each
-    /// macOS's or the toolkit's: the same distances, in the new setting.
-    private mutating func migrate(from c: KeyedDecodingContainer<LegacyKeys>,
-                                  within: (Double?, ClosedRange<Double>, Double) -> Double) throws {
+    /// macOS's or the toolkit's: the same distances, in the new setting, in lines.
+    private mutating func migrate(from c: KeyedDecodingContainer<LegacyKeys>) throws -> (fixed: Double, from: Double, to: Double)? {
         let speed = (try? c.decodeIfPresent(ValueMode.self, forKey: .scrollSpeedMode)) == .custom ? scrollSpeed : 1
         switch (try? c.decodeIfPresent(AccelMode.self, forKey: .scrollAccelMode)) ?? .macOS {
         case .macOS:
             scrollMode = .macOS
             scrollSpeed = speed
+            return nil
         case .off:
             // Three lines a notch, times the speed.
             scrollMode = .fixed
-            scrollLines = within((3 * speed).rounded(), Self.scrollLinesRange, 3)
+            return ((3 * speed).rounded(), 3, 6)
         case .custom:
             // Times three lines and the speed, from the notch to a fast spin;
             // before that, a strength on macOS's own slider's scale (0 to 1.7).
@@ -261,18 +298,26 @@ struct Profile: Codable, Equatable {
             let start = try c.decodeIfPresent(Double.self, forKey: .scrollAccelStart) ?? 1
             let strength = try c.decodeIfPresent(Double.self, forKey: .scrollAccel) ?? 0.3125
             let end = try c.decodeIfPresent(Double.self, forKey: .scrollAccelEnd) ?? 1 + strength / 1.7 * 3
-            scrollCurveStart = within(3 * speed * start, Self.scrollCurveRange, 3)
-            scrollCurveEnd = within(3 * speed * end, Self.scrollCurveRange, 6)
+            return (3, 3 * speed * start, 3 * speed * end)
         }
     }
 
     private enum LegacyKeys: String, CodingKey {
         case scrollSpeedMode, scrollAccelMode, scrollAccel, scrollAccelStart, scrollAccelEnd, autoscrollSpeed
+        case scrollLines, scrollCurveStart, scrollCurveEnd
+        case navigationButtons, backButton, forwardButton, autoscroll
+    }
+
+    /// Sets how far a notch goes. Leaving macOS's own for a distance of the
+    /// toolkit's turns Smooth scrolling on with it, as it's best with them.
+    mutating func setScrollMode(_ mode: ScrollMode) {
+        if scrollMode == .macOS, mode != .macOS { smoothScrolling = true }
+        scrollMode = mode
     }
 
     /// True when any setting needs the event tap (and so Accessibility).
     var needsEventTap: Bool {
-        rewritesWheelEvents || navigationButtons || autoscroll
+        rewritesWheelEvents
             || buttonActions.contains { if case .number = $0.button { return true } else { return false } }
     }
 
@@ -285,8 +330,7 @@ struct Profile: Codable, Equatable {
 
     var isAllMacOS: Bool {
         cursorSpeedMode == .macOS && accelMode == .macOS && scrollMode == .macOS && scrollSpeed == 1
-            && !verticalInverted && !horizontalInverted && !smoothScrolling && !navigationButtons
-            && !autoscroll && buttonActions.isEmpty
+            && !verticalInverted && !horizontalInverted && !smoothScrolling && buttonActions.isEmpty
     }
 
     /// Every setting back to macOS; which mouse it is, and its name, stay.
